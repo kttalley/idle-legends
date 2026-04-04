@@ -12,6 +12,9 @@ export type ZoneId =
 export type MobId = string
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
 export type Slot = 'weapon' | 'helm' | 'chest' | 'legs' | 'boots' | 'trinket'
+export type GameMode = 'combat' | 'traveling' | 'gathering' | 'crafting'
+export type MaterialId = string
+export type RecipeId = string
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 export interface Stats {
@@ -284,6 +287,15 @@ export interface GameState {
   lastTickTimestamp: number
   totalPlayTime: number
   settings: GameSettings
+  // ── Map / Travel / Professions ──────────────────────────────────────────────
+  gameMode: GameMode
+  travelTarget: ZoneId | null
+  travelProgress: number      // 0–1
+  travelDuration: number      // total seconds
+  gatheringTimer: number      // seconds until next harvest
+  materials: Record<MaterialId, number>
+  activeRecipe: RecipeId | null
+  craftingTimer: number
 }
 
 export interface FloatingNumber {

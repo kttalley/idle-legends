@@ -3,7 +3,10 @@ import type {
   GameState, ClassType, ZoneId, Item, Slot,
   MobInstance, CombatLogEntry, FloatingNumber,
   Stats, ActiveDoT, ActiveBuff, CombatProcState,
+  GameMode, RecipeId, MaterialId,
 } from '../data/types'
+import { ZONE_MATERIALS, RECIPES } from '../data/professions'
+import { ZONE_ORDER } from '../data/zones'
 import { ZONES } from '../data/zones'
 import { CLASS_DEFINITIONS } from '../data/classes'
 import { ACTIVE_ABILITIES, getClassAbilities } from '../data/abilities'
@@ -86,6 +89,15 @@ function defaultState(): GameState {
       autoSellCommon: false,
       volume: 0.5,
     },
+    // Map / Travel / Professions
+    gameMode: 'combat',
+    travelTarget: null,
+    travelProgress: 0,
+    travelDuration: 0,
+    gatheringTimer: 5,
+    materials: {},
+    activeRecipe: null,
+    craftingTimer: 0,
   }
 }
 
@@ -174,6 +186,10 @@ interface GameActions {
   respawnNow: () => void
   dismissFloatingNumber: (id: string) => void
   triggerThought: (event: ThoughtEvent, extra?: string) => void
+  beginTravel: (toZone: ZoneId) => void
+  cancelTravel: () => void
+  setMode: (mode: GameMode) => void
+  startCrafting: (recipeId: RecipeId) => void
 }
 
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
@@ -217,6 +233,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       saved.activeBuffs   = []
       saved.procState     = defaultProcState()
       saved.skillCooldowns = {}
+      // New fields — default if missing
+      saved.gameMode      = 'combat'
+      saved.travelTarget  = null
+      saved.travelProgress = 0
+      saved.travelDuration = 0
+      saved.gatheringTimer = 5
+      saved.materials     = saved.materials ?? {}
+      saved.activeRecipe  = null
+      saved.craftingTimer = 0
       resetCombatAccumulators()
       set(saved)
       return true
@@ -244,6 +269,91 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   tick: (deltaSeconds) => {
     const state = get()
     if (!state.initialized) return
+
+    // ── Travel tick ──────────────────────────────────────────────────────────
+    if (state.gameMode === 'traveling' && state.travelTarget) {
+      const newProgress = state.travelProgress + deltaSeconds / state.travelDuration
+      if (newProgress >= 1) {
+        // Arrive at destination
+        const dest = state.travelTarget
+        resetCombatAccumulators()
+        set({
+          currentZone: dest, currentMob: null, mobRespawnTimer: 0,
+          activeDoTs: [], gameMode: 'combat', travelTarget: null, travelProgress: 0,
+        })
+      } else {
+        set({ travelProgress: newProgress })
+      }
+      return
+    }
+
+    // ── Gathering tick ───────────────────────────────────────────────────────
+    if (state.gameMode === 'gathering') {
+      const newTimer = state.gatheringTimer - deltaSeconds
+      if (newTimer <= 0) {
+        const matId: MaterialId = ZONE_MATERIALS[state.currentZone][state.playerClass]
+        const newCount = (state.materials[matId] ?? 0) + 1
+        set({
+          gatheringTimer: 5,
+          materials: { ...state.materials, [matId]: newCount },
+        })
+      } else {
+        set({ gatheringTimer: newTimer })
+      }
+      return
+    }
+
+    // ── Crafting tick ────────────────────────────────────────────────────────
+    if (state.gameMode === 'crafting' && state.activeRecipe) {
+      const newTimer = state.craftingTimer - deltaSeconds
+      if (newTimer <= 0) {
+        const recipe = RECIPES.find(r => r.id === state.activeRecipe)
+        if (recipe) {
+          // Consume inputs
+          const newMaterials = { ...state.materials }
+          for (const inp of recipe.inputs) {
+            newMaterials[inp.materialId] = Math.max(0, (newMaterials[inp.materialId] ?? 0) - inp.qty)
+          }
+          // Apply effect
+          const eff = recipe.output.effect
+          const newLogs: CombatLogEntry[] = []
+          let hpDelta = 0
+          let newBuffs = [...state.activeBuffs]
+          if (eff.type === 'instant_heal') {
+            hpDelta = eff.value
+            newLogs.push(log('proc', `${recipe.output.icon} ${recipe.output.name} — healed ${eff.value} HP`, '#44ff88'))
+          } else {
+            const buffMap: Record<string, string> = {
+              buff_dmg_pct: 'next_hit_multiplier',
+              buff_armor:   'armor_buff',
+              buff_crit:    'crit_buff_pct',
+            }
+            newBuffs.push({
+              id:                `craft_buff_${Date.now()}`,
+              label:             recipe.output.name,
+              icon:              recipe.output.icon,
+              color:             '#ffd700',
+              type:              buffMap[eff.type] as any,
+              value:             eff.value,
+              durationRemaining: eff.durationSeconds ?? 30,
+            })
+            newLogs.push(log('proc', `${recipe.output.icon} Crafted ${recipe.output.name}!`, '#ffd700'))
+          }
+          const stats = { ...state.stats,
+            currentHp: Math.min(state.stats.maxHp, state.stats.currentHp + hpDelta) }
+          set({
+            activeRecipe: null, craftingTimer: 0,
+            materials: newMaterials, activeBuffs: newBuffs, stats,
+            combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX),
+          })
+        } else {
+          set({ activeRecipe: null, craftingTimer: 0 })
+        }
+      } else {
+        set({ craftingTimer: newTimer })
+      }
+      return
+    }
 
     const newLogs: CombatLogEntry[] = []
     const newFns: FloatingNumber[]  = []
@@ -808,6 +918,51 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         set(cur => cur.currentThought === thought ? { currentThought: null } : {})
       }, THOUGHT_DURATION_MS + 400)
     }).catch(() => { /* silent fail */ })
+  },
+
+  // ── Travel ────────────────────────────────────────────────────────────────────
+  beginTravel: (toZone) => {
+    const s = get()
+    if (!s.unlockedZones.includes(toZone)) return
+    if (toZone === s.currentZone) return
+    const fromIdx = ZONE_ORDER.indexOf(s.currentZone)
+    const toIdx   = ZONE_ORDER.indexOf(toZone)
+    const dist    = Math.abs(fromIdx - toIdx)
+    const dur     = dist * 8  // 8s per zone step
+    set({ gameMode: 'traveling', travelTarget: toZone, travelProgress: 0, travelDuration: dur,
+          currentMob: null, activeDoTs: [], activeBuffs: [], mobRespawnTimer: 0 })
+    resetCombatAccumulators()
+  },
+
+  cancelTravel: () => {
+    set({ gameMode: 'combat', travelTarget: null, travelProgress: 0 })
+    resetCombatAccumulators()
+  },
+
+  setMode: (mode) => {
+    const s = get()
+    if (s.gameMode === 'traveling') return
+    if (mode === 'gathering') {
+      set({ gameMode: 'gathering', gatheringTimer: 5, currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
+      resetCombatAccumulators()
+    } else if (mode === 'combat') {
+      set({ gameMode: 'combat', mobRespawnTimer: 0 })
+      resetCombatAccumulators()
+    } else if (mode === 'crafting') {
+      set({ gameMode: 'crafting', currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
+      resetCombatAccumulators()
+    }
+  },
+
+  startCrafting: (recipeId) => {
+    const s = get()
+    const recipe = RECIPES.find(r => r.id === recipeId)
+    if (!recipe || recipe.classFor !== s.playerClass) return
+    // Check materials
+    for (const inp of recipe.inputs) {
+      if ((s.materials[inp.materialId] ?? 0) < inp.qty) return
+    }
+    set({ activeRecipe: recipeId, craftingTimer: recipe.craftTime })
   },
 }))
 
