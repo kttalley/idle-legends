@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { CLASS_DEFINITIONS } from '../../data/classes'
-import { SpriteRenderer } from '../sprites/SpriteRenderer'
+import { AvatarRenderer, CLASS_PALETTES } from '../sprites/AvatarRenderer'
 import type { ClassType } from '../../data/types'
 
 interface ClassSelectProps {
@@ -10,6 +10,14 @@ interface ClassSelectProps {
 export function ClassSelect({ onSelect }: ClassSelectProps) {
   const [hovered, setHovered] = useState<ClassType | null>(null)
   const classes = Object.values(CLASS_DEFINITIONS)
+
+  // New random seed each session; XOR with index so each class card is distinct
+  const sessionSeeds = useMemo(() => {
+    const base = Math.floor(Math.random() * 0xFFFFFF)
+    return Object.fromEntries(
+      classes.map((cls, i) => [cls.id, base ^ (i * 0x7A3F)])
+    ) as Record<ClassType, number>
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
@@ -38,7 +46,7 @@ export function ClassSelect({ onSelect }: ClassSelectProps) {
         {classes.map(cls => (
           <div
             key={cls.id}
-            className="wow-panel cursor-pointer"
+            className="rp-panel cursor-pointer"
             style={{
               width: 180,
               padding: 16,
@@ -52,12 +60,12 @@ export function ClassSelect({ onSelect }: ClassSelectProps) {
             onClick={() => onSelect(cls.id)}
           >
             <div className="flex justify-center mb-3">
-              <SpriteRenderer
-                spriteKey={`player_${cls.id}`}
-                label={cls.name}
-                width={64}
-                height={64}
-                scale={1.5}
+              <AvatarRenderer
+                seed={sessionSeeds[cls.id as ClassType]}
+                palette={CLASS_PALETTES[cls.id as ClassType]}
+                cellSize={10}
+                animate={hovered === cls.id}
+                circle
               />
             </div>
             <div className={`text-lg font-bold mb-1 ${cls.colorClass}`} style={{ fontFamily: 'Cinzel, serif' }}>
@@ -81,7 +89,7 @@ export function ClassSelect({ onSelect }: ClassSelectProps) {
               </div>
             </div>
             <button
-              className="wow-button w-full mt-3"
+              className="rp-button w-full mt-3"
               style={{ background: hovered === cls.id ? 'linear-gradient(180deg, #6a5228, #4a3518)' : undefined }}
             >
               Play {cls.name}

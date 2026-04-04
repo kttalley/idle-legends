@@ -34,7 +34,7 @@ export function ItemTooltipContent({ item, equippedItem }: ItemTooltipProps) {
   const color = rarityColor(item.rarity)
 
   return (
-    <div className="wow-tooltip" style={{ fontSize: '0.7rem' }}>
+    <div className="rp-tooltip" style={{ fontSize: '0.7rem' }}>
       <div style={{ color, fontWeight: 700, fontSize: '0.8rem', marginBottom: 4 }}>
         {item.name}
       </div>

@@ -50,15 +50,15 @@ export function InventoryPanel() {
   const [activeTab, setActiveTab] = useState<'inventory' | 'equipment'>('equipment')
 
   return (
-    <div className="wow-panel flex flex-col h-full">
-      <div className="wow-panel-header">Inventory</div>
+    <div className="rp-panel flex flex-col h-full">
+      <div className="rp-panel-header">Inventory</div>
 
       {/* Tabs */}
       <div className="flex border-b" style={{ borderColor: '#3a2c10' }}>
         {(['equipment', 'inventory'] as const).map(t => (
           <button
             key={t}
-            className="wow-button flex-1"
+            className="rp-button flex-1"
             style={{
               background: activeTab === t ? 'rgba(200,161,0,0.15)' : undefined,
               borderBottom: activeTab === t ? '2px solid #ffd700' : '2px solid transparent',
@@ -123,7 +123,7 @@ export function InventoryPanel() {
               <span style={{ color: '#9d9d9d' }}>
                 {inventory.filter(Boolean).length} / {inventory.length} slots
               </span>
-              <button className="wow-button" style={{ fontSize: '0.6rem' }} onClick={sellAllCommon}>
+              <button className="rp-button" style={{ fontSize: '0.6rem' }} onClick={sellAllCommon}>
                 Sell Common
               </button>
             </div>

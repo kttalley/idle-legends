@@ -12,8 +12,8 @@ export function CharacterPanel() {
   const [tab, setTab] = useState<Tab>('stats')
 
   return (
-    <div className="wow-panel flex flex-col h-full">
-      <div className="wow-panel-header flex justify-between items-center">
+    <div className="rp-panel flex flex-col h-full">
+      <div className="rp-panel-header flex justify-between items-center">
         <div>
           <span className={classDef.colorClass}>{classDef.name}</span>
           {playerName && (
@@ -33,7 +33,7 @@ export function CharacterPanel() {
         {(['stats', 'talents'] as Tab[]).map(t => (
           <button
             key={t}
-            className="wow-button flex-1"
+            className="rp-button flex-1"
             style={{
               background: tab === t ? 'rgba(200,161,0,0.15)' : undefined,
               borderBottom: tab === t ? '2px solid #ffd700' : '2px solid transparent',

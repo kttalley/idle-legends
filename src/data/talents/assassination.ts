@@ -1,6 +1,6 @@
 import type { TalentNodeDef } from '../types'
 
-// ── Assassination Rogue ── Based on WoW Classic 1.12 Assassination tree ───────
+// ── Assassination Rogue ── Shadowed Edge Spec ─────────────────────────────────
 // Rebranded: "Shadowed Edge" spec — lethal precision, poison and blade
 export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
 

@@ -12,8 +12,8 @@ export function ZoneSelector() {
   const isTraveling = gameMode === 'traveling'
 
   return (
-    <div className="wow-panel">
-      <div className="wow-panel-header">Zones</div>
+    <div className="rp-panel">
+      <div className="rp-panel-header">Zones</div>
       <div className="p-1 flex flex-col gap-1">
         {ZONE_ORDER.map(zoneId => {
           const zone       = ZONES[zoneId]
@@ -34,7 +34,7 @@ export function ZoneSelector() {
           return (
             <button
               key={zoneId}
-              className={`wow-button text-left px-2 py-1.5 ${active ? 'zone-active' : ''}`}
+              className={`rp-button text-left px-2 py-1.5 ${active ? 'zone-active' : ''}`}
               disabled={!canEnter || isTraveling}
               onClick={() => canEnter && !isTraveling && beginTravel(zoneId as ZoneId)}
               style={{

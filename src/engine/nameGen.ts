@@ -52,7 +52,7 @@ export async function generateNames(playerClass: ClassType): Promise<GeneratedNa
     .map(([id, theme]) => `    "${id}": "<unique 2-3 word evocative zone name for: ${theme}>"`)
     .join(',\n')
 
-  const prompt = `You are generating unique fantasy names for a WoW-inspired idle RPG. Respond ONLY with valid JSON, no markdown, no commentary.
+  const prompt = `You are generating unique fantasy names for an idle RPG. Respond ONLY with valid JSON, no markdown, no commentary.
 
 The player is ${CLASS_FLAVOR[playerClass]}.
 Possible personality traits to draw from: ${CLASS_TRAIT_POOLS[playerClass]}.

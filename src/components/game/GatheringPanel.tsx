@@ -85,14 +85,14 @@ export function GatheringPanel() {
       {/* Action buttons */}
       <div className="flex gap-2 mt-auto" style={{ paddingTop: 4 }}>
         <button
-          className="wow-button"
+          className="rp-button"
           onClick={() => setMode('combat')}
           style={{ fontSize: '0.6rem', flex: 1 }}
         >
           ⚔ Fight
         </button>
         <button
-          className="wow-button"
+          className="rp-button"
           onClick={() => setMode('crafting')}
           disabled={!hasMaterials}
           style={{ fontSize: '0.6rem', flex: 1, opacity: hasMaterials ? 1 : 0.4 }}

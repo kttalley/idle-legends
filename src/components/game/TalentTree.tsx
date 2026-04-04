@@ -122,7 +122,7 @@ export function TalentTree() {
           {talentPoints} unspent
         </span>
         <button
-          className="wow-button"
+          className="rp-button"
           style={{ fontSize: '0.55rem', padding: '2px 6px' }}
           onClick={resetTalents}
           disabled={totalSpent === 0}

@@ -1,6 +1,6 @@
 import type { TalentNodeDef } from '../types'
 
-// ── Arms Warrior ── Based on WoW Classic 1.12 Arms tree ──────────────────────
+// ── Arms Warrior ── Ironcleave Spec ───────────────────────────────────────────
 // Rebranded: "Ironcleave" spec — the relentless two-handed warrior
 export const ARMS_TALENTS: TalentNodeDef[] = [
 

@@ -27,7 +27,7 @@ import { rollLoot } from '../engine/loot'
 import { generateNames, generateThought } from '../engine/nameGen'
 import type { ThoughtEvent } from '../engine/nameGen'
 
-const SAVE_KEY = 'idle_wow_save_v2'
+const SAVE_KEY = 'idle_legends_save_v2'
 const LOG_MAX  = 150
 
 function hashStr(s: string): number {
@@ -286,8 +286,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
   resetGame: () => {
     localStorage.removeItem(SAVE_KEY)
-    // also clear old key
+    // also clear legacy keys
     localStorage.removeItem('idle_wow_save')
+    localStorage.removeItem('idle_wow_save_v2')
     resetCombatAccumulators()
     set(defaultState())
   },

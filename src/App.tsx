@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useGameStore } from './store/gameStore'
 import { startGameLoop, stopGameLoop } from './engine/gameLoop'
 import { ClassSelect } from './components/game/ClassSelect'
@@ -10,21 +10,20 @@ import { CombatLog } from './components/game/CombatLog'
 import { GoldDisplay } from './components/ui/GoldDisplay'
 import type { ClassType } from './data/types'
 
+type MobilePanel = 'left' | 'right' | 'log' | null
+
 export default function App() {
   const { initialized, initGame, loadGame, resetGame, gold } = useGameStore()
+  const [activePanel, setActivePanel] = useState<MobilePanel>(null)
 
-  // On mount: try to load a saved game
-  useEffect(() => {
-    loadGame()
-  }, [])
+  const toggle = (p: MobilePanel) => setActivePanel(cur => cur === p ? null : p)
+  const close  = () => setActivePanel(null)
 
-  // Start/stop game loop based on initialized state
+  useEffect(() => { loadGame() }, [])
+
   useEffect(() => {
-    if (initialized) {
-      startGameLoop()
-    } else {
-      stopGameLoop()
-    }
+    if (initialized) startGameLoop()
+    else stopGameLoop()
     return () => stopGameLoop()
   }, [initialized])
 
@@ -33,21 +32,9 @@ export default function App() {
   }
 
   return (
-    <div
-      className="flex flex-col"
-      style={{
-        minHeight: '100vh',
-        maxWidth: 1400,
-        margin: '0 auto',
-        padding: '8px',
-        gap: 8,
-      }}
-    >
-      {/* Top bar */}
-      <div
-        className="wow-panel flex items-center justify-between px-3 py-1.5"
-        style={{ flexShrink: 0 }}
-      >
+    <div className="app-root">
+      {/* ── Top bar ── */}
+      <div className="rp-panel flex items-center justify-between px-3 py-1.5" style={{ flexShrink: 0 }}>
         <div style={{
           fontFamily: 'Cinzel Decorative, Cinzel, serif',
           color: '#ffd700',
@@ -59,49 +46,57 @@ export default function App() {
         </div>
         <GoldDisplay gold={gold} />
         <button
-          className="wow-button"
+          className="rp-button"
           style={{ fontSize: '0.6rem' }}
-          onClick={() => {
-            if (confirm('Reset all progress? This cannot be undone.')) resetGame()
-          }}
+          onClick={() => { if (confirm('Reset all progress? This cannot be undone.')) resetGame() }}
         >
           New Game
         </button>
       </div>
 
-      {/* Main layout */}
-      <div
-        className="flex gap-2 flex-1"
-        style={{ minHeight: 0 }}
-      >
-        {/* Left — Character + Zones */}
-        <div
-          className="flex flex-col gap-2"
-          style={{ width: 220, flexShrink: 0 }}
-        >
-          <div style={{ flex: '0 0 auto' }}>
-            <ZoneSelector />
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <CharacterPanel />
-          </div>
+      {/* ── Main body ── */}
+      <div className="app-body">
+
+        {/* Left: Zones + Character */}
+        <div className={`app-sidebar-left${activePanel === 'left' ? ' panel-open' : ''}`}>
+          <button className="app-drawer-close" onClick={close}>✕ close</button>
+          <ZoneSelector />
+          <CharacterPanel />
         </div>
 
-        {/* Center — Combat + Log */}
-        <div className="flex flex-col gap-2 flex-1" style={{ minWidth: 0, maxWidth: 400 }}>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <CombatView />
-          </div>
-          <div style={{ flex: '0 0 90px' }}>
+        {/* Center: Combat + Log */}
+        <div className="app-center">
+          <CombatView />
+          <div className={`app-log${activePanel === 'log' ? ' panel-open' : ''}`}>
             <CombatLog />
           </div>
         </div>
 
-        {/* Right — Inventory */}
-        <div style={{ width: 240, flexShrink: 0 }}>
+        {/* Right: Inventory */}
+        <div className={`app-sidebar-right${activePanel === 'right' ? ' panel-open' : ''}`}>
+          <button className="app-drawer-close" onClick={close}>✕ close</button>
           <InventoryPanel />
         </div>
       </div>
+
+      {/* ── Mobile FABs ── */}
+      <div className="app-fabs">
+        <button className={`app-fab${activePanel === 'left' ? ' fab-active' : ''}`} onClick={() => toggle('left')}>
+          <span className="app-fab-icon">⚔</span>
+          <span>Character</span>
+        </button>
+        <button className={`app-fab${activePanel === 'log' ? ' fab-active' : ''}`} onClick={() => toggle('log')}>
+          <span className="app-fab-icon">📜</span>
+          <span>Log</span>
+        </button>
+        <button className={`app-fab${activePanel === 'right' ? ' fab-active' : ''}`} onClick={() => toggle('right')}>
+          <span className="app-fab-icon">🎒</span>
+          <span>Inv</span>
+        </button>
+      </div>
+
+      {/* ── Backdrop (mobile only) ── */}
+      {activePanel && <div className="app-backdrop" onClick={close} />}
     </div>
   )
 }

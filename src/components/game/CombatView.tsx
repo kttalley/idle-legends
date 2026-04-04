@@ -2,7 +2,7 @@ import React from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { ZONES } from '../../data/zones'
 import { HealthBar } from '../ui/HealthBar'
-import { SpriteRenderer } from '../sprites/SpriteRenderer'
+import { AvatarRenderer, CLASS_PALETTES, mobAvatarPalette, hashStr } from '../sprites/AvatarRenderer'
 import { CLASS_DEFINITIONS } from '../../data/classes'
 import { xpForLevel } from '../../engine/progression'
 import { SkillBar } from './SkillBar'
@@ -35,6 +35,7 @@ export function CombatView() {
     gameMode,
     setMode,
     mobMapOffset,
+    equipment,
   } = useGameStore()
 
   const zone     = ZONES[currentZone]
@@ -42,6 +43,18 @@ export function CombatView() {
   const classDef = CLASS_DEFINITIONS[playerClass]
   const xpNeeded = xpForLevel(level)
   const prof     = CLASS_PROFESSIONS[playerClass]
+
+  // Player avatar seed: class + level + equipped item ids XORed together
+  const equipHash = Object.values(equipment)
+    .filter(Boolean)
+    .reduce((acc, item) => acc ^ hashStr(item!.id), 0)
+  const playerAvatarSeed = hashStr(playerClass) ^ (level * 7) ^ equipHash
+  const playerPalette    = CLASS_PALETTES[playerClass]
+
+  // Mob avatar
+  const mobSeed    = currentMob ? hashStr(currentMob.templateId) ^ (currentMob.isElite ? 0xABCDEF : 0) : 0
+  const mobPalette = currentMob ? mobAvatarPalette(hashStr(currentMob.templateId), currentMob.isElite, currentMob.isBoss) : null
+  const mobCellSize = currentMob?.isBoss ? 13 : currentMob?.isElite ? 11 : 9
 
   const isTraveling = gameMode === 'traveling'
   const mobDist = Math.sqrt(mobMapOffset.dx ** 2 + mobMapOffset.dy ** 2)
@@ -59,7 +72,7 @@ export function CombatView() {
 
   return (
     <div
-      className="wow-panel flex flex-col"
+      className="rp-panel flex flex-col"
       style={{
         background: `linear-gradient(180deg, ${zone?.bgColor ?? '#1a1510'}cc 0%, #1a1510 100%)`,
         position: 'relative',
@@ -153,16 +166,14 @@ export function CombatView() {
               {/* Player buffs */}
               <StatusEffects buffs={activeBuffs} />
 
-              {/* Sprite + thought bubble wrapper */}
+              {/* Avatar + thought bubble wrapper */}
               <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
                 <ThoughtBubble />
-                <SpriteRenderer
-                  spriteKey={`player_${playerClass}`}
-                  label={classDef.name}
-                  width={52}
-                  height={52}
-                  scale={1.3}
-                  animation={isAlive ? 'idle' : 'death'}
+                <AvatarRenderer
+                  seed={playerAvatarSeed}
+                  palette={playerPalette}
+                  cellSize={9}
+                  animate={isAlive}
                 />
               </div>
 
@@ -186,7 +197,7 @@ export function CombatView() {
                 <div className="text-center" style={{ fontSize: '0.6rem', color: '#ff4444' }}>
                   💀 {Math.ceil(respawnTimer)}s
                   <br />
-                  <button className="wow-button mt-1" onClick={respawnNow} style={{ fontSize: '0.55rem' }}>
+                  <button className="rp-button mt-1" onClick={respawnNow} style={{ fontSize: '0.55rem' }}>
                     Respawn
                   </button>
                 </div>
@@ -224,14 +235,14 @@ export function CombatView() {
                   )}
 
                   <div style={mobApproaching ? { opacity: 0.4, filter: 'blur(1.5px)', transition: 'all 0.5s' } : { transition: 'all 0.5s' }}>
-                    <SpriteRenderer
-                      spriteKey={currentMob.spriteKey}
-                      label={currentMob.name}
-                      width={52}
-                      height={52}
-                      scale={currentMob.isBoss ? 1.8 : currentMob.isElite ? 1.5 : 1.3}
-                      animation="idle"
-                    />
+                    {mobPalette && (
+                      <AvatarRenderer
+                        seed={mobSeed}
+                        palette={mobPalette}
+                        cellSize={mobCellSize}
+                        animate={!mobApproaching}
+                      />
+                    )}
                   </div>
 
                   {mobApproaching ? (

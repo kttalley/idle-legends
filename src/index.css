@@ -10,16 +10,201 @@ body {
   background-color: #1a1510;
   color: #d4b896;
   font-family: 'Cinzel', 'Palatino Linotype', serif;
-  min-height: 100vh;
-  overflow-x: hidden;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 #root {
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
-/* ── WoW UI Chrome ────────────────────────────────────────────────────────── */
-.wow-panel {
+/* ── App Layout — Desktop ────────────────────────────────────────────────────── */
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 8px;
+  gap: 8px;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-height: 0;
+}
+
+.app-sidebar-left {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #4a3818 #0a0805;
+}
+
+.app-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-sidebar-right {
+  width: 240px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #4a3818 #0a0805;
+}
+
+.app-log { flex-shrink: 0; height: 90px; }
+
+/* Hidden on desktop */
+.app-fabs         { display: none; }
+.app-backdrop     { display: none; }
+.app-drawer-close { display: none; }
+
+/* ── App Layout — Mobile / Tablet (< 900px) ─────────────────────────────────── */
+@media (max-width: 899px) {
+  .app-root {
+    max-width: 100%;
+    padding: 4px 4px 60px; /* bottom pad = FAB height */
+  }
+
+  .app-body {
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .app-center {
+    flex: 1;
+    max-width: 100%;
+  }
+
+  /* ── Side drawers ── */
+  .app-sidebar-left,
+  .app-sidebar-right {
+    position: fixed;
+    top: 0;
+    bottom: 56px;
+    width: min(310px, 88vw);
+    z-index: 50;
+    background: linear-gradient(160deg, #2a2218 0%, #141008 100%);
+    padding: 10px 8px 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #4a3818 #0a0805;
+    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .app-sidebar-left {
+    left: 0;
+    border-right: 1px solid #6b5020;
+    transform: translateX(calc(-100% - 2px));
+  }
+  .app-sidebar-right {
+    right: 0;
+    border-left: 1px solid #6b5020;
+    transform: translateX(calc(100% + 2px));
+  }
+  .app-sidebar-left.panel-open  { transform: translateX(0); }
+  .app-sidebar-right.panel-open { transform: translateX(0); }
+
+  /* ── Log bottom sheet ── */
+  .app-log {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 56px;
+    height: 200px;
+    z-index: 50;
+    background: linear-gradient(160deg, #2a2218 0%, #141008 100%);
+    border-top: 1px solid #c8a100;
+    transform: translateY(calc(100% + 2px));
+    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .app-log.panel-open { transform: translateY(0); }
+
+  /* ── Backdrop ── */
+  .app-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    bottom: 56px;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(2px);
+    z-index: 45;
+  }
+
+  /* ── FAB bar ── */
+  .app-fabs {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: #0d0b05;
+    border-top: 2px solid #c8a100;
+    z-index: 60;
+    align-items: stretch;
+  }
+
+  /* ── Drawer close button ── */
+  .app-drawer-close {
+    display: flex;
+    align-self: flex-end;
+    background: none;
+    border: 1px solid #3a2c10;
+    color: #666;
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+    font-family: monospace;
+    transition: color 0.1s;
+  }
+  .app-drawer-close:hover { color: #ffd700; border-color: #6b5020; }
+}
+
+/* ── FAB buttons ─────────────────────────────────────────────────────────────── */
+.app-fab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  border-right: 1px solid #2a2010;
+  color: #6a5228;
+  cursor: pointer;
+  font-family: 'Cinzel', serif;
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background 0.12s, color 0.12s;
+  padding: 0;
+}
+.app-fab:last-child { border-right: none; }
+.app-fab-icon { font-size: 1.1rem; line-height: 1; }
+.app-fab:hover   { background: #1a1508; color: #c8a864; }
+.app-fab.fab-active { background: #1e1a08; color: #ffd700; }
+
+/* ── RPG UI Chrome ────────────────────────────────────────────────────────── */
+.rp-panel {
   background: linear-gradient(160deg, #2a2218 0%, #1e1a12 60%, #141008 100%);
   border: 2px solid #6b5020;
   border-top-color: #c8a100;
@@ -30,7 +215,7 @@ body {
     0 4px 16px rgba(0,0,0,0.8);
 }
 
-.wow-panel-header {
+.rp-panel-header {
   background: linear-gradient(90deg, #3a2c10 0%, #4a3818 50%, #3a2c10 100%);
   border-bottom: 1px solid #6b5020;
   padding: 6px 12px;
@@ -42,7 +227,7 @@ body {
   text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 
-.wow-button {
+.rp-button {
   background: linear-gradient(180deg, #4a3818 0%, #2e2210 100%);
   border: 1px solid #6b5020;
   border-top-color: #9a7830;
@@ -57,18 +242,18 @@ body {
   text-shadow: 0 1px 2px rgba(0,0,0,0.9);
 }
 
-.wow-button:hover {
+.rp-button:hover {
   background: linear-gradient(180deg, #6a5228 0%, #4a3518 100%);
   border-color: #c8a100;
   color: #ffe040;
 }
 
-.wow-button:active {
+.rp-button:active {
   background: linear-gradient(180deg, #2e2210 0%, #4a3818 100%);
   transform: translateY(1px);
 }
 
-.wow-button:disabled {
+.rp-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
@@ -181,7 +366,7 @@ body {
 .panel-scroll::-webkit-scrollbar-thumb { background: #4a3818; }
 
 /* ── Tooltip ──────────────────────────────────────────────────────────────── */
-.wow-tooltip {
+.rp-tooltip {
   background: linear-gradient(160deg, #1a1508 0%, #0d0b05 100%);
   border: 1px solid #6b5020;
   border-top-color: #c8a100;
@@ -266,3 +451,9 @@ body {
 .talent-node.maxed    { border-color: #ffd700; background: #1e1800; box-shadow: 0 0 6px rgba(255,215,0,0.3); }
 .talent-node.locked   { opacity: 0.35; cursor: default; }
 .talent-node.available { border-color: #9a7830; }
+
+/* ── Generative Avatar ────────────────────────────────────────────────────── */
+@keyframes avatar-float {
+  0%,  100% { transform: translateY(0px);   filter: brightness(1.00); }
+  50%        { transform: translateY(-3px);  filter: brightness(1.08); }
+}

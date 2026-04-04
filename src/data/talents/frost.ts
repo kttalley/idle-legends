@@ -1,6 +1,6 @@
 import type { TalentNodeDef } from '../types'
 
-// ── Frost Mage ── Based on WoW Classic 1.12 Frost tree ───────────────────────
+// ── Frost Mage ── Glacial Rite Spec ───────────────────────────────────────────
 // Rebranded: "Glacial Rite" spec — absolute zero, death by a thousand shards
 export const FROST_TALENTS: TalentNodeDef[] = [
 

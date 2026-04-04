@@ -31,8 +31,8 @@ export function CombatLog() {
   }, [log.length])
 
   return (
-    <div className="wow-panel flex flex-col" style={{ height: '100%', minHeight: 0 }}>
-      <div className="wow-panel-header">Combat Log</div>
+    <div className="rp-panel flex flex-col" style={{ height: '100%', minHeight: 0 }}>
+      <div className="rp-panel-header">Combat Log</div>
       <div className="combat-log flex-1 p-1" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column-reverse' }}>
         {log.map(entry => (
           <div

@@ -116,7 +116,7 @@ export function CraftingPanel() {
       {/* Craft / nav buttons */}
       <div className="flex gap-2">
         <button
-          className="wow-button"
+          className="rp-button"
           onClick={() => setMode('gathering')}
           disabled={isCrafting}
           style={{ fontSize: '0.6rem', flex: 1, opacity: isCrafting ? 0.4 : 1 }}
@@ -124,7 +124,7 @@ export function CraftingPanel() {
           ⛏ Gather
         </button>
         <button
-          className="wow-button"
+          className="rp-button"
           onClick={() => setMode('combat')}
           disabled={isCrafting}
           style={{ fontSize: '0.6rem', flex: 1, opacity: isCrafting ? 0.4 : 1 }}
@@ -133,7 +133,7 @@ export function CraftingPanel() {
         </button>
         {selected && !isCrafting && (
           <button
-            className="wow-button"
+            className="rp-button"
             onClick={() => { startCrafting(selected); }}
             disabled={!canCraft(selected)}
             style={{

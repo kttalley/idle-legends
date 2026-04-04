@@ -61,7 +61,7 @@ export function TravelOverlay() {
 
       {/* Cancel */}
       <button
-        className="wow-button"
+        className="rp-button"
         onClick={cancelTravel}
         style={{ fontSize: '0.58rem' }}
       >

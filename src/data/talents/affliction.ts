@@ -1,6 +1,6 @@
 import type { TalentNodeDef } from '../types'
 
-// ── Affliction Warlock ── Based on WoW Classic 1.12 Affliction tree ───────────
+// ── Affliction Warlock ── Voidweave Spec ──────────────────────────────────────
 // Rebranded: "Voidweave" spec — shadow curses, life drain, and entropy
 export const AFFLICTION_TALENTS: TalentNodeDef[] = [
 
