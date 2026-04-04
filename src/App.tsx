@@ -88,11 +88,11 @@ export default function App() {
         </div>
 
         {/* Center — Combat + Log */}
-        <div className="flex flex-col gap-2 flex-1" style={{ minWidth: 0 }}>
-          <div style={{ flex: '0 0 320px' }}>
+        <div className="flex flex-col gap-2 flex-1" style={{ minWidth: 0, maxWidth: 400 }}>
+          <div style={{ flex: 1, minHeight: 0 }}>
             <CombatView />
           </div>
-          <div style={{ flex: 1, minHeight: 120 }}>
+          <div style={{ flex: '0 0 90px' }}>
             <CombatLog />
           </div>
         </div>

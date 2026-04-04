@@ -296,6 +296,40 @@ export interface GameState {
   materials: Record<MaterialId, number>
   activeRecipe: RecipeId | null
   craftingTimer: number
+  // ── World Map ───────────────────────────────────────────────────────────────
+  zoneMaps: Partial<Record<ZoneId, ZoneMap>>
+  playerMapPos: { x: number; y: number }   // float tile position
+  weatherState: WeatherState
+  mobMapOffset: { dx: number; dy: number } // tiles from player to mob
+}
+
+// ── World Map ─────────────────────────────────────────────────────────────────
+export type TileType = 'terrain' | 'water' | 'cliff' | 'resource_ore' | 'resource_herb'
+
+export interface MapTile {
+  type: TileType
+  charSet: string[]   // multiple chars for animated water, single for others
+  color: string
+}
+
+export interface MapNode {
+  x: number; y: number   // tile coords (0–63)
+  type: 'ore' | 'herb' | 'mob_spawn' | 'boss_lair'
+  icon: string; color: string
+}
+
+export interface ZoneMap {
+  tiles: MapTile[][]   // [row][col], 64×64
+  nodes: MapNode[]
+}
+
+export type WeatherType = 'clear' | 'cloudy' | 'rain'
+
+export interface WeatherState {
+  type: WeatherType
+  timer: number         // seconds until next transition
+  cloudOffset: number   // 0–1, drifts left→right
+  rainPhase: number     // 0–1, drives rain drop y cycling
 }
 
 export interface FloatingNumber {

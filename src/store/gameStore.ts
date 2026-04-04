@@ -3,10 +3,11 @@ import type {
   GameState, ClassType, ZoneId, Item, Slot,
   MobInstance, CombatLogEntry, FloatingNumber,
   Stats, ActiveDoT, ActiveBuff, CombatProcState,
-  GameMode, RecipeId, MaterialId,
+  GameMode, RecipeId, MaterialId, WeatherType,
 } from '../data/types'
 import { ZONE_MATERIALS, RECIPES } from '../data/professions'
 import { ZONE_ORDER } from '../data/zones'
+import { generateZoneMap } from '../engine/mapGen'
 import { ZONES } from '../data/zones'
 import { CLASS_DEFINITIONS } from '../data/classes'
 import { ACTIVE_ABILITIES, getClassAbilities } from '../data/abilities'
@@ -28,6 +29,17 @@ import type { ThoughtEvent } from '../engine/nameGen'
 
 const SAVE_KEY = 'idle_wow_save_v2'
 const LOG_MAX  = 150
+
+function hashStr(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+
+function seededRandLocal(seed: number, n: number): number {
+  const x = Math.sin(seed * 9301 + n * 49297 + 233) * 16807
+  return x - Math.floor(x)
+}
 
 // ── Default proc state ────────────────────────────────────────────────────────
 function defaultProcState(): CombatProcState {
@@ -98,6 +110,11 @@ function defaultState(): GameState {
     materials: {},
     activeRecipe: null,
     craftingTimer: 0,
+    // World Map
+    zoneMaps: {},
+    playerMapPos: { x: 32, y: 32 },
+    weatherState: { type: 'clear', timer: 45, cloudOffset: 0, rainPhase: 0 },
+    mobMapOffset: { dx: 0, dy: 0 },
   }
 }
 
@@ -204,6 +221,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     s.stats = compileStats(playerClass, 1, s.equipment, s.talentAllocs)
     s.stats.currentHp = s.stats.maxHp
     s.lastTickTimestamp = Date.now()
+    s.zoneMaps = { sunhollow_meadows: generateZoneMap('sunhollow_meadows') }
     resetCombatAccumulators()
     set(s)
     // Fire name generation async — game starts immediately, names trickle in
@@ -242,6 +260,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       saved.materials     = saved.materials ?? {}
       saved.activeRecipe  = null
       saved.craftingTimer = 0
+      // Generate maps for all unlocked zones
+      const zoneMaps: GameState['zoneMaps'] = {}
+      for (const zid of (saved.unlockedZones ?? ['sunhollow_meadows'])) {
+        zoneMaps[zid] = generateZoneMap(zid)
+      }
+      saved.zoneMaps      = zoneMaps
+      saved.playerMapPos  = { x: 32, y: 32 }
+      saved.weatherState  = { type: 'clear', timer: 45, cloudOffset: 0, rainPhase: 0 }
+      saved.mobMapOffset  = { dx: 0, dy: 0 }
       resetCombatAccumulators()
       set(saved)
       return true
@@ -270,19 +297,56 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const state = get()
     if (!state.initialized) return
 
+    // ── Weather tick (always runs) ────────────────────────────────────────────
+    {
+      const w = state.weatherState
+      const newTimer  = w.timer - deltaSeconds
+      const newOffset = (w.cloudOffset + deltaSeconds * 0.012) % 1
+      const newRain   = w.type === 'rain' ? (w.rainPhase + deltaSeconds * 0.4) % 1 : w.rainPhase
+
+      if (newTimer <= 0) {
+        const nextWeather = (t: WeatherType): WeatherType => {
+          if (t === 'clear')  return 'cloudy'
+          if (t === 'cloudy') return w.timer < 0 ? 'clear' : 'rain'
+          return 'cloudy'
+        }
+        // Alternate cloudy→rain vs cloudy→clear using cloudOffset as a coin flip
+        const next = (() => {
+          if (w.type === 'clear')  return 'cloudy' as WeatherType
+          if (w.type === 'rain')   return 'cloudy' as WeatherType
+          // cloudy: 50% go to rain, 50% go back to clear
+          return (w.cloudOffset < 0.5 ? 'rain' : 'clear') as WeatherType
+        })()
+        const dur = next === 'clear' ? 40 + Math.random() * 20
+                  : next === 'cloudy' ? 12 + Math.random() * 8
+                  : 20 + Math.random() * 15
+        set({ weatherState: { type: next, timer: dur, cloudOffset: newOffset, rainPhase: newRain } })
+        void nextWeather  // suppress unused warning
+      } else {
+        set({ weatherState: { ...w, timer: newTimer, cloudOffset: newOffset, rainPhase: newRain } })
+      }
+    }
+
     // ── Travel tick ──────────────────────────────────────────────────────────
     if (state.gameMode === 'traveling' && state.travelTarget) {
       const newProgress = state.travelProgress + deltaSeconds / state.travelDuration
+      // Advance playerMapPos.x in direction of travel
+      const fromIdx = ZONE_ORDER.indexOf(state.currentZone)
+      const toIdx   = ZONE_ORDER.indexOf(state.travelTarget)
+      const direction = toIdx > fromIdx ? 1 : -1
+      const newX = ((state.playerMapPos.x + direction * 64 * deltaSeconds / state.travelDuration) + 64) % 64
       if (newProgress >= 1) {
-        // Arrive at destination
         const dest = state.travelTarget
+        const destMap = state.zoneMaps[dest] ?? generateZoneMap(dest)
         resetCombatAccumulators()
         set({
           currentZone: dest, currentMob: null, mobRespawnTimer: 0,
           activeDoTs: [], gameMode: 'combat', travelTarget: null, travelProgress: 0,
+          playerMapPos: { x: 32, y: 32 },
+          zoneMaps: { ...state.zoneMaps, [dest]: destMap },
         })
       } else {
-        set({ travelProgress: newProgress })
+        set({ travelProgress: newProgress, playerMapPos: { x: newX, y: state.playerMapPos.y } })
       }
       return
     }
@@ -290,15 +354,53 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // ── Gathering tick ───────────────────────────────────────────────────────
     if (state.gameMode === 'gathering') {
       const newTimer = state.gatheringTimer - deltaSeconds
+      // World drift — slow wander so map scrolls past player
+      const gatherDriftAngle = state.totalPlayTime * 0.08
+      const gatherDriftX = Math.cos(gatherDriftAngle) * 0.5 * deltaSeconds
+      const gatherDriftY = Math.sin(gatherDriftAngle * 0.7) * 0.3 * deltaSeconds
+      const gatherMapPos = {
+        x: ((state.playerMapPos.x + gatherDriftX) + 64) % 64,
+        y: ((state.playerMapPos.y + gatherDriftY) + 64) % 64,
+      }
       if (newTimer <= 0) {
         const matId: MaterialId = ZONE_MATERIALS[state.currentZone][state.playerClass]
         const newCount = (state.materials[matId] ?? 0) + 1
+        const updatedMats = { ...state.materials, [matId]: newCount }
+
+        // Check if still near a resource node → keep gathering; else return to combat
+        const zMap = state.zoneMaps[state.currentZone]
+        const stillNearNode = zMap?.nodes.some(node => {
+          if (node.type !== 'ore' && node.type !== 'herb') return false
+          const ndx = Math.min(Math.abs(node.x - gatherMapPos.x), 64 - Math.abs(node.x - gatherMapPos.x))
+          const ndy = Math.min(Math.abs(node.y - gatherMapPos.y), 64 - Math.abs(node.y - gatherMapPos.y))
+          return Math.sqrt(ndx * ndx + ndy * ndy) < 2.5
+        }) ?? false
+
+        let nextGatherMode: GameMode = stillNearNode ? 'gathering' : 'combat'
+        let autoRecipe: RecipeId | null = null
+
+        // Auto-craft when leaving a resource node if materials are sufficient
+        if (!stillNearNode) {
+          for (const recipe of RECIPES) {
+            if (recipe.classFor !== state.playerClass) continue
+            let canCraft = true
+            for (const inp of recipe.inputs) {
+              if ((updatedMats[inp.materialId] ?? 0) < inp.qty) { canCraft = false; break }
+            }
+            if (canCraft) { autoRecipe = recipe.id; nextGatherMode = 'crafting'; break }
+          }
+        }
+
         set({
           gatheringTimer: 5,
-          materials: { ...state.materials, [matId]: newCount },
+          materials: updatedMats,
+          playerMapPos: gatherMapPos,
+          gameMode: nextGatherMode,
+          activeRecipe: autoRecipe,
+          craftingTimer: autoRecipe ? (RECIPES.find(r => r.id === autoRecipe)?.craftTime ?? 0) : 0,
         })
       } else {
-        set({ gatheringTimer: newTimer })
+        set({ gatheringTimer: newTimer, playerMapPos: gatherMapPos })
       }
       return
     }
@@ -344,6 +446,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           set({
             activeRecipe: null, craftingTimer: 0,
             materials: newMaterials, activeBuffs: newBuffs, stats,
+            gameMode: 'combat',   // return to wandering after craft completes
             combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX),
           })
         } else {
@@ -379,6 +482,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     skillCooldowns  = { ...skillCooldowns }
 
     const fx = compileTalentEffects(state.playerClass, talentAllocs)
+
+    // Is the mob close enough to fight? (arrives from map edge over ~5s)
+    const rawMobDist = Math.sqrt(state.mobMapOffset.dx ** 2 + state.mobMapOffset.dy ** 2)
+    const mobEngaged = rawMobDist < 1.5
 
     // ── Tick down skill cooldowns ───────────────────────────────────────────
     for (const id of Object.keys(skillCooldowns)) {
@@ -419,6 +526,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if (mobRespawnTimer <= 0) {
         currentMob = spawnMob(currentZone, state)
         if (currentMob) {
+          // Set mob approach offset (starts far, lerps to 0 in combat tick)
+          const mobSeed = hashStr(currentMob.templateId)
+          const angle = seededRandLocal(mobSeed, 0) * Math.PI * 2
+          const dist  = 10 + seededRandLocal(mobSeed, 1) * 5
+          set({ mobMapOffset: { dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist } })
+
           // Apply Ice Barrier absorb at combat start
           if (fx.iceBarrierAbsorb > 0 && procState.iceBarrierHp <= 0) {
             procState.iceBarrierHp = fx.iceBarrierAbsorb
@@ -480,8 +593,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     }
 
     // ── Player attacks mob ───────────────────────────────────────────────────
-    playerAttackAccum += deltaSeconds
-    if (playerAttackAccum >= stats.attackSpeedSeconds) {
+    if (mobEngaged) playerAttackAccum += deltaSeconds
+    else playerAttackAccum = 0  // reset during approach so first strike lands on arrival
+    if (mobEngaged && playerAttackAccum >= stats.attackSpeedSeconds) {
       playerAttackAccum -= stats.attackSpeedSeconds
 
       const result = resolvePlayerAttack(
@@ -588,6 +702,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             if (!unlockedZones.includes(zid as ZoneId) && level >= zone.levelRange[0]) {
               unlockedZones.push(zid as ZoneId)
               newLogs.push(log('zone_change', `New zone unlocked: ${zone.name}!`, '#00ff88'))
+              // Generate map for newly unlocked zone
+              if (!state.zoneMaps[zid as ZoneId]) {
+                set(s => ({ zoneMaps: { ...s.zoneMaps, [zid]: generateZoneMap(zid as ZoneId) } }))
+              }
             }
           }
         }
@@ -627,7 +745,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     }
 
     // ── Mob attacks player ───────────────────────────────────────────────────
-    if (currentMob && !procState.mobFrozen) {
+    if (currentMob && !procState.mobFrozen && mobEngaged) {
       mobAttackAccum += deltaSeconds
       if (mobAttackAccum >= currentMob.attackSpeedSeconds) {
         mobAttackAccum -= currentMob.attackSpeedSeconds
@@ -685,6 +803,48 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
     }
 
+    // ── Auto-gather: if drifting near a resource node with no active combat ──
+    let nextGameMode: GameMode = state.gameMode as GameMode
+    if (nextGameMode === 'combat' && !currentMob) {
+      const zMap = state.zoneMaps[currentZone]
+      if (zMap) {
+        for (const node of zMap.nodes) {
+          if (node.type !== 'ore' && node.type !== 'herb') continue
+          const ndx = Math.min(Math.abs(node.x - state.playerMapPos.x), 64 - Math.abs(node.x - state.playerMapPos.x))
+          const ndy = Math.min(Math.abs(node.y - state.playerMapPos.y), 64 - Math.abs(node.y - state.playerMapPos.y))
+          if (Math.sqrt(ndx * ndx + ndy * ndy) < 2.5) {
+            nextGameMode = 'gathering'
+            break
+          }
+        }
+      }
+    }
+
+    // ── World drift (combat) — slow wander so map scrolls past player ────────
+    const driftAngle = state.totalPlayTime * 0.08
+    const driftX = Math.cos(driftAngle) * 0.5 * deltaSeconds
+    const driftY = Math.sin(driftAngle * 0.7) * 0.3 * deltaSeconds
+    const playerMapPos = {
+      x: ((state.playerMapPos.x + driftX) + 64) % 64,
+      y: ((state.playerMapPos.y + driftY) + 64) % 64,
+    }
+
+    // ── Mob map approach lerp ─────────────────────────────────────────────────
+    let { mobMapOffset } = state
+    if (currentMob && (mobMapOffset.dx !== 0 || mobMapOffset.dy !== 0)) {
+      const speed = 2.5  // tiles per second
+      const { dx, dy } = mobMapOffset
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < 0.3) {
+        mobMapOffset = { dx: 0, dy: 0 }
+      } else {
+        const factor = Math.max(0, 1 - speed * deltaSeconds / dist)
+        mobMapOffset = { dx: dx * factor, dy: dy * factor }
+      }
+    } else if (!currentMob) {
+      mobMapOffset = { dx: 0, dy: 0 }
+    }
+
     // Prune old floating numbers
     const now = Date.now()
     const allFns = [...floatingNumbers.filter(f => now - f.createdAt < 1400), ...newFns]
@@ -696,6 +856,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones,
       totalPlayTime: state.totalPlayTime + deltaSeconds,
       combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX),
+      mobMapOffset,
+      playerMapPos,
+      gameMode: nextGameMode,
+      gatheringTimer: nextGameMode === 'gathering' && state.gameMode !== 'gathering' ? 5 : state.gatheringTimer,
     })
   },
 
