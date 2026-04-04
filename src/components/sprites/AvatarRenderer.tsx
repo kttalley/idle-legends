@@ -14,9 +14,10 @@ export function hashStr(s: string): number {
 }
 
 // ── Grid constants ─────────────────────────────────────────────────────────────
-const GW   = 5   // grid width (full)
-const GH   = 5   // grid height — square 5×5
-const HALF = 3   // generated cols: 0, 1, 2 → mirrored to [0,1,2,1,0]
+const GW     = 5   // grid width  (full)
+const GH     = 5   // grid height (full)
+const HALF_W = 3   // generated cols: 0,1,2 → mirrored to [0,1,2,1,0]
+const HALF_H = 3   // generated rows: 0,1,2 → mirrored to [0,1,2,1,0]
 
 // ── Palettes ───────────────────────────────────────────────────────────────────
 export interface AvatarPalette {
@@ -65,63 +66,49 @@ export function mobAvatarPalette(seed: number, isElite: boolean, isBoss: boolean
 
 // ── Grid generation ────────────────────────────────────────────────────────────
 function generateGrid(seed: number): boolean[][] {
-  // 1. Raw noise for left half (cols 0..HALF-1)
-  const raw: boolean[][] = Array.from({ length: GH }, (_, r) =>
-    Array.from({ length: HALF }, (_, c) => rand(seed, r * HALF + c) > 0.38)
+  // 1. Raw noise for top-left quadrant (rows 0..HALF_H-1, cols 0..HALF_W-1)
+  const raw: boolean[][] = Array.from({ length: HALF_H }, (_, r) =>
+    Array.from({ length: HALF_W }, (_, c) => rand(seed, r * HALF_W + c) > 0.38)
   )
 
-  // 2. One CA smoothing pass — removes stray lone pixels, fills small gaps
+  // 2. One CA smoothing pass on the quadrant
   const smooth = raw.map((row, r) => row.map((active, c) => {
     let n = 0
     for (let dr = -1; dr <= 1; dr++) {
       for (let dc = -1; dc <= 1; dc++) {
         if (!dr && !dc) continue
         const nr = r + dr; const nc = c + dc
-        if (nr >= 0 && nr < GH && nc >= 0 && nc < HALF && raw[nr][nc]) n++
+        if (nr >= 0 && nr < HALF_H && nc >= 0 && nc < HALF_W && raw[nr][nc]) n++
       }
     }
-    if (active  && n === 0) return rand(seed, 1000 + r * HALF + c) > 0.55  // lone → 45% die
-    if (!active && n >= 3)  return rand(seed, 2000 + r * HALF + c) > 0.45  // surrounded → 55% fill
+    if (active  && n === 0) return rand(seed, 1000 + r * HALF_W + c) > 0.55
+    if (!active && n >= 3)  return rand(seed, 2000 + r * HALF_W + c) > 0.45
     return active
   }))
 
-  // 3. Mirror to full 5-wide grid: pattern [0, 1, 2, 1, 0]
-  return smooth.map(row => [row[0], row[1], row[2], row[1], row[0]])
+  // 3. Mirror both axes: [0,1,2,1,0] for rows AND cols
+  const rows = [smooth[0], smooth[1], smooth[2], smooth[1], smooth[0]]
+  return rows.map(row => [row[0], row[1], row[2], row[1], row[0]])
 }
 
 // ── Cell color ─────────────────────────────────────────────────────────────────
 function pickColor(seed: number, r: number, c: number, palette: AvatarPalette): string {
-  // Eyes: row 1, cols 1 and 3 (symmetric) → always glow color if active
-  if (r === 1 && (c === 1 || c === 3)) return palette.glow
+  // Eyes: rows 1 & 3, cols 1 & 3 (all four symmetric positions) → glow color
+  if ((r === 1 || r === 3) && (c === 1 || c === 3)) return palette.glow
 
-  // Map to left-half col so mirrored cells share the same seed slot
+  // Map to quadrant coords so mirrored cells share the same seed slot
   const lc = c <= 2 ? c : GW - 1 - c
+  const lr = r <= 2 ? r : GH - 1 - r
 
-  // Vertical gradient: lighter near top (head), darker near bottom (feet)
-  const rowBias = r / (GH - 1)           // 0 (top) → 1 (bottom)
-  // Horizontal gradient: brighter at center col, darker at edges
-  const colBias = 1 - lc / (HALF - 1)   // 1 (col 0 = edge) → 0 (col 2 = center)
+  // Radial-ish gradient: brightest at center (row 2, col 2), darker at edges
+  const rowBias = Math.abs(lr - (HALF_H - 1)) / (HALF_H - 1)  // 0 (center) → 1 (edge)
+  const colBias = 1 - lc / (HALF_W - 1)                        // 1 (left edge) → 0 (center col)
 
-  const noise = rand(seed, 300 + r * HALF + lc) * 0.5
-  const t     = Math.max(0, Math.min(1, 1 - rowBias * 0.4 - colBias * 0.25 - noise))
+  const noise = rand(seed, 300 + lr * HALF_W + lc) * 0.5
+  const t     = Math.max(0, Math.min(1, 1 - rowBias * 0.3 - colBias * 0.25 - noise))
 
   const idx = Math.floor(t * (palette.shades.length - 1) + 0.5)
   return palette.shades[Math.min(idx, palette.shades.length - 1)]
-}
-
-// ── Cell border radius ─────────────────────────────────────────────────────────
-function cellRadius(grid: boolean[][], r: number, c: number): string {
-  let n = 0
-  for (let dr = -1; dr <= 1; dr++) {
-    for (let dc = -1; dc <= 1; dc++) {
-      if (!dr && !dc) continue
-      const nr = r + dr; const nc = c + dc
-      if (nr >= 0 && nr < GH && nc >= 0 && nc < GW && grid[nr][nc]) n++
-    }
-  }
-  if (n >= 6) return '30%'
-  if (n >= 4) return '40%'
-  return '50%'
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -129,7 +116,6 @@ interface AvatarRendererProps {
   seed:      number
   palette:   AvatarPalette
   cellSize?: number    // px per cell, default 9
-  gap?:      number    // px gap between cells, default 2
   animate?:  boolean   // floating bob animation, default true
   circle?:   boolean   // wrap in circular frame, default true
 }
@@ -138,13 +124,12 @@ export function AvatarRenderer({
   seed,
   palette,
   cellSize = 9,
-  gap      = 2,
   animate  = true,
   circle   = true,
 }: AvatarRendererProps) {
   const grid = useMemo(() => generateGrid(seed), [seed])
 
-  const totalSize = GW * cellSize + (GW - 1) * gap   // square since GW === GH
+  const totalSize = GW * cellSize   // no gap — cells are flush
 
   const avatarGrid = (
     <div
@@ -154,26 +139,22 @@ export function AvatarRenderer({
         display:  'grid',
         gridTemplateColumns: `repeat(${GW}, ${cellSize}px)`,
         gridTemplateRows:    `repeat(${GH}, ${cellSize}px)`,
-        gap:      `${gap}px`,
-        filter:   `drop-shadow(0 2px 6px ${palette.glow}80)`,
+        filter:   `drop-shadow(0 2px 8px ${palette.glow}90)`,
         flexShrink: 0,
       }}
     >
       {grid.flatMap((row, r) =>
         row.map((active, c) => {
           if (!active) return <div key={`${r}_${c}`} />
-          const color  = pickColor(seed, r, c, palette)
-          const radius = cellRadius(grid, r, c)
+          const color = pickColor(seed, r, c, palette)
           return (
             <div
               key={`${r}_${c}`}
               style={{
-                width:        cellSize,
-                height:       cellSize,
-                borderRadius: radius,
-                background:   color,
-                boxShadow:    `0 1px 3px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255,255,255,0.18)`,
-                transition:   'background 0.5s ease, border-radius 0.3s ease',
+                width:      cellSize,
+                height:     cellSize,
+                background: color,
+                transition: 'background 0.5s ease',
               }}
             />
           )
