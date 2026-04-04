@@ -1,0 +1,83 @@
+import type { ClassDefinition } from './types'
+import { ARMS_TALENTS } from './talents/arms'
+import { FROST_TALENTS } from './talents/frost'
+import { ASSASSINATION_TALENTS } from './talents/assassination'
+import { AFFLICTION_TALENTS } from './talents/affliction'
+
+export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
+  warrior: {
+    id: 'warrior',
+    name: 'Warrior',
+    description: 'A plate-armored bruiser. Steady damage, high health, built to endure. Arms spec: cleave and shatter.',
+    primaryStat: 'strength',
+    colorClass: 'class-warrior',
+    baseStats: {
+      strength: 20,
+      intellect: 5,
+      agility: 10,
+      stamina: 25,
+      armor: 30,
+      weaponDps: 8,
+      attackSpeedSeconds: 2.5,
+      goldFindBonus: 1.0,
+    },
+    talents: ARMS_TALENTS,
+  },
+
+  mage: {
+    id: 'mage',
+    name: 'Mage',
+    description: 'An arcane glass cannon. Frost spec: freeze, shatter, and Winter\'s Chill stacks.',
+    primaryStat: 'intellect',
+    colorClass: 'class-mage',
+    baseStats: {
+      strength: 5,
+      intellect: 25,
+      agility: 8,
+      stamina: 10,
+      armor: 5,
+      weaponDps: 6,
+      attackSpeedSeconds: 1.8,
+      goldFindBonus: 1.0,
+    },
+    talents: FROST_TALENTS,
+  },
+
+  rogue: {
+    id: 'rogue',
+    name: 'Rogue',
+    description: 'Shadow daggers and lethal precision. Assassination spec: poisons, combo points, Cold Blood.',
+    primaryStat: 'agility',
+    colorClass: 'class-rogue',
+    baseStats: {
+      strength: 10,
+      intellect: 8,
+      agility: 22,
+      stamina: 12,
+      armor: 12,
+      weaponDps: 7,
+      attackSpeedSeconds: 1.5,
+      goldFindBonus: 1.15,
+    },
+    talents: ASSASSINATION_TALENTS,
+  },
+
+  warlock: {
+    id: 'warlock',
+    name: 'Warlock',
+    description: 'Shadow curses and void corruption. Affliction spec: DoTs, Nightfall procs, Siphon Life.',
+    primaryStat: 'intellect',
+    colorClass: 'class-warlock',
+    baseStats: {
+      strength: 6,
+      intellect: 22,
+      agility: 7,
+      stamina: 15,
+      armor: 8,
+      weaponDps: 5,
+      attackSpeedSeconds: 2.2,
+      goldFindBonus: 1.0,
+    },
+    talents: AFFLICTION_TALENTS,
+  },
+}

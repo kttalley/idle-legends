@@ -1,0 +1,821 @@
+import { create } from 'zustand'
+import type {
+  GameState, ClassType, ZoneId, Item, Slot,
+  MobInstance, CombatLogEntry, FloatingNumber,
+  Stats, ActiveDoT, ActiveBuff, CombatProcState,
+} from '../data/types'
+import { ZONES } from '../data/zones'
+import { CLASS_DEFINITIONS } from '../data/classes'
+import { ACTIVE_ABILITIES, getClassAbilities } from '../data/abilities'
+import {
+  compileStats, compileTalentEffects,
+  resolvePlayerAttack, resolveMobAttack,
+  makeShadowBoltHit, makeAbilityBuff,
+} from '../engine/combat'
+import { xpForLevel } from '../engine/progression'
+import {
+  INVENTORY_SLOTS, MOB_RESPAWN_SECONDS,
+  ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE,
+  BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
+  AUTOSAVE_INTERVAL_MS,
+} from '../data/constants'
+import { rollLoot } from '../engine/loot'
+import { generateNames, generateThought } from '../engine/nameGen'
+import type { ThoughtEvent } from '../engine/nameGen'
+
+const SAVE_KEY = 'idle_wow_save_v2'
+const LOG_MAX  = 150
+
+// ── Default proc state ────────────────────────────────────────────────────────
+function defaultProcState(): CombatProcState {
+  return {
+    winterChillStacks: 0,
+    comboPoints: 0,
+    remorselessActive: false,
+    iceBlockUsed: false,
+    mobFrozen: false,
+    mobFrozenTimer: 0,
+    iceBarrierHp: 0,
+  }
+}
+
+// ── Default State ─────────────────────────────────────────────────────────────
+function defaultState(): GameState {
+  return {
+    initialized: false,
+    playerClass: 'warrior',
+    playerName: '',
+    characterTraits: [],
+    generatedZoneNames: {},
+    nameGenStatus: 'idle',
+    currentThought: null,
+    thoughtExpiresAt: 0,
+    lastThoughtAt: 0,
+    level: 1,
+    xp: 0,
+    stats: {} as Stats,
+    talentAllocs: {},
+    talentPoints: 1,  // start with 1 point at level 1
+    equipment: { weapon: null, helm: null, chest: null, legs: null, boots: null, trinket: null },
+    inventory: Array(INVENTORY_SLOTS).fill(null),
+    gold: 0,
+    skillCooldowns: {},
+    currentZone: 'sunhollow_meadows',
+    currentMob: null,
+    combatLog: [],
+    isAlive: true,
+    respawnTimer: 0,
+    mobRespawnTimer: 0,
+    activeDoTs: [],
+    activeBuffs: [],
+    procState: defaultProcState(),
+    floatingNumbers: [],
+    unlockedZones: ['sunhollow_meadows'],
+    zoneKillCounts: {},
+    totalZoneKills: {
+      sunhollow_meadows: 0, dustwind_plains: 0, grimshade_forest: 0,
+      thornvale_jungle: 0, ashfire_peaks: 0,
+    },
+    bossesDefeated: [],
+    lastTickTimestamp: Date.now(),
+    totalPlayTime: 0,
+    settings: {
+      tickRateMs: 1000,
+      combatTickSeconds: 2,
+      showDamageNumbers: true,
+      autoSellCommon: false,
+      volume: 0.5,
+    },
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function log(
+  type: CombatLogEntry['type'],
+  message: string,
+  color?: string,
+): CombatLogEntry {
+  return { id: `${Date.now()}_${Math.random().toString(36).slice(2,6)}`, timestamp: Date.now(), type, message, color }
+}
+
+function fn(value: number, isCrit: boolean, isMobDamage: boolean, isDoT: boolean, color?: string): FloatingNumber {
+  return {
+    id: `fn_${Date.now()}_${Math.random().toString(36).slice(2,5)}`,
+    value, isCrit, isMobDamage, isDoT, color,
+    x: 45 + (Math.random() - 0.5) * 22,
+    y: 40 + (Math.random() - 0.5) * 12,
+    createdAt: Date.now(),
+  }
+}
+
+function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
+  const zone = ZONES[zoneId]
+  if (!zone) return null
+  const totalKills = state.totalZoneKills[zoneId] ?? 0
+  const bossDefeated = state.bossesDefeated.includes(zoneId)
+  const canSpawnBoss = totalKills >= zone.unlockKills && !bossDefeated
+
+  let template
+  if (canSpawnBoss) {
+    template = zone.mobs.find(m => m.id === zone.bossId)!
+  } else {
+    const nonBoss = zone.mobs.filter(m => m.id !== zone.bossId)
+    template = nonBoss[Math.floor(Math.random() * nonBoss.length)]
+  }
+
+  const isElite = !canSpawnBoss && Math.random() < ELITE_SPAWN_CHANCE
+  const isBoss  = canSpawnBoss
+  const hpMult  = isBoss ? BOSS_HP_MULTIPLIER  : isElite ? ELITE_HP_MULTIPLIER  : 1
+  const dmgMult = isBoss ? BOSS_DAMAGE_MULTIPLIER : isElite ? ELITE_DAMAGE_MULTIPLIER : 1
+
+  return {
+    templateId: template.id,
+    name: isBoss ? `[BOSS] ${template.name}` : isElite ? `★ ${template.name}` : template.name,
+    currentHp: Math.round(template.hp * hpMult),
+    maxHp:     Math.round(template.hp * hpMult),
+    damage: template.damage,
+    xpReward: Math.round(template.xpReward * (isBoss ? 3 : isElite ? 2 : 1)),
+    goldMin: template.goldMin,
+    goldMax: template.goldMax,
+    lootTableIds: template.lootTableIds,
+    spriteKey: template.spriteKey,
+    attackSpeedSeconds: template.attackSpeedSeconds * dmgMult,
+    isElite,
+    isBoss,
+  }
+}
+
+let playerAttackAccum = 0
+let mobAttackAccum    = 0
+let siphonLifeAccum   = 0
+
+export function resetCombatAccumulators() {
+  playerAttackAccum = 0
+  mobAttackAccum    = 0
+  siphonLifeAccum   = 0
+}
+
+// ── Store ─────────────────────────────────────────────────────────────────────
+interface GameActions {
+  initGame: (playerClass: ClassType) => void
+  loadGame: () => boolean
+  saveGame: () => void
+  resetGame: () => void
+  tick: (deltaSeconds: number) => void
+  equipItem: (inventoryIndex: number) => void
+  unequipItem: (slot: Slot) => void
+  sellItem: (inventoryIndex: number) => void
+  sellAllCommon: () => void
+  selectZone: (zoneId: ZoneId) => void
+  allocateTalent: (talentId: string) => void
+  deallocateTalent: (talentId: string) => void
+  resetTalents: () => void
+  activateAbility: (abilityId: string) => void
+  respawnNow: () => void
+  dismissFloatingNumber: (id: string) => void
+  triggerThought: (event: ThoughtEvent, extra?: string) => void
+}
+
+export const useGameStore = create<GameState & GameActions>((set, get) => ({
+  ...defaultState(),
+
+  initGame: (playerClass) => {
+    const s = defaultState()
+    s.playerClass = playerClass
+    s.initialized = true
+    s.talentPoints = 1
+    s.nameGenStatus = 'loading'
+    s.stats = compileStats(playerClass, 1, s.equipment, s.talentAllocs)
+    s.stats.currentHp = s.stats.maxHp
+    s.lastTickTimestamp = Date.now()
+    resetCombatAccumulators()
+    set(s)
+    // Fire name generation async — game starts immediately, names trickle in
+    generateNames(playerClass)
+      .then(names => set({
+        playerName: names.playerName,
+        characterTraits: names.traits,
+        generatedZoneNames: names.zoneNames,
+        nameGenStatus: 'done',
+      }))
+      .catch(() => set({ nameGenStatus: 'error' }))
+  },
+
+  loadGame: () => {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY)
+      if (!raw) return false
+      const saved: GameState = JSON.parse(raw)
+      if (!saved.initialized) return false
+      // Recompile stats
+      saved.stats = compileStats(saved.playerClass, saved.level, saved.equipment, saved.talentAllocs ?? {})
+      saved.stats.currentHp = Math.min(saved.stats.maxHp, (saved.stats as any)._savedHp ?? saved.stats.maxHp)
+      // Ensure new fields exist on old saves
+      saved.talentAllocs  = saved.talentAllocs  ?? {}
+      saved.talentPoints  = saved.talentPoints  ?? saved.level
+      saved.activeDoTs    = []
+      saved.activeBuffs   = []
+      saved.procState     = defaultProcState()
+      saved.skillCooldowns = {}
+      resetCombatAccumulators()
+      set(saved)
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  saveGame: () => {
+    const s = get()
+    const toSave = { ...s };
+    (toSave.stats as any)._savedHp = s.stats.currentHp
+    localStorage.setItem(SAVE_KEY, JSON.stringify(toSave))
+  },
+
+  resetGame: () => {
+    localStorage.removeItem(SAVE_KEY)
+    // also clear old key
+    localStorage.removeItem('idle_wow_save')
+    resetCombatAccumulators()
+    set(defaultState())
+  },
+
+  // ── Main Tick ────────────────────────────────────────────────────────────────
+  tick: (deltaSeconds) => {
+    const state = get()
+    if (!state.initialized) return
+
+    const newLogs: CombatLogEntry[] = []
+    const newFns: FloatingNumber[]  = []
+    let {
+      stats, currentMob, isAlive, respawnTimer, mobRespawnTimer,
+      gold, xp, level, inventory, equipment, activeDoTs, activeBuffs,
+      procState, floatingNumbers, totalZoneKills, zoneKillCounts,
+      bossesDefeated, unlockedZones, currentZone, skillCooldowns, talentAllocs,
+    } = state
+
+    // Clone
+    stats          = { ...stats }
+    equipment      = { ...equipment }
+    inventory      = [...inventory]
+    activeDoTs     = activeDoTs.map(d => ({ ...d }))
+    activeBuffs    = activeBuffs.map(b => ({ ...b }))
+    procState      = { ...procState }
+    floatingNumbers = [...floatingNumbers]
+    totalZoneKills  = { ...totalZoneKills }
+    zoneKillCounts  = { ...zoneKillCounts }
+    bossesDefeated  = [...bossesDefeated]
+    unlockedZones   = [...unlockedZones]
+    skillCooldowns  = { ...skillCooldowns }
+
+    const fx = compileTalentEffects(state.playerClass, talentAllocs)
+
+    // ── Tick down skill cooldowns ───────────────────────────────────────────
+    for (const id of Object.keys(skillCooldowns)) {
+      skillCooldowns[id] = Math.max(0, skillCooldowns[id] - deltaSeconds)
+    }
+
+    // ── Tick down active buffs ──────────────────────────────────────────────
+    activeBuffs = activeBuffs.filter(b => {
+      b.durationRemaining -= deltaSeconds
+      return b.durationRemaining > 0
+    })
+
+    // ── Tick down frozen state ──────────────────────────────────────────────
+    if (procState.mobFrozen) {
+      procState.mobFrozenTimer -= deltaSeconds
+      if (procState.mobFrozenTimer <= 0) procState.mobFrozen = false
+    }
+
+    // ── Player respawn ──────────────────────────────────────────────────────
+    if (!isAlive) {
+      respawnTimer = Math.max(0, respawnTimer - deltaSeconds)
+      if (respawnTimer <= 0) {
+        isAlive = true
+        stats.currentHp = Math.floor(stats.maxHp * 0.5)
+        procState = defaultProcState()
+        activeDoTs = []
+        newLogs.push(log('player_respawn', 'You rise from the grave...', '#aaaaff'))
+        resetCombatAccumulators()
+      }
+      set({ stats, isAlive, respawnTimer, skillCooldowns,
+            combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX) })
+      return
+    }
+
+    // ── Mob respawn ─────────────────────────────────────────────────────────
+    if (!currentMob) {
+      mobRespawnTimer = Math.max(0, mobRespawnTimer - deltaSeconds)
+      if (mobRespawnTimer <= 0) {
+        currentMob = spawnMob(currentZone, state)
+        if (currentMob) {
+          // Apply Ice Barrier absorb at combat start
+          if (fx.iceBarrierAbsorb > 0 && procState.iceBarrierHp <= 0) {
+            procState.iceBarrierHp = fx.iceBarrierAbsorb
+          }
+          newLogs.push(log(
+            'mob_death',
+            `${currentMob.isBoss ? '⚠ BOSS: ' : currentMob.isElite ? '★ Elite: ' : ''}${currentMob.name} appears!`,
+            currentMob.isBoss ? '#ff8000' : currentMob.isElite ? '#a335ee' : '#cccccc'
+          ))
+          if (currentMob.isBoss) get().triggerThought('boss_spawn', currentMob.name)
+          resetCombatAccumulators()
+        }
+      }
+      set({ currentMob, mobRespawnTimer, procState, skillCooldowns,
+            combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX) })
+      return
+    }
+
+    // ── Process active DoTs ─────────────────────────────────────────────────
+    const dotDamageThisTick: number[] = []
+    const nightfallChance = fx.nightfallProcChance
+    let nightfallProc = false
+
+    activeDoTs = activeDoTs.filter(dot => {
+      dot.tickAccum += deltaSeconds
+      if (dot.tickAccum >= dot.tickIntervalSeconds) {
+        dot.tickAccum -= dot.tickIntervalSeconds
+        dot.ticksRemaining--
+        dotDamageThisTick.push(dot.tickDamage)
+        if (nightfallChance > 0 && Math.random() < nightfallChance) nightfallProc = true
+      }
+      return dot.ticksRemaining > 0
+    })
+
+    if (dotDamageThisTick.length > 0 && currentMob) {
+      const totalDotDmg = dotDamageThisTick.reduce((a, b) => a + b, 0)
+      currentMob = { ...currentMob, currentHp: currentMob.currentHp - totalDotDmg }
+      if (state.settings.showDamageNumbers) {
+        newFns.push(fn(totalDotDmg, false, false, true, '#aa88ff'))
+      }
+      newLogs.push(log('dot_tick', `Affliction deals ${totalDotDmg} damage`, '#aa88ff'))
+    }
+
+    // Nightfall Shadow Bolt proc
+    if (nightfallProc && currentMob) {
+      const boltDmg = makeShadowBoltHit(stats.weaponDps, stats.attackSpeedSeconds, 2.5)
+      currentMob = { ...currentMob, currentHp: currentMob.currentHp - boltDmg }
+      newFns.push(fn(boltDmg, true, false, false, '#cc44ff'))
+      newLogs.push(log('proc', `⚡ Nightfall! Shadow Bolt hits for ${boltDmg}`, '#cc44ff'))
+    }
+
+    // ── Siphon Life ──────────────────────────────────────────────────────────
+    if (fx.siphonLifeHpPerTick > 0) {
+      siphonLifeAccum += deltaSeconds
+      if (siphonLifeAccum >= 3) {
+        siphonLifeAccum -= 3
+        stats.currentHp = Math.min(stats.maxHp, stats.currentHp + fx.siphonLifeHpPerTick)
+      }
+    }
+
+    // ── Player attacks mob ───────────────────────────────────────────────────
+    playerAttackAccum += deltaSeconds
+    if (playerAttackAccum >= stats.attackSpeedSeconds) {
+      playerAttackAccum -= stats.attackSpeedSeconds
+
+      const result = resolvePlayerAttack(
+        stats, state.playerClass, talentAllocs, procState, activeBuffs
+      )
+
+      // Consume crit guarantee stack
+      const cgBuff = activeBuffs.find(b => b.type === 'crit_guarantee' && (b.stacks ?? 0) > 0)
+      if (cgBuff && result.isCrit) cgBuff.stacks = (cgBuff.stacks ?? 1) - 1
+
+      // Consume next-hit multiplier
+      const nhBuff = activeBuffs.find(b => b.type === 'next_hit_multiplier' && (b.stacks ?? 0) > 0)
+      if (nhBuff) nhBuff.stacks = (nhBuff.stacks ?? 1) - 1
+
+      // Consume lifesteal buff
+      const lsBuff = activeBuffs.find(b => b.type === 'lifesteal_buff' && result.isCrit)
+      if (lsBuff && (lsBuff.stacks ?? 0) > 0) {
+        lsBuff.stacks = (lsBuff.stacks ?? 1) - 1
+        stats.currentHp = Math.min(stats.maxHp, stats.currentHp + Math.round(result.damage * lsBuff.value))
+      }
+
+      currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - result.damage }
+
+      if (state.settings.showDamageNumbers) {
+        newFns.push(fn(result.damage, result.isCrit, false, false, result.isCrit ? '#ffcc00' : '#88aaff'))
+      }
+      newLogs.push(log(
+        result.isCrit ? 'player_crit' : 'player_attack',
+        `You hit ${currentMob!.name} for ${result.damage}${result.isCrit ? ' (CRIT!)' : ''}`,
+        result.isCrit ? '#ffcc00' : '#88aaff',
+      ))
+
+      // Apply new DoTs (deduplicate by sourceType — refresh existing)
+      for (const newDot of result.triggeredDoTs) {
+        const existing = activeDoTs.findIndex(d => d.sourceType === newDot.sourceType)
+        if (existing >= 0) activeDoTs[existing] = newDot
+        else activeDoTs.push(newDot)
+      }
+
+      // Extra hit from sword spec
+      if (result.extraHit) {
+        const xtraHit = Math.round(stats.weaponDps * stats.attackSpeedSeconds * 0.7)
+        currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - xtraHit }
+        newFns.push(fn(xtraHit, false, false, false, '#aabbff'))
+        newLogs.push(log('proc', `⚡ Blade Dance! Extra strike for ${xtraHit}`, '#aabbff'))
+      }
+
+      // Seal Fate combo points
+      if (result.sealFatePoint) {
+        procState.comboPoints++
+        if (procState.comboPoints >= 5) {
+          procState.comboPoints = 0
+          const finisherDmg = Math.round(stats.weaponDps * stats.attackSpeedSeconds * 3)
+          currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - finisherDmg }
+          newFns.push(fn(finisherDmg, true, false, false, '#ff8800'))
+          newLogs.push(log('proc', `🎴 Eviscerate! ${finisherDmg} damage!`, '#ff8800'))
+        }
+      }
+
+      // Frostbite freeze
+      if (fx.frostbiteChance > 0 && !procState.mobFrozen && Math.random() < fx.frostbiteChance) {
+        procState.mobFrozen = true
+        procState.mobFrozenTimer = 4 + (talentAllocs['frost_permafrost'] ?? 0)
+        newLogs.push(log('proc', `🥶 Frostbite! Enemy frozen!`, '#66ccff'))
+      }
+
+      // Winter's Chill stacks
+      if (fx.winterChillEnabled) {
+        procState.winterChillStacks = Math.min(5, procState.winterChillStacks + 1)
+      }
+
+      // Reset remorseless
+      procState.remorselessActive = false
+
+      // ── Mob dies ────────────────────────────────────────────────────────────
+      if (currentMob!.currentHp <= 0) {
+        const deadMob = currentMob!
+        const loot = rollLoot(deadMob, level, stats.goldFindBonus)
+        gold += loot.gold
+
+        newLogs.push(log('mob_death', `${deadMob.name} dies!`, '#ff4444'))
+        newLogs.push(log('loot_gold',  `+${loot.gold} gold`,   '#ffd700'))
+
+        // Thought: boss kill, elite kill, or regular kill (10% chance to avoid spam)
+        if (deadMob.isBoss) {
+          get().triggerThought('boss_kill', deadMob.name)
+        } else if (deadMob.isElite) {
+          get().triggerThought('elite_kill', deadMob.name)
+        } else if (Math.random() < 0.15) {
+          get().triggerThought('mob_kill')
+        }
+
+        xp += deadMob.xpReward
+        while (xp >= xpForLevel(level)) {
+          xp -= xpForLevel(level)
+          level++
+          const newStats = compileStats(state.playerClass, level, equipment, talentAllocs)
+          stats = { ...newStats, currentHp: Math.min(newStats.maxHp, stats.currentHp + 20) }
+          newLogs.push(log('level_up', `★ Level Up! Now level ${level}!`, '#ffd700'))
+          // Gain a talent point
+          set(s => ({ talentPoints: s.talentPoints + 1 }))
+          get().triggerThought('level_up', `level ${level}`)
+          for (const [zid, zone] of Object.entries(ZONES)) {
+            if (!unlockedZones.includes(zid as ZoneId) && level >= zone.levelRange[0]) {
+              unlockedZones.push(zid as ZoneId)
+              newLogs.push(log('zone_change', `New zone unlocked: ${zone.name}!`, '#00ff88'))
+            }
+          }
+        }
+
+        const killKey = `${currentZone}:${deadMob.templateId}`
+        zoneKillCounts[killKey] = (zoneKillCounts[killKey] ?? 0) + 1
+        totalZoneKills[currentZone] = (totalZoneKills[currentZone] ?? 0) + 1
+
+        if (deadMob.isBoss && !bossesDefeated.includes(currentZone)) {
+          bossesDefeated.push(currentZone)
+          const zone = ZONES[currentZone]
+          if (zone.nextZone && !unlockedZones.includes(zone.nextZone)) {
+            unlockedZones.push(zone.nextZone)
+            newLogs.push(log('zone_change', `★ Boss slain! ${ZONES[zone.nextZone!]?.name} unlocked!`, '#ff8000'))
+          }
+        }
+
+        if (loot.item) {
+          const empty = inventory.findIndex(s => s === null)
+          if (empty >= 0) {
+            inventory[empty] = loot.item
+            newLogs.push(log('loot_item', `Looted: ${loot.item.name}`, rarityColor(loot.item.rarity)))
+          } else {
+            newLogs.push(log('loot_item', `Bag full! Lost: ${loot.item.name}`, '#ff6666'))
+          }
+        }
+
+        if (fx.remorselessEnabled) procState.remorselessActive = true
+        procState.winterChillStacks = 0
+        procState.mobFrozen = false
+        procState.iceBarrierHp = 0
+        currentMob = null
+        activeDoTs  = []
+        mobRespawnTimer = MOB_RESPAWN_SECONDS
+        resetCombatAccumulators()
+      }
+    }
+
+    // ── Mob attacks player ───────────────────────────────────────────────────
+    if (currentMob && !procState.mobFrozen) {
+      mobAttackAccum += deltaSeconds
+      if (mobAttackAccum >= currentMob.attackSpeedSeconds) {
+        mobAttackAccum -= currentMob.attackSpeedSeconds
+        let mobDmg = resolveMobAttack(currentMob, stats.armor, fx.mobAttackSpeedFactor)
+
+        // Ice Barrier absorb
+        if (procState.iceBarrierHp > 0) {
+          const absorbed = Math.min(procState.iceBarrierHp, mobDmg)
+          procState.iceBarrierHp -= absorbed
+          mobDmg -= absorbed
+        }
+
+        if (mobDmg > 0) {
+          stats.currentHp = Math.max(0, stats.currentHp - mobDmg)
+          newFns.push(fn(mobDmg, false, true, false))
+          newLogs.push(log('mob_attack', `${currentMob.name} hits you for ${mobDmg}`, '#ff8888'))
+
+          // Ice Block: immune when near death
+          if (fx.iceBlockEnabled && !procState.iceBlockUsed && stats.currentHp / stats.maxHp < 0.15) {
+            procState.iceBlockUsed = true
+            stats.currentHp = Math.ceil(stats.maxHp * 0.15)
+            const iceBlockBuff: ActiveBuff = {
+              id: `buff_ice_block_${Date.now()}`,
+              label: 'Ice Block',
+              icon: '🧊',
+              color: '#6699ff',
+              type: 'armor_buff',
+              value: 999,
+              durationRemaining: 5,
+            }
+            activeBuffs.push(iceBlockBuff)
+            newLogs.push(log('proc', '🧊 Ice Block! Immune for 5s!', '#66ccff'))
+          }
+        }
+
+        // Near-death thought (10-20% HP, once per encounter)
+        if (mobDmg > 0 && stats.currentHp / stats.maxHp < 0.2 && stats.currentHp > 0) {
+          get().triggerThought('near_death', `${Math.round(stats.currentHp / stats.maxHp * 100)}% HP`)
+        }
+
+        if (stats.currentHp <= 0) {
+          // Check ice block
+          const iceBuff = activeBuffs.find(b => b.label === 'Ice Block')
+          if (!iceBuff) {
+            isAlive = false
+            respawnTimer = 5
+            stats.currentHp = 0
+            currentMob = null
+            activeDoTs = []
+            newLogs.push(log('player_death', 'You have been slain! Respawning in 5s...', '#ff4444'))
+            get().triggerThought('player_death')
+            resetCombatAccumulators()
+          }
+        }
+      }
+    }
+
+    // Prune old floating numbers
+    const now = Date.now()
+    const allFns = [...floatingNumbers.filter(f => now - f.createdAt < 1400), ...newFns]
+
+    set({
+      stats, gold, xp, level, currentMob, isAlive, respawnTimer, mobRespawnTimer,
+      inventory, equipment, activeDoTs, activeBuffs, procState, skillCooldowns,
+      floatingNumbers: allFns,
+      totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones,
+      totalPlayTime: state.totalPlayTime + deltaSeconds,
+      combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX),
+    })
+  },
+
+  // ── Equipment ────────────────────────────────────────────────────────────────
+  equipItem: (i) => {
+    const s = get()
+    const item = s.inventory[i]
+    if (!item) return
+    const equipment = { ...s.equipment }
+    const inventory = [...s.inventory]
+    equipment[item.slot] = item
+    inventory[i] = s.equipment[item.slot]
+    const stats = compileStats(s.playerClass, s.level, equipment, s.talentAllocs)
+    stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
+    set({ equipment, inventory, stats })
+  },
+
+  unequipItem: (slot) => {
+    const s = get()
+    const item = s.equipment[slot]
+    if (!item) return
+    const empty = s.inventory.findIndex(x => x === null)
+    if (empty < 0) return
+    const equipment = { ...s.equipment, [slot]: null }
+    const inventory = [...s.inventory]
+    inventory[empty] = item
+    const stats = compileStats(s.playerClass, s.level, equipment, s.talentAllocs)
+    stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
+    set({ equipment, inventory, stats })
+  },
+
+  sellItem: (i) => {
+    const s = get()
+    const item = s.inventory[i]
+    if (!item) return
+    const inventory = [...s.inventory]
+    inventory[i] = null
+    set({ inventory, gold: s.gold + item.vendorValue })
+  },
+
+  sellAllCommon: () => {
+    const s = get()
+    let gained = 0
+    const inventory = s.inventory.map(item => {
+      if (item?.rarity === 'common') { gained += item.vendorValue; return null }
+      return item
+    })
+    set({ inventory, gold: s.gold + gained })
+  },
+
+  // ── Zone ─────────────────────────────────────────────────────────────────────
+  selectZone: (zoneId) => {
+    const s = get()
+    if (!s.unlockedZones.includes(zoneId)) return
+    resetCombatAccumulators()
+    set({ currentZone: zoneId, currentMob: null, mobRespawnTimer: 0, activeDoTs: [] })
+  },
+
+  // ── Talents ──────────────────────────────────────────────────────────────────
+  allocateTalent: (talentId) => {
+    const s = get()
+    if (s.talentPoints <= 0) return
+    const classDef = CLASS_DEFINITIONS[s.playerClass]
+    const node = classDef.talents.find(t => t.id === talentId)
+    if (!node) return
+    const current = s.talentAllocs[talentId] ?? 0
+    if (current >= node.maxRanks) return
+
+    // Check points-in-tree requirement
+    const totalSpent = Object.values(s.talentAllocs).reduce((a, b) => a + b, 0)
+    const rowCost = (node.row - 1) * 5  // need 5 pts per row to unlock
+    if (totalSpent < rowCost) return
+
+    // Check hard prerequisite
+    if (node.requires) {
+      const prereqNode = classDef.talents.find(t => t.id === node.requires)
+      if (!prereqNode) return
+      if ((s.talentAllocs[node.requires] ?? 0) < prereqNode.maxRanks) return
+    }
+
+    const talentAllocs = { ...s.talentAllocs, [talentId]: current + 1 }
+    const stats = compileStats(s.playerClass, s.level, s.equipment, talentAllocs)
+    stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
+    set({ talentAllocs, talentPoints: s.talentPoints - 1, stats })
+  },
+
+  deallocateTalent: (talentId) => {
+    const s = get()
+    const current = s.talentAllocs[talentId] ?? 0
+    if (current <= 0) return
+    // Don't deallocate if another talent requires this one maxed
+    const classDef = CLASS_DEFINITIONS[s.playerClass]
+    for (const node of classDef.talents) {
+      if (node.requires === talentId) {
+        const reqNode = classDef.talents.find(t => t.id === talentId)!
+        if (current <= reqNode.maxRanks && (s.talentAllocs[node.id] ?? 0) > 0) return
+      }
+    }
+    const talentAllocs = { ...s.talentAllocs, [talentId]: current - 1 }
+    const stats = compileStats(s.playerClass, s.level, s.equipment, talentAllocs)
+    stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
+    set({ talentAllocs, talentPoints: s.talentPoints + 1, stats })
+  },
+
+  resetTalents: () => {
+    const s = get()
+    const totalSpent = Object.values(s.talentAllocs).reduce((a, b) => a + b, 0)
+    const stats = compileStats(s.playerClass, s.level, s.equipment, {})
+    stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
+    set({ talentAllocs: {}, talentPoints: s.talentPoints + totalSpent, stats })
+  },
+
+  // ── Skill Bar ────────────────────────────────────────────────────────────────
+  activateAbility: (abilityId) => {
+    const s = get()
+    if ((s.skillCooldowns[abilityId] ?? 0) > 0) return
+    const ability = ACTIVE_ABILITIES.find(a => a.id === abilityId)
+    if (!ability || !ability.classes.includes(s.playerClass)) return
+    if (!s.currentMob && ability.effects.every(e => e.type !== 'hot')) return // no target for damaging abilities
+
+    const newFns: FloatingNumber[] = []
+    const newLogs: CombatLogEntry[] = []
+    const newBuffs = [...s.activeBuffs]
+    let stats = { ...s.stats }
+    let currentMob = s.currentMob ? { ...s.currentMob } : null
+    let procState = { ...s.procState }
+
+    for (const effect of ability.effects) {
+      switch (effect.type) {
+        case 'freeze_mob':
+          procState.mobFrozen = true
+          procState.mobFrozenTimer = effect.durationSeconds ?? 4
+          break
+        case 'shadow_bolt':
+          if (currentMob) {
+            const dmg = makeShadowBoltHit(stats.weaponDps, stats.attackSpeedSeconds, effect.value)
+            currentMob.currentHp -= dmg
+            newFns.push(fn(dmg, true, false, false, '#cc44ff'))
+            newLogs.push(log('ability_use', `☠ Shadow Bolt strikes for ${dmg}!`, '#cc44ff'))
+          }
+          break
+        case 'hot':
+          // Heal over time — apply as buff
+          newBuffs.push(makeAbilityBuff(abilityId, effect, ability.name, ability.icon))
+          newLogs.push(log('ability_use', `💚 ${ability.name} — healing over time...`, '#44ff88'))
+          break
+        default:
+          newBuffs.push(makeAbilityBuff(abilityId, effect, ability.name, ability.icon))
+          newLogs.push(log('ability_use', `✨ ${ability.name} activated!`, '#ffd700'))
+      }
+    }
+
+    // Process hot immediately in tick, but set it up here
+    // Handle next_hit_multiplier as well
+    const skillCooldowns = { ...s.skillCooldowns, [abilityId]: ability.cooldownSeconds }
+
+    // If mob died from shadow bolt
+    if (currentMob && currentMob.currentHp <= 0) {
+      // Minimal kill handling — full path is in tick; just clear mob
+      newLogs.push(log('mob_death', `${currentMob.name} dies to Shadow Bolt!`, '#ff4444'))
+      const loot = rollLoot(currentMob, s.level, stats.goldFindBonus)
+      set(prev => ({
+        currentMob: null, mobRespawnTimer: 3,
+        activeDoTs: [], procState,
+        gold: prev.gold + loot.gold,
+        skillCooldowns,
+        activeBuffs: newBuffs,
+        floatingNumbers: [...prev.floatingNumbers, ...newFns],
+        combatLog: [...newLogs, ...prev.combatLog].slice(0, LOG_MAX),
+      }))
+      return
+    }
+
+    set(prev => ({
+      currentMob,
+      procState,
+      skillCooldowns,
+      activeBuffs: newBuffs,
+      floatingNumbers: [...prev.floatingNumbers, ...newFns],
+      combatLog: [...newLogs, ...prev.combatLog].slice(0, LOG_MAX),
+    }))
+  },
+
+  respawnNow: () => {
+    const s = get()
+    const stats = { ...s.stats, currentHp: Math.floor(s.stats.maxHp * 0.3) }
+    set({ isAlive: true, respawnTimer: 0, stats, procState: defaultProcState() })
+    resetCombatAccumulators()
+  },
+
+  dismissFloatingNumber: (id) => {
+    set(s => ({ floatingNumbers: s.floatingNumbers.filter(fn => fn.id !== id) }))
+  },
+
+  // ── Thought system ────────────────────────────────────────────────────────────
+  triggerThought: (event, extra) => {
+    const s = get()
+    const now = Date.now()
+    const THOUGHT_COOLDOWN_MS = 18_000
+    const THOUGHT_DURATION_MS = 5_000
+
+    // Don't fire if: no name gen done, thought still visible, or cooldown active
+    if (s.nameGenStatus !== 'done') return
+    if (now < s.thoughtExpiresAt) return
+    if (now - s.lastThoughtAt < THOUGHT_COOLDOWN_MS) return
+
+    // Optimistically mark as triggered to prevent duplicate calls
+    set({ lastThoughtAt: now })
+
+    generateThought(
+      s.playerName || 'The Wanderer',
+      s.playerClass,
+      s.characterTraits,
+      event,
+      extra,
+    ).then(thought => {
+      set({ currentThought: thought, thoughtExpiresAt: Date.now() + THOUGHT_DURATION_MS })
+      // Auto-clear after duration
+      setTimeout(() => {
+        set(cur => cur.currentThought === thought ? { currentThought: null } : {})
+      }, THOUGHT_DURATION_MS + 400)
+    }).catch(() => { /* silent fail */ })
+  },
+}))
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+export function rarityColor(rarity: string): string {
+  const map: Record<string, string> = {
+    common: '#9d9d9d', uncommon: '#1eff00', rare: '#0070dd',
+    epic: '#a335ee', legendary: '#ff8000',
+  }
+  return map[rarity] ?? '#ffffff'
+}

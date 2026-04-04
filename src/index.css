@@ -1,0 +1,268 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global Reset & Base ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background-color: #1a1510;
+  color: #d4b896;
+  font-family: 'Cinzel', 'Palatino Linotype', serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ── WoW UI Chrome ────────────────────────────────────────────────────────── */
+.wow-panel {
+  background: linear-gradient(160deg, #2a2218 0%, #1e1a12 60%, #141008 100%);
+  border: 2px solid #6b5020;
+  border-top-color: #c8a100;
+  border-left-color: #9a7830;
+  box-shadow:
+    inset 0 1px 0 rgba(200,161,0,0.2),
+    inset 0 -1px 0 rgba(0,0,0,0.6),
+    0 4px 16px rgba(0,0,0,0.8);
+}
+
+.wow-panel-header {
+  background: linear-gradient(90deg, #3a2c10 0%, #4a3818 50%, #3a2c10 100%);
+  border-bottom: 1px solid #6b5020;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ffd700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.wow-button {
+  background: linear-gradient(180deg, #4a3818 0%, #2e2210 100%);
+  border: 1px solid #6b5020;
+  border-top-color: #9a7830;
+  color: #ffd700;
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.1s;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+}
+
+.wow-button:hover {
+  background: linear-gradient(180deg, #6a5228 0%, #4a3518 100%);
+  border-color: #c8a100;
+  color: #ffe040;
+}
+
+.wow-button:active {
+  background: linear-gradient(180deg, #2e2210 0%, #4a3818 100%);
+  transform: translateY(1px);
+}
+
+.wow-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Health / XP Bars ─────────────────────────────────────────────────────── */
+.bar-track {
+  background: #0a0805;
+  border: 1px solid #2a2010;
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.bar-fill {
+  height: 100%;
+  transition: width 0.3s ease-out;
+  position: relative;
+}
+
+.bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+}
+
+.bar-hp       { background: linear-gradient(90deg, #8b0000, #cc2200); }
+.bar-xp       { background: linear-gradient(90deg, #003080, #0060cc); }
+.bar-mob-hp   { background: linear-gradient(90deg, #7a1a00, #c43000); }
+
+/* ── Rarity Colors ────────────────────────────────────────────────────────── */
+.rarity-common    { color: #9d9d9d; }
+.rarity-uncommon  { color: #1eff00; }
+.rarity-rare      { color: #0070dd; }
+.rarity-epic      { color: #a335ee; }
+.rarity-legendary { color: #ff8000; text-shadow: 0 0 8px rgba(255,128,0,0.6); }
+
+/* ── Combat Log ───────────────────────────────────────────────────────────── */
+.combat-log {
+  font-family: monospace;
+  font-size: 0.65rem;
+  line-height: 1.4;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #4a3818 #0a0805;
+}
+
+.combat-log::-webkit-scrollbar { width: 6px; }
+.combat-log::-webkit-scrollbar-track { background: #0a0805; }
+.combat-log::-webkit-scrollbar-thumb { background: #4a3818; border-radius: 3px; }
+
+/* ── Loot Toast ───────────────────────────────────────────────────────────── */
+@keyframes loot-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes loot-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.loot-toast {
+  animation: loot-in 0.2s ease-out forwards;
+}
+
+/* ── Floating Damage Numbers ─────────────────────────────────────────────── */
+@keyframes float-up {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  60%  { opacity: 1; transform: translateY(-30px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-50px) scale(0.9); }
+}
+
+.damage-float {
+  animation: float-up 1.2s ease-out forwards;
+  pointer-events: none;
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+}
+
+/* ── Inventory Grid ───────────────────────────────────────────────────────── */
+.inventory-slot {
+  background: #0d0b07;
+  border: 1px solid #3a2c10;
+  cursor: pointer;
+  transition: border-color 0.1s;
+  position: relative;
+}
+
+.inventory-slot:hover {
+  border-color: #c8a100;
+  background: #1a1508;
+}
+
+.inventory-slot.occupied::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ── Scrollbar for panels ─────────────────────────────────────────────────── */
+.panel-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #4a3818 #0a0805;
+}
+.panel-scroll::-webkit-scrollbar { width: 5px; }
+.panel-scroll::-webkit-scrollbar-track { background: #0a0805; }
+.panel-scroll::-webkit-scrollbar-thumb { background: #4a3818; }
+
+/* ── Tooltip ──────────────────────────────────────────────────────────────── */
+.wow-tooltip {
+  background: linear-gradient(160deg, #1a1508 0%, #0d0b05 100%);
+  border: 1px solid #6b5020;
+  border-top-color: #c8a100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.9);
+  padding: 8px 10px;
+  min-width: 180px;
+  max-width: 280px;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* ── Pulsing idle animation ───────────────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba(200,161,0,0.2); }
+  50%       { box-shadow: 0 0 12px rgba(200,161,0,0.5); }
+}
+
+.zone-active {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ── Class color chips ───────────────────────────────────────────────────── */
+.class-warrior { color: #c69b3a; }
+.class-mage    { color: #69ccf0; }
+.class-rogue   { color: #fff569; }
+.class-warlock { color: #9b59d0; }
+
+/* ── Skill Bar ────────────────────────────────────────────────────────────── */
+@keyframes cooldown-sweep {
+  from { --cd-pct: 100%; }
+  to   { --cd-pct: 0%; }
+}
+
+.skill-btn {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid #4a3818;
+  background: #1a1508;
+  transition: border-color 0.1s, transform 0.1s;
+  user-select: none;
+}
+.skill-btn:hover:not(.on-cooldown) { border-color: #c8a100; transform: scale(1.05); }
+.skill-btn:active:not(.on-cooldown) { transform: scale(0.97); }
+.skill-btn.on-cooldown { cursor: default; opacity: 0.7; }
+
+.skill-cd-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Status Effect Chips ──────────────────────────────────────────────────── */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border-radius: 3px;
+  font-size: 0.55rem;
+  font-family: monospace;
+  cursor: default;
+  transition: opacity 0.2s;
+}
+
+/* ── Talent Tree ──────────────────────────────────────────────────────────── */
+.talent-node {
+  border: 2px solid #3a2c10;
+  background: #0d0b07;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s, transform 0.1s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.talent-node:hover.available { border-color: #ffd700; background: #1a1508; transform: scale(1.06); }
+.talent-node.partial  { border-color: #6b5020; background: #140e05; }
+.talent-node.maxed    { border-color: #ffd700; background: #1e1800; box-shadow: 0 0 6px rgba(255,215,0,0.3); }
+.talent-node.locked   { opacity: 0.35; cursor: default; }
+.talent-node.available { border-color: #9a7830; }
