@@ -8,7 +8,7 @@ import { InventoryPanel } from './components/game/InventoryPanel'
 import { ZoneSelector } from './components/game/ZoneSelector'
 import { CombatLog } from './components/game/CombatLog'
 import { GoldDisplay } from './components/ui/GoldDisplay'
-import type { ClassType } from './data/types'
+import type { ClassType, RaceType } from './data/types'
 
 type MobilePanel = 'left' | 'right' | 'log' | null
 
@@ -28,7 +28,7 @@ export default function App() {
   }, [initialized])
 
   if (!initialized) {
-    return <ClassSelect onSelect={(cls: ClassType) => initGame(cls)} />
+    return <ClassSelect onSelect={(cls: ClassType, race: RaceType) => initGame(cls, race)} />
   }
 
   return (

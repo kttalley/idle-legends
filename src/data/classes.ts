@@ -11,6 +11,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
     description: 'A plate-armored bruiser. Steady damage, high health, built to endure. Arms spec: cleave and shatter.',
     primaryStat: 'strength',
     colorClass: 'class-warrior',
+    allowedRaces: ['human', 'dwarf', 'elf', 'orc', 'troll', 'tauren'],
     baseStats: {
       strength: 20,
       intellect: 5,
@@ -30,6 +31,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
     description: 'An arcane glass cannon. Frost spec: freeze, shatter, and Winter\'s Chill stacks.',
     primaryStat: 'intellect',
     colorClass: 'class-mage',
+    allowedRaces: ['human', 'elf', 'gnome', 'troll', 'goblin'],
     baseStats: {
       strength: 5,
       intellect: 25,
@@ -49,6 +51,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
     description: 'Shadow daggers and lethal precision. Assassination spec: poisons, combo points, Cold Blood.',
     primaryStat: 'agility',
     colorClass: 'class-rogue',
+    allowedRaces: ['human', 'dwarf', 'elf', 'gnome', 'orc', 'troll', 'goblin'],
     baseStats: {
       strength: 10,
       intellect: 8,
@@ -68,6 +71,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
     description: 'Shadow curses and void corruption. Affliction spec: DoTs, Nightfall procs, Siphon Life.',
     primaryStat: 'intellect',
     colorClass: 'class-warlock',
+    allowedRaces: ['human', 'gnome', 'orc', 'goblin', 'troll'],
     baseStats: {
       strength: 6,
       intellect: 22,

@@ -126,6 +126,7 @@ export function compileStats(
   level: number,
   equipment: Record<Slot, Item | null>,
   talentAllocs: Record<string, number>,
+  racialPassive: StatBonuses = {},
 ): Stats {
   const classDef = CLASS_DEFINITIONS[playerClass]
   const base = classDef.baseStats
@@ -140,17 +141,18 @@ export function compileStats(
   }
 
   const levelBonus = Math.floor((level - 1) * 0.5)
-  const strength  = base.strength  + levelBonus + (fx.statBonuses.strength  ?? 0) + (eqBonuses.strength  ?? 0)
-  const intellect = base.intellect + levelBonus + (fx.statBonuses.intellect ?? 0) + (eqBonuses.intellect ?? 0)
-  const agility   = base.agility   + levelBonus + (fx.statBonuses.agility   ?? 0) + (eqBonuses.agility   ?? 0)
-  const stamina   = base.stamina   + levelBonus + (fx.statBonuses.stamina   ?? 0) + (eqBonuses.stamina   ?? 0)
-  const armor     = Math.max(0, base.armor + (fx.statBonuses.armor ?? 0) + (eqBonuses.armor ?? 0))
-  const wDps      = base.weaponDps + (fx.statBonuses.weaponDps ?? 0) + (eqBonuses.weaponDps ?? 0)
+  const strength  = base.strength  + levelBonus + (fx.statBonuses.strength  ?? 0) + (eqBonuses.strength  ?? 0) + (racialPassive.strength  ?? 0)
+  const intellect = base.intellect + levelBonus + (fx.statBonuses.intellect ?? 0) + (eqBonuses.intellect ?? 0) + (racialPassive.intellect ?? 0)
+  const agility   = base.agility   + levelBonus + (fx.statBonuses.agility   ?? 0) + (eqBonuses.agility   ?? 0) + (racialPassive.agility   ?? 0)
+  const stamina   = base.stamina   + levelBonus + (fx.statBonuses.stamina   ?? 0) + (eqBonuses.stamina   ?? 0) + (racialPassive.stamina   ?? 0)
+  const armor     = Math.max(0, base.armor + (fx.statBonuses.armor ?? 0) + (eqBonuses.armor ?? 0) + (racialPassive.armor ?? 0))
+  const wDps      = base.weaponDps + (fx.statBonuses.weaponDps ?? 0) + (eqBonuses.weaponDps ?? 0) + (racialPassive.weaponDps ?? 0)
 
   const attackSpeedSeconds = Math.max(0.5,
     base.attackSpeedSeconds +
     (fx.statBonuses.attackSpeedSeconds ?? 0) +
-    (eqBonuses.attackSpeedSeconds ?? 0)
+    (eqBonuses.attackSpeedSeconds ?? 0) +
+    (racialPassive.attackSpeedSeconds ?? 0)
   )
 
   const primaryStat = playerClass === 'warrior' ? strength
@@ -160,9 +162,11 @@ export function compileStats(
   const critChance = Math.min(0.75,
     agility / AGILITY_CRIT_DIVISOR +
     (fx.statBonuses.critChance ?? 0) +
-    (eqBonuses.critChance ?? 0)
+    (eqBonuses.critChance ?? 0) +
+    (racialPassive.critChance ?? 0)
   )
-  const goldFindBonus = Math.max(base.goldFindBonus, eqBonuses.goldFindBonus ?? 1)
+  const goldFindBonus = Math.max(base.goldFindBonus,
+    (eqBonuses.goldFindBonus ?? 1) + (racialPassive.goldFindBonus ?? 0))
   const maxHp = Math.floor(stamina * HP_PER_STAMINA + 50 + level * 5)
 
   return {

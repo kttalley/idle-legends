@@ -1,4 +1,4 @@
-import type { ClassType, ZoneId } from '../data/types'
+import type { ClassType, ZoneId, FactionType } from '../data/types'
 
 const OLLAMA_BASE = 'https://llm.kristiantalley.com'
 const MODEL       = 'incept5/llama3.1-claude:latest'
@@ -7,6 +7,34 @@ export interface GeneratedNames {
   playerName: string
   zoneNames: Partial<Record<ZoneId, string>>
   traits: string[]
+  factionNames: Record<FactionType, string>
+}
+
+// ── Faction name fallback pools ───────────────────────────────────────────────
+// Light faction (maps to 'alliance') — noble, ordered, ancient
+const LIGHT_PREFIXES = ['Iron', 'Silver', 'Dawnward', 'Goldspire', 'Stone', 'Ashborn', 'Starfall', 'Frostmantle', 'Crystalhall', 'Stormridge', 'Whiteveil', 'Embercrown', 'Gilded', 'Ardent', 'Highwatch']
+const LIGHT_SUFFIXES = ['Covenant', 'Accord', 'Vigil', 'Conclave', 'Bastion', 'Order', 'Bulwark', 'Pact', 'Oath', 'Wardens', 'Vanguard', 'Sanctum', 'Compact', 'Brotherhood', 'Assembly']
+
+// Shadow faction (maps to 'horde') — brutal, primal, tribal
+const SHADOW_PREFIXES = ['Bloodmaw', 'Ashfang', 'Ironjaw', 'Boneclaw', 'Grimtide', 'Scarwar', 'Venomspur', 'Emberscar', 'Duskrend', 'Warspine', 'Skullbreak', 'Darkroar', 'Gorewind', 'Felbrand', 'Crushmarrow']
+const SHADOW_SUFFIXES = ['Clan', 'Warband', 'Legion', 'Pack', 'Host', 'Reavers', 'March', 'Surge', 'Tide', 'Rend', 'Dominion', 'Horde', 'Throng', 'Descent', 'Phalanx']
+
+// Neutral faction
+const NEUTRAL_PREFIXES = ['Gray', 'Wandering', 'Free', 'Open', 'Crossroads', 'Drifting', 'Between']
+const NEUTRAL_SUFFIXES = ['Circle', 'Exchange', 'Conclave', 'Forum', 'Compact', 'Market', 'Accord']
+
+function seededPick<T>(arr: T[], seed: number, offset: number): T {
+  const x = Math.sin(seed * 9301 + offset * 49297 + 233) * 16807
+  const idx = Math.abs(Math.floor((x - Math.floor(x)) * arr.length))
+  return arr[idx % arr.length]
+}
+
+export function generateFactionNamesFallback(seed: number): Record<FactionType, string> {
+  return {
+    alliance: `The ${seededPick(LIGHT_PREFIXES, seed, 1)} ${seededPick(LIGHT_SUFFIXES, seed, 2)}`,
+    horde:    `The ${seededPick(SHADOW_PREFIXES, seed, 3)} ${seededPick(SHADOW_SUFFIXES, seed, 4)}`,
+    neutral:  `The ${seededPick(NEUTRAL_PREFIXES, seed, 5)} ${seededPick(NEUTRAL_SUFFIXES, seed, 6)}`,
+  }
 }
 
 const CLASS_FLAVOR: Record<ClassType, string> = {
@@ -24,11 +52,18 @@ const CLASS_TRAIT_POOLS: Record<ClassType, string> = {
 }
 
 const ZONE_THEMES: Record<ZoneId, string> = {
-  sunhollow_meadows: 'peaceful sun-dappled starting meadow, level 1-10, home to wolves and boars',
-  dustwind_plains:   'harsh arid plains swept by gritty winds, level 10-20, home to scorpids and bandits',
-  grimshade_forest:  'dark haunted forest choked with shadow, level 20-30, home to undead and shadow beasts',
-  thornvale_jungle:  'dense deadly jungle with ancient ruins, level 30-40, home to trolls and giant spiders',
-  ashfire_peaks:     'volcanic mountain peaks shrouded in ash and flame, level 40-50, home to fire elementals and dragons',
+  sunhollow_meadows:  'peaceful sun-dappled starting meadow, level 1-10, home to wolves and boars',
+  dustwind_plains:    'harsh arid plains swept by gritty winds, level 10-20, home to scorpids and bandits',
+  grimshade_forest:   'dark haunted forest choked with shadow, level 20-30, home to undead and shadow beasts',
+  thornvale_jungle:   'dense deadly jungle with ancient ruins, level 30-40, home to trolls and giant spiders',
+  ashfire_peaks:      'volcanic mountain peaks shrouded in ash and flame, level 40-50, home to fire elementals and dragons',
+  shattered_crossing: 'ruined bridge-town where two factions battle, levels 45-55',
+  the_bloodfields:    'open war-torn plains littered with the dead, levels 50-60',
+  ironcrag_badlands:  'jagged iron-red badlands, first Horde stronghold, levels 55-70',
+  venom_hollows:      'fetid troll swamps reeking of poison, levels 65-80',
+  warsong_mesa:       'red stone plateaus echoing with orc war-drums, levels 75-90',
+  cinderfall_wastes:  'ash-choked ruins of a city burned in war, levels 85-100',
+  the_maw_eternal:    'the world-edge abyss, final Horde fortress, levels 95-100',
 }
 
 async function ollamaGenerate(prompt: string): Promise<string> {
@@ -47,7 +82,7 @@ async function ollamaGenerate(prompt: string): Promise<string> {
   return (data.response ?? '').trim()
 }
 
-export async function generateNames(playerClass: ClassType): Promise<GeneratedNames> {
+export async function generateNames(playerClass: ClassType, seed: number): Promise<GeneratedNames> {
   const zoneDescriptions = Object.entries(ZONE_THEMES)
     .map(([id, theme]) => `    "${id}": "<unique 2-3 word evocative zone name for: ${theme}>"`)
     .join(',\n')
@@ -57,10 +92,17 @@ export async function generateNames(playerClass: ClassType): Promise<GeneratedNa
 The player is ${CLASS_FLAVOR[playerClass]}.
 Possible personality traits to draw from: ${CLASS_TRAIT_POOLS[playerClass]}.
 
+This world has two opposing factions at war. The light faction is noble and ordered (humans, dwarves, elves). The shadow faction is primal and brutal (orcs, trolls, goblins). Do NOT use "Alliance" or "Horde" — invent original names that feel like they belong to a living world with history. Each name should be 2-4 words using "The" as a prefix.
+
 Generate this exact JSON:
 {
   "playerName": "<2-word fantasy name, format FirstName Epithet, e.g. 'Gorvain the Relentless'>",
   "traits": ["<trait 1>", "<trait 2>", "<trait 3>"],
+  "factionNames": {
+    "alliance": "<original name for the light/noble faction>",
+    "horde": "<original name for the shadow/primal faction>",
+    "neutral": "<original name for the neutral/wanderer faction>"
+  },
   "zoneNames": {
 ${zoneDescriptions}
   }
@@ -73,13 +115,21 @@ ${zoneDescriptions}
   const parsed = JSON.parse(match[0]) as {
     playerName: string
     traits: string[]
+    factionNames: Record<FactionType, string>
     zoneNames: Record<string, string>
   }
 
+  const fallbackFactions = generateFactionNamesFallback(seed)
+
   return {
-    playerName: parsed.playerName ?? 'The Wanderer',
-    traits:     Array.isArray(parsed.traits) ? parsed.traits.slice(0, 3) : [],
-    zoneNames:  (parsed.zoneNames ?? {}) as Partial<Record<ZoneId, string>>,
+    playerName:   parsed.playerName ?? 'The Wanderer',
+    traits:       Array.isArray(parsed.traits) ? parsed.traits.slice(0, 3) : [],
+    factionNames: {
+      alliance: parsed.factionNames?.alliance ?? fallbackFactions.alliance,
+      horde:    parsed.factionNames?.horde    ?? fallbackFactions.horde,
+      neutral:  parsed.factionNames?.neutral  ?? fallbackFactions.neutral,
+    },
+    zoneNames: (parsed.zoneNames ?? {}) as Partial<Record<ZoneId, string>>,
   }
 }
 

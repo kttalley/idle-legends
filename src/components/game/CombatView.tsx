@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { ZONES } from '../../data/zones'
 import { HealthBar } from '../ui/HealthBar'
@@ -59,6 +59,44 @@ export function CombatView() {
   const isTraveling = gameMode === 'traveling'
   const mobDist = Math.sqrt(mobMapOffset.dx ** 2 + mobMapOffset.dy ** 2)
   const mobApproaching = currentMob !== null && mobDist > 1.5
+
+  // ── Combat animation state ──────────────────────────────────────────────────
+  const [playerAnimClass, setPlayerAnimClass] = useState('')
+  const [mobAnimClass,    setMobAnimClass]    = useState('')
+  const [impactChar,      setImpactChar]      = useState<string | null>(null)
+  const [impactColor,     setImpactColor]     = useState('#ffffff')
+
+  // Detect spell class for player attack animation
+  const isSpellClass =
+    playerPalette.shades[0] === '#050a30' ||  // mage
+    playerPalette.shades[0] === '#100520'      // warlock
+
+  const prevFnIds = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const currentIds = new Set(floatingNumbers.map(fn => fn.id))
+    // Find IDs not seen before
+    const newFns = floatingNumbers.filter(fn => !prevFnIds.current.has(fn.id))
+    prevFnIds.current = currentIds
+
+    if (newFns.length === 0) return
+
+    for (const fn of newFns) {
+      if (!fn.isMobDamage) {
+        // Player attacked — lunge + impact flash
+        setPlayerAnimClass(isSpellClass ? 'avatar-spell-cast' : 'avatar-attacking')
+        const char  = fn.isCrit ? '★' : fn.isDoT ? '●' : isSpellClass ? '●' : '✕'
+        const color = fn.isCrit ? '#ffcc00' : fn.isDoT ? '#aa88ff' : isSpellClass ? '#70a0ff' : '#ff8866'
+        setImpactChar(char)
+        setImpactColor(color)
+        setTimeout(() => { setPlayerAnimClass(''); setImpactChar(null) }, 280)
+      } else {
+        // Mob attacked — player takes hit
+        setMobAnimClass('avatar-hit')
+        setTimeout(() => setMobAnimClass(''), 350)
+      }
+    }
+  }, [floatingNumbers]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-mode status label
   const autoStatus = (() => {
@@ -174,6 +212,8 @@ export function CombatView() {
                   palette={playerPalette}
                   cellSize={9}
                   animate={isAlive}
+                  attackAnim={playerAnimClass === 'avatar-attacking' || playerAnimClass === 'avatar-spell-cast'}
+                  hitAnim={mobAnimClass === 'avatar-hit'}
                 />
               </div>
 
@@ -204,9 +244,25 @@ export function CombatView() {
               )}
             </div>
 
-            {/* VS / Approach indicator */}
-            <div style={{ color: mobApproaching ? '#ff6644' : '#555', fontSize: mobApproaching ? '0.65rem' : '1rem', fontWeight: 700, transition: 'all 0.3s' }}>
-              {mobApproaching ? `↘ ${Math.round(mobDist)}` : '⚔'}
+            {/* Combat gap — VS / impact overlay */}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 60, flexShrink: 0 }}>
+              <span style={{ color: mobApproaching ? '#ff6644' : '#555', fontSize: mobApproaching ? '0.65rem' : '1rem', fontWeight: 700, transition: 'all 0.3s' }}>
+                {mobApproaching ? `↘ ${Math.round(mobDist)}` : '⚔'}
+              </span>
+              {impactChar && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    fontSize: impactChar === '★' ? '1.4rem' : '1.1rem',
+                    color: impactColor,
+                    textShadow: `0 0 8px ${impactColor}`,
+                    pointerEvents: 'none',
+                    animation: 'impact-flash 0.25s ease-out forwards',
+                  }}
+                >
+                  {impactChar}
+                </span>
+              )}
             </div>
 
             {/* Mob side */}

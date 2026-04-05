@@ -2,12 +2,26 @@
 
 export type ClassType = 'warrior' | 'mage' | 'rogue' | 'warlock'
 
+export type RaceType =
+  | 'human' | 'dwarf' | 'elf'          // Alliance
+  | 'orc'   | 'troll' | 'goblin'       // Horde
+  | 'gnome' | 'tauren'                  // Neutral
+
+export type FactionType = 'alliance' | 'horde' | 'neutral'
+
 export type ZoneId =
   | 'sunhollow_meadows'
   | 'dustwind_plains'
   | 'grimshade_forest'
   | 'thornvale_jungle'
   | 'ashfire_peaks'
+  | 'shattered_crossing'
+  | 'the_bloodfields'
+  | 'ironcrag_badlands'
+  | 'venom_hollows'
+  | 'warsong_mesa'
+  | 'cinderfall_wastes'
+  | 'the_maw_eternal'
 
 export type MobId = string
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
@@ -213,6 +227,20 @@ export interface ZoneConfig {
   nextZone?: ZoneId
   bgColor: string
   spriteKey?: string
+  faction: FactionType | 'contested'
+  hostileToFaction?: FactionType
+}
+
+// ── Races ─────────────────────────────────────────────────────────────────────
+export interface RaceDefinition {
+  id: RaceType
+  name: string
+  faction: FactionType
+  allowedClasses: ClassType[]
+  racialPassive: StatBonuses
+  racialPassiveLabel: string   // short description shown in UI
+  description: string
+  lore: string
 }
 
 // ── Classes ───────────────────────────────────────────────────────────────────
@@ -224,6 +252,7 @@ export interface ClassDefinition {
   baseStats: Omit<Stats, 'currentHp' | 'maxHp' | 'critChance'>
   talents: TalentNodeDef[]
   colorClass: string
+  allowedRaces: RaceType[]
 }
 
 // ── Combat Log ────────────────────────────────────────────────────────────────
@@ -254,7 +283,10 @@ export interface GameSettings {
 export interface GameState {
   initialized: boolean
   playerClass: ClassType
+  playerRace: RaceType
+  playerFaction: FactionType
   playerName: string
+  factionNames: Record<FactionType, string>   // generated per-playthrough
   characterTraits: string[]
   generatedZoneNames: Partial<Record<ZoneId, string>>
   nameGenStatus: 'idle' | 'loading' | 'done' | 'error'
@@ -301,6 +333,8 @@ export interface GameState {
   playerMapPos: { x: number; y: number }   // float tile position
   weatherState: WeatherState
   mobMapOffset: { dx: number; dy: number } // tiles from player to mob
+  // ── Prestige / Circuit ──────────────────────────────────────────────────────
+  zoneCircuit: number                      // prestige loop counter, starts at 0
 }
 
 // ── World Map ─────────────────────────────────────────────────────────────────

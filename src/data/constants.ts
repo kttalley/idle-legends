@@ -1,14 +1,14 @@
 // ── Timing ─────────────────────────────────────────────────────────────────
 export const TICK_RATE_MS = 1000          // game loop interval
 export const COMBAT_TICK_SECONDS = 2      // seconds per attack exchange
-export const RESPAWN_TIMER_SECONDS = 5    // player death respawn delay
-export const MOB_RESPAWN_SECONDS = 3      // mob respawn after kill
+export const RESPAWN_TIMER_SECONDS = 3    // player death respawn delay
+export const MOB_RESPAWN_SECONDS = 1.5    // mob respawn after kill
 export const OFFLINE_CAP_HOURS = 8        // max offline progress
 
 // ── XP Curve ────────────────────────────────────────────────────────────────
 // xpForLevel(n) = BASE * n^EXPONENT
-export const XP_BASE = 100
-export const XP_EXPONENT = 1.5
+export const XP_BASE = 75
+export const XP_EXPONENT = 1.4
 
 // ── Stats ────────────────────────────────────────────────────────────────────
 export const HP_PER_STAMINA = 10

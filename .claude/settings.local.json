@@ -6,7 +6,11 @@
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
       "mcp__Claude_Preview__preview_start",
-      "WebFetch(domain:llm.kristiantalley.com)"
+      "WebFetch(domain:llm.kristiantalley.com)",
+      "Bash(npx vite:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
     ]
   }
 }

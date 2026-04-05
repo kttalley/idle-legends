@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { getClassAbilities } from '../../data/abilities'
 import type { ActiveAbilityDef } from '../../data/types'
@@ -99,6 +99,19 @@ function SkillSlot({ ability, remaining, onActivate }: SlotProps) {
 export function SkillBar() {
   const { playerClass, skillCooldowns, activateAbility, currentMob, isAlive } = useGameStore()
   const abilities = getClassAbilities(playerClass)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Ignore if focus is on an input/textarea to avoid blocking text entry
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.key === '1' && abilities[0]) activateAbility(abilities[0].id)
+      if (e.key === '2' && abilities[1]) activateAbility(abilities[1].id)
+      if (e.key === '3' && abilities[2]) activateAbility(abilities[2].id)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [abilities, activateAbility])
 
   if (abilities.length === 0) return null
 

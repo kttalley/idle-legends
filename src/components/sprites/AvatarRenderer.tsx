@@ -113,23 +113,40 @@ function pickColor(seed: number, r: number, c: number, palette: AvatarPalette): 
 
 // ── Component ──────────────────────────────────────────────────────────────────
 interface AvatarRendererProps {
-  seed:      number
-  palette:   AvatarPalette
-  cellSize?: number    // px per cell, default 9
-  animate?:  boolean   // floating bob animation, default true
-  circle?:   boolean   // wrap in circular frame, default true
+  seed:         number
+  palette:      AvatarPalette
+  cellSize?:    number    // px per cell, default 9
+  animate?:     boolean   // floating bob animation, default true
+  circle?:      boolean   // wrap in circular frame, default true
+  attackAnim?:  boolean   // triggers attack-lunge or spell-cast
+  hitAnim?:     boolean   // triggers hit-recoil on the wrapper
 }
 
 export function AvatarRenderer({
   seed,
   palette,
-  cellSize = 9,
-  animate  = true,
-  circle   = true,
+  cellSize  = 9,
+  animate   = true,
+  circle    = true,
+  attackAnim = false,
+  hitAnim    = false,
 }: AvatarRendererProps) {
   const grid = useMemo(() => generateGrid(seed), [seed])
 
   const totalSize = GW * cellSize   // no gap — cells are flush
+
+  // Detect spell classes by first shade of palette
+  const isSpellClass =
+    palette.shades[0] === '#050a30' ||   // mage
+    palette.shades[0] === '#100520'       // warlock
+
+  // Build animation class for the outer wrapper
+  let animClass = ''
+  if (hitAnim) {
+    animClass = 'avatar-hit'
+  } else if (attackAnim) {
+    animClass = isSpellClass ? 'avatar-spell-cast' : 'avatar-attacking'
+  }
 
   const avatarGrid = (
     <div
@@ -166,8 +183,11 @@ export function AvatarRenderer({
   if (!circle) return avatarGrid
 
   const diameter = totalSize + 18
+  // When a combat anim class is active it overrides float via !important in CSS
+  const baseAnimation = animate ? 'avatar-float 3.2s ease-in-out infinite' : undefined
   return (
     <div
+      className={animClass || undefined}
       style={{
         width:          diameter,
         height:         diameter,
@@ -179,7 +199,7 @@ export function AvatarRenderer({
         alignItems:     'center',
         justifyContent: 'center',
         flexShrink:     0,
-        animation:      animate ? 'avatar-float 3.2s ease-in-out infinite' : undefined,
+        animation:      baseAnimation,
       }}
     >
       {avatarGrid}

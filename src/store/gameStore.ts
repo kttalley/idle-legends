@@ -1,10 +1,11 @@
 import { create } from 'zustand'
 import type {
-  GameState, ClassType, ZoneId, Item, Slot,
+  GameState, ClassType, RaceType, ZoneId, Item, Slot,
   MobInstance, CombatLogEntry, FloatingNumber,
   Stats, ActiveDoT, ActiveBuff, CombatProcState,
   GameMode, RecipeId, MaterialId, WeatherType,
 } from '../data/types'
+import { RACE_DEFINITIONS } from '../data/races'
 import { ZONE_MATERIALS, RECIPES } from '../data/professions'
 import { ZONE_ORDER } from '../data/zones'
 import { generateZoneMap } from '../engine/mapGen'
@@ -18,13 +19,13 @@ import {
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
 import {
-  INVENTORY_SLOTS, MOB_RESPAWN_SECONDS,
+  INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
   ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE,
   BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
   AUTOSAVE_INTERVAL_MS,
 } from '../data/constants'
 import { rollLoot } from '../engine/loot'
-import { generateNames, generateThought } from '../engine/nameGen'
+import { generateNames, generateThought, generateFactionNamesFallback } from '../engine/nameGen'
 import type { ThoughtEvent } from '../engine/nameGen'
 
 const SAVE_KEY = 'idle_legends_save_v2'
@@ -59,7 +60,10 @@ function defaultState(): GameState {
   return {
     initialized: false,
     playerClass: 'warrior',
+    playerRace: 'human',
+    playerFaction: 'alliance',
     playerName: '',
+    factionNames: generateFactionNamesFallback(Date.now() ^ Math.floor(Math.random() * 0xFFFFFF)),
     characterTraits: [],
     generatedZoneNames: {},
     nameGenStatus: 'idle',
@@ -90,8 +94,12 @@ function defaultState(): GameState {
     totalZoneKills: {
       sunhollow_meadows: 0, dustwind_plains: 0, grimshade_forest: 0,
       thornvale_jungle: 0, ashfire_peaks: 0,
+      shattered_crossing: 0, the_bloodfields: 0,
+      ironcrag_badlands: 0, venom_hollows: 0, warsong_mesa: 0,
+      cinderfall_wastes: 0, the_maw_eternal: 0,
     },
     bossesDefeated: [],
+    zoneCircuit: 0,
     lastTickTimestamp: Date.now(),
     totalPlayTime: 0,
     settings: {
@@ -157,13 +165,16 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
   const hpMult  = isBoss ? BOSS_HP_MULTIPLIER  : isElite ? ELITE_HP_MULTIPLIER  : 1
   const dmgMult = isBoss ? BOSS_DAMAGE_MULTIPLIER : isElite ? ELITE_DAMAGE_MULTIPLIER : 1
 
+  // Circuit scaling: each completed loop increases mob HP and damage by 50%
+  const circuitMult = 1 + (state.zoneCircuit ?? 0) * 0.5
+
   return {
     templateId: template.id,
     name: isBoss ? `[BOSS] ${template.name}` : isElite ? `★ ${template.name}` : template.name,
-    currentHp: Math.round(template.hp * hpMult),
-    maxHp:     Math.round(template.hp * hpMult),
-    damage: template.damage,
-    xpReward: Math.round(template.xpReward * (isBoss ? 3 : isElite ? 2 : 1)),
+    currentHp: Math.round(template.hp * hpMult * circuitMult),
+    maxHp:     Math.round(template.hp * hpMult * circuitMult),
+    damage: Math.round(template.damage * circuitMult),
+    xpReward: Math.round(template.xpReward * (isBoss ? 3 : isElite ? 2 : 1) * circuitMult),
     goldMin: template.goldMin,
     goldMax: template.goldMax,
     lootTableIds: template.lootTableIds,
@@ -186,7 +197,7 @@ export function resetCombatAccumulators() {
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 interface GameActions {
-  initGame: (playerClass: ClassType) => void
+  initGame: (playerClass: ClassType, playerRace: RaceType) => void
   loadGame: () => boolean
   saveGame: () => void
   resetGame: () => void
@@ -212,24 +223,29 @@ interface GameActions {
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
   ...defaultState(),
 
-  initGame: (playerClass) => {
+  initGame: (playerClass, playerRace) => {
     const s = defaultState()
     s.playerClass = playerClass
+    s.playerRace = playerRace
+    s.playerFaction = RACE_DEFINITIONS[playerRace].faction
     s.initialized = true
     s.talentPoints = 1
     s.nameGenStatus = 'loading'
-    s.stats = compileStats(playerClass, 1, s.equipment, s.talentAllocs)
+    s.stats = compileStats(playerClass, 1, s.equipment, s.talentAllocs, RACE_DEFINITIONS[playerRace].racialPassive)
     s.stats.currentHp = s.stats.maxHp
     s.lastTickTimestamp = Date.now()
     s.zoneMaps = { sunhollow_meadows: generateZoneMap('sunhollow_meadows') }
+    const nameSeed = Date.now() ^ Math.floor(Math.random() * 0xFFFFFF)
+    s.factionNames = generateFactionNamesFallback(nameSeed)  // instant fallback shown immediately
     resetCombatAccumulators()
     set(s)
     // Fire name generation async — game starts immediately, names trickle in
-    generateNames(playerClass)
+    generateNames(playerClass, nameSeed)
       .then(names => set({
         playerName: names.playerName,
         characterTraits: names.traits,
         generatedZoneNames: names.zoneNames,
+        factionNames: names.factionNames,
         nameGenStatus: 'done',
       }))
       .catch(() => set({ nameGenStatus: 'error' }))
@@ -241,10 +257,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if (!raw) return false
       const saved: GameState = JSON.parse(raw)
       if (!saved.initialized) return false
-      // Recompile stats
-      saved.stats = compileStats(saved.playerClass, saved.level, saved.equipment, saved.talentAllocs ?? {})
-      saved.stats.currentHp = Math.min(saved.stats.maxHp, (saved.stats as any)._savedHp ?? saved.stats.maxHp)
       // Ensure new fields exist on old saves
+      saved.playerRace    = saved.playerRace    ?? 'human'
+      saved.playerFaction = saved.playerFaction ?? 'alliance'
+      saved.factionNames  = saved.factionNames  ?? generateFactionNamesFallback(Date.now())
+      // Recompile stats
+      const savedRacialPassive = RACE_DEFINITIONS[saved.playerRace]?.racialPassive ?? {}
+      saved.stats = compileStats(saved.playerClass, saved.level, saved.equipment, saved.talentAllocs ?? {}, savedRacialPassive)
+      saved.stats.currentHp = Math.min(saved.stats.maxHp, (saved.stats as any)._savedHp ?? saved.stats.maxHp)
       saved.talentAllocs  = saved.talentAllocs  ?? {}
       saved.talentPoints  = saved.talentPoints  ?? saved.level
       saved.activeDoTs    = []
@@ -693,7 +713,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         while (xp >= xpForLevel(level)) {
           xp -= xpForLevel(level)
           level++
-          const newStats = compileStats(state.playerClass, level, equipment, talentAllocs)
+          const racialPassive = RACE_DEFINITIONS[state.playerRace]?.racialPassive ?? {}
+          const newStats = compileStats(state.playerClass, level, equipment, talentAllocs, racialPassive)
           stats = { ...newStats, currentHp: Math.min(newStats.maxHp, stats.currentHp + 20) }
           newLogs.push(log('level_up', `★ Level Up! Now level ${level}!`, '#ffd700'))
           // Gain a talent point
@@ -721,6 +742,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           if (zone.nextZone && !unlockedZones.includes(zone.nextZone)) {
             unlockedZones.push(zone.nextZone)
             newLogs.push(log('zone_change', `★ Boss slain! ${ZONES[zone.nextZone!]?.name} unlocked!`, '#ff8000'))
+          } else if (!zone.nextZone) {
+            // Final zone (the_maw_eternal) — circuit increment, loop back to start
+            set(s => ({ zoneCircuit: s.zoneCircuit + 1 }))
+            bossesDefeated.length = 0  // reset all boss kills for the new circuit
+            currentZone = 'sunhollow_meadows'
+            newLogs.push(log('zone_change', `The world resets. Stronger now. Circuit ${(state.zoneCircuit ?? 0) + 1} begins.`, '#cc88ff'))
           }
         }
 
@@ -792,11 +819,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           const iceBuff = activeBuffs.find(b => b.label === 'Ice Block')
           if (!iceBuff) {
             isAlive = false
-            respawnTimer = 5
+            respawnTimer = RESPAWN_TIMER_SECONDS
             stats.currentHp = 0
             currentMob = null
             activeDoTs = []
-            newLogs.push(log('player_death', 'You have been slain! Respawning in 5s...', '#ff4444'))
+            newLogs.push(log('player_death', `You have been slain! Respawning in ${RESPAWN_TIMER_SECONDS}s...`, '#ff4444'))
             get().triggerThought('player_death')
             resetCombatAccumulators()
           }
@@ -854,7 +881,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       stats, gold, xp, level, currentMob, isAlive, respawnTimer, mobRespawnTimer,
       inventory, equipment, activeDoTs, activeBuffs, procState, skillCooldowns,
       floatingNumbers: allFns,
-      totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones,
+      totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones, currentZone,
       totalPlayTime: state.totalPlayTime + deltaSeconds,
       combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX),
       mobMapOffset,
@@ -873,7 +900,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const inventory = [...s.inventory]
     equipment[item.slot] = item
     inventory[i] = s.equipment[item.slot]
-    const stats = compileStats(s.playerClass, s.level, equipment, s.talentAllocs)
+    const racialPassive = RACE_DEFINITIONS[s.playerRace]?.racialPassive ?? {}
+    const stats = compileStats(s.playerClass, s.level, equipment, s.talentAllocs, racialPassive)
     stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
     set({ equipment, inventory, stats })
   },
@@ -887,7 +915,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const equipment = { ...s.equipment, [slot]: null }
     const inventory = [...s.inventory]
     inventory[empty] = item
-    const stats = compileStats(s.playerClass, s.level, equipment, s.talentAllocs)
+    const racialPassive = RACE_DEFINITIONS[s.playerRace]?.racialPassive ?? {}
+    const stats = compileStats(s.playerClass, s.level, equipment, s.talentAllocs, racialPassive)
     stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
     set({ equipment, inventory, stats })
   },
@@ -941,8 +970,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if ((s.talentAllocs[node.requires] ?? 0) < prereqNode.maxRanks) return
     }
 
+    const racialPassive = RACE_DEFINITIONS[s.playerRace]?.racialPassive ?? {}
     const talentAllocs = { ...s.talentAllocs, [talentId]: current + 1 }
-    const stats = compileStats(s.playerClass, s.level, s.equipment, talentAllocs)
+    const stats = compileStats(s.playerClass, s.level, s.equipment, talentAllocs, racialPassive)
     stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
     set({ talentAllocs, talentPoints: s.talentPoints - 1, stats })
   },
@@ -959,16 +989,18 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         if (current <= reqNode.maxRanks && (s.talentAllocs[node.id] ?? 0) > 0) return
       }
     }
+    const racialPassive = RACE_DEFINITIONS[s.playerRace]?.racialPassive ?? {}
     const talentAllocs = { ...s.talentAllocs, [talentId]: current - 1 }
-    const stats = compileStats(s.playerClass, s.level, s.equipment, talentAllocs)
+    const stats = compileStats(s.playerClass, s.level, s.equipment, talentAllocs, racialPassive)
     stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
     set({ talentAllocs, talentPoints: s.talentPoints + 1, stats })
   },
 
   resetTalents: () => {
     const s = get()
+    const racialPassive = RACE_DEFINITIONS[s.playerRace]?.racialPassive ?? {}
     const totalSpent = Object.values(s.talentAllocs).reduce((a, b) => a + b, 0)
-    const stats = compileStats(s.playerClass, s.level, s.equipment, {})
+    const stats = compileStats(s.playerClass, s.level, s.equipment, {}, racialPassive)
     stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
     set({ talentAllocs: {}, talentPoints: s.talentPoints + totalSpent, stats })
   },
