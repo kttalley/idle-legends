@@ -906,7 +906,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       mobMapOffset,
       playerMapPos,
       gameMode: nextGameMode,
-      gatheringTimer: nextGameMode === 'gathering' && state.gameMode !== 'gathering' ? 5 : state.gatheringTimer,
+      gatheringTimer: nextGameMode === 'gathering' ? 5 : state.gatheringTimer,
     })
   },
 

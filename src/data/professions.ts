@@ -66,6 +66,48 @@ export const ZONE_MATERIALS: Record<ZoneId, Record<ClassType, MaterialId>> = {
     warlock: 'dreamfoil',
     rogue:   'thick_leather',
   },
+  shattered_crossing: {
+    warrior: 'copper_ore',
+    mage:    'linen_cloth',
+    warlock: 'silverleaf',
+    rogue:   'ruined_leather',
+  },
+  the_bloodfields: {
+    warrior: 'tin_ore',
+    mage:    'wool_cloth',
+    warlock: 'mageroyal',
+    rogue:   'light_leather',
+  },
+  ironcrag_badlands: {
+    warrior: 'iron_ore',
+    mage:    'silk_cloth',
+    warlock: 'briarthorn',
+    rogue:   'medium_leather',
+  },
+  venom_hollows: {
+    warrior: 'mithril_ore',
+    mage:    'mageweave_cloth',
+    warlock: 'kingsblood',
+    rogue:   'heavy_leather',
+  },
+  warsong_mesa: {
+    warrior: 'thorium_ore',
+    mage:    'runecloth',
+    warlock: 'dreamfoil',
+    rogue:   'thick_leather',
+  },
+  cinderfall_wastes: {
+    warrior: 'copper_ore',
+    mage:    'linen_cloth',
+    warlock: 'silverleaf',
+    rogue:   'ruined_leather',
+  },
+  the_maw_eternal: {
+    warrior: 'thorium_ore',
+    mage:    'runecloth',
+    warlock: 'dreamfoil',
+    rogue:   'thick_leather',
+  },
 }
 
 // ── Stat effect for crafted items ─────────────────────────────────────────────
@@ -340,5 +382,47 @@ export const BIOME_CONFIGS: Record<ZoneId, BiomeConfig> = {
     primaryColor: '#cf4520',
     accentColor:  '#8b1a1a',
     bgColor:      '#1a0a0a',
+  },
+  shattered_crossing: {
+    chars:        ['#', '~', '·', '≈', '-'],
+    primaryColor: '#4a7c59',
+    accentColor:  '#4488aa',
+    bgColor:      '#1a2e1a',
+  },
+  the_bloodfields: {
+    chars:        ['.', '·', ',', '~', '≈'],
+    primaryColor: '#8b1a1a',
+    accentColor:  '#5c0a0a',
+    bgColor:      '#1a0a0a',
+  },
+  ironcrag_badlands: {
+    chars:        ['^', '¬', '#', '·', '.'],
+    primaryColor: '#5c4400',
+    accentColor:  '#8b6914',
+    bgColor:      '#2a2010',
+  },
+  venom_hollows: {
+    chars:        ['♦', '♠', '·', '#', '¤'],
+    primaryColor: '#2d1b4e',
+    accentColor:  '#1a0e30',
+    bgColor:      '#0d0a14',
+  },
+  warsong_mesa: {
+    chars:        ['.', '~', '≈', ',', '·'],
+    primaryColor: '#c9a227',
+    accentColor:  '#8b6914',
+    bgColor:      '#2a2010',
+  },
+  cinderfall_wastes: {
+    chars:        ['^', '·', '/', '\\', '∧'],
+    primaryColor: '#cf4520',
+    accentColor:  '#8b1a1a',
+    bgColor:      '#1a0a0a',
+  },
+  the_maw_eternal: {
+    chars:        ['#', '%', '&', '·', '@'],
+    primaryColor: '#2e8b35',
+    accentColor:  '#1a5c2a',
+    bgColor:      '#0a1a0a',
   },
 }

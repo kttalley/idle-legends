@@ -392,7 +392,7 @@ export const CombatParticles = forwardRef<CombatParticlesHandle, Props>(
         }
 
         // Extra sparks at launch site
-        const launchCount = kind === 'crit' ? 8 : 4
+        const launchCount = isCrit(kind) ? 8 : 4
         for (let i = 0; i < launchCount; i++) {
           const angle = rand(0, Math.PI * 2)
           const speed = rand(0.5, 2)
