@@ -12,7 +12,12 @@ import { WorldMapView } from './WorldMapView'
 import { TravelOverlay } from './TravelOverlay'
 import { GatheringPanel } from './GatheringPanel'
 import { CraftingPanel } from './CraftingPanel'
+import { TownView } from './TownView'
 import { CLASS_PROFESSIONS } from '../../data/professions'
+import { CombatParticles } from './CombatParticles'
+import type { CombatParticlesHandle } from './CombatParticles'
+import { ZONE_TOWN } from '../../data/towns'
+import { TOWNS } from '../../data/towns'
 
 export function CombatView() {
   const {
@@ -36,6 +41,8 @@ export function CombatView() {
     setMode,
     mobMapOffset,
     equipment,
+    currentTown,
+    enterTown,
   } = useGameStore()
 
   const zone     = ZONES[currentZone]
@@ -60,40 +67,52 @@ export function CombatView() {
   const mobDist = Math.sqrt(mobMapOffset.dx ** 2 + mobMapOffset.dy ** 2)
   const mobApproaching = currentMob !== null && mobDist > 1.5
 
+  // ── Refs for particle system ────────────────────────────────────────────────
+  const combatContainerRef = useRef<HTMLDivElement>(null)
+  const playerAvatarRef    = useRef<HTMLDivElement>(null)
+  const mobAvatarRef       = useRef<HTMLDivElement>(null)
+  const particlesRef       = useRef<CombatParticlesHandle>(null)
+
   // ── Combat animation state ──────────────────────────────────────────────────
   const [playerAnimClass, setPlayerAnimClass] = useState('')
   const [mobAnimClass,    setMobAnimClass]    = useState('')
-  const [impactChar,      setImpactChar]      = useState<string | null>(null)
-  const [impactColor,     setImpactColor]     = useState('#ffffff')
 
   // Detect spell class for player attack animation
   const isSpellClass =
     playerPalette.shades[0] === '#050a30' ||  // mage
     playerPalette.shades[0] === '#100520'      // warlock
 
+  // Class palette glow colors for projectiles
+  const playerGlow = playerPalette.glow
+  const playerProjectileColor = playerPalette.shades[3] ?? playerPalette.shades[0]
+
   const prevFnIds = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    const currentIds = new Set(floatingNumbers.map(fn => fn.id))
-    // Find IDs not seen before
     const newFns = floatingNumbers.filter(fn => !prevFnIds.current.has(fn.id))
-    prevFnIds.current = currentIds
+    prevFnIds.current = new Set(floatingNumbers.map(fn => fn.id))
 
     if (newFns.length === 0) return
 
     for (const fn of newFns) {
       if (!fn.isMobDamage) {
-        // Player attacked — lunge + impact flash
+        // Player attacked
         setPlayerAnimClass(isSpellClass ? 'avatar-spell-cast' : 'avatar-attacking')
-        const char  = fn.isCrit ? '★' : fn.isDoT ? '●' : isSpellClass ? '●' : '✕'
-        const color = fn.isCrit ? '#ffcc00' : fn.isDoT ? '#aa88ff' : isSpellClass ? '#70a0ff' : '#ff8866'
-        setImpactChar(char)
-        setImpactColor(color)
-        setTimeout(() => { setPlayerAnimClass(''); setImpactChar(null) }, 280)
+        setTimeout(() => setPlayerAnimClass(''), 280)
+
+        // Fire projectile — rogue = slash, warrior = blunt, spell classes = orb
+        const isSharp = playerClass === 'rogue'
+        const kind = isSpellClass
+          ? 'spell'
+          : fn.isCrit
+            ? (isSharp ? 'crit_slash' : 'crit_blunt')
+            : (isSharp ? 'melee_slash' : 'melee_blunt')
+        particlesRef.current?.fireAttack(kind, playerProjectileColor, playerGlow)
       } else {
         // Mob attacked — player takes hit
         setMobAnimClass('avatar-hit')
         setTimeout(() => setMobAnimClass(''), 350)
+        particlesRef.current?.fireAttack('mob', '#ff4444', '#ff0000')
       }
     }
   }, [floatingNumbers]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -104,12 +123,14 @@ export function CombatView() {
     if (mobApproaching) return { label: `${currentMob!.isBoss ? '⚠' : '↘'} ${currentMob!.name} approaching…`, color: currentMob!.isBoss ? '#ff8000' : '#ff6666' }
     if (gameMode === 'gathering') return { label: `${prof.gatherIcon} Gathering…`, color: '#88cc88' }
     if (gameMode === 'crafting') return { label: `${prof.craftIcon} Crafting…`, color: '#ffd700' }
+    if (gameMode === 'in_town' && currentTown) return { label: `🏠 In Town`, color: '#ddaa44' }
     if (gameMode === 'combat' && currentMob) return { label: `⚔ Fighting ${currentMob.name}`, color: '#88aaff' }
     return null
   })()
 
   return (
     <div
+      ref={combatContainerRef}
       className="rp-panel flex flex-col"
       style={{
         background: `linear-gradient(180deg, ${zone?.bgColor ?? '#1a1510'}cc 0%, #1a1510 100%)`,
@@ -119,6 +140,12 @@ export function CombatView() {
         minHeight: 0,
       }}
     >
+      <CombatParticles
+        ref={particlesRef}
+        playerRef={playerAvatarRef}
+        mobRef={mobAvatarRef}
+        containerRef={combatContainerRef}
+      />
       {/* ── World Map — always visible at top ── */}
       <div style={{ padding: '4px 4px 0 4px', flexShrink: 0 }}>
         <WorldMapView />
@@ -173,6 +200,26 @@ export function CombatView() {
               {m === 'crafting'  ? prof.craftIcon      : null}
             </button>
           ))}
+          {ZONE_TOWN[currentZone] && (
+            <button
+              onClick={() => enterTown(ZONE_TOWN[currentZone]!)}
+              disabled={isTraveling}
+              title="Visit town"
+              style={{
+                fontSize: '0.50rem',
+                padding: '1px 4px',
+                borderRadius: 3,
+                border: `1px solid ${gameMode === 'in_town' ? '#c8a864' : '#2a2a2a'}`,
+                background: gameMode === 'in_town' ? '#2a1e00' : '#0d0d0d',
+                color: gameMode === 'in_town' ? '#ffd700' : '#444',
+                cursor: isTraveling ? 'default' : 'pointer',
+                opacity: isTraveling ? 0.3 : 1,
+                transition: 'all 0.15s',
+              }}
+            >
+              🏠
+            </button>
+          )}
         </div>
       </div>
 
@@ -184,6 +231,9 @@ export function CombatView() {
 
       {/* ── Crafting panel ── */}
       {gameMode === 'crafting' && <CraftingPanel />}
+
+      {/* ── Town panel ── */}
+      {gameMode === 'in_town' && currentTown && <TownView />}
 
       {/* ── Combat arena ── */}
       {gameMode === 'combat' && (
@@ -205,7 +255,7 @@ export function CombatView() {
               <StatusEffects buffs={activeBuffs} />
 
               {/* Avatar + thought bubble wrapper */}
-              <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+              <div ref={playerAvatarRef} style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
                 <ThoughtBubble />
                 <AvatarRenderer
                   seed={playerAvatarSeed}
@@ -244,25 +294,11 @@ export function CombatView() {
               )}
             </div>
 
-            {/* Combat gap — VS / impact overlay */}
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 60, flexShrink: 0 }}>
-              <span style={{ color: mobApproaching ? '#ff6644' : '#555', fontSize: mobApproaching ? '0.65rem' : '1rem', fontWeight: 700, transition: 'all 0.3s' }}>
+            {/* Combat gap — approach indicator only (particles handle the rest) */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 60, flexShrink: 0 }}>
+              <span style={{ color: mobApproaching ? '#ff6644' : '#333', fontSize: mobApproaching ? '0.65rem' : '0.9rem', fontWeight: 700, transition: 'all 0.3s' }}>
                 {mobApproaching ? `↘ ${Math.round(mobDist)}` : '⚔'}
               </span>
-              {impactChar && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    fontSize: impactChar === '★' ? '1.4rem' : '1.1rem',
-                    color: impactColor,
-                    textShadow: `0 0 8px ${impactColor}`,
-                    pointerEvents: 'none',
-                    animation: 'impact-flash 0.25s ease-out forwards',
-                  }}
-                >
-                  {impactChar}
-                </span>
-              )}
             </div>
 
             {/* Mob side */}
@@ -290,7 +326,7 @@ export function CombatView() {
                     </div>
                   )}
 
-                  <div style={mobApproaching ? { opacity: 0.4, filter: 'blur(1.5px)', transition: 'all 0.5s' } : { transition: 'all 0.5s' }}>
+                  <div ref={mobAvatarRef} style={mobApproaching ? { opacity: 0.4, filter: 'blur(1.5px)', transition: 'all 0.5s' } : { transition: 'all 0.5s' }}>
                     {mobPalette && (
                       <AvatarRenderer
                         seed={mobSeed}

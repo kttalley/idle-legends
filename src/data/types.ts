@@ -26,9 +26,21 @@ export type ZoneId =
 export type MobId = string
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
 export type Slot = 'weapon' | 'helm' | 'chest' | 'legs' | 'boots' | 'trinket'
-export type GameMode = 'combat' | 'traveling' | 'gathering' | 'crafting'
+export type GameMode = 'combat' | 'traveling' | 'gathering' | 'crafting' | 'in_town'
 export type MaterialId = string
 export type RecipeId = string
+export type TownId = string
+export type TownServiceType = 'rest' | 'vendor' | 'repair'
+
+export interface TownConfig {
+  id: TownId
+  name: string
+  faction: FactionType | 'neutral'
+  type: 'friendly' | 'neutral' | 'hostile'
+  services: TownServiceType[]
+  linkedZone: ZoneId
+  description: string
+}
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 export interface Stats {
@@ -304,6 +316,7 @@ export interface GameState {
   skillCooldowns: Record<string, number>  // abilityId → seconds remaining
   currentZone: ZoneId
   currentMob: MobInstance | null
+  persistedBoss: MobInstance | null
   combatLog: CombatLogEntry[]
   isAlive: boolean
   respawnTimer: number
@@ -335,6 +348,9 @@ export interface GameState {
   mobMapOffset: { dx: number; dy: number } // tiles from player to mob
   // ── Prestige / Circuit ──────────────────────────────────────────────────────
   zoneCircuit: number                      // prestige loop counter, starts at 0
+  // ── Towns ──────────────────────────────────────────────────────────────────
+  currentTown: TownId | null
+  generatedTownNames: Record<TownId, string>
 }
 
 // ── World Map ─────────────────────────────────────────────────────────────────

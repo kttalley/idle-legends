@@ -4,10 +4,11 @@ import { CLASS_DEFINITIONS } from '../../data/classes'
 import type { TalentNodeDef } from '../../data/types'
 
 // ── Layout constants ──────────────────────────────────────────────────────────
-const CELL_W  = 72   // px per column
-const CELL_H  = 78   // px per row
-const NODE_W  = 58   // node box width
-const NODE_H  = 62   // node box height
+// Sidebar is 220px; 4 cols × 48 + 8 padding = 200px, fits with room to spare
+const CELL_W  = 48   // px per column
+const CELL_H  = 66   // px per row
+const NODE_W  = 40   // node box width
+const NODE_H  = 54   // node box height
 const PAD     = 4    // grid padding
 
 // Node center in SVG/absolute space
@@ -109,7 +110,7 @@ export function TalentTree() {
   }
 
   return (
-    <div>
+    <div style={{ overflow: 'hidden' }}>
       {/* Header */}
       <div className="flex items-center justify-between mb-2" style={{ fontSize: '0.65rem' }}>
         <span style={{ color: '#ffd700', fontWeight: 700 }}>
@@ -136,7 +137,8 @@ export function TalentTree() {
         Left-click to allocate · Right-click to remove
       </div>
 
-      {/* Grid container */}
+      {/* Grid container — scrollable, height-bounded */}
+      <div style={{ overflowY: 'auto', overflowX: 'hidden', maxHeight: '44vh' }}>
       <div
         ref={containerRef}
         style={{ position: 'relative', width: gridW, height: gridH, margin: '0 auto' }}
@@ -271,6 +273,7 @@ export function TalentTree() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   )

@@ -51,7 +51,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'meadow_beast',
         name: 'Elder Meadow Beast',
-        hp: 400,
+        hp: 40,
         damage: 20,
         xpReward: 200,
         goldMin: 20,
@@ -113,7 +113,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'bandit_warlord',
         name: 'Bandit Warlord Grak',
-        hp: 1200,
+        hp: 120,
         damage: 50,
         xpReward: 600,
         goldMin: 80,
@@ -175,7 +175,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'death_arbiter',
         name: 'Death Arbiter Malachar',
-        hp: 3000,
+        hp: 300,
         damage: 100,
         xpReward: 1500,
         goldMin: 200,
@@ -237,7 +237,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'troll_warchief',
         name: 'Warchief Zul\'thak',
-        hp: 6000,
+        hp: 600,
         damage: 180,
         xpReward: 3000,
         goldMin: 400,
@@ -299,7 +299,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'flame_wyrm',
         name: 'Ashfire Flame Wyrm',
-        hp: 15000,
+        hp: 1500,
         damage: 300,
         xpReward: 8000,
         goldMin: 800,
@@ -363,7 +363,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'crossing_war_golem',
         name: 'Siege War Golem',
-        hp: 11250,
+        hp: 1125,
         damage: 540,
         xpReward: 22000,
         goldMin: 1200,
@@ -425,7 +425,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'bloodfield_warlord',
         name: 'Warlord Kessith the Unyielding',
-        hp: 15000,
+        hp: 1500,
         damage: 600,
         xpReward: 30000,
         goldMin: 1800,
@@ -490,7 +490,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'ironcrag_overlord',
         name: 'Overlord Grommash Ironjaw',
-        hp: 17500,
+        hp: 1750,
         damage: 700,
         xpReward: 44000,
         goldMin: 2500,
@@ -553,7 +553,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'venom_hexlord',
         name: 'Hexlord Zal\'grak the Venomous',
-        hp: 20000,
+        hp: 2000,
         damage: 800,
         xpReward: 60000,
         goldMin: 3500,
@@ -616,7 +616,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'warsong_chieftain',
         name: 'Chieftain Rok\'nar Bloodscream',
-        hp: 22500,
+        hp: 2250,
         damage: 900,
         xpReward: 80000,
         goldMin: 5000,
@@ -679,7 +679,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'cinder_dreadlord',
         name: 'Dreadlord Ashvael the Burning',
-        hp: 25000,
+        hp: 2500,
         damage: 1020,
         xpReward: 100000,
         goldMin: 7000,
@@ -741,7 +741,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       {
         id: 'maw_warlord',
         name: 'Warlord Zar\'goth the Eternal',
-        hp: 30000,
+        hp: 3000,
         damage: 1140,
         xpReward: 120000,
         goldMin: 10000,

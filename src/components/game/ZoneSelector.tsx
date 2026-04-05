@@ -12,9 +12,9 @@ export function ZoneSelector() {
   const isTraveling = gameMode === 'traveling'
 
   return (
-    <div className="rp-panel">
+    <div className="rp-panel" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       <div className="rp-panel-header">Zones</div>
-      <div className="p-1 flex flex-col gap-1">
+      <div className="p-1 flex flex-col gap-1" style={{ overflowY: 'auto', maxHeight: '38vh' }}>
         {ZONE_ORDER.map(zoneId => {
           const zone       = ZONES[zoneId]
           const zoneName   = generatedZoneNames[zoneId as ZoneId] ?? zone.name

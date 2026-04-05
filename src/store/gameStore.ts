@@ -3,8 +3,9 @@ import type {
   GameState, ClassType, RaceType, ZoneId, Item, Slot,
   MobInstance, CombatLogEntry, FloatingNumber,
   Stats, ActiveDoT, ActiveBuff, CombatProcState,
-  GameMode, RecipeId, MaterialId, WeatherType,
+  GameMode, RecipeId, MaterialId, WeatherType, TownId,
 } from '../data/types'
+import { TOWNS } from '../data/towns'
 import { RACE_DEFINITIONS } from '../data/races'
 import { ZONE_MATERIALS, RECIPES } from '../data/professions'
 import { ZONE_ORDER } from '../data/zones'
@@ -81,6 +82,7 @@ function defaultState(): GameState {
     skillCooldowns: {},
     currentZone: 'sunhollow_meadows',
     currentMob: null,
+    persistedBoss: null,
     combatLog: [],
     isAlive: true,
     respawnTimer: 0,
@@ -123,6 +125,9 @@ function defaultState(): GameState {
     playerMapPos: { x: 32, y: 32 },
     weatherState: { type: 'clear', timer: 45, cloudOffset: 0, rainPhase: 0 },
     mobMapOffset: { dx: 0, dy: 0 },
+    // Towns
+    currentTown: null,
+    generatedTownNames: {},
   }
 }
 
@@ -218,6 +223,9 @@ interface GameActions {
   cancelTravel: () => void
   setMode: (mode: GameMode) => void
   startCrafting: (recipeId: RecipeId) => void
+  enterTown: (townId: TownId) => void
+  leaveTown: () => void
+  restInTown: () => void
 }
 
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
@@ -246,6 +254,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         characterTraits: names.traits,
         generatedZoneNames: names.zoneNames,
         factionNames: names.factionNames,
+        generatedTownNames: names.townNames ?? {},
         nameGenStatus: 'done',
       }))
       .catch(() => set({ nameGenStatus: 'error' }))
@@ -288,7 +297,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       saved.zoneMaps      = zoneMaps
       saved.playerMapPos  = { x: 32, y: 32 }
       saved.weatherState  = { type: 'clear', timer: 45, cloudOffset: 0, rainPhase: 0 }
-      saved.mobMapOffset  = { dx: 0, dy: 0 }
+      saved.mobMapOffset       = { dx: 0, dy: 0 }
+      saved.currentTown        = null
+      saved.generatedTownNames = saved.generatedTownNames ?? {}
       resetCombatAccumulators()
       set(saved)
       return true
@@ -479,10 +490,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       return
     }
 
+    // ── In-town: no combat ───────────────────────────────────────────────────
+    if (state.gameMode === 'in_town') return
+
     const newLogs: CombatLogEntry[] = []
     const newFns: FloatingNumber[]  = []
     let {
-      stats, currentMob, isAlive, respawnTimer, mobRespawnTimer,
+      stats, currentMob, persistedBoss, isAlive, respawnTimer, mobRespawnTimer,
       gold, xp, level, inventory, equipment, activeDoTs, activeBuffs,
       procState, floatingNumbers, totalZoneKills, zoneKillCounts,
       bossesDefeated, unlockedZones, currentZone, skillCooldowns, talentAllocs,
@@ -545,7 +559,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (!currentMob) {
       mobRespawnTimer = Math.max(0, mobRespawnTimer - deltaSeconds)
       if (mobRespawnTimer <= 0) {
-        currentMob = spawnMob(currentZone, state)
+        // Resume a persisted boss (HP preserved from previous attempt) if available
+        currentMob = persistedBoss ?? spawnMob(currentZone, state)
+        persistedBoss = null
         if (currentMob) {
           // Set mob approach offset (starts far, lerps to 0 in combat tick)
           const mobSeed = hashStr(currentMob.templateId)
@@ -566,7 +582,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           resetCombatAccumulators()
         }
       }
-      set({ currentMob, mobRespawnTimer, procState, skillCooldowns,
+      set({ currentMob, persistedBoss, mobRespawnTimer, procState, skillCooldowns,
             combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX) })
       return
     }
@@ -821,6 +837,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             isAlive = false
             respawnTimer = RESPAWN_TIMER_SECONDS
             stats.currentHp = 0
+            if (currentMob?.isBoss) {
+              persistedBoss = currentMob
+            }
             currentMob = null
             activeDoTs = []
             newLogs.push(log('player_death', `You have been slain! Respawning in ${RESPAWN_TIMER_SECONDS}s...`, '#ff4444'))
@@ -878,7 +897,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const allFns = [...floatingNumbers.filter(f => now - f.createdAt < 1400), ...newFns]
 
     set({
-      stats, gold, xp, level, currentMob, isAlive, respawnTimer, mobRespawnTimer,
+      stats, gold, xp, level, currentMob, persistedBoss, isAlive, respawnTimer, mobRespawnTimer,
       inventory, equipment, activeDoTs, activeBuffs, procState, skillCooldowns,
       floatingNumbers: allFns,
       totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones, currentZone,
@@ -1160,6 +1179,38 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if ((s.materials[inp.materialId] ?? 0) < inp.qty) return
     }
     set({ activeRecipe: recipeId, craftingTimer: recipe.craftTime })
+  },
+
+  // ── Towns ─────────────────────────────────────────────────────────────────────
+  enterTown: (townId) => {
+    resetCombatAccumulators()
+    set({
+      gameMode: 'in_town',
+      currentTown: townId,
+      currentMob: null,
+      mobRespawnTimer: 0,
+      activeDoTs: [],
+    })
+  },
+
+  leaveTown: () => {
+    resetCombatAccumulators()
+    set({ gameMode: 'combat', currentTown: null, mobRespawnTimer: 0 })
+  },
+
+  restInTown: () => {
+    const s = get()
+    if (!s.currentTown) return
+    const town = TOWNS[s.currentTown]
+    if (!town || !town.services.includes('rest')) return
+    const stats = { ...s.stats, currentHp: s.stats.maxHp }
+    set({
+      stats,
+      combatLog: [
+        { id: `rest_${Date.now()}`, timestamp: Date.now(), type: 'proc' as const, message: 'You rest and recover fully.', color: '#44ff88' },
+        ...s.combatLog,
+      ].slice(0, 150),
+    })
   },
 }))
 

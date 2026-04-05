@@ -1,4 +1,4 @@
-import type { ClassType, ZoneId, FactionType } from '../data/types'
+import type { ClassType, ZoneId, FactionType, TownId } from '../data/types'
 
 const OLLAMA_BASE = 'https://llm.kristiantalley.com'
 const MODEL       = 'incept5/llama3.1-claude:latest'
@@ -8,6 +8,7 @@ export interface GeneratedNames {
   zoneNames: Partial<Record<ZoneId, string>>
   traits: string[]
   factionNames: Record<FactionType, string>
+  townNames: Record<TownId, string>
 }
 
 // ── Faction name fallback pools ───────────────────────────────────────────────
@@ -82,9 +83,22 @@ async function ollamaGenerate(prompt: string): Promise<string> {
   return (data.response ?? '').trim()
 }
 
+const TOWN_THEMES: Record<string, string> = {
+  sunhollow_village: 'a threatened farming village in sun-dappled meadows, level 1-10',
+  dustwind_post:     'a fortified military outpost on harsh arid plains, level 10-20',
+  grimshade_refuge:  'a survivor encampment in a dark cursed forest, level 20-30',
+  crossroads_market: 'a neutral war-profiteer trading hub at a ruined bridge-town, levels 45-55',
+  ironcrag_hold:     'the seat of the first Horde clan in jagged iron-red badlands, levels 55-70',
+  warsong_bastion:   'an orcish military bastion on red stone plateaus with war-drums, levels 75-90',
+}
+
 export async function generateNames(playerClass: ClassType, seed: number): Promise<GeneratedNames> {
   const zoneDescriptions = Object.entries(ZONE_THEMES)
     .map(([id, theme]) => `    "${id}": "<unique 2-3 word evocative zone name for: ${theme}>"`)
+    .join(',\n')
+
+  const townDescriptions = Object.entries(TOWN_THEMES)
+    .map(([id, theme]) => `    "${id}": "<evocative 2-4 word town name for: ${theme}>"`)
     .join(',\n')
 
   const prompt = `You are generating unique fantasy names for an idle RPG. Respond ONLY with valid JSON, no markdown, no commentary.
@@ -105,6 +119,9 @@ Generate this exact JSON:
   },
   "zoneNames": {
 ${zoneDescriptions}
+  },
+  "townNames": {
+${townDescriptions}
   }
 }`.trim()
 
@@ -117,6 +134,7 @@ ${zoneDescriptions}
     traits: string[]
     factionNames: Record<FactionType, string>
     zoneNames: Record<string, string>
+    townNames: Record<string, string>
   }
 
   const fallbackFactions = generateFactionNamesFallback(seed)
@@ -129,7 +147,8 @@ ${zoneDescriptions}
       horde:    parsed.factionNames?.horde    ?? fallbackFactions.horde,
       neutral:  parsed.factionNames?.neutral  ?? fallbackFactions.neutral,
     },
-    zoneNames: (parsed.zoneNames ?? {}) as Partial<Record<ZoneId, string>>,
+    zoneNames:  (parsed.zoneNames  ?? {}) as Partial<Record<ZoneId, string>>,
+    townNames:  (parsed.townNames  ?? {}) as Record<TownId, string>,
   }
 }
 
