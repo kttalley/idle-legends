@@ -257,7 +257,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         generatedTownNames: names.townNames ?? {},
         nameGenStatus: 'done',
       }))
-      .catch(() => set({ nameGenStatus: 'error' }))
+      .catch((err) => { console.error('[nameGen] failed:', err); set({ nameGenStatus: 'error' }) })
   },
 
   loadGame: () => {

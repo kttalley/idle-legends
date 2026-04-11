@@ -1,6 +1,6 @@
 import type { ClassType, ZoneId, FactionType, TownId } from '../data/types'
 
-const OLLAMA_BASE = 'https://llm.kristiantalley.com'
+const OLLAMA_BASE = import.meta.env.LLM_URL || 'http://localhost:11434'
 const MODEL       = 'incept5/llama3.1-claude:latest'
 
 export interface GeneratedNames {
@@ -75,7 +75,7 @@ async function ollamaGenerate(prompt: string): Promise<string> {
       model: MODEL,
       prompt,
       stream: false,
-      options: { temperature: 0.92, num_predict: 200 },
+      options: { temperature: 0.92, num_predict: 700 },
     }),
   })
   if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`)
