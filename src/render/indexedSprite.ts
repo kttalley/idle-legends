@@ -3,6 +3,7 @@
 // against the manifest's sourcePalette (nearest-color for antialiased strays), so the
 // renderer downstream only ever handles slots — never source colors.
 
+import { registerPalette } from './palettes'
 import type { IndexedSprite, SpriteManifest } from './types'
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -100,6 +101,9 @@ export async function loadSprite(manifestUrl: string): Promise<IndexedSprite | n
     const manifest = (await res.json()) as SpriteManifest
     const imgUrl = new URL(manifest.image, new URL(manifestUrl, location.href)).href
     const img = await loadImage(imgUrl)
+    // The sheet's own colors become palette id `src/<id>` — render byte-true by default,
+    // or pass any registry palette id to recolor the same rig.
+    registerPalette(`src/${manifest.id}`, manifest.sourcePalette)
     return decompose(manifest, img)
   } catch {
     return null

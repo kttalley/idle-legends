@@ -125,7 +125,9 @@ async function main(): Promise<void> {
   const heroRig = await loadSpriteOrPlaceholder(`${scaffold}hero.json`, makeHumanoidRig)
   const hero2Rig = await loadSpriteOrPlaceholder(`${scaffold}hero2.json`, () => makeHumanoidRig('rig/humanoid2'))
   const enemyRig = await loadSpriteOrPlaceholder(`${scaffold}enemy1.json`, () => makeHumanoidRig('rig/enemy'))
-  const beastRig = makeBeastRig()
+  const goblinRig = await loadSpriteOrPlaceholder(`${scaffold}goblin.json`, () => makeBeastRig('rig/goblin'))
+  const redcapRig = await loadSpriteOrPlaceholder(`${scaffold}redcap.json`, () => makeBeastRig('rig/redcap'))
+  const bombRig = await loadSpriteOrPlaceholder(`${scaffold}bomb.json`, () => makeBeastRig('rig/bomb'))
   const tileset = makeTileset()
   document.getElementById('artpath')!.textContent =
     heroRig.id.startsWith('rig/') ? 'art: programmatic placeholders' : 'art: ffta scaffold (local-only)'
@@ -183,10 +185,10 @@ async function main(): Promise<void> {
     faceTarget: 'se',
   }
   const duelistB: Fighter = {
-    e: scene.spawn(enemyRig, 'team/enemy', 31.8, 34.4),
+    e: scene.spawn(goblinRig, 'src/goblin', 31.8, 34.4),
     homeX: 31.8,
     homeY: 34.4,
-    basePalette: 'team/enemy',
+    basePalette: 'src/goblin',
     lungeT: 0,
     lunging: false,
     flashT: 0,
@@ -198,11 +200,13 @@ async function main(): Promise<void> {
   let duelTimer = 0.8
   let duelTurn = 0
 
-  // ── Ambience: beasts by the lake + a wandering second hero. ──
-  const b1 = scene.spawn(beastRig, 'unit/base', 40, 26)
+  // ── Ambience: FFTA monsters by the lake + a wandering enemy humanoid. ──
+  const b1 = scene.spawn(bombRig, 'src/bomb', 40, 26)
   b1.animator.face('sw')
-  const b2 = scene.spawn(beastRig, 'elite', 43, 29)
+  b1.animator.set('idle')
+  const b2 = scene.spawn(redcapRig, 'src/redcap', 43, 29)
   b2.animator.face('se')
+  b2.animator.set('walk')
   const wanderer = scene.spawn(enemyRig, 'team/enemy', 34, 24)
   wanderer.animator.set('walk')
   wanderer.animator.face('sw')
