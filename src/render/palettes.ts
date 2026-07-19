@@ -82,6 +82,15 @@ reg('elite', composePalette(BASE_UNIT, {
   13: '#8c2014', 14: '#c83820', 15: '#f46434',
 }))
 
+// ── FX: full-body flash palettes (swap in for ~100ms on hit/heal — pure palette trick) ──
+const flash = (hex: string) => {
+  const o: Partial<Record<number, string>> = {}
+  for (let s = 1; s < 16; s++) o[s] = hex
+  return o
+}
+reg('fx/hitflash', composePalette(BASE_UNIT, flash('#f4f0e8')))
+reg('fx/healflash', composePalette(BASE_UNIT, flash('#8ce88c')))
+
 // ── Teams: one ramp differs (the reference's adjacent-set trick, spec §2.2) ──
 reg('team/player', composePalette(BASE_UNIT, { 9: '#1c3454', 10: '#284c7c', 11: '#3866a4', 12: '#5084c8' }))
 reg('team/enemy', composePalette(BASE_UNIT, { 9: '#54201c', 10: '#7c2e28', 11: '#a44038', 12: '#c85c50' }))

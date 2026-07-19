@@ -61,6 +61,36 @@
     .slot .glyph i { width: 22px; height: 22px; border-radius: 3px; display: block; }
     .slot.cd::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.55); border-radius: 5px; }
 
+    /* ── damage floaters ── */
+    #floaters { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+    .floater {
+      position: absolute; top: 0; left: 0; opacity: 0;
+      font-size: 15px; font-weight: 800; color: #ffe27a;
+      text-shadow: 0 1px 0 #000, 0 0 6px #00000088;
+      font-family: ui-monospace, monospace;
+    }
+    .floater.crit { font-size: 20px; color: #ff9a3c; }
+
+    /* ── inventory — bottom right ── */
+    #inventory {
+      bottom: 12px; right: 12px;
+      background: rgba(8, 8, 14, 0.82);
+      border: 1px solid #3a3630; border-radius: 6px;
+      padding: 7px;
+    }
+    #inventory .title { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #b8a878; margin-bottom: 5px; }
+    #bag { display: grid; grid-template-columns: repeat(5, 30px); gap: 4px; }
+    .islot {
+      width: 30px; height: 30px; border-radius: 4px;
+      background: linear-gradient(180deg, #1c1a22, #121017);
+      border: 1px solid #3c3833;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .islot.r-uncommon { border-color: #2e8c42; }
+    .islot.r-rare { border-color: #2e6cc4; }
+    .islot.r-epic { border-color: #8038c8; }
+    .islot.r-legendary { border-color: #c88820; box-shadow: 0 0 5px #c8882066; }
+
     /* ── harness meters — bottom left ── */
     #meters {
       bottom: 12px; left: 12px;
@@ -94,6 +124,12 @@
   </div>
 
   <div class="hud" id="actionbar"></div>
+  <div id="floaters"></div>
+
+  <div class="hud" id="inventory">
+    <div class="title">Inventory</div>
+    <div id="bag"></div>
+  </div>
 
   <div class="hud" id="meters">
     <div><span id="fps">— fps</span> · <span id="alloc">—</span></div>
@@ -101,14 +137,33 @@
   </div>
 
   <script>
-    // Static mock action bar: 10 slots, placeholder ability chips.
+    // Static mock action bar: 10 spell slots (glyph chips stand in for sprite icons —
+    // real icons arrive via the same import pipeline in Phase 4).
     const bar = document.getElementById('actionbar')
-    const chipColors = ['#a04c30', '#3c62b0', '#4a9a3c', '#8a5cc8', '#c8a030', '#b0402e', '#3a8a8a', '#986a38', '#606a78', '#7a3c60']
+    const spells = [
+      ['⚔', '#a04c30'], ['🛡', '#986a38'], ['❄', '#3c62b0'], ['🔥', '#b0402e'], ['☠', '#8a5cc8'],
+      ['✦', '#c8a030'], ['♥', '#4a9a3c'], ['⚡', '#3a8a8a'], ['◈', '#606a78'], ['✧', '#7a3c60'],
+    ]
     for (let i = 0; i < 10; i++) {
       const s = document.createElement('div')
       s.className = 'slot' + (i > 6 ? ' cd' : '')
-      s.innerHTML = `<span class="key">${i === 9 ? 0 : i + 1}</span><span class="glyph"><i style="background:${chipColors[i]}"></i></span>`
+      s.innerHTML = `<span class="key">${i === 9 ? 0 : i + 1}</span>` +
+        `<span class="glyph" style="font-size:17px;color:${spells[i][1]};text-shadow:0 0 6px ${spells[i][1]}88">${spells[i][0]}</span>`
       bar.appendChild(s)
+    }
+
+    // Static mock inventory: 15 slots, a few items with rarity-colored borders.
+    const bag = document.getElementById('bag')
+    const items = [
+      ['🗡', 'r-rare'], ['🛡', ''], ['🧪', 'r-uncommon'], ['💍', 'r-epic'], ['📜', ''],
+      ['⛏', ''], ['🌿', 'r-uncommon'], ['🗡', 'r-legendary'], ['', ''], ['', ''],
+      ['', ''], ['', ''], ['', ''], ['', ''], ['', ''],
+    ]
+    for (const [glyph, rarity] of items) {
+      const s = document.createElement('div')
+      s.className = 'islot ' + rarity
+      s.textContent = glyph
+      bag.appendChild(s)
     }
   </script>
   <script type="module" src="./src/render/dev/harness.ts"></script>
