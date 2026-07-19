@@ -81,17 +81,29 @@ public/sprites/             # authored assets: indexed PNGs + JSON manifests
   Write `docs/graphics-spec.md`: sprite cel organization & compositing, facing/mirroring,
   anchors; indexed palettes & swap-based variants; tile/layer/draw-order; and the browser
   translation plan (adopt / simplify / drop). No game code.
-- **Phase 1 — Renderer core.** Everything under `src/render/` + dev harness.
+- **Phase 1 — Renderer core.** Everything under `src/render/` + dev harness, plus
+  `tools/importSprite.ts` (RGBA/indexed PNG → our indexed manifest format) feeding the
+  gitignored FFTA scaffold, and a static HUD mock in the harness (action bar / minimap /
+  unit-frame cards as DOM overlay) to judge the new UI composition early.
   Acceptance: 60fps at 4× CPU throttle with full map + 6 animated units, no frame-loop
   allocations, one rig → 3+ variants by palette ID alone.
-- **Phase 2 — Combat scene.** Diorama in the combat panel replacing `AvatarRenderer`
-  usage; anims driven by the existing `floatingNumbers` feed; damage numbers preserved;
-  enemy variety via palette swaps; class → rig palette + weapon layer.
-  Acceptance: full fight in sprites, zero combat-logic diffs.
-- **Phase 3 — Map.** `DimetricMapView` replaces ASCII map; existing `ZoneMap` data mapped
-  to tiles; walk animation; existing camera behavior (player-centered, fractional scroll,
-  64×64 wrap) preserved; ASCII path kept behind a fallback flag.
-  Acceptance: Sunhollow Meadows renders as tiles and the player traverses it.
+- **Phase 2 — Unified world scene** *(restructured by owner decision — the dimetric
+  engine replaces the roguelike-abstraction UI, not just individual panels)*. One
+  full-viewport dimetric scene replaces BOTH the ASCII `WorldMapView` strip and the
+  side-by-side combat arena: the player walks the zone in-world, mobs approach in-world
+  (state already models this via `mobMapOffset`), and attack/hit animations + floating
+  damage numbers play over the sprites, driven by the existing `floatingNumbers` feed.
+  Existing camera semantics (player-centered, fractional scroll, 64×64 wrap) preserved.
+  Old ASCII+arena path kept behind a fallback flag.
+  Acceptance: full fight plays out in-world in sprites; Sunhollow Meadows renders as
+  tiles and the player traverses it; zero combat-logic diffs.
+- **Phase 3 — HUD shell (WoW/Diablo-style).** DOM overlay on top of the canvas (text,
+  tooltips, and Tailwind stay crisp; canvas renders only the world): **action bar
+  docked bottom** (reskinned `SkillBar` + mode/town buttons); **minimap top-left**
+  (zone `ZoneMap` rendered to a small canvas with player/mob/node blips — the "radar");
+  **player unit-frame card top-right** (HP/mana/XP, buffs) with the **target frame
+  adjacent** (mob HP, DoTs, cast state); gathering/crafting/town become overlay panels.
+  Acceptance: playable end-to-end in the new shell; old layout behind the fallback flag.
 - **Phase 4 — Pipeline & handoff.** `docs/art-authoring.md`; palette registry demonstrated
   (races, 4 gear tiers, elite); emoji UI icons → placeholder sprite icons.
 
@@ -164,24 +176,27 @@ is now the reason the phase gates can't drift. The WoW-derived ability/talent na
 **launch blocker**, not a nice-to-have — they must be replaced before store submission.
 
 
-## Placeholder art policy (decided)
+## Placeholder art policy (amended by owner decision, Phase 1)
 
-Extracted FFTA sprites will **not** be used, even temporarily. Beyond rules 1–2 of the
-brief, the practical reasons: this repo's destination is a commercial App Store launch
-under hackathon spotlight (#BuildInPublic posts, demo video, judge screenshots), and
-placeholders always leak into those; ripped Square Enix assets there are legal exposure
-and grounds for store/hackathon disqualification. The decomp contributes *knowledge*
-(frame sizes, proportions, anchor and cel conventions — captured in the Phase 0 spec),
-never pixels. Placeholders come from, in order of effort:
-1. **Programmatic placeholders** (Phase 1 plan of record) — silhouette rigs generated in
-   the exact authored format; ugly but structurally perfect.
-2. **Gen-AI original pixel art** — prompted to the *genre style* (GBA-tactics-like
-   dimetric pixel art), then quantized into our indexed-palette format by a small import
-   script. Style isn't protected; specific sprites are. This can raise placeholder quality
-   dramatically before hand-drawn art lands, and the import script doubles as a pipeline
-   validator for the final art.
-3. **CC0/licensed packs** as interim fill (license file kept in `public/sprites/`),
-   only if a pack actually matches the 2:1 format.
+**Decision:** extracted FFTA sprites (the decomp's already-dumped `extracted/*.png`) ARE
+used as a **local-only dev scaffold** during Phases 1–3, because evaluating animation,
+art direction, character angles, and perspective — the things this engine lives or dies
+on — is not honest with programmer-art silhouettes. This amends rules 1–2 of the original
+brief by owner decision, under hard guardrails:
+
+- **Never committed.** Scaffold assets live in `local-assets/` which is `.gitignore`d in
+  the same commit that creates the import path. I (orchestrator) verify no ripped pixels
+  are staged before every commit.
+- **Never published.** Nothing containing scaffold art goes into #BuildInPublic posts,
+  screenshots, demo video, store assets, or any push to a remote.
+- **Format firewall.** Scaffold PNGs pass through `tools/importSprite.ts` into OUR
+  indexed-manifest format — the renderer never grows FFTA-specific code paths, and the
+  import script is the same one gen-AI and hand-drawn art will use (pipeline validator).
+- **Tear-out = delete `local-assets/` + the loader falls back automatically** to
+  programmatic placeholders (which remain the committed, shippable default).
+- **Launch blocker:** the game must ship with zero scaffold-derived pixels; replacement
+  art comes from gen-AI derivatives first (user has an image-generator endpoint), then
+  hand-drawn (every sprite/tile/item, long-term).
 
 ## Track M — monetization strategy (post-Phase-4 milestone, pre-launch)
 
