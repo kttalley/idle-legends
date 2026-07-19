@@ -258,6 +258,42 @@ brief by owner decision, under hard guardrails:
 - **M2 (post-event seasons):** season passes keyed to hand-drawn art drops; founder
   auto-upgrades honored; rewarded-ads experiment only if data says so.
 
+## Track P — cloud async faction PvP (in-event update target)
+
+**Shape:** asynchronous "ghost" PvP — no realtime netcode. Players' rosters (character
+snapshot: level/class/race/stats/equipment/talents + their *look* as `(spriteId,
+paletteId)` pairs) live in cloud accounts. A duel fetches an opponent snapshot and runs a
+**deterministic, seeded, headless combat sim** (the existing tick-based `combat.ts` logic
+run without UI) — both sides see the same result. Faction (rebranded Alliance/Horde)
+aggregates individual results into a **faction war leaderboard**; individual ladders per
+season alongside.
+
+**Why this architecture is unusually good at it:**
+- An opponent's entire visual identity syncs as a handful of sprite/palette IDs — bytes,
+  not assets — and the dimetric combat scene can render any roster instantly. Head-to-head
+  battles are fully visual for free.
+- **PvP is the display case that makes cosmetic IAP convert** — opponents *see* your
+  prismatic/limited palettes on the ladder and in duels. Track M's cosmetics gain social
+  value the moment Track P ships; faction-war seasons pair naturally with season passes.
+
+**Backend (decision gate before build):** accounts + roster store + leaderboards.
+Recommend Supabase or Firebase for auth/rosters/snapshots; leaderboards either same
+backend (cross-platform-ready) or native Game Center (free, iOS-credible, zero server).
+No gameplay servers needed — the sim is client-side deterministic in P0.
+
+**Sequencing:**
+- **P0 (MVP, sized as the first or second in-event update):** account link, snapshot
+  upload on save, "Duel" — fetch 3 opponent choices, run seeded sim, render the fight
+  in the dimetric scene, weekly individual ladder + faction totals. In-event feature
+  updates are exactly the "growth momentum during the event" the Grand Prize judges.
+- **P1 (post-event):** faction-war seasons with cosmetic-only rewards, brackets/
+  matchmaking by level band, snapshot server-side validation.
+
+**Risks:** determinism discipline (all combat RNG must be seedable — audit `combat.ts`
+for `Math.random` before P0); cheat surface (P0 accepts client-trust snapshots, validate
+server-side in P1); scope pressure — Track P is explicitly **not a launch blocker**; the
+graphics rebuild and Track M/R own the runway to launch.
+
 ## Track R — rebrand (parallel to render phases, launch blocker)
 
 Audit result: the WoW debt is structural, not cosmetic — factions are "The Alliance" /
