@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Idle Legends — Render Harness</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0a0f; font-family: -apple-system, 'Segoe UI', sans-serif; }
+    #view {
+      width: 100%; height: 100%;
+      image-rendering: pixelated;
+      display: block;
+    }
+    .hud { position: absolute; pointer-events: none; color: #d8d4c8; }
+
+    /* ── minimap / radar — top left ── */
+    #radar {
+      top: 10px; left: 10px;
+      background: rgba(8, 8, 14, 0.82);
+      border: 1px solid #3a3630; border-radius: 6px;
+      padding: 5px;
+    }
+    #minimap { display: block; border-radius: 3px; image-rendering: pixelated; }
+    #radar .zone { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #b8a878; margin-top: 4px; text-align: center; }
+
+    /* ── unit-frame cards — top right ── */
+    #frames { top: 10px; right: 10px; display: flex; gap: 8px; }
+    .unitcard {
+      width: 170px;
+      background: rgba(8, 8, 14, 0.82);
+      border: 1px solid #3a3630; border-radius: 6px;
+      padding: 7px 9px;
+    }
+    .unitcard.target { border-color: #6a2c24; }
+    .unitcard .name { font-size: 11px; font-weight: 600; margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .unitcard .lvl { color: #8a8578; font-weight: 400; }
+    .bar { height: 9px; border-radius: 2px; background: #1c1a18; overflow: hidden; margin-bottom: 4px; position: relative; }
+    .bar > i { display: block; height: 100%; }
+    .hp > i { width: 78%; background: linear-gradient(180deg, #4a9a3c, #2e6a24); }
+    .target .hp > i { width: 54%; background: linear-gradient(180deg, #b0402e, #7a2418); }
+    .mana > i { width: 62%; background: linear-gradient(180deg, #3c62b0, #24407a); }
+    .bar b { position: absolute; inset: 0; font-size: 8px; font-weight: 500; color: #fffdf4cc; text-align: center; line-height: 9px; }
+
+    /* ── action bar — bottom center ── */
+    #actionbar {
+      bottom: 12px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 5px;
+      background: rgba(8, 8, 14, 0.82);
+      border: 1px solid #3a3630; border-radius: 8px;
+      padding: 7px;
+    }
+    .slot {
+      width: 42px; height: 42px; border-radius: 5px;
+      background: linear-gradient(180deg, #201d26, #14121a);
+      border: 1px solid #45403a;
+      position: relative;
+    }
+    .slot .key { position: absolute; top: 1px; left: 3px; font-size: 8px; color: #8a8578; }
+    .slot .glyph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+    .slot .glyph i { width: 22px; height: 22px; border-radius: 3px; display: block; }
+    .slot.cd::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.55); border-radius: 5px; }
+
+    /* ── harness meters — bottom left ── */
+    #meters {
+      bottom: 12px; left: 12px;
+      font-size: 11px; font-family: ui-monospace, monospace;
+      background: rgba(8, 8, 14, 0.82);
+      border: 1px solid #3a3630; border-radius: 6px;
+      padding: 6px 9px; line-height: 1.5;
+    }
+    #fps { color: #8ec06a; font-weight: 700; }
+    #artpath { color: #b8a878; }
+  </style>
+</head>
+<body>
+  <canvas id="view"></canvas>
+
+  <div class="hud" id="radar">
+    <canvas id="minimap"></canvas>
+    <div class="zone">Sunhollow Meadows</div>
+  </div>
+
+  <div class="hud" id="frames">
+    <div class="unitcard">
+      <div class="name"><span>Adventurer</span><span class="lvl">Lv 12</span></div>
+      <div class="bar hp"><i></i><b>780 / 1000</b></div>
+      <div class="bar mana"><i></i><b>310 / 500</b></div>
+    </div>
+    <div class="unitcard target">
+      <div class="name"><span>Ashen Prowler</span><span class="lvl">Lv 13</span></div>
+      <div class="bar hp"><i></i><b>432 / 800</b></div>
+    </div>
+  </div>
+
+  <div class="hud" id="actionbar"></div>
+
+  <div class="hud" id="meters">
+    <div><span id="fps">— fps</span> · <span id="alloc">—</span></div>
+    <div id="artpath">art: —</div>
+  </div>
+
+  <script>
+    // Static mock action bar: 10 slots, placeholder ability chips.
+    const bar = document.getElementById('actionbar')
+    const chipColors = ['#a04c30', '#3c62b0', '#4a9a3c', '#8a5cc8', '#c8a030', '#b0402e', '#3a8a8a', '#986a38', '#606a78', '#7a3c60']
+    for (let i = 0; i < 10; i++) {
+      const s = document.createElement('div')
+      s.className = 'slot' + (i > 6 ? ' cd' : '')
+      s.innerHTML = `<span class="key">${i === 9 ? 0 : i + 1}</span><span class="glyph"><i style="background:${chipColors[i]}"></i></span>`
+      bar.appendChild(s)
+    }
+  </script>
+  <script type="module" src="./src/render/dev/harness.ts"></script>
+</body>
+</html>

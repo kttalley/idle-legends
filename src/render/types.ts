@@ -1,0 +1,55 @@
+// Core data contracts for the dimetric renderer. Architecture: docs/graphics-spec.md §4–5.
+// This module (and everything under src/render/ except dev/) must stay free of React and
+// game-code imports; the game talks to the renderer through src/render/adapter/ only.
+
+export type AnimName = 'idle' | 'walk' | 'attack' | 'hit'
+
+// Four logical facings; only 'se' and 'ne' are drawn, 'sw'/'nw' are horizontal mirrors.
+export type Facing = 'se' | 'sw' | 'ne' | 'nw'
+export type DrawnFacing = 'se' | 'ne'
+
+export interface AnimDef {
+  frames: number[] // frame indices into the sheet grid
+  fps: number
+  loop: boolean
+}
+
+export type AnimationSet = Record<AnimName, Record<DrawnFacing, AnimDef>>
+
+// The authored format: an indexed-color PNG sheet + this manifest (JSON).
+// Hand-drawn art, gen-AI imports, and the FFTA scaffold all arrive in exactly this shape
+// via tools/importSprite.mjs; placeholderArt.ts synthesizes the runtime form directly.
+export interface SpriteManifest {
+  id: string
+  image: string // sheet PNG path, relative to the manifest file
+  frameW: number
+  frameH: number
+  // Feet-center anchor in frame pixels. Depth sort keys off this point and mirroring
+  // reflects about its vertical axis — see graphics-spec §1.4.
+  anchor: { x: number; y: number }
+  // Slot → source color. Loader decomposes the sheet back to slot indices with this.
+  // [0] must be the transparent color (or "" for alpha-0 transparency).
+  sourcePalette: string[]
+  animations: AnimationSet
+}
+
+// Runtime form: pixels are palette slots, not colors (graphics-spec §7.1).
+export interface IndexedSprite {
+  id: string
+  frameW: number
+  frameH: number
+  cols: number // frames per sheet row
+  frameCount: number
+  indices: Uint8Array // frameCount * frameW * frameH, one slot per pixel, frame-major
+  anchor: { x: number; y: number }
+  animations: AnimationSet
+}
+
+// 16 packed little-endian RGBA colors (ImageData byte order). Slot 0 is always 0 (transparent).
+export type Palette = Uint32Array
+
+export interface TileMapData {
+  w: number
+  h: number
+  tiles: Uint8Array // frame index into the tileset sprite, row-major
+}
