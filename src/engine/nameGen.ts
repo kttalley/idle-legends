@@ -38,6 +38,28 @@ export function generateFactionNamesFallback(seed: number): Record<FactionType, 
   }
 }
 
+// ── Player-name fallback (synchronous) ────────────────────────────────────────
+// Instant, seeded, class-flavoured — used by character creation so "reroll" is
+// immediate and the field is editable. The async LLM generator still runs after the
+// game starts to enrich traits/zone names, but it must not overwrite a chosen name.
+const NAME_STARTS = ['Gor', 'Bran', 'Kael', 'Thal', 'Vor', 'Dra', 'Mor', 'Syl', 'Aer', 'Grim', 'Fen', 'Rho', 'Ulf', 'Var', 'Zar', 'Eld', 'Hroth', 'Kor', 'Mal', 'Ryn', 'Tor', 'Vael', 'Wyn', 'Cael', 'Dain', 'Ser', 'Fael', 'Bael', 'Nyx', 'Oren']
+const NAME_ENDS   = ['van', 'dor', 'ric', 'gar', 'wyn', 'thas', 'mir', 'ok', 'ash', 'en', 'wald', 'rin', 'mund', 'oth', 'ael', 'gorn', 'dris', 'vek', 'nar', 'wen']
+
+const CLASS_EPITHETS: Record<ClassType, string[]> = {
+  warrior: ['the Relentless', 'the Unbroken', 'Ironheart', 'the Wrathful', 'Bloodsworn', 'the Stalwart', 'Oathkeeper'],
+  mage:    ['the Frostborn', 'the Arcane', 'Coldmind', 'Wintertongue', 'the Calculating', 'the Unseen', 'Riftwatcher'],
+  rogue:   ['the Silent', 'Poisonhand', 'the Patient', 'Nightblade', 'the Vengeful', 'Shadowstep', 'the Quick'],
+  warlock: ['the Hollow', 'Voidsworn', 'the Cursed', 'Duskcaller', 'the Haunted', 'Felbound', 'the Nameless'],
+}
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+export function generatePlayerNameFallback(seed: number, playerClass: ClassType): string {
+  const first = cap(seededPick(NAME_STARTS, seed, 7) + seededPick(NAME_ENDS, seed, 8))
+  const epithet = seededPick(CLASS_EPITHETS[playerClass] ?? CLASS_EPITHETS.warrior, seed, 9)
+  return `${first} ${epithet}`
+}
+
 const CLASS_FLAVOR: Record<ClassType, string> = {
   warrior: 'a battle-scarred Arms Warrior who fights with massive two-handed weapons',
   mage:    'a Frost Mage who wields ice and arcane magic',

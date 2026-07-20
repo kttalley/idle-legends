@@ -4,7 +4,13 @@ description: Current single-slot localStorage save needs to become a multi-chara
 type: project
 ---
 
-**STATUS (2026-07-19): save slots + character-select screen IMPLEMENTED** (Track S, part 1). Still pending: the *character-creation refresh* (live dimetric hero preview recoloring as race/class/faction change) and the hosted-account backend swap.
+**STATUS (2026-07-20): save slots + character-select + character-creation refresh IMPLEMENTED** (Track S). Still pending: the hosted-account backend swap (post-launch, gated with Track P).
+
+Creation refresh (part 2) shipped:
+- `src/render/adapter/heroWardrobe.ts` — `heroPaletteId(class, race, faction, rarity)` composes the hero look onto the rig's semantic slot bands: skin(1-4)←race, tunic(5-8)←class, trim(9-12)←faction, accent(13-15)←rarity. This is the "palette registry is the wardrobe" premise made concrete. `combatAdapter` now uses it too (replaced the race+rarity-only `playerPaletteId`), so the in-world hero matches the creation preview 1:1.
+- `src/components/game/HeroPreview.tsx` — single idle hero on a baked grass patch via the real Scene/renderer; recolors live by swapping only the entity paletteId (reads a lookRef each frame, no re-init).
+- `src/components/game/CharacterCreate.tsx` — cohesive flow: persistent HeroPreview + name (sync `generatePlayerNameFallback` in nameGen.ts, reroll 🎲 / edit ✎) + class chips + race chips (filtered to class.allowedRaces) + faction (toggle only for neutral races gnome/tauren). Replaces the old ClassSelect→RaceSelect (ClassSelect.tsx deleted).
+- `initGame(class, race, opts?{name,faction})` — chosen name is authoritative (LLM enrichment never overwrites it; nameGenStatus set 'done' immediately so the game is playable offline). Neutral races can pick alliance/horde.
 
 What shipped:
 - `src/store/saveSlots.ts` — `SlotStorage` interface (list/load/save/delete) with `localSlotStorage` impl, key `idle_legends_saves_v1` → `{ slots: SaveSlot[] }`. One-time migration wraps the legacy `idle_legends_save_v2` blob into slot 1 on first read. `MAX_SLOTS = 5`. `slotStorage` singleton is the swap point for a hosted backend.

@@ -16,6 +16,7 @@ import { loadSpriteOrPlaceholder } from '../indexedSprite'
 import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeBoltRig, makeBurstRig, TILE_ANIMS } from '../placeholderArt'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { composePalette } from '../palette'
+import { heroPaletteId } from './heroWardrobe'
 import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
 import type { Facing, IndexedSprite } from '../types'
 import type {
@@ -49,14 +50,6 @@ const RANGED_GAP_TILES = 5
 
 // ── Mappings (display-only; internal ids untouched) ──────────────────────────
 
-const RACE_PALETTE: Record<RaceType, string> = {
-  human: 'race/human', dwarf: 'race/dwarf', elf: 'race/elf', orc: 'race/orc',
-  troll: 'race/troll', goblin: 'race/goblin', gnome: 'race/gnome',
-  // tauren → hornborn rig palette (Track R rename is display-only; renderer just
-  // needs a palette id that exists).
-  tauren: 'race/hornborn',
-}
-
 const RARITY_RANK: Record<Rarity, number> = {
   common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4,
 }
@@ -84,16 +77,6 @@ function bestEquipmentRarity(state: GameState): Rarity {
     if (r > rank) { rank = r; best = item.rarity }
   }
   return best
-}
-
-/** Compose race skin + rarity accent (the itemization signal) once, cache by key. */
-function playerPaletteId(race: RaceType, rarity: Rarity): string {
-  const id = `player/${race}/${rarity}`
-  if (hasPalette(id)) return id
-  const base = getPalette(RACE_PALETTE[race] ?? 'race/human')
-  const accents = RARITY_ACCENTS[rarity] ?? RARITY_ACCENTS.common
-  registerPaletteRaw(id, composePalette(base, accents))
-  return id
 }
 
 function mobPaletteId(mob: MobInstance): string {
@@ -560,7 +543,9 @@ export class WorldSceneController {
     this.autoTy = PAD + WorldSceneController.wrapMod(this.storeMapY + this.autoOffsetDy)
 
     // Player palette: race + best-equipment rarity accent.
-    this.playerBasePalette = playerPaletteId(state.playerRace, bestEquipmentRarity(state))
+    this.playerBasePalette = heroPaletteId(
+      state.playerClass, state.playerRace, state.playerFaction, bestEquipmentRarity(state),
+    )
     if (this.playerFlashT <= 0) this.player.paletteId = this.playerBasePalette
 
     // Mob presence + approach offset (the store shrinks mobMapOffset toward 0).

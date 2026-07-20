@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type {
-  GameState, ClassType, RaceType, ZoneId, Item, Slot,
+  GameState, ClassType, RaceType, FactionType, ZoneId, Item, Slot,
   MobInstance, CombatLogEntry, FloatingNumber,
   Stats, ActiveDoT, ActiveBuff, CombatProcState,
   GameMode, RecipeId, MaterialId, WeatherType, TownId,
@@ -26,7 +26,7 @@ import {
   AUTOSAVE_INTERVAL_MS,
 } from '../data/constants'
 import { rollLoot } from '../engine/loot'
-import { generateNames, generateThought, generateFactionNamesFallback } from '../engine/nameGen'
+import { generateNames, generateThought, generateFactionNamesFallback, generatePlayerNameFallback } from '../engine/nameGen'
 import type { ThoughtEvent } from '../engine/nameGen'
 import { slotStorage, summarize, newSlotId } from './saveSlots'
 
@@ -261,7 +261,7 @@ export function resetCombatAccumulators() {
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 interface GameActions {
-  initGame: (playerClass: ClassType, playerRace: RaceType) => void
+  initGame: (playerClass: ClassType, playerRace: RaceType, opts?: { name?: string; faction?: FactionType }) => void
   loadSlot: (id: string) => boolean
   saveGame: () => void
   returnToMenu: () => void
@@ -292,37 +292,47 @@ interface GameActions {
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
   ...defaultState(),
 
-  initGame: (playerClass, playerRace) => {
+  initGame: (playerClass, playerRace, opts) => {
     const s = defaultState()
     s.playerClass = playerClass
     s.playerRace = playerRace
-    s.playerFaction = RACE_DEFINITIONS[playerRace].faction
+    // Faction: explicit choice (neutral races may pick a side) else the race default.
+    s.playerFaction = opts?.faction ?? RACE_DEFINITIONS[playerRace].faction
     s.initialized = true
     s.talentPoints = 1
-    s.nameGenStatus = 'loading'
     s.stats = compileStats(playerClass, 1, s.equipment, s.talentAllocs, RACE_DEFINITIONS[playerRace].racialPassive)
     s.stats.currentHp = s.stats.maxHp
     s.lastTickTimestamp = Date.now()
     s.zoneMaps = { sunhollow_meadows: generateZoneMap('sunhollow_meadows') }
     const nameSeed = Date.now() ^ Math.floor(Math.random() * 0xFFFFFF)
     s.factionNames = generateFactionNamesFallback(nameSeed)  // instant fallback shown immediately
+    // A name chosen in creation is authoritative: set it now and mark naming done so
+    // the game is fully playable offline; the LLM only enriches the rest afterward.
+    const chosenName = opts?.name?.trim() || ''
+    if (chosenName) {
+      s.playerName = chosenName
+      s.nameGenStatus = 'done'
+    } else {
+      s.nameGenStatus = 'loading'
+    }
     resetCombatAccumulators()
     // Mint a fresh save slot for this character and persist it immediately, so the
     // run survives a reload even before the first autosave.
     activeSlotId = newSlotId()
     set(s)
     get().saveGame()
-    // Fire name generation async — game starts immediately, names trickle in
+    // Fire name generation async — game starts immediately, names trickle in. A
+    // creation-chosen name is preserved (never overwritten by the LLM).
     generateNames(playerClass, nameSeed)
       .then(names => { set({
-        playerName: names.playerName,
+        playerName: chosenName || names.playerName,
         characterTraits: names.traits,
         generatedZoneNames: names.zoneNames,
         factionNames: names.factionNames,
         generatedTownNames: names.townNames ?? {},
         nameGenStatus: 'done',
       }); get().saveGame() })  // persist the generated identity into the slot
-      .catch((err) => { console.error('[nameGen] failed:', err); set({ nameGenStatus: 'error' }) })
+      .catch((err) => { console.error('[nameGen] failed:', err); if (!chosenName) set({ nameGenStatus: 'error' }) })
   },
 
   loadSlot: (id) => {

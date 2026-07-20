@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useGameStore } from './store/gameStore'
 import { startGameLoop, stopGameLoop } from './engine/gameLoop'
-import { ClassSelect } from './components/game/ClassSelect'
+import { CharacterCreate } from './components/game/CharacterCreate'
 import { CharacterSelect } from './components/game/CharacterSelect'
 import { CombatView } from './components/game/CombatView'
 import { CharacterPanel } from './components/game/CharacterPanel'
@@ -11,7 +11,6 @@ import { CombatLog } from './components/game/CombatLog'
 import { GoldDisplay } from './components/ui/GoldDisplay'
 import { slotStorage } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
-import type { ClassType, RaceType } from './data/types'
 
 type MobilePanel = 'left' | 'right' | 'log' | null
 
@@ -48,8 +47,8 @@ export default function App() {
   if (!initialized) {
     if (creating) {
       return (
-        <ClassSelect
-          onSelect={(cls: ClassType, race: RaceType) => initGame(cls, race)}
+        <CharacterCreate
+          onCreate={(cls, race, opts) => initGame(cls, race, opts)}
           onBack={slots.length > 0 ? () => setCreating(false) : undefined}
         />
       )
