@@ -166,19 +166,35 @@ const BIOME_MAP_CONFIGS: Record<ZoneId, BiomeMapConfig> = {
 // tileToFrame); the legacy ASCII view treats any non-water/cliff type as land, so the
 // new types are forward-compatible there too. Old saves without these types still
 // render (tileToFrame defaults unknown → grass).
-const BIOME_TERRAIN_TILE: Record<ZoneId, TileType> = {
-  sunhollow_meadows:  'flower', // flowery meadow (flower tiles mixed with grass)
-  shattered_crossing: 'moss',   // temperate forest floor
-  thornvale_jungle:   'moss',   // jungle floor
-  the_maw_eternal:    'moss',   // corrupted swamp
-  dustwind_plains:    'sand',   // pale dust
-  ironcrag_badlands:  'rock',   // red-rock badlands
-  warsong_mesa:       'sand',   // dusty mesa
-  ashfire_peaks:      'rock',   // charred rock peaks
-  the_bloodfields:    'sand',   // red dirt plains
-  cinderfall_wastes:  'sand',   // ashen/cinder ground
-  grimshade_forest:   'moss',   // dark forest floor
-  venom_hollows:      'moss',   // sickly swamp
+// Each biome mixes several ground materials (dominant + accents) rather than a single
+// flat tile, so a zone reads as textured terrain instead of one repeated diamond. The
+// per-material art (placeholderArt.makeTileset) is distinct in SHAPE, and the biome
+// palette tints all of them — together that makes each zone unmistakable.
+type TerrainMix = ReadonlyArray<{ type: TileType; w: number }>
+const BIOME_TERRAIN: Record<ZoneId, TerrainMix> = {
+  sunhollow_meadows:  [{ type: 'grass', w: 6 }, { type: 'flower', w: 3 }, { type: 'dirt', w: 1 }],
+  shattered_crossing: [{ type: 'grass', w: 5 }, { type: 'moss', w: 3 }, { type: 'dirt', w: 2 }],
+  thornvale_jungle:   [{ type: 'moss', w: 6 }, { type: 'grass', w: 3 }, { type: 'bog', w: 1 }],
+  the_maw_eternal:    [{ type: 'bog', w: 5 }, { type: 'moss', w: 3 }, { type: 'ember', w: 2 }],
+  dustwind_plains:    [{ type: 'sand', w: 6 }, { type: 'dirt', w: 3 }, { type: 'rock', w: 1 }],
+  ironcrag_badlands:  [{ type: 'rock', w: 5 }, { type: 'sand', w: 3 }, { type: 'dirt', w: 2 }],
+  warsong_mesa:       [{ type: 'sand', w: 5 }, { type: 'rock', w: 4 }, { type: 'dirt', w: 1 }],
+  ashfire_peaks:      [{ type: 'rock', w: 5 }, { type: 'ember', w: 4 }, { type: 'sand', w: 1 }],
+  the_bloodfields:    [{ type: 'dirt', w: 5 }, { type: 'sand', w: 3 }, { type: 'rock', w: 2 }],
+  cinderfall_wastes:  [{ type: 'ember', w: 5 }, { type: 'sand', w: 3 }, { type: 'rock', w: 2 }],
+  grimshade_forest:   [{ type: 'moss', w: 6 }, { type: 'dirt', w: 3 }, { type: 'bog', w: 1 }],
+  venom_hollows:      [{ type: 'bog', w: 5 }, { type: 'moss', w: 4 }, { type: 'water', w: 1 }],
+}
+
+/** Deterministic weighted pick from a biome's material mix, in coarse patches so the
+ *  same material clusters (via a low-frequency cell hash) rather than salt-and-pepper. */
+function pickTerrain(mix: TerrainMix, seed: number, r: number, c: number): TileType {
+  // Quantize to 2×2 cells so a material fills a small patch, not single tiles.
+  const roll = seededRand(seed + 17, Math.floor(r / 2) * 64 + Math.floor(c / 2))
+  const total = mix.reduce((a, m) => a + m.w, 0)
+  let t = roll * total
+  for (const m of mix) { if ((t -= m.w) < 0) return m.type }
+  return mix[0].type
 }
 
 // Flat ground-clutter scatter per biome (environment-plan Phase D). `density` is the
@@ -281,10 +297,10 @@ export function generateZoneMap(zoneId: ZoneId): ZoneMap {
           charSet = cfg.cliffChars
           color = cfg.cliffColor
         } else {
-          // Biome-flavored ground (Phase C): the dominant terrain tile for this zone
-          // instead of plain grass. charSet/color stay on the terrain values for the
-          // legacy ASCII view; the dimetric renderer keys off `type` only.
-          type = BIOME_TERRAIN_TILE[zoneId]
+          // Biome-flavored ground: a weighted mix of materials in coarse patches, so
+          // the zone reads as varied terrain. charSet/color stay on the terrain values
+          // for the legacy ASCII view; the dimetric renderer keys off `type` only.
+          type = pickTerrain(BIOME_TERRAIN[zoneId], seed, r, c)
           charSet = cfg.terrainChars
           color = cfg.terrainColor
         }

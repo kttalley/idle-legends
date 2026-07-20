@@ -36,6 +36,10 @@ function tileToFrame(type: string, x: number, y: number): number {
     case 'rock': return TILE.ROCK
     case 'snow': return TILE.SNOW
     case 'moss': return TILE.MOSS
+    case 'ember': return TILE.EMBER
+    case 'bog': return TILE.BOG
+    case 'dirt': return (hashTile(x, y) % 100) < 45 ? TILE.PATH_ALT : TILE.PATH
+    case 'grass': return (hashTile(x, y) % 100) < 30 ? TILE.GRASS_ALT : TILE.GRASS
     case 'flower': return (hashTile(x, y) % 100) < 35 ? TILE.FLOWER : TILE.GRASS
     // resource_ore / resource_herb are nodes, not tile types (mapGen never sets
     // them on tiles), but defend anyway → treat as terrain.

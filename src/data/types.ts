@@ -374,7 +374,7 @@ export type TileType =
   | 'terrain' | 'water' | 'cliff' | 'resource_ore' | 'resource_herb'
   // Biome-flavored terrain (environment-plan Phase C). Emitted by generateZoneMap per
   // biome character; old saves without these still render (tileToFrame defaults to grass).
-  | 'sand' | 'rock' | 'snow' | 'moss' | 'flower'
+  | 'sand' | 'rock' | 'snow' | 'moss' | 'flower' | 'ember' | 'bog' | 'grass' | 'dirt'
 
 export interface MapTile {
   type: TileType

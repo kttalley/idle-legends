@@ -255,7 +255,7 @@ export function makeBeastRig(id = 'rig/beast'): IndexedSprite {
 // All palette-indexed so Phase A biome palettes tint them via their semantic channels
 // (earth 1-4, veg 5-8, water 9-12, stone 13-15).
 
-const T_FRAMES = 12
+const T_FRAMES = 14
 const TW = 32
 const TH = 24
 const DIAMOND_TOP = 8 // ground diamond occupies y 8..23
@@ -281,15 +281,27 @@ function speck(x: number, y: number, f: number): number {
   return ((h ^ (h >> 16)) >>> 0) % 100
 }
 
+/** Coarse-cell hash — quantizes (x,y) into `size`-px blocks so patterns read as
+ *  patches/facets/ripples (low spatial frequency) instead of per-pixel noise. Lower
+ *  frequency = calmer ground + a distinct material identity, not just a recolor. */
+function cell(x: number, y: number, size: number, f: number): number {
+  return speck(Math.floor(x / size), Math.floor(y / size), f)
+}
+
 export function makeTileset(id = 'tileset/base'): IndexedSprite {
   const p = new Painter(TW, TH, T_FRAMES)
 
-  // 0/1: grass — primary ramp with speckle; edge rows darker for tile separation.
+  // Each ground material gets a DISTINCT surface pattern (not just a recolored ramp)
+  // so biomes read as different terrain, not one meadow tileset tinted. Patterns are
+  // low-frequency (coarse cells / bands / facets) — calmer than per-pixel speckle, so
+  // units stay readable over them. y>=14 is the diamond's dark front edge (separation).
+
+  // 0/1: grass — mid-green sward with sparse upright blade flecks (calm, not noisy).
   for (const f of [0, 1]) {
     fillDiamond(p, f, (x, y) => {
       if (y >= 14) return 5
-      const s = speck(x, y, f)
-      return s < 8 ? 8 : s < 22 ? 7 : 6
+      if (speck(x, y, f + 30) < 7) return 8        // blade highlight
+      return cell(x, y, 3, f) < 42 ? 7 : 6         // soft clumping
     })
   }
   // 2/3: water — secondary ramp, wave glints alternate between the two frames.
@@ -314,50 +326,67 @@ export function makeTileset(id = 'tileset/base'): IndexedSprite {
       p.px(4, x, y, s < 30 ? 13 : s < 45 ? 15 : 14)
     }
   }
-  // 5: path/dirt — earth ramp.
+  // 5: path/dirt — packed earth with a few embedded stones (accent flecks).
   fillDiamond(p, 5, (x, y) => {
     if (y >= 14) return 1
-    const s = speck(x, y, 5)
-    return s < 15 ? 4 : s < 40 ? 3 : 2
+    if (speck(x, y, 55) < 6) return 13             // pebble
+    return cell(x, y, 3, 5) < 45 ? 3 : 2
   })
-  // 6: sand — pale earth ramp (dust/wastes/desert). Lighter and more uniform than path.
+  // 6: sand — desert dunes: horizontal ripple bands, lighter on the crests.
   fillDiamond(p, 6, (x, y) => {
     if (y >= 14) return 2
-    const s = speck(x, y, 6)
-    return s < 10 ? 2 : s < 45 ? 3 : 4
+    const ripple = (y * 2 + ((x >> 2) & 1) + (cell(x, y, 4, 6) % 2)) % 6
+    return ripple === 0 ? 4 : ripple < 3 ? 3 : 2   // crest→trough
   })
-  // 7: rock — stone/accent ramp (badlands/peaks/cinder). Flat diamond of bare stone.
+  // 7: rock — flagstone facets: coarse blocks with dark mortar seams.
   fillDiamond(p, 7, (x, y) => {
     if (y >= 14) return 13
-    const s = speck(x, y, 7)
-    return s < 20 ? 15 : s < 50 ? 14 : 13
+    if (x % 4 === 0 || y % 4 === 0) return 13       // seam
+    const c = cell(x, y, 4, 7)
+    return c < 33 ? 15 : c < 66 ? 14 : 13
   })
-  // 8: snow — palest accent ramp (future snow biome). Reads white under a cool palette.
+  // 8: snow — smooth pale drift shading with rare sparkle.
   fillDiamond(p, 8, (x, y) => {
-    if (y >= 14) return 14
-    const s = speck(x, y, 8)
-    return s < 15 ? 13 : s < 50 ? 14 : 15
+    if (y >= 14) return 13
+    if (speck(x, y, 88) < 4) return 15              // sparkle
+    return cell(x, y, 4, 8) < 55 ? 14 : 13          // soft drifts
   })
-  // 9: moss — darker vegetation ramp (jungle/swamp/forest floor). Leans 5-6 vs grass 6-8.
+  // 9: moss — mottled vegetation clumps with occasional bright fronds.
   fillDiamond(p, 9, (x, y) => {
     if (y >= 14) return 5
-    const s = speck(x, y, 9)
-    return s < 12 ? 5 : s < 30 ? 6 : 7
+    if (speck(x, y, 91) < 5) return 7               // frond fleck
+    const c = cell(x, y, 3, 9)
+    return c < 38 ? 5 : c < 72 ? 6 : 5
   })
-  // 10: flower — grass base (6-8) with sparse bright accent (15) blooms. Tints with the
-  // biome's lightest accent, so meadow = cream blooms, venom = pale purple, etc.
+  // 10: flower — grass sward broken by distinct bloom clusters (accent blooms).
   fillDiamond(p, 10, (x, y) => {
     if (y >= 14) return 5
-    if (speck(x, y, 71) < 5) return 15
-    if (speck(x, y, 72) < 3) return 12
-    const s = speck(x, y, 10)
-    return s < 8 ? 8 : s < 22 ? 7 : 6
+    const bloom = cell(x, y, 4, 73)
+    if (bloom < 9) return 15                        // bloom head
+    if (bloom < 13) return 12
+    return speck(x, y, 30) < 7 ? 8 : 6
   })
-  // 11: path alt — darker earth ramp (worn/trampled dirt).
+  // 11: path alt — worn/trampled darker dirt with ruts (banding).
   fillDiamond(p, 11, (x, y) => {
     if (y >= 14) return 1
-    const s = speck(x, y, 11)
-    return s < 15 ? 1 : s < 40 ? 2 : 3
+    return ((y + (cell(x, y, 3, 11) % 2)) % 4) === 0 ? 1 : cell(x, y, 3, 11) < 50 ? 2 : 3
+  })
+  // 12: ember — cracked charcoal ground veined with glowing fissures (ashfire/cinder).
+  // Charcoal on the earth-dark slots (1–2, near-black in fire biomes); fissures on the
+  // WATER channel (10–12) — fire biomes put lava/ember colours there, so the cracks
+  // read as molten while the surface stays charred.
+  fillDiamond(p, 12, (x, y) => {
+    if (y >= 14) return 1
+    const crack = (speck(x >> 1, y, 12) % 7 === 0) || (x % 5 === 0 && speck(x, y >> 1, 12) % 3 === 0)
+    if (crack) { const g = speck(x, y, 12); return g < 33 ? 10 : g < 66 ? 11 : 12 }  // molten glow
+    return cell(x, y, 3, 12) < 55 ? 1 : 2             // charcoal
+  })
+  // 13: bog — murky swamp muck on the water channel (dark green/black in swamp biomes)
+  // with rising bubble highlights.
+  fillDiamond(p, 13, (x, y) => {
+    if (y >= 14) return 9
+    if (speck(x, y, 131) < 4) return 12               // bubble glint (water-light)
+    return cell(x, y, 4, 13) < 50 ? 9 : 10
   })
 
   const still = (frame: number) => ({
@@ -379,6 +408,7 @@ export function makeTileset(id = 'tileset/base'): IndexedSprite {
 export const TILE = {
   GRASS: 0, GRASS_ALT: 1, WATER: 2, WATER_ALT: 3, CLIFF: 4, PATH: 5,
   SAND: 6, ROCK: 7, SNOW: 8, MOSS: 9, FLOWER: 10, PATH_ALT: 11,
+  EMBER: 12, BOG: 13,
 } as const
 
 // Animated ground cycles (environment-plan Phase B): water shimmers between its two
