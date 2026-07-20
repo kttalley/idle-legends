@@ -354,7 +354,11 @@ export interface GameState {
 }
 
 // ── World Map ─────────────────────────────────────────────────────────────────
-export type TileType = 'terrain' | 'water' | 'cliff' | 'resource_ore' | 'resource_herb'
+export type TileType =
+  | 'terrain' | 'water' | 'cliff' | 'resource_ore' | 'resource_herb'
+  // Biome-flavored terrain (environment-plan Phase C). Emitted by generateZoneMap per
+  // biome character; old saves without these still render (tileToFrame defaults to grass).
+  | 'sand' | 'rock' | 'snow' | 'moss' | 'flower'
 
 export interface MapTile {
   type: TileType
@@ -368,9 +372,25 @@ export interface MapNode {
   icon: string; color: string
 }
 
+// Flat ground-clutter prop kinds (environment-plan Phase D). artId indexes the prop
+// sheet authored in placeholderArt.makePropSheet; the data layer keeps the id contract
+// so engine mapGen never imports from the render layer. ≤ one tile footprint, baked
+// into the ground (under units, no depth sort).
+export const PROP_KIND = {
+  TUFT: 0, PEBBLE: 1, FLOWER: 2, CRYSTAL: 3, MUSHROOM: 4, BONE: 5, CATTAIL: 6, ROCK: 7,
+} as const
+
+export interface MapProp {
+  x: number       // game tile coords (0–63)
+  y: number
+  artId: number   // PROP_KIND.*
+}
+
 export interface ZoneMap {
   tiles: MapTile[][]   // [row][col], 64×64
   nodes: MapNode[]
+  /** Flat ground clutter (Phase D); optional for forward-compat with old saves. */
+  props?: MapProp[]
 }
 
 export type WeatherType = 'clear' | 'cloudy' | 'rain'

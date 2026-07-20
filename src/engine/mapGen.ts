@@ -1,4 +1,4 @@
-import type { ZoneId, ZoneMap, MapTile, MapNode, TileType } from '../data/types'
+import { PROP_KIND, type ZoneId, type ZoneMap, type MapTile, type MapNode, type MapProp, type TileType } from '../data/types'
 
 // ── Seeded PRNG ───────────────────────────────────────────────────────────────
 function hashStr(s: string): number {
@@ -160,6 +160,46 @@ const BIOME_MAP_CONFIGS: Record<ZoneId, BiomeMapConfig> = {
   },
 }
 
+// Dominant terrain tile type per biome (environment-plan Phase C). Emitted for every
+// non-water, non-cliff cell so each biome reads with its characteristic ground instead
+// of uniform grass. The dimetric renderer maps these to tileset frames (mapAdapter
+// tileToFrame); the legacy ASCII view treats any non-water/cliff type as land, so the
+// new types are forward-compatible there too. Old saves without these types still
+// render (tileToFrame defaults unknown → grass).
+const BIOME_TERRAIN_TILE: Record<ZoneId, TileType> = {
+  sunhollow_meadows:  'flower', // flowery meadow (flower tiles mixed with grass)
+  shattered_crossing: 'moss',   // temperate forest floor
+  thornvale_jungle:   'moss',   // jungle floor
+  the_maw_eternal:    'moss',   // corrupted swamp
+  dustwind_plains:    'sand',   // pale dust
+  ironcrag_badlands:  'rock',   // red-rock badlands
+  warsong_mesa:       'sand',   // dusty mesa
+  ashfire_peaks:      'rock',   // charred rock peaks
+  the_bloodfields:    'sand',   // red dirt plains
+  cinderfall_wastes:  'sand',   // ashen/cinder ground
+  grimshade_forest:   'moss',   // dark forest floor
+  venom_hollows:      'moss',   // sickly swamp
+}
+
+// Flat ground-clutter scatter per biome (environment-plan Phase D). `density` is the
+// fraction of land tiles that carry a prop; `kinds` is the weighted pool (repeat an id
+// to weight it). Deterministic via seededRand (no Math.random) so a zone's clutter is
+// stable across reloads. artId values are PROP_KIND.* (data-layer contract).
+const BIOME_PROPS: Record<ZoneId, { density: number; kinds: number[] }> = {
+  sunhollow_meadows:  { density: 0.18, kinds: [PROP_KIND.TUFT, PROP_KIND.FLOWER, PROP_KIND.PEBBLE, PROP_KIND.TUFT] },
+  shattered_crossing: { density: 0.20, kinds: [PROP_KIND.TUFT, PROP_KIND.MUSHROOM, PROP_KIND.PEBBLE, PROP_KIND.FLOWER] },
+  thornvale_jungle:   { density: 0.24, kinds: [PROP_KIND.TUFT, PROP_KIND.MUSHROOM, PROP_KIND.CATTAIL, PROP_KIND.FLOWER] },
+  the_maw_eternal:    { density: 0.22, kinds: [PROP_KIND.CATTAIL, PROP_KIND.MUSHROOM, PROP_KIND.TUFT, PROP_KIND.BONE] },
+  dustwind_plains:    { density: 0.14, kinds: [PROP_KIND.PEBBLE, PROP_KIND.BONE, PROP_KIND.ROCK] },
+  ironcrag_badlands:  { density: 0.16, kinds: [PROP_KIND.PEBBLE, PROP_KIND.ROCK, PROP_KIND.BONE, PROP_KIND.CRYSTAL] },
+  warsong_mesa:       { density: 0.14, kinds: [PROP_KIND.PEBBLE, PROP_KIND.ROCK, PROP_KIND.BONE] },
+  ashfire_peaks:      { density: 0.16, kinds: [PROP_KIND.BONE, PROP_KIND.ROCK, PROP_KIND.PEBBLE, PROP_KIND.CRYSTAL] },
+  the_bloodfields:    { density: 0.18, kinds: [PROP_KIND.BONE, PROP_KIND.ROCK, PROP_KIND.PEBBLE] },
+  cinderfall_wastes:  { density: 0.14, kinds: [PROP_KIND.BONE, PROP_KIND.ROCK, PROP_KIND.PEBBLE, PROP_KIND.CRYSTAL] },
+  grimshade_forest:   { density: 0.20, kinds: [PROP_KIND.MUSHROOM, PROP_KIND.BONE, PROP_KIND.TUFT, PROP_KIND.FLOWER] },
+  venom_hollows:      { density: 0.22, kinds: [PROP_KIND.MUSHROOM, PROP_KIND.CATTAIL, PROP_KIND.TUFT] },
+}
+
 const MAP_SIZE = 64
 
 // ── CA terrain generation ─────────────────────────────────────────────────────
@@ -241,7 +281,10 @@ export function generateZoneMap(zoneId: ZoneId): ZoneMap {
           charSet = cfg.cliffChars
           color = cfg.cliffColor
         } else {
-          type = 'terrain'
+          // Biome-flavored ground (Phase C): the dominant terrain tile for this zone
+          // instead of plain grass. charSet/color stay on the terrain values for the
+          // legacy ASCII view; the dimetric renderer keys off `type` only.
+          type = BIOME_TERRAIN_TILE[zoneId]
           charSet = cfg.terrainChars
           color = cfg.terrainColor
         }
@@ -274,7 +317,10 @@ export function generateZoneMap(zoneId: ZoneId): ZoneMap {
       const r = Math.floor(seededRand(seed + 100, nodeIdx) * MAP_SIZE)
       const c = Math.floor(seededRand(seed + 200, nodeIdx) * MAP_SIZE)
       nodeIdx++
-      if (tiles[r][c].type === 'terrain') {
+      // Place on any walkable land tile (grass or any biome-flavored ground type);
+      // never on water or cliffs.
+      const t = tiles[r][c].type
+      if (t !== 'water' && t !== 'cliff') {
         nodes.push({ x: c, y: r, type, icon, color })
         placed++
       }
@@ -286,5 +332,20 @@ export function generateZoneMap(zoneId: ZoneId): ZoneMap {
   placeNodes('mob_spawn', nodeCount.mob_spawn, '×', '#ff4444')
   placeNodes('boss_lair', nodeCount.boss_lair, '☠', '#ff8000')
 
-  return { tiles, nodes }
+  // Step 5: scatter flat ground-clutter props on land tiles (Phase D). Deterministic
+  // per tile via seededRand, density + weighted kind pool per biome (BIOME_PROPS).
+  const pcfg = BIOME_PROPS[zoneId]
+  const props: MapProp[] = []
+  for (let r = 0; r < MAP_SIZE; r++) {
+    for (let c = 0; c < MAP_SIZE; c++) {
+      const t = tiles[r][c].type
+      if (t === 'water' || t === 'cliff') continue
+      const k = r * MAP_SIZE + c
+      if (seededRand(seed + 300, k) >= pcfg.density) continue
+      const kind = pcfg.kinds[Math.floor(seededRand(seed + 400, k) * pcfg.kinds.length)]
+      props.push({ x: c, y: r, artId: kind })
+    }
+  }
+
+  return { tiles, nodes, props }
 }
