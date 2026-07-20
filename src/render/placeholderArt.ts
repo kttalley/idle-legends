@@ -274,3 +274,83 @@ export function makeTileset(id = 'tileset/base'): IndexedSprite {
 }
 
 export const TILE = { GRASS: 0, GRASS_ALT: 1, WATER: 2, WATER_ALT: 3, CLIFF: 4, PATH: 5 } as const
+
+// ── Spell effects: bolt (looping projectile) + burst (one-shot impact) ───────
+// Drawn entirely in the accent channel (13–15) + primary core, so spell schools are
+// palette ids ('spell/fire', 'spell/frost', …), not separate art — same trick as units.
+
+export function makeBoltRig(id = 'fx/bolt'): IndexedSprite {
+  const FW = 10
+  const FH = 10
+  const p = new Painter(FW, FH, 2)
+  for (const f of [0, 1]) {
+    const r = f === 0 ? 3 : 4 // pulse
+    for (let y = 0; y < FH; y++) {
+      for (let x = 0; x < FW; x++) {
+        const d2 = (x - 5) * (x - 5) + (y - 5) * (y - 5)
+        if (d2 <= (r - 2) * (r - 2)) p.px(f, x, y, 15)
+        else if (d2 <= (r - 1) * (r - 1)) p.px(f, x, y, 14)
+        else if (d2 <= r * r) p.px(f, x, y, 13)
+      }
+    }
+  }
+  const anim = (frames: number[], fps: number, loop: boolean) => ({
+    se: { frames, fps, loop },
+    ne: { frames, fps, loop },
+  })
+  return {
+    id,
+    frameW: FW,
+    frameH: FH,
+    cols: 2,
+    frameCount: 2,
+    indices: p.data,
+    anchor: { x: 5, y: 5 },
+    animations: { idle: anim([0, 1], 8, true), walk: anim([0, 1], 8, true), attack: anim([0, 1], 8, true), hit: anim([0, 1], 8, true) },
+  }
+}
+
+export function makeBurstRig(id = 'fx/burst'): IndexedSprite {
+  const FW = 26
+  const FH = 26
+  const FRAMES = 5
+  const p = new Painter(FW, FH, FRAMES)
+  for (let f = 0; f < FRAMES; f++) {
+    const r = 3 + f * 2.6
+    const thick = f < 2 ? r : 2.5 // solid flash → expanding ring
+    for (let y = 0; y < FH; y++) {
+      for (let x = 0; x < FW; x++) {
+        const d = Math.sqrt((x - 13) * (x - 13) + (y - 13) * (y - 13))
+        if (d <= r && d >= r - thick) {
+          p.px(f, x, y, d >= r - 1 ? 13 : d >= r - 2 ? 14 : 15)
+        }
+      }
+    }
+    // Sparks on later frames.
+    if (f >= 2) {
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2
+        p.px(f, Math.round(13 + Math.cos(a) * (r + 1)), Math.round(13 + Math.sin(a) * (r + 1)), 15)
+      }
+    }
+  }
+  const anim = (frames: number[], fps: number, loop: boolean) => ({
+    se: { frames, fps, loop },
+    ne: { frames, fps, loop },
+  })
+  return {
+    id,
+    frameW: FW,
+    frameH: FH,
+    cols: FRAMES,
+    frameCount: FRAMES,
+    indices: p.data,
+    anchor: { x: 13, y: 18 },
+    animations: {
+      idle: anim([0], 1, true),
+      walk: anim([0], 1, true),
+      attack: anim([0, 1, 2, 3, 4], 16, false),
+      hit: anim([0, 1, 2, 3, 4], 16, false),
+    },
+  }
+}

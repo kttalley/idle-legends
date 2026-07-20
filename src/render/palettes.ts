@@ -91,6 +91,12 @@ const flash = (hex: string) => {
 reg('fx/hitflash', composePalette(BASE_UNIT, flash('#f4f0e8')))
 reg('fx/healflash', composePalette(BASE_UNIT, flash('#8ce88c')))
 
+// ── Spell schools: effect rigs read only the accent channel (13–15) ──────────
+reg('spell/fire', composePalette(BASE_UNIT, { 13: '#c83c14', 14: '#f47820', 15: '#ffd23c' }))
+reg('spell/frost', composePalette(BASE_UNIT, { 13: '#1c50b0', 14: '#3c8ce0', 15: '#b0e8ff' }))
+reg('spell/shadow', composePalette(BASE_UNIT, { 13: '#4c1c78', 14: '#8038c8', 15: '#d08cff' }))
+reg('spell/holy', composePalette(BASE_UNIT, { 13: '#b09018', 14: '#e8c840', 15: '#fff8c0' }))
+
 // ── Teams: one ramp differs (the reference's adjacent-set trick, spec §2.2) ──
 reg('team/player', composePalette(BASE_UNIT, { 9: '#1c3454', 10: '#284c7c', 11: '#3866a4', 12: '#5084c8' }))
 reg('team/enemy', composePalette(BASE_UNIT, { 9: '#54201c', 10: '#7c2e28', 11: '#a44038', 12: '#c85c50' }))
@@ -127,4 +133,9 @@ export function paletteIds(): string[] {
 /** Register a palette at runtime (scaffold imports, future purchased/prismatic ids). */
 export function registerPalette(id: string, hex: string[]): void {
   reg(id, paletteFromHex(hex))
+}
+
+/** Register an already-packed palette (tints/derived variants). */
+export function registerPaletteRaw(id: string, p: Palette): void {
+  reg(id, p)
 }
