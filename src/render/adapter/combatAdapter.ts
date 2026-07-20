@@ -139,6 +139,33 @@ interface InputState { up: boolean; down: boolean; left: boolean; right: boolean
 
 // ── Controller ───────────────────────────────────────────────────────────────
 
+// ── Particle FX (bloom via additive compositing) ────────────────────────────
+// World-buffer-space particles rendered after the scene with globalCompositeOperation
+// 'lighter' (overlapping glows sum → bloom) + shadowBlur halos + radial-gradient orbs.
+// Recovers the legacy CombatParticles vocabulary (orb/spark/ring/flash) at more volume.
+interface Particle {
+  x: number; y: number          // world-buffer px (feetX/feetY space)
+  vx: number; vy: number        // px/sec
+  life: number; decay: number   // 1→0, per second
+  r: number
+  color: string; glow: string
+  kind: 0 | 1 | 2 | 3           // 0 spark · 1 orb · 2 ring · 3 flash
+}
+const PARTICLE_CAP = 640
+const P_SPARK = 0, P_ORB = 1, P_RING = 2, P_FLASH = 3
+
+// FX color pair (bright core → glow halo) per school/impact palette id.
+const FX_COLORS: Record<string, { core: string; glow: string }> = {
+  'spell/shadow': { core: '#e2b8ff', glow: '#9038d8' },
+  'spell/fire':   { core: '#ffe070', glow: '#f0501c' },
+  'spell/frost':  { core: '#dcf4ff', glow: '#3c8ce0' },
+  'spell/holy':   { core: '#fff6c8', glow: '#f0c030' },
+  'fx/hitflash':  { core: '#ffd8b0', glow: '#ff5828' },
+}
+function fxColors(pal: string): { core: string; glow: string } {
+  return FX_COLORS[pal] ?? { core: '#eaf0ff', glow: '#7fb0ff' }
+}
+
 export class WorldSceneController {
   private scene = new Scene()
   private canvas: HTMLCanvasElement
@@ -236,6 +263,9 @@ export class WorldSceneController {
   private dyingMobs: { e: Entity; t: number }[] = []
   private mobWasPresent = false
   private playerDead = false
+
+  // Particle FX pool (bloom).
+  private particles: Particle[] = []
 
   constructor(canvas: HTMLCanvasElement, floatersHost: HTMLElement) {
     this.canvas = canvas
@@ -344,14 +374,113 @@ export class WorldSceneController {
   }
 
   /** Impact reaction shared by melee and projectile hits: flash + recoil the target,
-   *  pop a burst, kick the camera. */
-  private impactHit(target: Entity, palette: string, burstPalette: string, mag: number, stop = 0): void {
+   *  pop a burst + particle explosion, kick the camera. Colors derive from `fxPalette`. */
+  private impactHit(target: Entity, fxPalette: string, mag: number, stop = 0): void {
     if (target === this.mob) { this.mobFlashT = 0.13 } else { this.playerFlashT = 0.13 }
     target.paletteId = 'fx/hitflash'
     target.animator.set('hit')
     target.animator.restart()
-    this.spawnBurst(target.tx, target.ty, burstPalette)
+    this.spawnBurst(target.tx, target.ty, fxPalette)
     this.punch(mag, stop)
+    const m = this.worldMid(target)
+    const c = fxColors(fxPalette)
+    this.emitImpact(m.x, m.y, c.core, c.glow, mag >= 3 ? 1.5 : 1)
+  }
+
+  // ── Particles ──────────────────────────────────────────────────────────────
+  /** Body-center world-buffer coords for an entity (where FX should originate/land). */
+  private worldMid(e: Entity): { x: number; y: number } {
+    const g = this.ground!
+    return { x: feetX(g, e.tx, e.ty), y: feetY(g, e.tx, e.ty) - e.sprite.frameH * 0.45 - e.z }
+  }
+
+  private push(x: number, y: number, vx: number, vy: number, life: number, decay: number, r: number, color: string, glow: string, kind: Particle['kind']): void {
+    if (this.particles.length >= PARTICLE_CAP) return
+    this.particles.push({ x, y, vx, vy, life, decay, r, color, glow, kind })
+  }
+
+  /** Impact spray: radial sparks + an expanding shock ring + a soft central flash. */
+  private emitImpact(x: number, y: number, color: string, glow: string, scale = 1): void {
+    const n = Math.round(14 * scale)
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + (Math.random() - 0.5) * 0.6
+      const sp = (70 + Math.random() * 150) * scale
+      this.push(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 20, 1, 2.0 + Math.random() * 1.6, (1.4 + Math.random() * 1.8) * scale, color, glow, P_SPARK)
+    }
+    this.push(x, y, 0, 0, 1, 3.0, 4 * scale, color, glow, P_RING)
+    this.push(x, y, 0, 0, 1, 5.5, 10 * scale, glow, glow, P_FLASH)
+  }
+
+  /** Charge-up: sparks converging toward the cast point. */
+  private emitCharge(x: number, y: number, color: string, glow: string): void {
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * Math.PI * 2
+      const d = 12 + Math.random() * 10
+      this.push(x + Math.cos(a) * d, y + Math.sin(a) * d, -Math.cos(a) * 90, -Math.sin(a) * 90, 1, 3.2, 1.6, color, glow, P_SPARK)
+    }
+    this.push(x, y, 0, 0, 1, 4, 6, glow, glow, P_FLASH)
+  }
+
+  /** Trailing glow behind a projectile (called per frame while it flies). */
+  private emitTrail(x: number, y: number, color: string, glow: string): void {
+    this.push(x + (Math.random() - 0.5) * 3, y + (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 24, (Math.random() - 0.5) * 24, 1, 3.6, 3.2, color, glow, P_ORB)
+  }
+
+  private updateParticles(dt: number): void {
+    const ps = this.particles
+    const damp = Math.exp(-6 * dt)
+    for (let i = ps.length - 1; i >= 0; i--) {
+      const p = ps[i]
+      p.life -= p.decay * dt
+      if (p.life <= 0) { ps.splice(i, 1); continue }
+      p.x += p.vx * dt
+      p.y += p.vy * dt
+      if (p.kind === P_SPARK) p.vy += 220 * dt // gravity on sparks
+      p.vx *= damp
+      p.vy *= damp
+    }
+  }
+
+  private drawParticles(): void {
+    const ps = this.particles
+    if (!ps.length) return
+    const ctx = this.ctx
+    const cx = this.cam.x, cy = this.cam.y
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter' // additive → overlapping glows bloom
+    for (let i = 0; i < ps.length; i++) {
+      const p = ps[i]
+      const dx = p.x - cx, dy = p.y - cy
+      const a = p.life < 1 ? p.life : 1
+      ctx.globalAlpha = a
+      if (p.kind === P_RING) {
+        const rr = (1 - p.life) * 26 * (p.r / 4) + p.r
+        ctx.strokeStyle = p.color
+        ctx.shadowColor = p.glow
+        ctx.shadowBlur = 8
+        ctx.lineWidth = Math.max(0.5, p.life * 2.5)
+        ctx.beginPath(); ctx.arc(dx, dy, rr, 0, Math.PI * 2); ctx.stroke()
+      } else if (p.kind === P_SPARK) {
+        ctx.strokeStyle = p.color
+        ctx.shadowColor = p.glow
+        ctx.shadowBlur = 6
+        ctx.lineWidth = Math.max(0.6, p.r * p.life)
+        const tl = 0.04
+        ctx.beginPath(); ctx.moveTo(dx, dy); ctx.lineTo(dx - p.vx * tl, dy - p.vy * tl); ctx.stroke()
+      } else {
+        // orb / flash — radial gradient, bright core → transparent edge
+        const rr = Math.max(0.6, p.r * (p.kind === P_FLASH ? (0.4 + p.life) : p.life))
+        const g = ctx.createRadialGradient(dx, dy, 0, dx, dy, rr)
+        g.addColorStop(0, p.glow)
+        g.addColorStop(0.45, p.color)
+        g.addColorStop(1, 'rgba(0,0,0,0)')
+        ctx.fillStyle = g
+        ctx.beginPath(); ctx.arc(dx, dy, rr, 0, Math.PI * 2); ctx.fill()
+      }
+    }
+    ctx.restore()
+    ctx.globalAlpha = 1
+    ctx.shadowBlur = 0
   }
 
   /** Kick the camera (rumble) and optionally freeze the sim briefly (hit-stop). */
@@ -494,6 +623,9 @@ export class WorldSceneController {
         this.dyingMobs.push({ e, t: 0 })
         this.spawnBurst(e.tx, e.ty, 'spell/holy') // loot/impact pop
         this.punch(2.6, 0.05)
+        const dm = this.worldMid(e)
+        const dc = fxColors('spell/holy')
+        this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 1.7)
       } else {
         this.mob.active = false
       }
@@ -559,6 +691,10 @@ export class WorldSceneController {
     if (fn.isCrit) this.spawnBurst(this.mob.tx, this.mob.ty, 'spell/holy')
     // Rumble scales with the hit: crits kick hard + a brief hit-stop; normal a nudge.
     this.punch(fn.isCrit ? 3.6 : 1.3, fn.isCrit ? 0.05 : 0)
+    // Melee spark spray — steel-white, gold on a crit.
+    const mm = this.worldMid(this.mob)
+    const mc = fn.isCrit ? fxColors('spell/holy') : { core: '#eaf0ff', glow: '#7fb0ff' }
+    this.emitImpact(mm.x, mm.y, mc.core, mc.glow, fn.isCrit ? 1.7 : 0.9)
     this.spawnFloater(
       this.mob, `${fn.value}${fn.isCrit ? '!' : ''}`, fn.isCrit,
       fn.color ?? (fn.isCrit ? '#ffcc00' : '#88bbff'),
@@ -574,6 +710,9 @@ export class WorldSceneController {
     this.faceToward(this.player, this.mob.tx, this.mob.ty)
     const r = WorldSceneController.FX_RISE
     this.spawnBurst(this.player.tx - r, this.player.ty - r, 'spell/shadow')
+    const cc = fxColors('spell/shadow')
+    const pm = this.worldMid(this.player)
+    this.emitCharge(pm.x, pm.y, cc.core, cc.glow)
     this.spawnBolt(
       this.player.tx - r, this.player.ty - r,
       this.mob.tx - r, this.mob.ty - r,
@@ -586,6 +725,9 @@ export class WorldSceneController {
     if (!this.mob || !this.ground) return
     // Ongoing affliction: a small recurrent pulse on the mob, no attacker lunge.
     this.spawnBurst(this.mob.tx, this.mob.ty, 'spell/shadow')
+    const dc = fxColors('spell/shadow')
+    const dm = this.worldMid(this.mob)
+    this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 0.5)
     this.spawnFloater(this.mob, `${fn.value}`, false, fn.color ?? '#aa88ff')
   }
 
@@ -608,7 +750,7 @@ export class WorldSceneController {
       this.beginLunge(this.mobLunge, this.mob, this.player)
       this.mob.animator.set('attack')
       this.mob.animator.restart()
-      this.impactHit(this.player, 'fx/hitflash', 'spell/shadow', 2.0)
+      this.impactHit(this.player, 'fx/hitflash', 2.0)
     }
     this.spawnFloater(this.player, `-${fn.value}`, false, '#ff6666')
   }
@@ -742,12 +884,14 @@ export class WorldSceneController {
           b.entity.active = false
           // Impact reaction on arrival (this is where a spell should *land* and feel
           // heavy) — flash/recoil the target, burst, rumble; else just a burst.
-          if (b.impact && b.impact.active) this.impactHit(b.impact, b.palette, b.palette, b.mag, 0.05)
+          if (b.impact && b.impact.active) this.impactHit(b.impact, b.palette, b.mag, 0.05)
           else this.spawnBurst(b.toX, b.toY, b.palette)
           this.bolts.splice(i, 1)
         } else {
           b.entity.tx = b.fromX + (b.toX - b.fromX) * b.t
           b.entity.ty = b.fromY + (b.toY - b.fromY) * b.t
+          const tc = fxColors(b.palette)
+          this.emitTrail(feetX(g, b.entity.tx, b.entity.ty), feetY(g, b.entity.tx, b.entity.ty), tc.core, tc.glow)
         }
       }
     }
@@ -792,6 +936,11 @@ export class WorldSceneController {
     this.updatePropEntities()
 
     this.scene.render(this.ctx, this.cam, g, dt)
+
+    // Particle FX over the world (bloom via additive compositing). Advanced on real
+    // time so glows keep flowing through hit-stop.
+    this.updateParticles(realDt)
+    this.drawParticles()
 
     // Fallback glyphs for any node type without a tall-prop sprite (Phase E: the
     // mapped node types — ore/herb/boss_lair/mob_spawn — are now depth-sorted props).
