@@ -328,6 +328,15 @@ single-player idle game that *reads* like a busy MMO server.
 - **L2:** light interactions — party-up with an ambient hero (AI companion), trade barks,
   world events (a boss draws a crowd of heroes).
 
+**Footnote — simulated MMO chat / banter (high-charm, low-cost).** Give ambient heroes
+occasional speech-bubble one-liners (reuse the existing `ThoughtBubble` + `nameGen`/
+`generateThought` system, or a canned pool for zero-cost/offline) so the fake server has
+*personality*, not just motion. Context-driven barks land best: contesting a node ("naw,
+I saw that iron ore first, noob — qq"), declining help ("need a hand with that mob…? naw,
+u got it"), faction trash-talk, loot brags, idle chatter. Cheap flavor that massively
+sells the "living server" feel; pairs with the L0 ambient crowd already in place. Could
+even wire the LLM thought system to react to what the nearby ambient hero is *doing*.
+
 **Risks:** entity/perf budget in the scene (cap ambient count per viewport, cull off-
 screen sims); behavior determinism (reuse the seedable combat sim Track P already
 requires); scope — this is explicitly a *post-launch* world-depth play, sequenced behind
