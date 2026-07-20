@@ -1252,7 +1252,7 @@ export class WorldSceneController {
       const gy = WorldSceneController.wrapMod(pgy + near(i * 9 + 6))
       const e = this.scene.spawn(this.rigs.player, heroPaletteId(cls, race, faction, rarity),
         PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
-      e.shadow = true; e.animator.set('walk')
+      e.shadow = true; e.animator.set('idle')  // idle tag IS the gait (walk tag is flinchy)
       this.ambient.push({
         e, kind: 'hero', gx, gy, tgx: gx, tgy: gy, t: 0, fightT: 0, atkCd: 0,
         name: AMBIENT_NAMES[Math.floor(rnd(i * 9 + 7) * AMBIENT_NAMES.length)],
@@ -1265,7 +1265,7 @@ export class WorldSceneController {
       const gx = WorldSceneController.wrapMod(pgx + near(300 + i))
       const gy = WorldSceneController.wrapMod(pgy + near(400 + i))
       const e = this.scene.spawn(rig, pal, PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
-      e.shadow = true; e.animator.set('walk')
+      e.shadow = true; e.animator.set('idle')  // idle tag IS the gait (walk tag is flinchy)
       this.ambient.push({ e, kind: 'mob', gx, gy, tgx: gx, tgy: gy, t: 0, fightT: 0, atkCd: 0, name: '', level: 0, faction: 'neutral' })
     }
   }
@@ -1281,7 +1281,7 @@ export class WorldSceneController {
         a.atkCd -= dt
         if (a.atkCd <= 0) { a.e.animator.set('attack'); a.e.animator.restart(); a.atkCd = 0.6 + Math.random() * 0.5 }
         else if (a.e.animator.finished) a.e.animator.set('idle')
-        if (a.fightT <= 0) a.e.animator.set('walk')
+        if (a.fightT <= 0) a.e.animator.set('idle')  // resume the gait (idle tag), not flinchy walk
       } else {
         // Torus-shortest delta to the target; repick a target near the PLAYER so the
         // crowd follows the camera-centred player and stays roughly in view.

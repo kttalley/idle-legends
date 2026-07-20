@@ -11,6 +11,7 @@ import { CombatLog } from './components/game/CombatLog'
 import { GoldDisplay } from './components/ui/GoldDisplay'
 import { slotStorage } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
+import { ZONES, ZONE_ORDER } from './data/zones'
 
 type MobilePanel = 'left' | 'right' | 'log' | null
 
@@ -20,6 +21,8 @@ export default function App() {
   const loadSlot     = useGameStore(s => s.loadSlot)
   const returnToMenu = useGameStore(s => s.returnToMenu)
   const gold         = useGameStore(s => s.gold)
+  const currentZone  = useGameStore(s => s.currentZone)
+  const devJumpZone  = useGameStore(s => s.devJumpZone)
 
   const [activePanel, setActivePanel] = useState<MobilePanel>(null)
   const [slots, setSlots]   = useState<SaveSlotMeta[]>(() => slotStorage.list())
@@ -77,13 +80,27 @@ export default function App() {
           Idle Legends
         </div>
         <GoldDisplay gold={gold} />
-        <button
-          className="rp-button"
-          style={{ fontSize: '0.6rem' }}
-          onClick={returnToMenu}
-        >
-          Menu
-        </button>
+        <div className="flex items-center gap-2">
+          {/* DEV: jump to any biome to inspect it (bypasses unlock/progression). */}
+          <select
+            value={currentZone}
+            onChange={e => devJumpZone(e.target.value as typeof currentZone)}
+            title="DEV: jump to biome"
+            className="rp-button"
+            style={{ fontSize: '0.55rem', padding: '2px 4px', maxWidth: 130 }}
+          >
+            {ZONE_ORDER.map(z => (
+              <option key={z} value={z}>{ZONES[z]?.name ?? z}</option>
+            ))}
+          </select>
+          <button
+            className="rp-button"
+            style={{ fontSize: '0.6rem' }}
+            onClick={returnToMenu}
+          >
+            Menu
+          </button>
+        </div>
       </div>
 
       {/* ── Main body ── */}

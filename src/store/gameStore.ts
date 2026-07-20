@@ -272,6 +272,7 @@ interface GameActions {
   sellItem: (inventoryIndex: number) => void
   sellAllCommon: () => void
   selectZone: (zoneId: ZoneId) => void
+  devJumpZone: (zoneId: ZoneId) => void
   allocateTalent: (talentId: string) => void
   deallocateTalent: (talentId: string) => void
   resetTalents: () => void
@@ -1057,6 +1058,21 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (!s.unlockedZones.includes(zoneId)) return
     resetCombatAccumulators()
     set({ currentZone: zoneId, currentMob: null, mobRespawnTimer: 0, activeDoTs: [] })
+  },
+
+  // Dev-only override: jump to ANY zone (unlock + generate its map if needed), so the
+  // biome can be inspected up close. Not part of normal progression.
+  devJumpZone: (zoneId) => {
+    const s = get()
+    const unlockedZones = s.unlockedZones.includes(zoneId) ? s.unlockedZones : [...s.unlockedZones, zoneId]
+    const zoneMaps = s.zoneMaps[zoneId] ? s.zoneMaps : { ...s.zoneMaps, [zoneId]: generateZoneMap(zoneId) }
+    resetCombatAccumulators()
+    set({
+      unlockedZones, zoneMaps, currentZone: zoneId,
+      gameMode: 'combat', currentTown: null, currentMob: null,
+      mobRespawnTimer: 0, activeDoTs: [], travelTarget: null, travelProgress: 0,
+      playerMapPos: { x: 32, y: 32 },
+    })
   },
 
   // ── Talents ──────────────────────────────────────────────────────────────────
