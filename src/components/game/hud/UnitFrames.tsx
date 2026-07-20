@@ -15,13 +15,12 @@ import type { CastState } from '../../../data/types'
 const TEXT_SHADOW = '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 1px 3px rgba(0,0,0,0.9)'
 const WIDTH = 150
 
-// Light "shadow bg": low-opacity dark fill whose matching blurred box-shadow feathers
-// the edges out to transparent — darkens behind the content without a hard rectangle.
+// Match the bottom action bar's panel so the HUD reads as one system.
 const SCRIM: React.CSSProperties = {
-  background: 'rgba(8,6,12,0.34)',
-  boxShadow: '0 0 14px 8px rgba(8,6,12,0.34)',
-  borderRadius: 9,
-  padding: '5px 8px',
+  background: 'rgba(8,8,14,0.82)',
+  border: '1px solid #3a3630',
+  borderRadius: 8,
+  padding: '6px 8px',
 }
 
 function CastBar({ cast }: { cast: CastState }) {
