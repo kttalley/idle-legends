@@ -237,6 +237,23 @@ const BIOME_SCENERY: Record<ZoneId, { density: number; kinds: number[] }> = {
   venom_hollows:      { density: 0.026, kinds: [SK.DEADTREE, SK.BUSH, SK.REEDS, SK.MOUND, SK.DEADTREE] },
 }
 
+// A handful of structure landmarks per zone. Ruined/war biomes get arches & towers;
+// settled biomes get the occasional hut. Kept rare so they read as points of interest.
+const BIOME_LANDMARK: Record<ZoneId, { count: number; kinds: number[] }> = {
+  sunhollow_meadows:  { count: 3, kinds: [SK.HUT, SK.HUT, SK.TOWER] },
+  shattered_crossing: { count: 4, kinds: [SK.HUT, SK.TOWER, SK.ARCH] },
+  thornvale_jungle:   { count: 2, kinds: [SK.ARCH, SK.PILLAR] },
+  the_maw_eternal:    { count: 3, kinds: [SK.ARCH, SK.PILLAR, SK.TOWER] },
+  dustwind_plains:    { count: 2, kinds: [SK.HUT, SK.TOWER] },
+  ironcrag_badlands:  { count: 3, kinds: [SK.TOWER, SK.ARCH, SK.HUT] },
+  warsong_mesa:       { count: 3, kinds: [SK.TOWER, SK.HUT, SK.ARCH] },
+  ashfire_peaks:      { count: 2, kinds: [SK.ARCH, SK.TOWER] },
+  the_bloodfields:    { count: 4, kinds: [SK.ARCH, SK.TOWER, SK.PILLAR] },
+  cinderfall_wastes:  { count: 3, kinds: [SK.ARCH, SK.TOWER, SK.PILLAR] },
+  grimshade_forest:   { count: 3, kinds: [SK.HUT, SK.ARCH, SK.TOWER] },
+  venom_hollows:      { count: 2, kinds: [SK.ARCH, SK.PILLAR] },
+}
+
 // ── CA terrain generation ─────────────────────────────────────────────────────
 function countNeighbours(grid: number[][], r: number, c: number): number {
   let count = 0
@@ -402,6 +419,26 @@ export function generateZoneMap(zoneId: ZoneId): ZoneMap {
           !(isWater(r - 1, c) || isWater(r + 1, c) || isWater(r, c - 1) || isWater(r, c + 1))) continue
       scenery.push({ x: c, y: r, kind })
     }
+  }
+
+  // Step 7: a few structure landmarks (hut / watchtower / ruined arch) — rare and
+  // well-separated so they read as landmarks, not clutter. Ruined biomes get ruins.
+  const landCfg = BIOME_LANDMARK[zoneId]
+  let lmPlaced = 0, lmAttempts = 0
+  const minSep = 10
+  while (lmPlaced < landCfg.count && lmAttempts < 60) {
+    const li = lmAttempts++
+    const r = Math.floor(seededRand(seed + 700, li) * MAP_SIZE)
+    const c = Math.floor(seededRand(seed + 800, li) * MAP_SIZE)
+    const t = tiles[r][c].type
+    if (t === 'water' || t === 'cliff') continue
+    if (nodeSet.has(r * MAP_SIZE + c)) continue
+    // keep landmarks apart from each other
+    if (scenery.some(s => s.kind >= SCENERY_KIND.HUT &&
+        Math.abs(s.x - c) < minSep && Math.abs(s.y - r) < minSep)) continue
+    const kind = landCfg.kinds[Math.floor(seededRand(seed + 900, li) * landCfg.kinds.length)]
+    scenery.push({ x: c, y: r, kind })
+    lmPlaced++
   }
 
   return { tiles, nodes, props, scenery }

@@ -408,6 +408,7 @@ export interface MapProp {
 export const SCENERY_KIND = {
   TREE: 0, ROCK_BIG: 1, PINE: 7, BOULDER: 8, SPIRE: 9, MOUND: 10,
   BUSH: 11, FLOWERBED: 12, PILLAR: 13, DEADTREE: 14, STUMP: 15, REEDS: 16,
+  HUT: 17, TOWER: 18, ARCH: 19,
 } as const
 
 export interface MapScenery {

@@ -304,12 +304,16 @@ export function makeTileset(id = 'tileset/base'): IndexedSprite {
       return cell(x, y, 3, f) < 42 ? 7 : 6         // soft clumping
     })
   }
-  // 2/3: water — secondary ramp, wave glints alternate between the two frames.
+  // 2/3: water — mid-blue body with light crest ripple lines that SCROLL down between
+  // the two frames (the shift), plus sparse glints, so water reads as moving waves
+  // rather than static noise. Water channel (9–12) is tinted per biome (lava, bog…).
   for (const f of [2, 3]) {
+    const shift = f === 3 ? 2 : 0
     fillDiamond(p, f, (x, y) => {
-      const s = speck(x, y + (f === 3 ? 5 : 0), 2)
-      if (y >= 14) return 9
-      return s < 7 ? 12 : s < 18 ? 11 : 10
+      if (y >= 14) return 9                                       // dark front edge
+      if (((y + shift + ((x >> 2) & 1)) % 3) === 0) return 12     // crest ripple line
+      if (speck(x, y + shift * 3, 21) < 4) return 11             // glint
+      return 10                                                   // body
     })
   }
   // 4: cliff — grass cap + raised rock detail above the plane (accent/stone slots).
@@ -501,11 +505,13 @@ export const TALL_PROP = {
   // scenery (7+) — scattered per biome for a populated, FFTA-diorama world
   PINE: 7, BOULDER: 8, SPIRE: 9, MOUND: 10, BUSH: 11, FLOWERBED: 12,
   PILLAR: 13, DEADTREE: 14, STUMP: 15, REEDS: 16,
+  // structures (17+) — sparse landmarks (a few per zone)
+  HUT: 17, TOWER: 18, ARCH: 19,
 } as const
 
 const TP_W = 32
 const TP_H = 48
-const TP_N = 17
+const TP_N = 20
 
 export function makePropEntities(): Record<number, IndexedSprite> {
   const p = new Painter(TP_W, TP_H, TP_N)
@@ -606,6 +612,32 @@ export function makePropEntities(): Record<number, IndexedSprite> {
   p.rect(TALL_PROP.REEDS, 18, 30, 1, 12, 6); p.px(TALL_PROP.REEDS, 18, 29, 8)
   p.rect(TALL_PROP.REEDS, 20, 26, 1, 16, 7); p.px(TALL_PROP.REEDS, 20, 25, 8)
 
+  // ── Structures (17–19): sparse landmarks. Stone walls (13–15), wood roof/door
+  // (1–4), lit accents (15) — read on both prop palettes as hut / tower / ruin. ──
+
+  // 17 HUT — walls + pitched roof + door.
+  p.rect(TALL_PROP.HUT, 8, 30, 16, 12, 13)   // walls
+  p.rect(TALL_PROP.HUT, 8, 30, 3, 12, 14)    // lit wall edge
+  p.rect(TALL_PROP.HUT, 6, 26, 20, 4, 3)     // eaves
+  p.rect(TALL_PROP.HUT, 9, 22, 14, 4, 4)     // roof mid
+  p.rect(TALL_PROP.HUT, 12, 19, 8, 3, 4)     // roof ridge
+  p.rect(TALL_PROP.HUT, 14, 34, 4, 8, 1)     // door
+  p.px(TALL_PROP.HUT, 11, 33, 15); p.px(TALL_PROP.HUT, 20, 33, 15) // windows
+  // 18 TOWER — watchtower with crenellations.
+  p.rect(TALL_PROP.TOWER, 12, 15, 8, 27, 13)
+  p.rect(TALL_PROP.TOWER, 12, 15, 3, 27, 14) // lit
+  p.rect(TALL_PROP.TOWER, 10, 12, 12, 4, 13) // parapet
+  p.px(TALL_PROP.TOWER, 11, 11, 14); p.px(TALL_PROP.TOWER, 14, 11, 14)
+  p.px(TALL_PROP.TOWER, 17, 11, 14); p.px(TALL_PROP.TOWER, 20, 11, 14)
+  p.rect(TALL_PROP.TOWER, 14, 34, 4, 8, 1)   // door
+  p.px(TALL_PROP.TOWER, 15, 22, 15); p.px(TALL_PROP.TOWER, 16, 27, 15) // windows
+  // 19 ARCH — ruined stone archway.
+  p.rect(TALL_PROP.ARCH, 7, 20, 4, 22, 13)   // left pillar
+  p.rect(TALL_PROP.ARCH, 21, 20, 4, 22, 13)  // right pillar
+  p.rect(TALL_PROP.ARCH, 7, 16, 18, 4, 14)   // span
+  p.rect(TALL_PROP.ARCH, 7, 20, 1, 22, 15)   // lit edge
+  p.px(TALL_PROP.ARCH, 22, 26, 13); p.px(TALL_PROP.ARCH, 9, 32, 13) // cracks
+
   const still = (frame: number) => ({
     se: { frames: [frame], fps: 1, loop: true },
     ne: { frames: [frame], fps: 1, loop: true },
@@ -637,6 +669,9 @@ export function makePropEntities(): Record<number, IndexedSprite> {
     [TALL_PROP.DEADTREE]: slice(TALL_PROP.DEADTREE, 'props/tall/deadtree'),
     [TALL_PROP.STUMP]: slice(TALL_PROP.STUMP, 'props/tall/stump'),
     [TALL_PROP.REEDS]: slice(TALL_PROP.REEDS, 'props/tall/reeds'),
+    [TALL_PROP.HUT]: slice(TALL_PROP.HUT, 'props/tall/hut'),
+    [TALL_PROP.TOWER]: slice(TALL_PROP.TOWER, 'props/tall/tower'),
+    [TALL_PROP.ARCH]: slice(TALL_PROP.ARCH, 'props/tall/arch'),
   }
 }
 
