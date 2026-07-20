@@ -333,6 +333,45 @@ screen sims); behavior determinism (reuse the seedable combat sim Track P alread
 requires); scope — this is explicitly a *post-launch* world-depth play, sequenced behind
 the graphics rebuild, Track R rebrand, and the RevenueCat launch milestone.
 
+## Track S — accounts, character slots & creation (launch-critical; local now → hosted later)
+
+**Shape:** a proper entry flow in front of the game — a **character select / login screen**
+backed by persistent multi-character storage, plus a refreshed **character creation**
+experience. Built **local-first** now (browser storage), with the persistence layer designed
+so it can move behind a hosted account service later without a data-model rewrite.
+
+**Why launch-critical:** today there is a single localStorage key (`idle_legends_save_v2`),
+one character, and "New Game" wipes everything — one misclick destroys a run and there's no
+way to try different class/race/faction combos without deleting progress. See the
+[[character-persistence-and-save-slots]] memory for the current-state audit and the proposed
+data shape.
+
+**Scope:**
+- **Save slots.** Namespaced multi-slot store (`idle_legends_saves_v1` → `{ slots: SaveSlot[] }`),
+  each slot `{ id, createdAt, lastPlayedAt, summary, state: GameState }`. `loadGame/saveGame/
+  resetGame` become slot-aware. 3–5 slots for a casual idle game.
+- **Character select screen.** Shown on load above `ClassSelect`: lists saves with generated
+  name, avatar (dimetric hero render via the renderer's `(spriteId, paletteId)` — the same
+  identity Tracks P/L sync), class/race/faction, level, zone progress, last-played. Per slot:
+  Continue, Delete (confirm). "New Character" enters creation.
+- **Character creation refresh.** Rework the `ClassSelect → RaceSelect` flow into a cohesive
+  creation experience: live dimetric preview of the hero rig recoloring as race/class/faction
+  change (the palette registry *is* the wardrobe), name (generated + reroll/edit), faction
+  pick. Sets up the visual-identity data Tracks M/P/L all read.
+- **Persistence abstraction.** A storage interface (`load/save/list/delete` slot blobs) with a
+  local implementation now, so the hosted-account backend (see below) is a drop-in later.
+
+**Local now → hosted later.** Persistence stays in the browser until we stand up a hosting
+service. When we do, the account backend is **shared with Track P** (cloud rosters/leaderboards)
+and **Track L** (ambient heroes seeded from real player snapshots): one accounts + roster store
+serves login, cross-device save, PvP snapshots, and world population. Decision gate before that
+build — Supabase/Firebase vs. Game Center — is captured under Track P. No gameplay servers
+needed; combat stays client-side deterministic.
+
+**Sequencing:** save slots + character select are **launch-blocker** (data-loss risk); the
+creation refresh pairs naturally with the dimetric hero preview now that the renderer exists.
+The hosted-account swap is **post-launch**, gated with Track P.
+
 ## Track R — rebrand (parallel to render phases, launch blocker)
 
 Audit result: the WoW debt is structural, not cosmetic — factions are "The Alliance" /
