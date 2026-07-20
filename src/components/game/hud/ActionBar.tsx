@@ -43,7 +43,7 @@ export function ActionBar() {
       display: 'flex',
       alignItems: 'center',
       gap: 8,
-      background: 'rgba(8,8,14,0.82)',
+      background: 'rgba(8,8,14,0.6)',
       border: '1px solid #3a3630',
       borderRadius: 8,
       padding: 7,
