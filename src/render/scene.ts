@@ -30,6 +30,8 @@ export interface Entity {
   /** Vertical lift in px (jump/hop). Applied to the body draw only — feet stay on
    *  the ground, so depth sort and shadow are unchanged while airborne. */
   z: number
+  /** Body + shadow opacity (death fade-out). 1 = opaque. */
+  alpha: number
   // Computed each frame (buffer space):
   screenX: number
   screenY: number
@@ -51,6 +53,7 @@ export class Scene {
         e.animator = new Animator(sprite)
         e.shadow = true
         e.z = 0
+        e.alpha = 1
         return e
       }
     }
@@ -63,6 +66,7 @@ export class Scene {
       animator: new Animator(sprite),
       shadow: true,
       z: 0,
+      alpha: 1,
       screenX: 0,
       screenY: 0,
     }
@@ -137,11 +141,12 @@ export class Scene {
       const dx = e.screenX - cam.x
       const dy = e.screenY - cam.y
       const shr = e.z > 0 ? Math.max(0.5, 1 - e.z / 40) : 1
-      if (e.z > 0) ctx.globalAlpha = 0.3 * shr
+      const ga = (e.z > 0 ? 0.3 * shr : 1) * e.alpha
+      if (ga !== 1) ctx.globalAlpha = ga
       ctx.beginPath()
       ctx.ellipse(dx, dy, e.sprite.frameW * 0.28 * shr, 3.5 * shr, 0, 0, Math.PI * 2)
       ctx.fill()
-      if (e.z > 0) ctx.globalAlpha = 1
+      if (ga !== 1) ctx.globalAlpha = 1
     }
 
     for (let i = 0; i < order.length; i++) {
@@ -154,6 +159,7 @@ export class Scene {
       const sy = ((f / s.cols) | 0) * s.frameH
       const dx = Math.round(e.screenX - cam.x)
       const dy = Math.round(e.screenY - cam.y - e.z)
+      if (e.alpha < 1) ctx.globalAlpha = e.alpha
       if (e.animator.mirror) {
         // Mirror about the feet-center anchor's vertical axis.
         // Local space is x-mirrored: source column c lands at screen dx + anchor.x - c,
@@ -164,6 +170,7 @@ export class Scene {
       } else {
         ctx.drawImage(sheet, sx, sy, s.frameW, s.frameH, dx - s.anchor.x, dy - s.anchor.y, s.frameW, s.frameH)
       }
+      if (e.alpha < 1) ctx.globalAlpha = 1
     }
   }
 }

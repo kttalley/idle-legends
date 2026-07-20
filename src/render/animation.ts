@@ -35,7 +35,11 @@ export class Animator {
   }
 
   private def() {
-    return this.sprite.animations[this.anim][drawnFacing(this.facing)]
+    const set = this.sprite.animations
+    // Fall back when an optional anim (death) isn't authored on this sprite: use the
+    // recoil ('hit') as a collapse, else idle — so set('death') is always safe.
+    const a = set[this.anim] ?? set.hit ?? set.idle
+    return a[drawnFacing(this.facing)]
   }
 
   /** Switch animation; restarts only when the tag actually changes. */

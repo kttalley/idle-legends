@@ -30,10 +30,11 @@ class Painter {
 }
 
 // ── Humanoid rig: 24×32, feet-center anchor (12, 30) ─────────────────────────
-// Frames (single row): se: idle 0-1 · walk 2-5 · attack 6-8 · hit 9-10
-//                      ne: same order at +11.
+// Frames (single row): se: idle 0-1 · walk 2-5 · attack 6-8 · hit 9-10 · death 11-12
+//                      ne: same order at +13.
 
-const H_FRAMES = 22
+const H_FRAMES = 26
+const H_PER_FACING = 13
 const HW = 24
 const HH = 32
 
@@ -88,6 +89,29 @@ function drawHumanoid(p: Painter, f: number, opts: { back: boolean; bob: number;
   p.rect(f, cx - 4, top - 1, 8, 1, 9) // hairline
 }
 
+// Death: a two-frame collapse — slump to a knee (t=0), then a low prone heap on the
+// ground (t=1). Same semantic channels (skin 1-4, primary 5-8, secondary 9-12) so
+// palettes still tint it. Reads as "downed" from the dimetric camera.
+function drawHumanoidDeath(p: Painter, f: number, opts: { back: boolean; t: number }): void {
+  const gy = 24
+  if (opts.t === 0) {
+    // Mid-collapse: torso pitched forward over a knee, head dropping.
+    p.rect(f, 7, gy - 6, 11, 6, 6)      // torso heap
+    p.rect(f, 7, gy - 6, 11, 2, 7)      // top light
+    p.rect(f, 7, gy - 1, 11, 1, 5)      // under-shade
+    p.rect(f, 15, gy - 9, 6, 5, 3)      // head lowered to the side (skin)
+    p.rect(f, 16, gy - 8, 2, 1, opts.back ? 9 : 1) // hair/eye hint
+    p.rect(f, 5, gy, 12, 2, 10)         // legs folding under
+  } else {
+    // Flat: a low horizontal body on the ground, head to the side, feet trailing.
+    p.rect(f, 3, gy + 1, 16, 4, 6)      // prone body
+    p.rect(f, 3, gy + 1, 16, 1, 7)      // top light
+    p.rect(f, 3, gy + 4, 16, 1, 5)      // ground-contact shade
+    p.rect(f, 18, gy, 5, 4, 3)          // head (skin) to the side
+    p.rect(f, 1, gy + 2, 4, 2, 10)      // trailing feet
+  }
+}
+
 function humanoidAnimations(): AnimationSet {
   // The gentle 2-frame bob (0,1) is the good-looking gait — it reads as a walk, so
   // it drives ALL movement (map traversal + combat approach). Idle is the same bob,
@@ -99,21 +123,23 @@ function humanoidAnimations(): AnimationSet {
     walk: { frames: [o + 0, o + 1], fps: 6, loop: true },
     attack: { frames: [o + 6, o + 7, o + 8], fps: 12, loop: false },
     hit: { frames: [o + 9, o + 10], fps: 10, loop: false },
+    death: { frames: [o + 11, o + 12], fps: 6, loop: false },
   })
   const se = dir(0)
-  const ne = dir(11)
+  const ne = dir(H_PER_FACING)
   return {
     idle: { se: se.idle, ne: ne.idle },
     walk: { se: se.walk, ne: ne.walk },
     attack: { se: se.attack, ne: ne.attack },
     hit: { se: se.hit, ne: ne.hit },
+    death: { se: se.death, ne: ne.death },
   }
 }
 
 export function makeHumanoidRig(id = 'rig/humanoid'): IndexedSprite {
   const p = new Painter(HW, HH, H_FRAMES)
   for (const back of [false, true]) {
-    const o = back ? 11 : 0
+    const o = back ? H_PER_FACING : 0
     drawHumanoid(p, o + 0, { back, bob: 0, legPhase: 0, armSwing: 0, armReach: 0, recoil: 0 })
     drawHumanoid(p, o + 1, { back, bob: 1, legPhase: 0, armSwing: 0, armReach: 0, recoil: 0 })
     // Walk: ±2px stride + 2px bob + back-arm swing opposite the legs. Contact
@@ -128,6 +154,8 @@ export function makeHumanoidRig(id = 'rig/humanoid'): IndexedSprite {
     drawHumanoid(p, o + 8, { back, bob: 0, legPhase: 0, armSwing: 0, armReach: 2, recoil: 0 })
     drawHumanoid(p, o + 9, { back, bob: 0, legPhase: 0, armSwing: 0, armReach: 0, recoil: 2 })
     drawHumanoid(p, o + 10, { back, bob: 1, legPhase: 0, armSwing: 0, armReach: 0, recoil: 1 })
+    drawHumanoidDeath(p, o + 11, { back, t: 0 })
+    drawHumanoidDeath(p, o + 12, { back, t: 1 })
   }
   return {
     id,
@@ -143,7 +171,8 @@ export function makeHumanoidRig(id = 'rig/humanoid'): IndexedSprite {
 
 // ── Beast rig: 28×22 quadruped, for enemy variety ────────────────────────────
 
-const B_FRAMES = 22
+const B_FRAMES = 26        // 13 per facing, matching humanoidAnimations' frame scheme
+const B_PER_FACING = 13
 const BW = 28
 const BH = 22
 
@@ -173,10 +202,27 @@ function drawBeast(p: Painter, f: number, opts: { back: boolean; bob: number; le
   p.rect(f, back ? cx + 8 : cx - 12, top + 4, 3, 2, 9)
 }
 
+// Beast death: collapse (t=0) then a low sprawled heap (t=1) on the ground.
+function drawBeastDeath(p: Painter, f: number, opts: { t: number }): void {
+  const gy = 15
+  if (opts.t === 0) {
+    p.rect(f, 5, gy - 4, 18, 6, 6)      // body sagging
+    p.rect(f, 5, gy - 4, 18, 2, 7)      // top light
+    p.rect(f, 5, gy + 1, 18, 1, 5)      // under-shade
+    p.rect(f, 3, gy + 2, 5, 2, 10)      // legs buckling
+  } else {
+    p.rect(f, 2, gy + 2, 24, 4, 6)      // sprawled body
+    p.rect(f, 2, gy + 2, 24, 1, 7)      // top light
+    p.rect(f, 2, gy + 5, 24, 1, 5)      // ground shade
+    p.rect(f, 22, gy + 1, 5, 3, 7)      // head to the side
+    p.px(f, 25, gy + 2, 13)             // dimmed eye
+  }
+}
+
 export function makeBeastRig(id = 'rig/beast'): IndexedSprite {
   const p = new Painter(BW, BH, B_FRAMES)
   for (const back of [false, true]) {
-    const o = back ? 11 : 0
+    const o = back ? B_PER_FACING : 0
     drawBeast(p, o + 0, { back, bob: 0, legPhase: 0, lunge: 0, recoil: 0 })
     drawBeast(p, o + 1, { back, bob: 1, legPhase: 0, lunge: 0, recoil: 0 })
     drawBeast(p, o + 2, { back, bob: 0, legPhase: -2, lunge: 0, recoil: 0 })
@@ -188,6 +234,8 @@ export function makeBeastRig(id = 'rig/beast'): IndexedSprite {
     drawBeast(p, o + 8, { back, bob: 0, legPhase: 0, lunge: 2, recoil: 0 })
     drawBeast(p, o + 9, { back, bob: 0, legPhase: 0, lunge: 0, recoil: 2 })
     drawBeast(p, o + 10, { back, bob: 1, legPhase: 0, lunge: 0, recoil: 1 })
+    drawBeastDeath(p, o + 11, { t: 0 })
+    drawBeastDeath(p, o + 12, { t: 1 })
   }
   return {
     id,

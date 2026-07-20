@@ -2,7 +2,10 @@
 // This module (and everything under src/render/ except dev/) must stay free of React and
 // game-code imports; the game talks to the renderer through src/render/adapter/ only.
 
-export type AnimName = 'idle' | 'walk' | 'attack' | 'hit'
+export type CoreAnim = 'idle' | 'walk' | 'attack' | 'hit'
+// 'death' is optional — sprites that don't author it (e.g. the FFTA scaffold, whose
+// import only pulls idle/walk/attack) fall back to a recoil-collapse in the Animator.
+export type AnimName = CoreAnim | 'death'
 
 // Four logical facings; only 'se' and 'ne' are drawn, 'sw'/'nw' are horizontal mirrors.
 export type Facing = 'se' | 'sw' | 'ne' | 'nw'
@@ -14,7 +17,9 @@ export interface AnimDef {
   loop: boolean
 }
 
-export type AnimationSet = Record<AnimName, Record<DrawnFacing, AnimDef>>
+export type AnimationSet =
+  Record<CoreAnim, Record<DrawnFacing, AnimDef>> &
+  Partial<Record<'death', Record<DrawnFacing, AnimDef>>>
 
 // The authored format: an indexed-color PNG sheet + this manifest (JSON).
 // Hand-drawn art, gen-AI imports, and the FFTA scaffold all arrive in exactly this shape

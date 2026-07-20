@@ -35,6 +35,7 @@ const AUTO_LERP_K = 6         // exp-approach rate for auto-follow (1/s); tracks
 const JUMP_DURATION = 0.55    // seconds, apex at the midpoint
 const JUMP_HEIGHT = 16        // px lift at apex
 const SHAKE_DURATION = 0.26   // seconds a rumble decays over
+const DEATH_DURATION = 0.7    // seconds a slain mob plays death + fades before retiring
 const LUNGE_MAX = 1.35        // tiles; the attack lunge never exceeds this (no slingshot)
 const ENGAGE_DIST = 1.5       // mob "engaged" threshold (matches the store's mobEngaged)
 // Engagement gap from the player, in per-axis diagonal tiles. The store shrinks
@@ -228,6 +229,13 @@ export class WorldSceneController {
   private mobBasePalette = 'team/enemy'
 
   private lastNodes: MapNode[] = []
+
+  // Death choreography. A slain mob is moved off `this.mob` into dyingMobs so it keeps
+  // rendering its 'death' pose while fading out, then retires. playerDead forces the
+  // player's downed pose while !isAlive. mobWasPresent gates kill-detection in sync.
+  private dyingMobs: { e: Entity; t: number }[] = []
+  private mobWasPresent = false
+  private playerDead = false
 
   constructor(canvas: HTMLCanvasElement, floatersHost: HTMLElement) {
     this.canvas = canvas
@@ -473,7 +481,22 @@ export class WorldSceneController {
         if (this.mobFlashT <= 0) this.mob.paletteId = this.mobBasePalette
       }
     } else if (this.mob) {
-      this.mob.active = false
+      // The mob entity should go away. If we were mid-combat, the player is alive, and
+      // there's simply no mob now → it was slain: hand it to the death-fade list (plays
+      // 'death', fades, loot pop). Otherwise (player died, mode switch, travel) retire
+      // it immediately.
+      const slain = state.gameMode === 'combat' && state.isAlive && !state.currentMob && this.mobWasPresent
+      if (slain) {
+        const e = this.mob
+        e.paletteId = this.mobBasePalette   // clear any lingering hit-flash
+        e.animator.set('death')
+        e.animator.restart()
+        this.dyingMobs.push({ e, t: 0 })
+        this.spawnBurst(e.tx, e.ty, 'spell/holy') // loot/impact pop
+        this.punch(2.6, 0.05)
+      } else {
+        this.mob.active = false
+      }
       this.mob = null
       this.mobLunge.active = false
       this.mobFlashT = 0
@@ -482,6 +505,9 @@ export class WorldSceneController {
       this.mobApproachDx = Math.SQRT1_2
       this.mobApproachDy = Math.SQRT1_2
     }
+
+    this.mobWasPresent = this.showMob
+    this.playerDead = !state.isAlive
   }
 
   private faceToward(e: Entity, targetX: number, targetY: number): void {
@@ -667,6 +693,11 @@ export class WorldSceneController {
     // ── Player animation + facing ──
     const pAnim = this.player.animator.anim
     const inCombatAnim = pAnim === 'attack' || pAnim === 'hit'
+    if (this.playerDead) {
+      // Downed: hold the death pose, no movement/attack anim, cancel any lunge.
+      this.player.animator.set('death')
+      this.playerLunge.active = false
+    } else {
     if (this.player.animator.finished && this.playerLunge.t >= 1) this.player.animator.set('idle')
     if (this.mob && this.mobEngaged && !this.playerLunge.active) {
       // Engaged: face the mob, idle between swings (attack/hit are set by triggers).
@@ -682,6 +713,7 @@ export class WorldSceneController {
       if (!inCombatAnim) this.player.animator.set('idle')
     } else if (!inCombatAnim) {
       this.player.animator.set('idle')
+    }
     }
 
     // ── Mob placement (glued to the player) + animation + facing ──
@@ -724,6 +756,24 @@ export class WorldSceneController {
     for (let i = 0; i < es.length; i++) {
       const e = es[i]
       if (e.active && e.sprite === this.burstRig && e.animator.finished) e.active = false
+    }
+
+    // Advance slain-mob death fades (real time, so it continues through hit-stop):
+    // hold the 'death' pose, ease alpha to 0, sink slightly, then retire the entity.
+    if (this.dyingMobs.length) {
+      for (let i = this.dyingMobs.length - 1; i >= 0; i--) {
+        const d = this.dyingMobs[i]
+        d.t += realDt / DEATH_DURATION
+        if (d.t >= 1) {
+          d.e.active = false
+          d.e.alpha = 1
+          d.e.z = 0
+          this.dyingMobs.splice(i, 1)
+        } else {
+          d.e.alpha = 1 - d.t * d.t     // ease-out fade
+          d.e.z = -Math.min(3, d.t * 3) // slight sink into the ground
+        }
+      }
     }
 
     // Camera centered on the player's feet (height-aware → follows up hills).
