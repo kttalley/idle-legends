@@ -10,8 +10,19 @@ import type { CastState } from '../../../data/types'
 // icons floating over the world — no card panel. The HP/XP bar tracks provide their own
 // contrast; text carries a shadow for legibility.
 
-const TEXT_SHADOW = '0 1px 2px #000, 0 0 2px #000'
+// 1px corner outline + soft drop — legible over the busy tiles, paired with a light
+// feathered scrim on the container (below) instead of a hard card panel.
+const TEXT_SHADOW = '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 1px 3px rgba(0,0,0,0.9)'
 const WIDTH = 150
+
+// Light "shadow bg": low-opacity dark fill whose matching blurred box-shadow feathers
+// the edges out to transparent — darkens behind the content without a hard rectangle.
+const SCRIM: React.CSSProperties = {
+  background: 'rgba(8,6,12,0.34)',
+  boxShadow: '0 0 14px 8px rgba(8,6,12,0.34)',
+  borderRadius: 9,
+  padding: '5px 8px',
+}
 
 function CastBar({ cast }: { cast: CastState }) {
   const pct = cast.total > 0 ? Math.max(0, Math.min(1, 1 - cast.remaining / cast.total)) : 0
@@ -42,7 +53,7 @@ export function UnitFrames() {
   const combo = procState.comboPoints
 
   return (
-    <div style={{ width: WIDTH, display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ width: WIDTH, display: 'flex', flexDirection: 'column', gap: 6, ...SCRIM }}>
       {/* ── Player ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 10, textShadow: TEXT_SHADOW }}>
