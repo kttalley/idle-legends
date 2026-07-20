@@ -46,8 +46,9 @@ export function HeroPreview({ playerClass, race, faction, size = 168 }: HeroPrev
     const scaffold = `${base}local-assets/ffta-scaffold/`
 
     ;(async () => {
-      // Same rig the in-world hero uses (scaffold-first, programmatic fallback).
-      const rig = await loadSpriteOrPlaceholder(`${scaffold}hero.json`, () => makeHumanoidRig('rig/humanoid'))
+      // Same rig the in-world hero uses (auto-exported FFTA roster first;
+      // programmatic placeholder is the tear-out fallback).
+      const rig = await loadSpriteOrPlaceholder(`${scaffold}ffta-units/ffa_soldier.json`, () => makeHumanoidRig('rig/humanoid'))
       if (disposed) return
 
       // A small grass patch as a backdrop; the hero stands on its center tile.

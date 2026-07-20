@@ -131,19 +131,21 @@ async function main(): Promise<void> {
   canvas.height = vh
   ctx.imageSmoothingEnabled = false
 
-  // Assets: scaffold-first (gitignored local-assets/), programmatic fallback.
+  // Assets: auto-exported FFTA roster first (gitignored local-assets/ffta-scaffold/ffta-units/),
+  // with committed programmatic placeholders as the tear-out fallback.
   const base = import.meta.env.BASE_URL
   const scaffold = `${base}local-assets/ffta-scaffold/`
-  const heroRig = await loadSpriteOrPlaceholder(`${scaffold}hero.json`, makeHumanoidRig)
-  const hero2Rig = await loadSpriteOrPlaceholder(`${scaffold}hero2.json`, () => makeHumanoidRig('rig/humanoid2'))
-  const enemyRig = await loadSpriteOrPlaceholder(`${scaffold}enemy1.json`, () => makeHumanoidRig('rig/enemy'))
-  const goblinRig = await loadSpriteOrPlaceholder(`${scaffold}goblin.json`, () => makeBeastRig('rig/goblin'))
-  const redcapRig = await loadSpriteOrPlaceholder(`${scaffold}redcap.json`, () => makeBeastRig('rig/redcap'))
-  const bombRig = await loadSpriteOrPlaceholder(`${scaffold}bomb.json`, () => makeBeastRig('rig/bomb'))
+  const ffaUnits = `${scaffold}ffta-units/`
+  const heroRig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_soldier.json`, makeHumanoidRig)
+  const hero2Rig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_white_monk.json`, () => makeHumanoidRig('rig/humanoid2'))
+  const enemyRig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_fencer.json`, () => makeHumanoidRig('rig/enemy'))
+  const goblinRig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_goblin.json`, () => makeBeastRig('rig/goblin'))
+  const redcapRig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_lamia.json`, () => makeBeastRig('rig/redcap'))
+  const bombRig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_bomb.json`, () => makeBeastRig('rig/bomb'))
   const tileset = makeTileset()
   const propSheet = makePropSheet()
   document.getElementById('artpath')!.textContent =
-    heroRig.id.startsWith('rig/') ? 'art: programmatic placeholders' : 'art: ffta scaffold (local-only)'
+    heroRig.id.startsWith('ffa_') ? 'art: auto-exported FFTA roster' : 'art: programmatic placeholders'
 
   // Ground: FFTA scaffold map if present (2× scale makes its 16×8 diamonds exactly our
   // 32×16 footprint), else the programmatic tileset. Same GroundBuffer contract either way.

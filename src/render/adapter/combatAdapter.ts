@@ -352,9 +352,12 @@ export class WorldSceneController {
   async init(): Promise<void> {
     const base = import.meta.env.BASE_URL
     const scaffold = `${base}local-assets/ffta-scaffold/`
-    const player = await loadSpriteOrPlaceholder(`${scaffold}hero.json`, () => makeHumanoidRig('rig/humanoid'))
-    const mobHumanoid = await loadSpriteOrPlaceholder(`${scaffold}enemy1.json`, () => makeHumanoidRig('rig/mob-humanoid'))
-    const mobBeast = await loadSpriteOrPlaceholder(`${scaffold}goblin.json`, () => makeBeastRig('rig/mob-beast'))
+    const ffaUnits = `${scaffold}ffta-units/`
+    // Auto-exported FFTA roster replaces the small manual scaffold; placeholders stay
+    // as the tear-out fallback so the repo always builds without gitignored assets.
+    const player = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_soldier.json`, () => makeHumanoidRig('rig/humanoid'))
+    const mobHumanoid = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_white_monk.json`, () => makeHumanoidRig('rig/mob-humanoid'))
+    const mobBeast = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_bomb.json`, () => makeBeastRig('rig/mob-beast'))
     this.rigs = { player, mobHumanoid, mobBeast }
     // FFTA-traced ground tiles (gitignored dev scaffold); falls back to the programmatic
     // tileset set in the constructor. Traced tiles are indexed to our semantic slots, so
