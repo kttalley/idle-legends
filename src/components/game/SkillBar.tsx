@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { getClassAbilities } from '../../data/abilities'
+import { SpriteIcon } from '../ui/SpriteIcon'
 import type { ActiveAbilityDef } from '../../data/types'
 
 interface SlotProps {
@@ -55,9 +56,9 @@ function SkillSlot({ ability, remaining, onActivate }: SlotProps) {
         />
       )}
 
-      {/* Icon */}
-      <span style={{ fontSize: '1.4rem', lineHeight: 1, zIndex: 1 }}>
-        {ability.icon}
+      {/* Icon — pixel sprite (falls back to the emoji glyph if unmapped) */}
+      <span style={{ zIndex: 1, opacity: onCd ? 0.5 : 1 }}>
+        <SpriteIcon emoji={ability.icon} size={26} />
       </span>
 
       {/* Name (truncated) */}

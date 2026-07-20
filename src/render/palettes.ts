@@ -84,6 +84,16 @@ reg('elite', composePalette(BASE_UNIT, {
   13: '#8c2014', 14: '#c83820', 15: '#f46434',
 }))
 
+// ── UI icons: readable high-contrast bands (not a single ramp) so one sheet covers
+// steel/warm/cool shapes + three accent signals (nature/treasure/arcane). ────────
+reg('icon/base', paletteFromHex([
+  '',
+  '#2a2e38', '#566072', '#9aa4b4', '#e8eef6', // 1-4 steel / bone / white (blades, skull)
+  '#a01c14', '#d84824', '#f08828', '#ffcc48', // 5-8 warm (red→orange→gold: flame, blood, wood)
+  '#14345c', '#2860a8', '#50a0e0', '#b0e4ff', // 9-12 cool (frost, mana, water, gust)
+  '#2e7a34', '#e0b028', '#a050e0',            // 13 nature-green · 14 treasure-gold · 15 arcane-purple
+]))
+
 // ── FX: full-body flash palettes (swap in for ~100ms on hit/heal — pure palette trick) ──
 const flash = (hex: string) => {
   const o: Partial<Record<number, string>> = {}

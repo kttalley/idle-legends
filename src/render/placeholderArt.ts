@@ -619,3 +619,73 @@ export function makeBurstRig(id = 'fx/burst'): IndexedSprite {
     },
   }
 }
+
+// ── UI icon sheet (Phase 4): 16×16 indexed icons, one row, palette 'icon/base' ──
+// Replaces emoji in the DOM UI (abilities, nav) with pixel icons that match the world.
+// Verified visually before authoring; drawn on the same semantic slots so future real
+// icon art drops in through the same import path. `SpriteIcon` renders these; unmapped
+// emoji fall back to the glyph, so adoption is incremental.
+
+/** Semantic icon key → frame index in the sheet. */
+export const ICON = {
+  sword: 0, shield: 1, dagger: 2, blood: 3, frost: 4, flame: 5, hourglass: 6, moon: 7,
+  gust: 8, skull: 9, heart: 10, house: 11, pick: 12, hammer: 13, herb: 14, star: 15,
+} as const
+export type IconKey = keyof typeof ICON
+
+/** Emoji used in game data → icon key, so existing emoji-labelled content resolves to
+ *  a sprite without touching the data. Unmapped emoji render as their glyph. */
+export const EMOJI_ICON: Record<string, IconKey> = {
+  '⚔': 'sword', '🛡': 'shield', '🗡': 'dagger', '🩸': 'blood', '❄': 'frost', '🔥': 'flame',
+  '⏳': 'hourglass', '🌑': 'moon', '💨': 'gust', '☠': 'skull', '💀': 'skull', '💚': 'heart',
+  '❤': 'heart', '♥': 'heart', '🏠': 'house', '⛏': 'pick', '🔨': 'hammer', '🌿': 'herb',
+  '🍃': 'herb', '✦': 'star', '✧': 'star', '★': 'star', '✨': 'star', '🎴': 'star',
+}
+
+const IN = 16
+export function makeIconSheet(id = 'icons/base'): IndexedSprite {
+  const P = new Painter(IN, IN, 16)
+  const px = (f: number, x: number, y: number, s: number) => P.px(f, x, y, s)
+  const r  = (f: number, x: number, y: number, w: number, h: number, s: number) => P.rect(f, x, y, w, h, s)
+
+  // 0 sword — steel blade, gold crossguard, wood grip
+  r(0,7,2,2,9,3); px(0,7,1,4); px(0,8,1,4); r(0,7,2,1,8,4); r(0,4,11,9,2,14); r(0,7,13,2,3,6)
+  // 1 shield — gold body, steel field, center boss
+  r(1,4,2,8,7,14); r(1,5,3,6,6,2); r(1,5,3,6,2,3); for(let i=0;i<3;i++) r(1,5+i,9+i,6-2*i,1,2); px(1,7,6,4); px(1,8,6,4)
+  // 2 dagger — steel blade diagonal, gold guard, grip
+  for(let i=0;i<7;i++){ px(2,6+i,10-i,3); px(2,7+i,10-i,4) } r(2,4,10,3,2,14); r(2,3,12,3,2,6)
+  // 3 blood — red teardrop
+  px(3,8,3,5); px(3,8,4,5); r(3,7,5,2,1,5); r(3,7,6,3,1,5); r(3,6,7,4,2,5); r(3,6,9,4,2,6); r(3,7,11,2,1,5); px(3,7,8,7); px(3,7,9,7)
+  // 4 frost — cyan snowflake asterisk
+  r(4,7,2,2,12,11); r(4,2,7,12,2,11); for(let i=0;i<5;i++){ px(4,3+i,3+i,10); px(4,12-i,3+i,10); px(4,3+i,12-i,10); px(4,12-i,12-i,10) } px(4,8,8,12)
+  // 5 flame — red base, orange body, gold core, tip
+  px(5,8,2,7); px(5,8,3,6); r(5,7,4,2,2,6); r(5,6,6,4,2,5); r(5,5,8,6,3,5); r(5,6,11,4,2,5); px(5,5,10,5); px(5,10,10,5); r(5,7,7,2,4,8); px(5,8,6,8); px(5,7,11,7); px(5,9,11,7)
+  // 6 hourglass — gold frame, steel sand
+  r(6,4,3,8,1,14); r(6,4,12,8,1,14); for(let i=0;i<4;i++){ px(6,5+i,4+i,14); px(6,10-i,4+i,14); px(6,5+i,11-i,14); px(6,10-i,11-i,14) } r(6,6,6,4,4,3)
+  // 7 moon — purple crescent
+  for(let y=2;y<14;y++){ const d=Math.round(Math.sqrt(36-(y-8)*(y-8))); for(let x=8-d;x<=8+d;x++) px(7,x,y,15) }
+  for(let y=2;y<14;y++){ const d=Math.round(Math.sqrt(36-(y-8)*(y-8))); for(let x=11-d;x<=11+d;x++) px(7,x,y,0) }
+  // 8 gust — three cyan strokes
+  r(8,3,4,9,2,11); px(8,12,5,11); px(8,12,6,10); r(8,4,8,8,2,11); px(8,3,9,10); r(8,5,12,7,2,11); px(8,12,13,11)
+  // 9 skull — white dome, dark eyes, teeth
+  r(9,4,3,8,7,4); r(9,4,3,8,2,3); px(9,6,6,1); px(9,7,6,1); px(9,9,6,1); px(9,10,6,1); px(9,8,8,1); r(9,5,10,6,2,4); px(9,6,11,1); px(9,8,11,1); px(9,10,11,1)
+  // 10 heart — green (heal)
+  r(10,4,4,3,2,13); r(10,9,4,3,2,13); r(10,3,6,10,3,13); r(10,4,9,8,2,13); r(10,6,11,4,1,13); px(10,8,13,13); r(10,4,5,3,1,3)
+  // 11 house — warm roof, steel walls, door
+  for(let i=0;i<7;i++) r(11,8-1-i,3+i,2+2*i,1,6); r(11,4,10,8,4,3); r(11,4,10,8,1,2); r(11,7,11,3,3,5)
+  // 12 pick — gold head arc, wood handle
+  r(12,3,4,10,2,14); px(12,2,5,14); px(12,13,5,14); px(12,3,3,14); px(12,12,3,14); r(12,7,6,2,8,6)
+  // 13 hammer — steel head, wood handle
+  r(13,4,3,8,4,3); r(13,4,3,8,1,4); r(13,4,3,2,4,2); r(13,7,7,2,7,6)
+  // 14 herb — green sprig
+  r(14,7,6,2,8,13); for(let i=0;i<3;i++){ px(14,6-i,7+i,13); px(14,9+i,7+i,13) } px(14,8,4,13); px(14,7,5,13); px(14,9,5,13); px(14,6,10,13); px(14,10,10,13)
+  // 15 star — gold sparkle
+  r(15,7,2,2,12,14); r(15,2,7,12,2,14); for(let i=0;i<4;i++){ px(15,5+i,5+i,14); px(15,11-i,5+i,14); px(15,5+i,10-i,14); px(15,11-i,10-i,14) } px(15,8,8,4)
+
+  const st = { frames: [0], fps: 1, loop: true }
+  return {
+    id, frameW: IN, frameH: IN, cols: 16, frameCount: 16,
+    indices: P.data, anchor: { x: 8, y: 8 },
+    animations: { idle: { se: st, ne: st }, walk: { se: st, ne: st }, attack: { se: st, ne: st }, hit: { se: st, ne: st } },
+  }
+}

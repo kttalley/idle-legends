@@ -1,6 +1,7 @@
 import React from 'react'
 import { useGameStore } from '../../../store/gameStore'
 import { SkillBar } from '../SkillBar'
+import { SpriteIcon } from '../../ui/SpriteIcon'
 import { CLASS_PROFESSIONS } from '../../../data/professions'
 import { ZONE_TOWN } from '../../../data/towns'
 import type { GameMode } from '../../../data/types'
@@ -57,7 +58,7 @@ export function ActionBar() {
             title={`${m[0].toUpperCase()}${m.slice(1)}`}
             style={MODE_BTN(isActive(m), isTraveling)}
           >
-            {m === 'combat' ? '⚔' : m === 'gathering' ? prof.gatherIcon : prof.craftIcon}
+            <SpriteIcon emoji={m === 'combat' ? '⚔' : m === 'gathering' ? prof.gatherIcon : prof.craftIcon} size={18} />
           </button>
         ))}
         {townId && (
@@ -67,7 +68,7 @@ export function ActionBar() {
             title="Visit town"
             style={MODE_BTN(gameMode === 'in_town', isTraveling)}
           >
-            🏠
+            <SpriteIcon emoji="🏠" size={18} />
           </button>
         )}
       </div>
