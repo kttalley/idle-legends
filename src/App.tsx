@@ -2,33 +2,66 @@ import React, { useEffect, useState } from 'react'
 import { useGameStore } from './store/gameStore'
 import { startGameLoop, stopGameLoop } from './engine/gameLoop'
 import { ClassSelect } from './components/game/ClassSelect'
+import { CharacterSelect } from './components/game/CharacterSelect'
 import { CombatView } from './components/game/CombatView'
 import { CharacterPanel } from './components/game/CharacterPanel'
 import { InventoryPanel } from './components/game/InventoryPanel'
 import { ZoneSelector } from './components/game/ZoneSelector'
 import { CombatLog } from './components/game/CombatLog'
 import { GoldDisplay } from './components/ui/GoldDisplay'
+import { slotStorage } from './store/saveSlots'
+import type { SaveSlotMeta } from './store/saveSlots'
 import type { ClassType, RaceType } from './data/types'
 
 type MobilePanel = 'left' | 'right' | 'log' | null
 
 export default function App() {
-  const { initialized, initGame, loadGame, resetGame, gold } = useGameStore()
+  const initialized  = useGameStore(s => s.initialized)
+  const initGame     = useGameStore(s => s.initGame)
+  const loadSlot     = useGameStore(s => s.loadSlot)
+  const returnToMenu = useGameStore(s => s.returnToMenu)
+  const gold         = useGameStore(s => s.gold)
+
   const [activePanel, setActivePanel] = useState<MobilePanel>(null)
+  const [slots, setSlots]   = useState<SaveSlotMeta[]>(() => slotStorage.list())
+  // Show creation directly when there are no heroes yet; otherwise the select screen.
+  const [creating, setCreating] = useState<boolean>(() => slotStorage.list().length === 0)
 
   const toggle = (p: MobilePanel) => setActivePanel(cur => cur === p ? null : p)
   const close  = () => setActivePanel(null)
 
-  useEffect(() => { loadGame() }, [])
+  const refreshSlots = () => setSlots(slotStorage.list())
 
   useEffect(() => {
-    if (initialized) startGameLoop()
-    else stopGameLoop()
+    if (initialized) {
+      startGameLoop()
+    } else {
+      stopGameLoop()
+      // Back at the menu — resync the slot list and reset creation state.
+      const list = slotStorage.list()
+      setSlots(list)
+      setCreating(list.length === 0)
+    }
     return () => stopGameLoop()
   }, [initialized])
 
   if (!initialized) {
-    return <ClassSelect onSelect={(cls: ClassType, race: RaceType) => initGame(cls, race)} />
+    if (creating) {
+      return (
+        <ClassSelect
+          onSelect={(cls: ClassType, race: RaceType) => initGame(cls, race)}
+          onBack={slots.length > 0 ? () => setCreating(false) : undefined}
+        />
+      )
+    }
+    return (
+      <CharacterSelect
+        slots={slots}
+        onContinue={(id) => loadSlot(id)}
+        onCreate={() => setCreating(true)}
+        onDelete={(id) => { slotStorage.delete(id); refreshSlots() }}
+      />
+    )
   }
 
   return (
@@ -48,9 +81,9 @@ export default function App() {
         <button
           className="rp-button"
           style={{ fontSize: '0.6rem' }}
-          onClick={() => { if (confirm('Reset all progress? This cannot be undone.')) resetGame() }}
+          onClick={returnToMenu}
         >
-          New Game
+          Menu
         </button>
       </div>
 

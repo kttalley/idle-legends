@@ -4,6 +4,14 @@ description: Current single-slot localStorage save needs to become a multi-chara
 type: project
 ---
 
+**STATUS (2026-07-19): save slots + character-select screen IMPLEMENTED** (Track S, part 1). Still pending: the *character-creation refresh* (live dimetric hero preview recoloring as race/class/faction change) and the hosted-account backend swap.
+
+What shipped:
+- `src/store/saveSlots.ts` — `SlotStorage` interface (list/load/save/delete) with `localSlotStorage` impl, key `idle_legends_saves_v1` → `{ slots: SaveSlot[] }`. One-time migration wraps the legacy `idle_legends_save_v2` blob into slot 1 on first read. `MAX_SLOTS = 5`. `slotStorage` singleton is the swap point for a hosted backend.
+- `gameStore`: `activeSlotId` module var (not serialized); `loadSlot(id)`, `returnToMenu()` (saves + drops to menu, no wipe), slot-aware `saveGame()`; `initGame` mints a slot. Shared `rehydrateState()`/`toSaveBlob()` helpers. Old `loadGame` removed; `resetGame` retained (dev-only, deletes active slot).
+- `src/components/game/CharacterSelect.tsx` — slot cards (avatar via `hashStr(class)^(level*7)`, name/class/race/faction/zone/circuit/last-played), Continue, Delete (inline confirm), New Character card. `App.tsx` gates: select ↔ create (ClassSelect gained optional `onBack`) ↔ game. Top-bar "New Game" wipe button replaced with safe "Menu".
+
+--- Original context (pre-implementation) ---
 Current save system uses a single key `idle_legends_save_v2` in localStorage (src/store/gameStore.ts). Only one character at a time — New Game wipes everything.
 
 **Why:** As the game grows (races, factions, 12+ zones, prestige loop) players will want multiple characters and the ability to resume a specific run. Single-slot also means a misclick on "New Game" destroys progress permanently.

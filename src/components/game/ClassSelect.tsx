@@ -8,13 +8,14 @@ import type { ClassType, RaceType } from '../../data/types'
 
 interface ClassSelectProps {
   onSelect: (cls: ClassType, race: RaceType) => void
+  onBack?:  () => void   // return to character select (only when other heroes exist)
 }
 
 type Step = 'class' | 'race'
 
 const FACTION_ORDER: Array<'alliance' | 'horde' | 'neutral'> = ['alliance', 'horde', 'neutral']
 
-export function ClassSelect({ onSelect }: ClassSelectProps) {
+export function ClassSelect({ onSelect, onBack }: ClassSelectProps) {
   const factionNames = useGameStore(s => s.factionNames)
   const [step, setStep]           = useState<Step>('class')
   const [hoveredClass, setHoveredClass] = useState<ClassType | null>(null)
@@ -53,6 +54,14 @@ export function ClassSelect({ onSelect }: ClassSelectProps) {
         style={{ background: 'radial-gradient(ellipse at center, #1e1a10 0%, #0d0b05 100%)' }}
       >
         <div className="mb-8 text-center">
+          {onBack && (
+            <button
+              onClick={onBack}
+              style={{ color: '#666', fontSize: '0.7rem', marginBottom: 12, cursor: 'pointer', background: 'none', border: 'none' }}
+            >
+              ← Back to Heroes
+            </button>
+          )}
           <h1 style={{
             fontFamily: 'Cinzel Decorative, Cinzel, serif',
             fontSize: 'clamp(1.8rem, 5vw, 3rem)',

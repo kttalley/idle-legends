@@ -28,8 +28,12 @@ import {
 import { rollLoot } from '../engine/loot'
 import { generateNames, generateThought, generateFactionNamesFallback } from '../engine/nameGen'
 import type { ThoughtEvent } from '../engine/nameGen'
+import { slotStorage, summarize, newSlotId } from './saveSlots'
 
-const SAVE_KEY = 'idle_legends_save_v2'
+// The slot currently loaded into the store — the target of every autosave. Null
+// while at the character-select menu. Kept out of GameState so it isn't serialized
+// into the save blob itself.
+let activeSlotId: string | null = null
 const LOG_MAX  = 150
 // Cast pushback: seconds added to a channel per mob hit, and the per-cast cap.
 const CAST_PUSHBACK_PER_HIT = 0.5
@@ -135,6 +139,57 @@ function defaultState(): GameState {
   }
 }
 
+// ── Rehydrate a saved blob into a runnable state ────────────────────────────────
+// Backfills fields added since the save was written, recompiles derived stats, and
+// resets all transient/combat state. Shared by every load path (slot load,
+// migrated legacy save). Mutates and returns `saved`.
+function rehydrateState(saved: GameState): GameState {
+  // Ensure new fields exist on old saves
+  saved.playerRace    = saved.playerRace    ?? 'human'
+  saved.playerFaction = saved.playerFaction ?? 'alliance'
+  saved.factionNames  = saved.factionNames  ?? generateFactionNamesFallback(Date.now())
+  // Recompile stats
+  const savedRacialPassive = RACE_DEFINITIONS[saved.playerRace]?.racialPassive ?? {}
+  saved.stats = compileStats(saved.playerClass, saved.level, saved.equipment, saved.talentAllocs ?? {}, savedRacialPassive)
+  saved.stats.currentHp = Math.min(saved.stats.maxHp, (saved.stats as any)._savedHp ?? saved.stats.maxHp)
+  saved.talentAllocs  = saved.talentAllocs  ?? {}
+  saved.talentPoints  = saved.talentPoints  ?? saved.level
+  saved.activeDoTs    = []
+  saved.activeBuffs   = []
+  saved.procState     = defaultProcState()
+  saved.castState     = null
+  saved.skillCooldowns = {}
+  // New fields — default if missing
+  saved.gameMode      = 'combat'
+  saved.travelTarget  = null
+  saved.travelProgress = 0
+  saved.travelDuration = 0
+  saved.gatheringTimer = 5
+  saved.materials     = saved.materials ?? {}
+  saved.activeRecipe  = null
+  saved.craftingTimer = 0
+  // Generate maps for all unlocked zones
+  const zoneMaps: GameState['zoneMaps'] = {}
+  for (const zid of (saved.unlockedZones ?? ['sunhollow_meadows'])) {
+    zoneMaps[zid] = generateZoneMap(zid)
+  }
+  saved.zoneMaps      = zoneMaps
+  saved.playerMapPos  = { x: 32, y: 32 }
+  saved.weatherState  = { type: 'clear', timer: 45, cloudOffset: 0, rainPhase: 0 }
+  saved.mobMapOffset       = { dx: 0, dy: 0 }
+  saved.currentTown        = null
+  saved.generatedTownNames = saved.generatedTownNames ?? {}
+  return saved
+}
+
+// Serialize the live state into a save blob, stashing currentHp (derived stats are
+// recomputed on load, but current HP must survive).
+function toSaveBlob(s: GameState): GameState {
+  const blob = { ...s } as GameState;
+  (blob.stats as any) = { ...s.stats, _savedHp: s.stats.currentHp }
+  return blob
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function log(
   type: CombatLogEntry['type'],
@@ -207,8 +262,9 @@ export function resetCombatAccumulators() {
 // ── Store ─────────────────────────────────────────────────────────────────────
 interface GameActions {
   initGame: (playerClass: ClassType, playerRace: RaceType) => void
-  loadGame: () => boolean
+  loadSlot: (id: string) => boolean
   saveGame: () => void
+  returnToMenu: () => void
   resetGame: () => void
   tick: (deltaSeconds: number) => void
   equipItem: (inventoryIndex: number) => void
@@ -251,63 +307,33 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const nameSeed = Date.now() ^ Math.floor(Math.random() * 0xFFFFFF)
     s.factionNames = generateFactionNamesFallback(nameSeed)  // instant fallback shown immediately
     resetCombatAccumulators()
+    // Mint a fresh save slot for this character and persist it immediately, so the
+    // run survives a reload even before the first autosave.
+    activeSlotId = newSlotId()
     set(s)
+    get().saveGame()
     // Fire name generation async — game starts immediately, names trickle in
     generateNames(playerClass, nameSeed)
-      .then(names => set({
+      .then(names => { set({
         playerName: names.playerName,
         characterTraits: names.traits,
         generatedZoneNames: names.zoneNames,
         factionNames: names.factionNames,
         generatedTownNames: names.townNames ?? {},
         nameGenStatus: 'done',
-      }))
+      }); get().saveGame() })  // persist the generated identity into the slot
       .catch((err) => { console.error('[nameGen] failed:', err); set({ nameGenStatus: 'error' }) })
   },
 
-  loadGame: () => {
+  loadSlot: (id) => {
     try {
-      const raw = localStorage.getItem(SAVE_KEY)
-      if (!raw) return false
-      const saved: GameState = JSON.parse(raw)
-      if (!saved.initialized) return false
-      // Ensure new fields exist on old saves
-      saved.playerRace    = saved.playerRace    ?? 'human'
-      saved.playerFaction = saved.playerFaction ?? 'alliance'
-      saved.factionNames  = saved.factionNames  ?? generateFactionNamesFallback(Date.now())
-      // Recompile stats
-      const savedRacialPassive = RACE_DEFINITIONS[saved.playerRace]?.racialPassive ?? {}
-      saved.stats = compileStats(saved.playerClass, saved.level, saved.equipment, saved.talentAllocs ?? {}, savedRacialPassive)
-      saved.stats.currentHp = Math.min(saved.stats.maxHp, (saved.stats as any)._savedHp ?? saved.stats.maxHp)
-      saved.talentAllocs  = saved.talentAllocs  ?? {}
-      saved.talentPoints  = saved.talentPoints  ?? saved.level
-      saved.activeDoTs    = []
-      saved.activeBuffs   = []
-      saved.procState     = defaultProcState()
-      saved.castState     = null
-      saved.skillCooldowns = {}
-      // New fields — default if missing
-      saved.gameMode      = 'combat'
-      saved.travelTarget  = null
-      saved.travelProgress = 0
-      saved.travelDuration = 0
-      saved.gatheringTimer = 5
-      saved.materials     = saved.materials ?? {}
-      saved.activeRecipe  = null
-      saved.craftingTimer = 0
-      // Generate maps for all unlocked zones
-      const zoneMaps: GameState['zoneMaps'] = {}
-      for (const zid of (saved.unlockedZones ?? ['sunhollow_meadows'])) {
-        zoneMaps[zid] = generateZoneMap(zid)
-      }
-      saved.zoneMaps      = zoneMaps
-      saved.playerMapPos  = { x: 32, y: 32 }
-      saved.weatherState  = { type: 'clear', timer: 45, cloudOffset: 0, rainPhase: 0 }
-      saved.mobMapOffset       = { dx: 0, dy: 0 }
-      saved.currentTown        = null
-      saved.generatedTownNames = saved.generatedTownNames ?? {}
+      const slot = slotStorage.load(id)
+      if (!slot || !slot.state?.initialized) return false
+      const saved = rehydrateState(slot.state)
       resetCombatAccumulators()
+      activeSlotId = id
       set(saved)
+      get().saveGame()   // refreshes lastPlayedAt
       return true
     } catch {
       return false
@@ -315,17 +341,34 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   },
 
   saveGame: () => {
+    if (!activeSlotId) return
     const s = get()
-    const toSave = { ...s };
-    (toSave.stats as any)._savedHp = s.stats.currentHp
-    localStorage.setItem(SAVE_KEY, JSON.stringify(toSave))
+    if (!s.initialized) return
+    const now = Date.now()
+    const existing = slotStorage.load(activeSlotId)
+    slotStorage.save({
+      id:           activeSlotId,
+      createdAt:    existing?.createdAt ?? now,
+      lastPlayedAt: now,
+      summary:      summarize(s),
+      state:        toSaveBlob(s),
+    })
+  },
+
+  // Save the active run and drop back to the character-select menu (no data loss —
+  // this replaces the old destructive "New Game" wipe).
+  returnToMenu: () => {
+    get().saveGame()
+    activeSlotId = null
+    resetCombatAccumulators()
+    set({ ...defaultState(), initialized: false })
   },
 
   resetGame: () => {
-    localStorage.removeItem(SAVE_KEY)
-    // also clear legacy keys
-    localStorage.removeItem('idle_wow_save')
-    localStorage.removeItem('idle_wow_save_v2')
+    // Full wipe of the active run only (not other slots). Retained for dev use;
+    // not wired to any UI button.
+    if (activeSlotId) slotStorage.delete(activeSlotId)
+    activeSlotId = null
     resetCombatAccumulators()
     set(defaultState())
   },
