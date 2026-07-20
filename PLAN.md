@@ -294,6 +294,45 @@ for `Math.random` before P0); cheat surface (P0 accepts client-trust snapshots, 
 server-side in P1); scope pressure — Track P is explicitly **not a launch blocker**; the
 graphics rebuild and Track M/R own the runway to launch.
 
+## Track L — living world / ambient MMO sim (post-launch vision, composes with Track P)
+
+**Shape:** the world feels populated. As our idle legend wanders a zone, *other*
+heroes — same shape as the player (class/race/level + a `(spriteId, paletteId)` look) —
+roam the same tiles: fighting monsters, gathering, moving between nodes, idling near
+towns. They are **ambient agents**, not networked opponents: each is a lightweight
+state machine (wander → engage nearby mob → fight via the existing headless combat sim →
+loot → move on) rendered as ordinary dimetric entities in the world scene. NPCs (quest
+givers, vendors) stand at town/node anchors with occasional barks. The result is a
+single-player idle game that *reads* like a busy MMO server.
+
+**Why this architecture is unusually good at it:**
+- A hero's entire identity is a handful of sprite/palette ids + stats — spawning 8–20
+  ambient heroes per zone is bytes, and the dimetric scene already depth-sorts and
+  animates arbitrary entities (walk cycle, attack/hit, the new death anim). Zero new
+  render work; it's population + a behavior tick.
+- **It's the on-ramp to Track P.** Ambient heroes can be seeded from *real* player
+  roster snapshots (the Track P cloud store) — so the "NPCs" you pass are other people's
+  legends, and their prismatic/limited palettes (Track M cosmetics) are on display in the
+  open world, not just in duels. Living-world + async PvP + cosmetic IAP reinforce each
+  other: the world is the display case.
+- **LLM thought bubbles scale to it** — the existing `nameGen`/thought system can give
+  ambient heroes and NPCs personality-driven barks reacting to what they're doing, which
+  is already flagged as the game's most unique differentiator.
+
+**Sequencing (post-launch; not a launch blocker):**
+- **L0:** purely local ambient heroes — N per zone, deterministic seeded behavior +
+  headless combat sim, rendered in-world; no backend. Big "alive world" payoff for
+  render-only cost.
+- **L1:** seed ambient heroes from Track P roster snapshots (real players as world NPCs);
+  NPC quest-givers/vendors at town anchors.
+- **L2:** light interactions — party-up with an ambient hero (AI companion), trade barks,
+  world events (a boss draws a crowd of heroes).
+
+**Risks:** entity/perf budget in the scene (cap ambient count per viewport, cull off-
+screen sims); behavior determinism (reuse the seedable combat sim Track P already
+requires); scope — this is explicitly a *post-launch* world-depth play, sequenced behind
+the graphics rebuild, Track R rebrand, and the RevenueCat launch milestone.
+
 ## Track R — rebrand (parallel to render phases, launch blocker)
 
 Audit result: the WoW debt is structural, not cosmetic — factions are "The Alliance" /

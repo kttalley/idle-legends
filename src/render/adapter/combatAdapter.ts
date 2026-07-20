@@ -640,7 +640,11 @@ export class WorldSceneController {
     } else if (moving) {
       this.lastFaceDx = mvx; this.lastFaceDy = mvy
       this.faceToward(this.player, this.player.tx + mvx, this.player.ty + mvy)
-      if (!inCombatAnim) this.player.animator.set('walk')
+      // Movement uses the 'idle' tag on purpose: in the sprites we have (FFTA scaffold
+      // and the placeholder rig alike) the idle tag holds the good-looking gait, while
+      // the 'walk' tag is a flinchy jitter. Idle-as-walk is the intended movement anim;
+      // the flinch/'hit' tag is reserved for taking damage.
+      if (!inCombatAnim) this.player.animator.set('idle')
     } else if (!inCombatAnim) {
       this.player.animator.set('idle')
     }
@@ -655,7 +659,9 @@ export class WorldSceneController {
       const mobInCombat = mAnim === 'attack' || mAnim === 'hit'
       if (this.mob.animator.finished && this.mobLunge.t >= 1) this.mob.animator.set('idle')
       this.faceToward(this.mob, this.player.tx, this.player.ty)
-      if (!mobInCombat) this.mob.animator.set(this.mobEngaged ? 'idle' : 'walk')
+      // 'idle' for both engaged and approaching — the 'walk' tag is the flinchy jitter
+      // (see the player movement note); idle holds the good gait for these sprites.
+      if (!mobInCombat) this.mob.animator.set('idle')
     }
 
     this.scene.update(dt)
