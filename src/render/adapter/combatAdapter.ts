@@ -20,7 +20,7 @@ import { heroPaletteId } from './heroWardrobe'
 import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
 import type { Facing, IndexedSprite } from '../types'
 import type {
-  GameState, MobInstance, RaceType, Rarity, FloatingNumber, MapNode, MapScenery, WeatherType, ZoneId,
+  GameState, MobInstance, ClassType, RaceType, FactionType, Rarity, FloatingNumber, MapNode, MapScenery, WeatherType, ZoneId,
 } from '../../data/types'
 
 export const CSS_SCALE = 2
@@ -173,6 +173,42 @@ const BARREN_SCENERY = new Set<ZoneId>([
   'the_bloodfields', 'cinderfall_wastes', 'the_maw_eternal',
 ])
 
+// ── Simulated MMO ambience (Track L0) ─────────────────────────────────────────
+// Other heroes + monsters roam each zone so the world reads like a populated server
+// rather than a lone duel. Purely local, seeded, render-only — no combat sim, no
+// netcode. Heroes wear real (spriteId, paletteId) identities (the same wardrobe the
+// player + future PvP snapshots use) and carry faction-coloured nameplates.
+const AMBIENT_NAMES = [
+  'Aldric', 'Brenna', 'Corvin', 'Dahlia', 'Eirik', 'Fenna', 'Gorvan', 'Haldis',
+  'Ivo', 'Jora', 'Kaelen', 'Lyra', 'Morrin', 'Nyssa', 'Orin', 'Perrin',
+  'Roan', 'Sable', 'Torin', 'Ulla', 'Vesk', 'Wren', 'Yorick', 'Zara',
+]
+const AMBIENT_CLASSES: ClassType[] = ['warrior', 'mage', 'rogue', 'warlock']
+const ALLIANCE_RACES: RaceType[] = ['human', 'dwarf', 'elf']
+const HORDE_RACES: RaceType[] = ['orc', 'troll', 'goblin']
+// Weighted toward common so a rare/epic/legendary drop-in reads as special.
+const AMBIENT_RARITY: Rarity[] = ['common', 'common', 'common', 'uncommon', 'uncommon', 'rare', 'epic', 'legendary']
+// How far ambient actors roam from the player's tile (keeps the crowd on-camera).
+const AMBIENT_LEASH = 11
+
+interface Ambient {
+  e: Entity
+  kind: 'hero' | 'mob'
+  gx: number; gy: number    // wrapping game-tile position (0..64)
+  tgx: number; tgy: number  // current wander target
+  t: number                 // seconds until repick
+  fightT: number            // >0 → skirmishing (attack anims, no wander)
+  atkCd: number
+  name: string
+  level: number
+  faction: FactionType
+}
+
+/** Movement vector → dimetric facing (se:+x, sw:+y, nw:−x, ne:−y). */
+function faceFromVec(dx: number, dy: number): Facing {
+  return Math.abs(dx) > Math.abs(dy) ? (dx >= 0 ? 'se' : 'nw') : (dy >= 0 ? 'sw' : 'ne')
+}
+
 export class WorldSceneController {
   private scene = new Scene()
   private canvas: HTMLCanvasElement
@@ -205,6 +241,10 @@ export class WorldSceneController {
   private tallProps: Record<number, IndexedSprite>
   /** Spawned tall-prop entities + the node each represents; retired on zone change. */
   private propEntities: { entity: Entity; gx: number; gy: number }[] = []
+
+  // Simulated MMO ambience — other heroes/monsters roaming the zone.
+  private ambient: Ambient[] = []
+  private ambientSkirmishCd = 0
 
   // Weather + ambience: synced from game state; phases advanced on real time in render.
   private weatherType: WeatherType = 'clear'
@@ -536,9 +576,10 @@ export class WorldSceneController {
 
     // Zone change → rebake ground, snap the player into the new zone's player tile.
     if (state.currentZone !== this.zone) {
-      // Retire the previous zone's tall-prop entities first (even if the new zone's
-      // map isn't ready yet, so stale props never linger).
+      // Retire the previous zone's tall-prop + ambient entities first (even if the
+      // new zone's map isn't ready yet, so stale entities never linger).
       this.retirePropEntities()
+      this.retireAmbient()
       const zm = state.zoneMaps[state.currentZone]
       if (zm) {
         const palId = biomePaletteId(state.currentZone)
@@ -565,6 +606,8 @@ export class WorldSceneController {
         // Plus scattered biome scenery (trees/boulders/spires/mounds/ruins) so the
         // world reads as populated FFTA-style terrain, not a bare tile grid.
         this.spawnScenery(zm.scenery ?? [])
+        // Populate the zone with roaming heroes + monsters (simulated MMO ambience).
+        this.spawnAmbient()
       }
     }
 
@@ -956,6 +999,8 @@ export class WorldSceneController {
     // Pin tall-prop entities to the wrapped copy nearest the player before the sort
     // so they depth-correct against the player/mob as the player moves (Phase E).
     this.updatePropEntities()
+    // Advance roaming heroes/monsters + pin them to the near torus copy.
+    this.updateAmbient(realDt)
 
     this.scene.render(this.ctx, this.cam, g, dt)
 
@@ -967,6 +1012,9 @@ export class WorldSceneController {
     // Fallback glyphs for any node type without a tall-prop sprite (Phase E: the
     // mapped node types — ore/herb/boss_lair/mob_spawn — are now depth-sorted props).
     this.drawNodes(g)
+
+    // Faction-coloured nameplates over roaming ambient heroes (sells "other players").
+    this.drawAmbientNameplates()
 
     // Player chevron — gold marker above the followed unit (rides above the jump).
     const px = Math.round(this.player.screenX - this.cam.x)
@@ -1165,6 +1213,130 @@ export class WorldSceneController {
       pe.entity.tx = this.player.tx + WorldSceneController.wrapDiff(pe.gx, pgx)
       pe.entity.ty = this.player.ty + WorldSceneController.wrapDiff(pe.gy, pgy)
     }
+  }
+
+  // ── Simulated MMO ambience ────────────────────────────────────────────────────
+  private zoneSeed(): number {
+    const s = this.currentZone
+    let h = 0
+    for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
+    return Math.abs(h)
+  }
+
+  private retireAmbient(): void {
+    for (const a of this.ambient) a.e.active = false
+    this.ambient = []
+  }
+
+  private spawnAmbient(): void {
+    if (!this.rigs) return
+    const seed = this.zoneSeed()
+    const rnd = (n: number) => { const x = Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453; return x - Math.floor(x) }
+    // Cluster the crowd around the player's tile (who stays camera-centred) so several
+    // are always in view; they roam within a leash that follows the player (below).
+    const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
+    const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
+    const near = (n: number) => (rnd(n) * 2 - 1) * AMBIENT_LEASH
+    const HEROES = 6, MOBS = 4
+    for (let i = 0; i < HEROES; i++) {
+      const faction: FactionType = rnd(i * 9 + 1) < 0.5 ? 'alliance' : 'horde'
+      const races = faction === 'alliance' ? ALLIANCE_RACES : HORDE_RACES
+      const race = races[Math.floor(rnd(i * 9 + 2) * races.length)]
+      const cls = AMBIENT_CLASSES[Math.floor(rnd(i * 9 + 3) * AMBIENT_CLASSES.length)]
+      const rarity = AMBIENT_RARITY[Math.floor(rnd(i * 9 + 4) * AMBIENT_RARITY.length)]
+      const gx = WorldSceneController.wrapMod(pgx + near(i * 9 + 5))
+      const gy = WorldSceneController.wrapMod(pgy + near(i * 9 + 6))
+      const e = this.scene.spawn(this.rigs.player, heroPaletteId(cls, race, faction, rarity),
+        PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
+      e.shadow = true; e.animator.set('walk')
+      this.ambient.push({
+        e, kind: 'hero', gx, gy, tgx: gx, tgy: gy, t: 0, fightT: 0, atkCd: 0,
+        name: AMBIENT_NAMES[Math.floor(rnd(i * 9 + 7) * AMBIENT_NAMES.length)],
+        level: 1 + Math.floor(rnd(i * 9 + 8) * 60), faction,
+      })
+    }
+    for (let i = 0; i < MOBS; i++) {
+      const rig = rnd(100 + i) < 0.5 ? this.rigs.mobBeast : this.rigs.mobHumanoid
+      const pal = rnd(200 + i) < 0.25 ? 'elite' : 'team/enemy'
+      const gx = WorldSceneController.wrapMod(pgx + near(300 + i))
+      const gy = WorldSceneController.wrapMod(pgy + near(400 + i))
+      const e = this.scene.spawn(rig, pal, PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
+      e.shadow = true; e.animator.set('walk')
+      this.ambient.push({ e, kind: 'mob', gx, gy, tgx: gx, tgy: gy, t: 0, fightT: 0, atkCd: 0, name: '', level: 0, faction: 'neutral' })
+    }
+  }
+
+  private updateAmbient(dt: number): void {
+    if (!this.ambient.length) return
+    const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
+    const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
+    const SPEED = 1.4
+    for (const a of this.ambient) {
+      if (a.fightT > 0) {
+        a.fightT -= dt
+        a.atkCd -= dt
+        if (a.atkCd <= 0) { a.e.animator.set('attack'); a.e.animator.restart(); a.atkCd = 0.6 + Math.random() * 0.5 }
+        else if (a.e.animator.finished) a.e.animator.set('idle')
+        if (a.fightT <= 0) a.e.animator.set('walk')
+      } else {
+        // Torus-shortest delta to the target; repick a target near the PLAYER so the
+        // crowd follows the camera-centred player and stays roughly in view.
+        const dx = WorldSceneController.wrapDiff(a.tgx, a.gx)
+        const dy = WorldSceneController.wrapDiff(a.tgy, a.gy)
+        const d = Math.hypot(dx, dy)
+        if (d < 0.5 || a.t <= 0) {
+          a.tgx = WorldSceneController.wrapMod(pgx + (Math.random() * 2 - 1) * AMBIENT_LEASH)
+          a.tgy = WorldSceneController.wrapMod(pgy + (Math.random() * 2 - 1) * AMBIENT_LEASH)
+          a.t = 2 + Math.random() * 4
+        } else {
+          a.gx = WorldSceneController.wrapMod(a.gx + dx / d * SPEED * dt)
+          a.gy = WorldSceneController.wrapMod(a.gy + dy / d * SPEED * dt)
+          a.e.animator.face(faceFromVec(dx, dy))
+        }
+        a.t -= dt
+      }
+      a.e.tx = this.player.tx + WorldSceneController.wrapDiff(a.gx, pgx)
+      a.e.ty = this.player.ty + WorldSceneController.wrapDiff(a.gy, pgy)
+    }
+    // Occasionally start a hero↔mob skirmish when one wanders near a monster.
+    this.ambientSkirmishCd -= dt
+    if (this.ambientSkirmishCd <= 0) {
+      for (const h of this.ambient) {
+        if (h.kind !== 'hero' || h.fightT > 0) continue
+        for (const m of this.ambient) {
+          if (m.kind !== 'mob' || m.fightT > 0) continue
+          if (Math.hypot(h.gx - m.gx, h.gy - m.gy) < 3) {
+            h.fightT = m.fightT = 2.5 + Math.random() * 2.5
+            h.e.animator.face(faceFromVec(m.gx - h.gx, m.gy - h.gy))
+            m.e.animator.face(faceFromVec(h.gx - m.gx, h.gy - m.gy))
+            this.ambientSkirmishCd = 1.5
+            break
+          }
+        }
+      }
+    }
+  }
+
+  private drawAmbientNameplates(): void {
+    if (!this.ambient.length) return
+    const ctx = this.ctx
+    ctx.save()
+    ctx.font = '7px ui-monospace, monospace'
+    ctx.textAlign = 'center'
+    for (const a of this.ambient) {
+      if (a.kind !== 'hero') continue
+      const sx = Math.round(a.e.screenX - this.cam.x)
+      const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 3)
+      if (sx < -40 || sx > this.cam.w + 40 || sy < 2 || sy > this.cam.h) continue
+      const col = a.faction === 'horde' ? '#e07060' : '#70a8e8'
+      const label = `${a.name} ${a.level}`
+      const w = ctx.measureText(label).width + 6
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'
+      ctx.fillRect(sx - w / 2, sy - 8, w, 9)
+      ctx.fillStyle = col
+      ctx.fillText(label, sx, sy - 7)
+    }
+    ctx.restore()
   }
 
   /** Fallback glyph overlay for node types without a tall-prop sprite (Phase E: the
