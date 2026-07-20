@@ -104,14 +104,106 @@ reg('team/player', composePalette(BASE_UNIT, { 9: '#1c3454', 10: '#284c7c', 11: 
 reg('team/enemy', composePalette(BASE_UNIT, { 9: '#54201c', 10: '#7c2e28', 11: '#a44038', 12: '#c85c50' }))
 
 // ── Biome tile palettes: the map recolors with the same mechanism ────────────
-reg('biome/meadow', BASE_TILE)
-reg('biome/ashen', composePalette(BASE_TILE, {
-  5: '#4c2c1c', 6: '#6c3c24', 7: '#8c4c2c', 8: '#b06438',
-  9: '#5c2414', 10: '#84341c', 11: '#ac4424', 12: '#d45c30',
+// biome/map080 is the faithful FFTA map #080 grassland palette, decoded straight
+// from the ROM via the sibling ff-tactics-decomp editor sidecar (/api/map_full?id=80).
+// Bank 0 of that map: deep water blues, teal→yellow-green grass, pale stone/cream
+// highlights — slotted onto the tileset's semantic channels (5-8 veg, 9-12 water,
+// 13-15 stone, 1-4 earth/path). This is the environment's default look.
+reg('biome/map080', paletteFromHex([
+  '',
+  '#7b94a4', '#9cb4b4', '#cdcdbe', '#e6e6cd', // 1-4 earth / path (pale stone→cream)
+  '#184a52', '#187b73', '#399c73', '#accd6a', // 5-8 vegetation (teal→yellow-green)
+  '#294152', '#295a73', '#39738b', '#527b9c', // 9-12 water (deep blue→blue)
+  '#9cb4b4', '#cdcdbe', '#e6e6cd',            // 13-15 stone / cliff faces
+]))
+// biome/meadow is the default grassland look (alias of map080) — also used by the
+// dev harness, so the id must stay registered.
+reg('biome/meadow', REGISTRY.get('biome/map080')!)
+
+// Per-zone biome variety (environment-plan Phase A): each biome is map080 with its
+// four semantic channels — earth/path (1-4), vegetation (5-8), water (9-12), stone
+// (13-15) — swapped to a coherent character. All palette-indexed, so a biome palette
+// also tints any future props/tiles authored against the same slots. Original art:
+// no FFTA pixels or constants are reused, only the slot convention.
+const M080 = (): Palette => REGISTRY.get('biome/map080')!
+function biome(ch: { e: readonly string[]; v: readonly string[]; w: readonly string[]; s: readonly string[] }): Palette {
+  const o: Record<number, string> = {}
+  ch.e.forEach((h, i) => { o[i + 1] = h })
+  ch.v.forEach((h, i) => { o[i + 5] = h })
+  ch.w.forEach((h, i) => { o[i + 9] = h })
+  ch.s.forEach((h, i) => { o[i + 13] = h })
+  return composePalette(M080(), o)
+}
+
+// Temperate forest — deeper greens and brown loam than the meadow.
+reg('biome/forest', biome({
+  e: ['#4a3c28', '#6c543c', '#8c7048', '#a88858'],
+  v: ['#1c3c1c', '#2c5c2c', '#3c7c3c', '#5c9c4c'],
+  w: ['#1c2c44', '#243c5c', '#2c5074', '#3c6c94'],
+  s: ['#5c5c4c', '#7c7c68', '#989880'],
 }))
-reg('biome/gloom', composePalette(BASE_TILE, {
-  5: '#241c3c', 6: '#342a54', 7: '#443a6c', 8: '#584c88',
-  9: '#141c3c', 10: '#1c2a58', 11: '#283a74', 12: '#384c94',
+// Deep jungle — saturated green canopy, dark loam, murky green water.
+reg('biome/jungle', biome({
+  e: ['#2c2418', '#3c3424', '#4c442c', '#5c5438'],
+  v: ['#0c3c14', '#1c5c24', '#2c7c34', '#4ca44c'],
+  w: ['#143024', '#1c4434', '#245848', '#347060'],
+  s: ['#4c4c3c', '#646450', '#7c7c64'],
+}))
+// Red-rock badlands / mesa — dry scrub over rust earth, rare murky water.
+reg('biome/badlands', biome({
+  e: ['#5c2c1c', '#7c3c24', '#9c5030', '#bc6c40'],
+  v: ['#4c3c1c', '#6c5430', '#8c703c', '#a8884c'],
+  w: ['#3c2c24', '#50402c', '#6c5438', '#887048'],
+  s: ['#7c3c24', '#9c5030', '#bc6c40'],
+}))
+// Ashfire peaks — charcoal ground, charred scrub, lava/ember "water".
+reg('biome/ashfire', biome({
+  e: ['#1c1c20', '#2c2c30', '#3c3c44', '#4c4c54'],
+  v: ['#2c241c', '#3c3024', '#4c4030', '#5c5038'],
+  w: ['#5c1408', '#8c2410', '#bc3818', '#e85020'],
+  s: ['#2c2c30', '#3c3c44', '#4c4c54'],
+}))
+// Cinderfall wastes — cinder earth, scorched scrub, glowing ember fissures.
+reg('biome/cinder', biome({
+  e: ['#3c1810', '#5c2418', '#7c3420', '#9c4830'],
+  v: ['#3c2c18', '#5c4020', '#7c5430', '#9c7040'],
+  w: ['#6c1c08', '#9c2c14', '#cc4420', '#f46430'],
+  s: ['#5c2418', '#7c3420', '#9c4830'],
+}))
+// Dustwind plains — pale dust and dry grass, bleached stone, pale murky water.
+reg('biome/wastes', biome({
+  e: ['#9c8c6c', '#b4a484', '#ccbc98', '#e0d4b0'],
+  v: ['#7c7c4c', '#9c9c64', '#b4b47c', '#ccc094'],
+  w: ['#6c7080', '#848898', '#9ca0ac', '#b4b8c0'],
+  s: ['#a09c84', '#b8b498', '#d0ccb0'],
+}))
+// The bloodfields — red earth, blood-tinted scrub, dark blood water.
+reg('biome/bloodfields', biome({
+  e: ['#5c1c14', '#7c2c1c', '#9c3c24', '#bc5030'],
+  v: ['#3c2c20', '#5c3c28', '#7c4c30', '#9c6038'],
+  w: ['#3c0c0c', '#5c1818', '#7c2828', '#9c3838'],
+  s: ['#5c1c14', '#7c2c1c', '#9c3c24'],
+}))
+// Grimshade forest — dark purple canopy and shadowed loom.
+reg('biome/gloom', biome({
+  e: ['#2c2034', '#3c2c48', '#4c385c', '#604874'],
+  v: ['#241c3c', '#342a54', '#443a6c', '#584c88'],
+  w: ['#141c3c', '#1c2a58', '#283a74', '#384c94'],
+  s: ['#342a54', '#443a6c', '#584c88'],
+}))
+// Venom hollows — sickly green vegetation over purple-rot earth, toxic green water.
+reg('biome/venom', biome({
+  e: ['#2c2434', '#3c3448', '#4c445c', '#605874'],
+  v: ['#1c3c18', '#2c5424', '#3c7030', '#509044'],
+  w: ['#143018', '#1c4420', '#2c5c2c', '#3c7838'],
+  s: ['#3c3448', '#4c445c', '#605874'],
+}))
+// The maw eternal — corrupted dark swamp: sickly green over dark mire, black water.
+reg('biome/maw', biome({
+  e: ['#1c1c14', '#2c2c1c', '#3c3c24', '#4c4c30'],
+  v: ['#142c14', '#1c441c', '#2c5c28', '#3c7838'],
+  w: ['#0c1c14', '#143020', '#1c4430', '#2c5840'],
+  s: ['#2c2c1c', '#3c3c24', '#4c4c30'],
 }))
 
 export function getPalette(id: string): Palette {

@@ -15,6 +15,11 @@ export class Animator {
   sprite: IndexedSprite
   anim: AnimName = 'idle'
   facing: Facing = 'se'
+  /** Horizontal flip for the drawn frame. Defaults to isMirrored(facing) so the
+   *  4-facing mirror still works for callers that only use face(); faceToward in
+   *  combatAdapter overrides it from the actual screen-direction to the target so
+   *  two profile fighters face each other instead of turning back-to-back. */
+  mirror = false
   /** Current sheet frame index — read by the scene when drawing. */
   frame = 0
   /** True once a non-looping animation has played out (caller decides what's next). */
@@ -26,6 +31,7 @@ export class Animator {
   constructor(sprite: IndexedSprite) {
     this.sprite = sprite
     this.frame = this.def().frames[0]
+    this.mirror = isMirrored(this.facing)
   }
 
   private def() {
@@ -54,6 +60,7 @@ export class Animator {
     if (facing === this.facing) return
     const before = drawnFacing(this.facing)
     this.facing = facing
+    this.mirror = isMirrored(facing)
     if (drawnFacing(facing) !== before) {
       // Different drawn sheet row — re-resolve the frame, keep the cursor.
       const def = this.def()

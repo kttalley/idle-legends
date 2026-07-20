@@ -43,14 +43,13 @@ export function DimetricWorldScene() {
 
     const onStore = (state: ReturnType<typeof useGameStore.getState>) => {
       controller.sync(state)
-      // Diff floatingNumbers → attack/hit triggers.
+      // Diff floatingNumbers → combat-event triggers (melee / spell / DoT / mob attack).
       const fns = state.floatingNumbers
       for (let i = 0; i < fns.length; i++) {
         const f = fns[i]
         if (seenFnIds.has(f.id)) continue
         seenFnIds.add(f.id)
-        if (f.isMobDamage) controller.triggerMobAttack(f)
-        else controller.triggerPlayerAttack(f)
+        controller.handleFloatingNumber(f)
       }
       // Trim the seen set to current ids so it can't grow unbounded.
       if (seenFnIds.size > 256) {
@@ -61,6 +60,22 @@ export function DimetricWorldScene() {
       }
     }
     const unsub = useGameStore.subscribe(onStore)
+
+    // Keyboard → controller (WASD/arrows walk, Space jumps). Prevent the page from
+    // scrolling on Space / arrows while the world scene is mounted.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat) return
+      const k = e.key
+      if (k === ' ' || k.startsWith('Arrow')) e.preventDefault()
+      controller.setKey(k, true)
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      controller.setKey(e.key, false)
+    }
+    const onBlur = () => controller.clearInput()
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
 
     const frame = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000)
@@ -75,6 +90,9 @@ export function DimetricWorldScene() {
       cancelAnimationFrame(raf)
       unsub()
       ro.disconnect()
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
     }
   }, [])
 

@@ -1,18 +1,19 @@
 // The imperative bridge from game state → dimetric scene. Owns the canvas rAF
-// work so the React host stays cheap: the host feeds store snapshots via sync()
-// and forwards floatingNumber events to the attack triggers; everything else
-// (entity placement, animation, camera, floaters) is handled here, read-only
-// over the store — zero combat-logic diffs.
+// work so the React host stays cheap: the host feeds store snapshots via sync(),
+// forwards floatingNumber events to the attack triggers, and forwards keyboard
+// input via setKey(); everything else (entity placement, animation, camera, jump,
+// floaters) is handled here, read-only over the store — zero combat-logic diffs.
 //
 // World model: the 64×64 game zone is a torus. We bake it once as a PADDED_W×
-// PADDED_W wrapped map (mapAdapter) and place the player + mob in player-local
-// buffer space, so a player-centered camera always sees real wrapped ground
-// with no seams and no per-frame wrap math on the render core.
+// PADDED_W wrapped map (mapAdapter) and keep the player entity at its zone-snap
+// buffer position in auto mode; a mob (when present) is GLUED to the player entity
+// (mob.tx = player.tx + offset) so approach + engagement always read from the same
+// anchor and lunges can never slingshot across the screen.
 
 import { Scene, type Camera, type Entity } from '../scene'
 import { bakeGround, feetX, feetY, type GroundBuffer } from '../tilemap'
 import { loadSpriteOrPlaceholder } from '../indexedSprite'
-import { makeHumanoidRig, makeBeastRig, makeTileset } from '../placeholderArt'
+import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeBoltRig, makeBurstRig, TILE_ANIMS } from '../placeholderArt'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { composePalette } from '../palette'
 import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
@@ -22,6 +23,27 @@ import type {
 } from '../../data/types'
 
 export const CSS_SCALE = 2
+
+// FN color → spell school, for VFX classification (game-free; the store already
+// tags Shadow Bolt hits with this exact color).
+const SHADOW_BOLT_COLOR = '#cc44ff'
+
+// ── Tuning ────────────────────────────────────────────────────────────────────
+const MANUAL_SPEED = 4.2      // tiles/sec while WASD is held
+const AUTO_LERP_K = 6         // exp-approach rate for auto-follow (1/s); tracks the
+                              // store's drift/travel with a small steady-state lag
+const JUMP_DURATION = 0.55    // seconds, apex at the midpoint
+const JUMP_HEIGHT = 16        // px lift at apex
+const LUNGE_MAX = 1.35        // tiles; the attack lunge never exceeds this (no slingshot)
+const ENGAGE_DIST = 1.5       // mob "engaged" threshold (matches the store's mobEngaged)
+// Engagement gap from the player, in per-axis diagonal tiles. The store shrinks
+// mobMapOffset to 0 (mob on the player's tile); we instead hold the mob off by
+// this much once it has arrived. Melee is close enough to lunge; ranged stands
+// back and casts. Sized for the dimetric projection: a diagonal step is only
+// TILE_H (16px) tall on screen while sprites are ~32px, so ~2 tiles keeps melee
+// bodies from overlapping even when the mob settles due-south of the player.
+const MELEE_GAP_TILES = 2
+const RANGED_GAP_TILES = 5
 
 // ── Mappings (display-only; internal ids untouched) ──────────────────────────
 
@@ -41,6 +63,14 @@ const BEAST_RE = /wolf|boar|raptor|tiger|vulture|bomb|beast|whelp|dragon|worg|se
 function isBeastMob(mob: MobInstance): boolean {
   const k = `${mob.templateId} ${mob.spriteKey}`.toLowerCase()
   return BEAST_RE.test(k)
+}
+
+// Ranged/caster mobs keep a multi-tile engagement distance and cast (spawn a bolt)
+// instead of lunging. Matched on the mob name so the bestiary's archers/shamans/
+// warlocks read as ranged without a data flag.
+const RANGED_RE = /archer|ranger|hunter|gunner|warlock|mage|magus|caster|spellcaster|shaman|priest|seer|oracle|necromancer|sorcerer|conjurer|elementalist|pyromancer|cryomancer/
+function isRangedMob(mob: MobInstance): boolean {
+  return RANGED_RE.test(mob.name.toLowerCase())
 }
 
 function bestEquipmentRarity(state: GameState): Rarity {
@@ -75,10 +105,23 @@ function mobPaletteId(mob: MobInstance): string {
   return mob.isElite ? 'elite' : 'team/enemy'
 }
 
-// ── Floaters (DOM pool, fixed size, zero per-frame allocation) ────────────────
+const clamp = (v: number, lo: number, hi: number) => v < lo ? lo : v > hi ? hi : v
 
-const FLOATER_POOL = 12
-interface Floater { el: HTMLDivElement; t: number; wx: number; wy: number }
+// ── Floaters (DOM pool, fixed size, zero per-frame allocation) ────────────────
+// Each floater is anchored to an entity so the number rises from the unit and
+// follows it; when the anchor is gone (mob died) it freezes at the last spot and
+// finishes its rise/fade. Lifetime is short with an ease-out fade that begins
+// immediately, and a full pool recycles the oldest entry (LRU) so new damage always
+// shows instead of piling up at full opacity.
+const FLOATER_POOL = 16
+const FLOATER_LIFE = 0.95
+interface Floater {
+  el: HTMLDivElement
+  t: number        // remaining seconds; <= 0 = free
+  anchor: Entity | null
+  wx: number       // last resolved world-x (buffer space)
+  wy: number       // last resolved world-y (buffer space, already at head height)
+}
 
 // ── Lunge choreography (ported from the dev harness duel) ─────────────────────
 interface Lunge {
@@ -86,9 +129,11 @@ interface Lunge {
   t: number           // 0→1→0 triangle progress driver
   homeX: number       // buffer-tile home position
   homeY: number
-  targetX: number     // buffer-tile target (defender) position
+  targetX: number     // buffer-tile target (clamped to LUNGE_MAX from home)
   targetY: number
 }
+
+interface InputState { up: boolean; down: boolean; left: boolean; right: boolean }
 
 // ── Controller ───────────────────────────────────────────────────────────────
 
@@ -109,25 +154,62 @@ export class WorldSceneController {
     mobBeast: IndexedSprite
   } | null = null
 
+  // Spell/impact FX rigs (accent-channel only → palette id picks the school).
+  private burstRig!: IndexedSprite
+  private boltRig!: IndexedSprite
+  // In-flight projectiles; retired on arrival. Small list — splice on retirement
+  // is fine (events are infrequent, not per-entity-per-frame).
+  private bolts: { entity: Entity; fromX: number; fromY: number; toX: number; toY: number; t: number; palette: string }[] = []
+
   private ground: GroundBuffer | null = null
   private zone: string | null = null
   private tileset: IndexedSprite
+  private propSheet: IndexedSprite
+  /** Tall prop sprite per kind (Phase E), spawned as depth-sorted entities at nodes. */
+  private tallProps: Record<number, IndexedSprite>
+  /** Spawned tall-prop entities + the node each represents; retired on zone change. */
+  private propEntities: { entity: Entity; node: MapNode }[] = []
 
-  // Continuous (unwrapped) player position in game-tile space, advanced by the
-  // wrap-aware per-tick delta so camera motion is smooth across the 64-tile seam.
-  private displayX = 32
-  private displayY = 32
-  private prevPx = 32
-  private prevPy = 32
-  private velX = 0
-  private velY = 0
-
-  // Mob offset from the player (store snapshot); applied in renderFrame against
-  // the lerped player position so the mob stays glued to the player between ticks.
+  // The player entity's buffer position is the visual source of truth. In auto mode
+  // it sits at the zone-snap spot; in manual mode WASD drives it (clamped to the
+  // zone interior). The mob is glued to it via mobMapOffset (synced each sync()).
   private mobOffsetDx = 0
   private mobOffsetDy = 0
+  private mobEngaged = false
+  private showMob = false
+  private mobIsRanged = false
+  // Final engagement placement (buffer-tile offset from the player). While the mob
+  // closes from the map edge this tracks the store's shrinking offset; once it has
+  // arrived it is held at a fixed gap (MELEE_GAP_TILES / RANGED_GAP_TILES) along the
+  // captured approach direction so the mob never sits on the player's tile.
+  private mobPlacedDx = 0
+  private mobPlacedDy = 0
+  private mobApproachDx = Math.SQRT1_2
+  private mobApproachDy = Math.SQRT1_2
 
   private cam: Camera = { x: 0, y: 0, w: 0, h: 0 }
+
+  // Manual control + jump state. manualMode is true while any WASD key is held.
+  private input: InputState = { up: false, down: false, left: false, right: false }
+  private manualMode = false
+  private jumpActive = false
+  private jumpT = 0
+  // Last movement vector (for facing when auto-drift would otherwise leave it stale).
+  private lastFaceDx = 1
+  private lastFaceDy = 1
+
+  // Auto-follow target: the store's playerMapPos (wrapped into the buffer) plus a
+  // persistent offset. The offset absorbs manual-walk displacement and combat-freeze
+  // drift so auto-follow resumes from where the player actually is, not slingshotting
+  // back to the store's playerMapPos. The player entity lerps toward autoTx/autoTy
+  // each frame when not manual/engaged, so it walks and the camera-followed world
+  // scrolls past (the harness "followed player" patrol).
+  private storeMapX = 0
+  private storeMapY = 0
+  private autoOffsetDx = 0
+  private autoOffsetDy = 0
+  private autoTx = 0
+  private autoTy = 0
 
   private playerLunge: Lunge = { active: false, t: 0, homeX: 0, homeY: 0, targetX: 0, targetY: 0 }
   private mobLunge: Lunge = { active: false, t: 0, homeX: 0, homeY: 0, targetX: 0, targetY: 0 }
@@ -137,7 +219,6 @@ export class WorldSceneController {
   private mobBasePalette = 'team/enemy'
 
   private lastNodes: MapNode[] = []
-  private lastZoneId: string | null = null
 
   constructor(canvas: HTMLCanvasElement, floatersHost: HTMLElement) {
     this.canvas = canvas
@@ -145,6 +226,8 @@ export class WorldSceneController {
     this.ctx.imageSmoothingEnabled = false
     this.floatersHost = floatersHost
     this.tileset = makeTileset()
+    this.propSheet = makePropSheet()
+    this.tallProps = makePropEntities()
   }
 
   async init(): Promise<void> {
@@ -154,6 +237,8 @@ export class WorldSceneController {
     const mobHumanoid = await loadSpriteOrPlaceholder(`${scaffold}enemy1.json`, () => makeHumanoidRig('rig/mob-humanoid'))
     const mobBeast = await loadSpriteOrPlaceholder(`${scaffold}goblin.json`, () => makeBeastRig('rig/mob-beast'))
     this.rigs = { player, mobHumanoid, mobBeast }
+    this.burstRig = makeBurstRig('fx/burst')
+    this.boltRig = makeBoltRig('fx/bolt')
 
     this.player = this.scene.spawn(player, 'team/player', PAD + 32, PAD + 32)
     this.player.animator.set('idle')
@@ -168,39 +253,100 @@ export class WorldSceneController {
       el.className = 'il-floater'
       el.style.opacity = '0'
       this.floatersHost.appendChild(el)
-      pool.push({ el, t: 0, wx: 0, wy: 0 })
+      pool.push({ el, t: 0, anchor: null, wx: 0, wy: 0 })
     }
     return pool
   }
 
-  private spawnFloater(wx: number, wy: number, text: string, crit: boolean, color: string): void {
+  /** Spawn a floater anchored to `anchorEntity` (rises from its head). LRU: if the
+   *  pool is saturated, evict the entry with the least remaining time. */
+  private spawnFloater(anchorEntity: Entity, text: string, crit: boolean, color: string): void {
+    let slot = -1
+    let least = Infinity
     for (let i = 0; i < this.floaters.length; i++) {
       const f = this.floaters[i]
-      if (f.t <= 0) {
-        f.t = 1.1
-        f.wx = wx
-        f.wy = wy
-        f.el.textContent = text
-        f.el.style.color = color
-        f.el.className = crit ? 'il-floater il-crit' : 'il-floater'
-        return
-      }
+      if (f.t <= 0) { slot = i; break }      // free slot — take it
+      if (f.t < least) { least = f.t; slot = i } // else track oldest for LRU eviction
     }
+    if (slot < 0) return
+    const f = this.floaters[slot]
+    f.t = FLOATER_LIFE
+    f.anchor = anchorEntity
+    f.wx = anchorEntity.screenX
+    f.wy = anchorEntity.screenY - anchorEntity.sprite.frameH
+    f.el.textContent = text
+    f.el.style.color = color
+    f.el.className = crit ? 'il-floater il-crit' : 'il-floater'
+  }
+
+  // ── Keyboard input (forwarded by the host) ──────────────────────────────────
+  // WASD walks the player entity (manual override of position); Space jumps.
+  setKey(key: string, down: boolean): void {
+    const k = key.toLowerCase()
+    let handled = true
+    switch (k) {
+      case 'w': case 'arrowup': this.input.up = down; break
+      case 's': case 'arrowdown': this.input.down = down; break
+      case 'a': case 'arrowleft': this.input.left = down; break
+      case 'd': case 'arrowright': this.input.right = down; break
+      case ' ':
+        if (down && !this.jumpActive) this.jumpActive = true
+        break
+      default: handled = false
+    }
+    if (handled) {
+      this.manualMode = this.input.up || this.input.down || this.input.left || this.input.right
+    }
+  }
+
+  /** Release all movement keys (e.g. on window blur so the player doesn't walk off
+   *  while a key is physically held but the app lost focus). */
+  clearInput(): void {
+    this.input = { up: false, down: false, left: false, right: false }
+    this.manualMode = false
+  }
+
+  // ── Spell / impact FX (burst = one-shot ring, bolt = traveling orb) ──────────
+  // Raising an entity on screen by Δpx without horizontal shift: subtract the same
+  // amount from tx and ty — feetY depends on (tx+ty), feetX on (tx−ty), so this lifts
+  // the anchor straight up. 1 tile ≈ 16px, so RISE=1 puts a projectile at body mid.
+  private static readonly FX_RISE = 1
+
+  private spawnBurst(tx: number, ty: number, paletteId: string): void {
+    const e = this.scene.spawn(this.burstRig, paletteId, tx, ty)
+    e.animator.set('attack') // one-shot expanding ring
+    e.animator.restart()
+    e.shadow = false
+  }
+
+  private spawnBolt(fromX: number, fromY: number, toX: number, toY: number, paletteId: string): void {
+    const e = this.scene.spawn(this.boltRig, paletteId, fromX, fromY)
+    e.animator.set('idle') // looping pulse
+    e.shadow = false
+    this.bolts.push({ entity: e, fromX, fromY, toX, toY, t: 0, palette: paletteId })
+  }
+
+  // Classify a floating-number event → the right visual. The store's FN feed is the
+  // only combat signal we get; we branch on its existing flags/color so no game-data
+  // changes are needed. DoT ticks no longer trigger a melee lunge (they used to).
+  handleFloatingNumber(fn: FloatingNumber): void {
+    if (fn.isMobDamage) { this.triggerMobAttack(fn); return }
+    if (fn.isDoT) { this.triggerDotTick(fn); return }
+    if (fn.color === SHADOW_BOLT_COLOR) { this.triggerShadowBolt(fn); return }
+    this.triggerPlayerAttack(fn)
   }
 
   // ── Wrap helpers ───────────────────────────────────────────────────────────
 
-  private static wrapDiff(next: number, prev: number): number {
-    // Full wrap to [-MAP_SIZE/2, MAP_SIZE/2). displayX is continuous (unbounded),
-    // so a single ±MAP_SIZE step is not enough after long play.
-    let d = next - prev
+  private static wrapMod(v: number): number {
+    return ((v % MAP_SIZE) + MAP_SIZE) % MAP_SIZE
+  }
+
+  private static wrapDiff(a: number, b: number): number {
+    let d = a - b
     d = ((d % MAP_SIZE) + MAP_SIZE) % MAP_SIZE
     if (d > MAP_SIZE / 2) d -= MAP_SIZE
     return d
-  }
-
-  private static wrapMod(v: number): number {
-    return ((v % MAP_SIZE) + MAP_SIZE) % MAP_SIZE
   }
 
   // ── Read-only state sync (called by the host on store change) ──────────────
@@ -208,118 +354,107 @@ export class WorldSceneController {
   sync(state: GameState): void {
     if (!this.rigs) return
 
-    // Zone change → rebake ground, reset display to the zone's player pos.
+    // Zone change → rebake ground, snap the player into the new zone's player tile.
     if (state.currentZone !== this.zone) {
+      // Retire the previous zone's tall-prop entities first (even if the new zone's
+      // map isn't ready yet, so stale props never linger).
+      this.retirePropEntities()
       const zm = state.zoneMaps[state.currentZone]
       if (zm) {
+        const palId = biomePaletteId(state.currentZone)
         this.ground = bakeGround(
           zoneMapToTileMap(zm), this.tileset,
-          biomePaletteId(state.currentZone), getPalette(biomePaletteId(state.currentZone)),
+          palId, getPalette(palId),
+          TILE_ANIMS, this.propSheet,
         )
         this.zone = state.currentZone
-        this.lastZoneId = state.currentZone
         this.lastNodes = zm.nodes
-        this.displayX = state.playerMapPos.x
-        this.displayY = state.playerMapPos.y
-        this.prevPx = state.playerMapPos.x
-        this.prevPy = state.playerMapPos.y
-        // Snap the player into the new zone's buffer (no lerp across a zone swap).
-        this.player.tx = PAD + WorldSceneController.wrapMod(this.displayX)
-        this.player.ty = PAD + WorldSceneController.wrapMod(this.displayY)
+        this.player.tx = PAD + WorldSceneController.wrapMod(state.playerMapPos.x)
+        this.player.ty = PAD + WorldSceneController.wrapMod(state.playerMapPos.y)
+        // Cancel any in-flight manual movement/jump across the zone swap.
+        this.manualMode = false
+        this.jumpActive = false
+        this.jumpT = 0
+        this.input = { up: false, down: false, left: false, right: false }
+        // Player snapped to the new zone's playerMapPos — clear the visual offset.
+        this.autoOffsetDx = 0
+        this.autoOffsetDy = 0
+        // Spawn tall-prop entities at each node (Phase E) — depth-sorted with units,
+        // replacing the old flat glyph overlay. Tinted with the biome palette.
+        this.spawnPropEntities(zm.nodes, palId)
       }
     }
 
     if (!this.ground) return
 
-    // Advance continuous display position by the wrap-aware per-tick delta.
-    const dx = WorldSceneController.wrapDiff(state.playerMapPos.x, this.prevPx)
-    const dy = WorldSceneController.wrapDiff(state.playerMapPos.y, this.prevPy)
-    this.displayX += dx
-    this.displayY += dy
-    this.prevPx = state.playerMapPos.x
-    this.prevPy = state.playerMapPos.y
-    // Velocity (for walk facing) — smoothed lightly.
-    this.velX = this.velX * 0.6 + dx * 0.4
-    this.velY = this.velY * 0.6 + dy * 0.4
-
-    const pbx = PAD + WorldSceneController.wrapMod(this.displayX)
-    const pby = PAD + WorldSceneController.wrapMod(this.displayY)
-    // (Player position is lerped toward (pbx,pby) in renderFrame; the snap-on-wrap
-    //  there is invisible because the padded buffer shows identical content around
-    //  both sides of the seam.)
+    // Auto-follow target = store's map position (wrapped) + the persistent visual
+    // offset. Updated every sync so combat drift / travel / gathering all drive the
+    // walk, while manual-walk displacement and combat-freeze drift are absorbed into
+    // the offset (synced in renderFrame) so there's no slingshot back to playerMapPos.
+    this.storeMapX = WorldSceneController.wrapMod(state.playerMapPos.x)
+    this.storeMapY = WorldSceneController.wrapMod(state.playerMapPos.y)
+    this.autoTx = PAD + WorldSceneController.wrapMod(this.storeMapX + this.autoOffsetDx)
+    this.autoTy = PAD + WorldSceneController.wrapMod(this.storeMapY + this.autoOffsetDy)
 
     // Player palette: race + best-equipment rarity accent.
     this.playerBasePalette = playerPaletteId(state.playerRace, bestEquipmentRarity(state))
     if (this.playerFlashT <= 0) this.player.paletteId = this.playerBasePalette
 
-    // Player animation: walk while alive & drifting; idle when dead or still.
-    const drifting = Math.abs(this.velX) + Math.abs(this.velY) > 0.0001
-    if (!state.isAlive) {
-      this.player.animator.set('idle')
-    } else if (this.player.animator.anim !== 'attack' && this.player.animator.anim !== 'hit') {
-      this.player.animator.set(drifting ? 'walk' : 'idle')
-    }
+    // Mob presence + approach offset (the store shrinks mobMapOffset toward 0).
+    this.showMob = !!state.currentMob && state.gameMode === 'combat'
+    this.mobOffsetDx = state.mobMapOffset.dx
+    this.mobOffsetDy = state.mobMapOffset.dy
+    this.mobEngaged = Math.hypot(this.mobOffsetDx, this.mobOffsetDy) < ENGAGE_DIST
 
-    // Mob entity: present only in combat with a currentMob.
-    const showMob = !!state.currentMob && state.gameMode === 'combat'
-    if (showMob && state.currentMob) {
+    if (this.showMob && state.currentMob) {
       const mob = state.currentMob
+      this.mobIsRanged = isRangedMob(mob)
+      // Engagement placement: follow the store offset while the mob is still closing
+      // (remembering its approach direction), then hold a fixed diagonal gap so it
+      // never parks on the player. The radial hold is continuous with the approach
+      // (the store shrinks along the same ray), so there is no snap on arrival.
+      const gapTiles = this.mobIsRanged ? RANGED_GAP_TILES : MELEE_GAP_TILES
+      const gapMag = Math.SQRT2 * gapTiles
+      const offDist = Math.hypot(this.mobOffsetDx, this.mobOffsetDy)
+      if (offDist > gapMag) {
+        this.mobApproachDx = this.mobOffsetDx / offDist
+        this.mobApproachDy = this.mobOffsetDy / offDist
+        this.mobPlacedDx = this.mobOffsetDx
+        this.mobPlacedDy = this.mobOffsetDy
+      } else {
+        this.mobPlacedDx = this.mobApproachDx * gapMag
+        this.mobPlacedDy = this.mobApproachDy * gapMag
+      }
+
       const wantBeast = isBeastMob(mob)
       if (!this.mob) {
         this.mob = this.scene.spawn(
           wantBeast ? this.rigs.mobBeast : this.rigs.mobHumanoid,
-          mobPaletteId(mob), pbx + state.mobMapOffset.dx, pby + state.mobMapOffset.dy,
+          mobPaletteId(mob), this.player.tx + this.mobPlacedDx, this.player.ty + this.mobPlacedDy,
         )
         this.mobRigIsBeast = wantBeast
-      } else {
+      } else if (wantBeast !== this.mobRigIsBeast) {
         // Swap rig if the kind changed (rare; keeps the pool entity but re-spawns).
-        if (wantBeast !== this.mobRigIsBeast) {
-          this.mob.active = false
-          this.mob = this.scene.spawn(
-            wantBeast ? this.rigs.mobBeast : this.rigs.mobHumanoid,
-            mobPaletteId(mob), pbx + state.mobMapOffset.dx, pby + state.mobMapOffset.dy,
-          )
-          this.mobRigIsBeast = wantBeast
-        }
+        this.mob.active = false
+        this.mob = this.scene.spawn(
+          wantBeast ? this.rigs.mobBeast : this.rigs.mobHumanoid,
+          mobPaletteId(mob), this.player.tx + this.mobPlacedDx, this.player.ty + this.mobPlacedDy,
+        )
+        this.mobRigIsBeast = wantBeast
       }
       if (this.mob) {
         this.mobBasePalette = mobPaletteId(mob)
         if (this.mobFlashT <= 0) this.mob.paletteId = this.mobBasePalette
-        const mbx = pbx + state.mobMapOffset.dx
-        const mby = pby + state.mobMapOffset.dy
-        if (!this.mobLunge.active) {
-          this.mob.tx = mbx
-          this.mob.ty = mby
-        }
-        const mobDist = Math.hypot(state.mobMapOffset.dx, state.mobMapOffset.dy)
-        const approaching = mobDist > 1.5
-        // Face each other while engaged; mob walks while approaching.
-        if (!approaching) {
-          this.faceToward(this.player, this.mob.tx, this.mob.ty)
-          this.faceToward(this.mob, this.player.tx, this.player.ty)
-          if (this.mob.animator.anim !== 'attack' && this.mob.animator.anim !== 'hit') {
-            this.mob.animator.set('idle')
-          }
-        } else {
-          this.faceToward(this.mob, this.player.tx, this.player.ty)
-          if (this.mob.animator.anim !== 'attack' && this.mob.animator.anim !== 'hit') {
-            this.mob.animator.set('walk')
-          }
-        }
       }
     } else if (this.mob) {
       this.mob.active = false
       this.mob = null
       this.mobLunge.active = false
       this.mobFlashT = 0
-    }
-
-    // Walk facing when drifting & not in an attack/hit anim.
-    if (
-      state.isAlive && drifting &&
-      this.player.animator.anim !== 'attack' && this.player.animator.anim !== 'hit'
-    ) {
-      this.faceToward(this.player, this.player.tx + this.velX, this.player.ty + this.velY)
+      this.mobPlacedDx = 0
+      this.mobPlacedDy = 0
+      this.mobApproachDx = Math.SQRT1_2
+      this.mobApproachDy = Math.SQRT1_2
     }
   }
 
@@ -333,19 +468,34 @@ export class WorldSceneController {
     else if (dx < 0 && dy >= 0) f = 'sw'
     else f = 'nw'
     e.animator.face(f)
+    // The base sheets face screen-left unmirrored, so flip when the target is to
+    // screen-right. feetX = (tx-ty)*HALF_W, so screen-right is (dx-dy) >= 0. This
+    // makes two profile fighters face each other; pure north/south keep the front/
+    // back sheet (orientation unchanged), and the flip only happens as a target
+    // crosses the screen-vertical axis — i.e. when the unit should actually turn.
+    e.animator.mirror = (dx - dy) >= 0
   }
 
   // ── Combat-event triggers (called from the host's floatingNumbers effect) ───
+  // All lunges are clamped to LUNGE_MAX from the attacker's home so a far anchor
+  // can never produce a screen-spanning slingshot.
+
+  private beginLunge(l: Lunge, e: Entity, targetEntity: Entity): void {
+    let ddx = targetEntity.tx - e.tx
+    let ddy = targetEntity.ty - e.ty
+    const dl = Math.hypot(ddx, ddy)
+    if (dl > LUNGE_MAX) { ddx = ddx / dl * LUNGE_MAX; ddy = ddy / dl * LUNGE_MAX }
+    l.active = true
+    l.t = 0
+    l.homeX = e.tx
+    l.homeY = e.ty
+    l.targetX = e.tx + ddx
+    l.targetY = e.ty + ddy
+  }
 
   triggerPlayerAttack(fn: FloatingNumber): void {
     if (!this.mob || !this.ground) return
-    // Attacker lunge toward the mob (swing-through).
-    this.playerLunge.active = true
-    this.playerLunge.t = 0
-    this.playerLunge.homeX = this.player.tx
-    this.playerLunge.homeY = this.player.ty
-    this.playerLunge.targetX = this.mob.tx
-    this.playerLunge.targetY = this.mob.ty
+    this.beginLunge(this.playerLunge, this.player, this.mob)
     this.player.animator.set('attack')
     this.player.animator.restart()
     this.faceToward(this.player, this.mob.tx, this.mob.ty)
@@ -354,31 +504,58 @@ export class WorldSceneController {
     this.mob.paletteId = 'fx/hitflash'
     this.mob.animator.set('hit')
     this.mob.animator.restart()
+    if (fn.isCrit) this.spawnBurst(this.mob.tx, this.mob.ty, 'spell/holy')
     this.spawnFloater(
-      this.mob.screenX, this.mob.screenY - this.mob.sprite.frameH,
-      `${fn.value}${fn.isCrit ? '!' : ''}`, fn.isCrit, fn.color ?? (fn.isCrit ? '#ffcc00' : '#88bbff'),
+      this.mob, `${fn.value}${fn.isCrit ? '!' : ''}`, fn.isCrit,
+      fn.color ?? (fn.isCrit ? '#ffcc00' : '#88bbff'),
     )
+  }
+
+  triggerShadowBolt(fn: FloatingNumber): void {
+    if (!this.mob || !this.ground) return
+    // Cast recoil — a small back-step + swing pose, not a full melee lunge.
+    this.player.animator.set('attack')
+    this.player.animator.restart()
+    this.faceToward(this.player, this.mob.tx, this.mob.ty)
+    const r = WorldSceneController.FX_RISE
+    this.spawnBolt(
+      this.player.tx - r, this.player.ty - r,
+      this.mob.tx - r, this.mob.ty - r,
+      'spell/shadow',
+    )
+    this.spawnFloater(this.mob, `${fn.value}!`, true, fn.color ?? SHADOW_BOLT_COLOR)
+  }
+
+  triggerDotTick(fn: FloatingNumber): void {
+    if (!this.mob || !this.ground) return
+    // Ongoing affliction: a small recurrent pulse on the mob, no attacker lunge.
+    this.spawnBurst(this.mob.tx, this.mob.ty, 'spell/shadow')
+    this.spawnFloater(this.mob, `${fn.value}`, false, fn.color ?? '#aa88ff')
   }
 
   triggerMobAttack(fn: FloatingNumber): void {
     if (!this.mob || !this.ground) return
-    this.mobLunge.active = true
-    this.mobLunge.t = 0
-    this.mobLunge.homeX = this.mob.tx
-    this.mobLunge.homeY = this.mob.ty
-    this.mobLunge.targetX = this.player.tx
-    this.mobLunge.targetY = this.player.ty
-    this.mob.animator.set('attack')
-    this.mob.animator.restart()
     this.faceToward(this.mob, this.player.tx, this.player.ty)
+    if (this.mobIsRanged) {
+      // Ranged: stand-off cast — a traveling bolt instead of a melee lunge.
+      this.mob.animator.set('attack')
+      this.mob.animator.restart()
+      const r = WorldSceneController.FX_RISE
+      this.spawnBolt(
+        this.mob.tx - r, this.mob.ty - r,
+        this.player.tx - r, this.player.ty - r,
+        'spell/shadow',
+      )
+    } else {
+      this.beginLunge(this.mobLunge, this.mob, this.player)
+      this.mob.animator.set('attack')
+      this.mob.animator.restart()
+    }
     this.playerFlashT = 0.13
     this.player.paletteId = 'fx/hitflash'
     this.player.animator.set('hit')
     this.player.animator.restart()
-    this.spawnFloater(
-      this.player.screenX, this.player.screenY - this.player.sprite.frameH,
-      `-${fn.value}`, false, '#ff6666',
-    )
+    this.spawnFloater(this.player, `-${fn.value}`, false, '#ff6666')
   }
 
   // ── Frame loop ─────────────────────────────────────────────────────────────
@@ -413,24 +590,115 @@ export class WorldSceneController {
       if (this.mobFlashT <= 0 && this.mob) this.mob.paletteId = this.mobBasePalette
     }
 
-    // Animator returns to idle when a non-loop anim finishes.
+    // ── Player movement (manual WASD, else auto-follow the store's map pos) + jump ──
+    let moving = false
+    let mvx = 0, mvy = 0
+    if (this.manualMode) {
+      let dx = 0, dy = 0
+      if (this.input.up) { dx -= 1; dy -= 1 }
+      if (this.input.down) { dx += 1; dy += 1 }
+      if (this.input.left) { dx -= 1; dy += 1 }
+      if (this.input.right) { dx += 1; dy -= 1 }
+      const len = Math.hypot(dx, dy)
+      if (len > 0) {
+        dx /= len; dy /= len
+        this.player.tx = clamp(this.player.tx + dx * MANUAL_SPEED * dt, PAD + 1, PAD + MAP_SIZE - 1)
+        this.player.ty = clamp(this.player.ty + dy * MANUAL_SPEED * dt, PAD + 1, PAD + MAP_SIZE - 1)
+        moving = true; mvx = dx; mvy = dy
+      }
+    } else if (!this.playerLunge.active && !this.mobEngaged) {
+      // Auto: torus-aware lerp toward the store's playerMapPos (plus offset) so the
+      // player walks and the camera-followed world scrolls past. Frozen while a mob
+      // is engaged (stand and fight) or mid-attack-lunge.
+      const a = this.approachAuto(dt)
+      moving = a.moving; mvx = a.mvx; mvy = a.mvy
+    } else {
+      // Frozen (mid-lunge or in melee): pin the auto target to the entity by
+      // absorbing the store's drift into the offset, so resuming auto-follow
+      // continues from here instead of yanking the player forward on disengage.
+      this.syncOffset()
+    }
+    if (this.manualMode) this.syncOffset()
+
+    // Jump arc (independent of horizontal movement). sin(πt) lifts and lands softly.
+    if (this.jumpActive) {
+      this.jumpT += dt / JUMP_DURATION
+      if (this.jumpT >= 1) { this.jumpT = 0; this.jumpActive = false; this.player.z = 0 }
+      else this.player.z = Math.sin(this.jumpT * Math.PI) * JUMP_HEIGHT
+    } else {
+      this.player.z = 0
+    }
+
+    // ── Player animation + facing ──
+    const pAnim = this.player.animator.anim
+    const inCombatAnim = pAnim === 'attack' || pAnim === 'hit'
     if (this.player.animator.finished && this.playerLunge.t >= 1) this.player.animator.set('idle')
-    if (this.mob && this.mob.animator.finished && this.mobLunge.t >= 1) this.mob.animator.set('idle')
+    if (this.mob && this.mobEngaged && !this.playerLunge.active) {
+      // Engaged: face the mob, idle between swings (attack/hit are set by triggers).
+      this.faceToward(this.player, this.mob.tx, this.mob.ty)
+      if (!inCombatAnim) this.player.animator.set('idle')
+    } else if (moving) {
+      this.lastFaceDx = mvx; this.lastFaceDy = mvy
+      this.faceToward(this.player, this.player.tx + mvx, this.player.ty + mvy)
+      if (!inCombatAnim) this.player.animator.set('walk')
+    } else if (!inCombatAnim) {
+      this.player.animator.set('idle')
+    }
+
+    // ── Mob placement (glued to the player) + animation + facing ──
+    if (this.mob) {
+      if (!this.mobLunge.active) {
+        this.mob.tx = this.player.tx + this.mobPlacedDx
+        this.mob.ty = this.player.ty + this.mobPlacedDy
+      }
+      const mAnim = this.mob.animator.anim
+      const mobInCombat = mAnim === 'attack' || mAnim === 'hit'
+      if (this.mob.animator.finished && this.mobLunge.t >= 1) this.mob.animator.set('idle')
+      this.faceToward(this.mob, this.player.tx, this.player.ty)
+      if (!mobInCombat) this.mob.animator.set(this.mobEngaged ? 'idle' : 'walk')
+    }
 
     this.scene.update(dt)
 
-    // Camera centered on the player's feet (no clamp — padded ground fills edges).
+    // Advance traveling bolts → burst at the target on arrival, then retire.
+    if (this.bolts.length) {
+      for (let i = this.bolts.length - 1; i >= 0; i--) {
+        const b = this.bolts[i]
+        b.t += dt * 5.5 // ~0.18s flight
+        if (b.t >= 1) {
+          b.entity.active = false
+          this.spawnBurst(b.toX, b.toY, b.palette)
+          this.bolts.splice(i, 1)
+        } else {
+          b.entity.tx = b.fromX + (b.toX - b.fromX) * b.t
+          b.entity.ty = b.fromY + (b.toY - b.fromY) * b.t
+        }
+      }
+    }
+    // Retire one-shot bursts once their anim finishes (free the pool slot).
+    const es = this.scene.entities
+    for (let i = 0; i < es.length; i++) {
+      const e = es[i]
+      if (e.active && e.sprite === this.burstRig && e.animator.finished) e.active = false
+    }
+
+    // Camera centered on the player's feet (height-aware → follows up hills).
     this.cam.x = feetX(g, this.player.tx, this.player.ty) - this.cam.w / 2
     this.cam.y = feetY(g, this.player.tx, this.player.ty) - this.cam.h / 2
 
-    this.scene.render(this.ctx, this.cam, g)
+    // Pin tall-prop entities to the wrapped copy nearest the player before the sort
+    // so they depth-correct against the player/mob as the player moves (Phase E).
+    this.updatePropEntities()
 
-    // Node markers (ore/herb/boss_lair/mob_spawn) near the player.
+    this.scene.render(this.ctx, this.cam, g, dt)
+
+    // Fallback glyphs for any node type without a tall-prop sprite (Phase E: the
+    // mapped node types — ore/herb/boss_lair/mob_spawn — are now depth-sorted props).
     this.drawNodes(g)
 
-    // Player chevron — gold marker above the followed unit.
+    // Player chevron — gold marker above the followed unit (rides above the jump).
     const px = Math.round(this.player.screenX - this.cam.x)
-    const py = Math.round(this.player.screenY - this.cam.y - this.player.sprite.frameH - 6)
+    const py = Math.round(this.player.screenY - this.cam.y - this.player.sprite.frameH - 6 - this.player.z)
     this.ctx.fillStyle = '#f4c84a'
     this.ctx.beginPath()
     this.ctx.moveTo(px - 4, py)
@@ -441,6 +709,32 @@ export class WorldSceneController {
 
     // Floaters (DOM pool).
     this.updateFloaters(dt)
+  }
+
+  /** Torus-aware exponential approach toward the store's playerMapPos (autoTx/autoTy).
+   *  Returns the unit movement vector so the caller can drive the walk animation and
+   *  facing. wrapDiff gives the shortest signed delta across the 64-tile torus, and
+   *  wrapMod re-anchors the entity into the buffer interior — the wrapped ground
+   *  buffer makes that re-anchor visually seamless (same game tile on both sides). */
+  private approachAuto(dt: number): { moving: boolean; mvx: number; mvy: number } {
+    const ddx = WorldSceneController.wrapDiff(this.autoTx - PAD, this.player.tx - PAD)
+    const ddy = WorldSceneController.wrapDiff(this.autoTy - PAD, this.player.ty - PAD)
+    const dist = Math.hypot(ddx, ddy)
+    if (dist < 0.02) return { moving: false, mvx: 0, mvy: 0 }
+    const step = 1 - Math.exp(-AUTO_LERP_K * dt)
+    this.player.tx = PAD + WorldSceneController.wrapMod(this.player.tx - PAD + ddx * step)
+    this.player.ty = PAD + WorldSceneController.wrapMod(this.player.ty - PAD + ddy * step)
+    return { moving: true, mvx: ddx / dist, mvy: ddy / dist }
+  }
+
+  /** Recompute the visual offset = entity − store map pos (shortest toroidal delta).
+   *  Called while the player is manual-controlled or frozen (engaged / mid-lunge) so
+   *  the auto-follow target stays pinned to the entity; NOT called during auto-drive
+   *  (that would cancel the very movement we want). Keeps auto from slingshotting
+   *  back to the store's playerMapPos when manual override or combat ends. */
+  private syncOffset(): void {
+    this.autoOffsetDx = WorldSceneController.wrapDiff(this.player.tx - PAD, this.storeMapX)
+    this.autoOffsetDy = WorldSceneController.wrapDiff(this.player.ty - PAD, this.storeMapY)
   }
 
   private advanceLunge(l: Lunge, e: Entity, dt: number): void {
@@ -457,21 +751,69 @@ export class WorldSceneController {
     }
   }
 
+  // ── Tall-prop entity lifecycle (Phase E) ──────────────────────────────────────
+
+  private nodeTallProp(type: MapNode['type']): IndexedSprite | null {
+    switch (type) {
+      case 'ore': return this.tallProps[TALL_PROP.ORE_OUTCROP]
+      case 'herb': return this.tallProps[TALL_PROP.HERB_BUSH]
+      case 'boss_lair': return this.tallProps[TALL_PROP.LAIR]
+      case 'mob_spawn': return this.tallProps[TALL_PROP.CAIRN]
+      default: return null
+    }
+  }
+
+  private retirePropEntities(): void {
+    for (const pe of this.propEntities) pe.entity.active = false
+    this.propEntities = []
+  }
+
+  private spawnPropEntities(nodes: MapNode[], palId: string): void {
+    for (const node of nodes) {
+      const sprite = this.nodeTallProp(node.type)
+      if (!sprite) continue // unmapped types fall back to the drawNodes glyph
+      // Spawn at PAD + wrapped game coord; updatePropEntities re-pins to the near
+      // copy each frame so props wrap correctly as the player moves.
+      const e = this.scene.spawn(
+        sprite, palId,
+        PAD + WorldSceneController.wrapMod(node.x),
+        PAD + WorldSceneController.wrapMod(node.y),
+      )
+      e.shadow = false
+      e.animator.set('idle')
+      this.propEntities.push({ entity: e, node })
+    }
+  }
+
+  private updatePropEntities(): void {
+    if (!this.propEntities.length) return
+    const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
+    const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
+    for (const pe of this.propEntities) {
+      // Pin to the wrapped copy nearest the player so the prop is always on the
+      // visible side of the torus (mirrors drawNodes' wrapDiff logic).
+      pe.entity.tx = this.player.tx + WorldSceneController.wrapDiff(pe.node.x, pgx)
+      pe.entity.ty = this.player.ty + WorldSceneController.wrapDiff(pe.node.y, pgy)
+    }
+  }
+
+  /** Fallback glyph overlay for node types without a tall-prop sprite (Phase E: the
+   *  mapped types are now depth-sorted entities, so this draws nothing for them). */
   private drawNodes(g: GroundBuffer): void {
     if (!this.lastNodes.length) return
-    const pbx = PAD + WorldSceneController.wrapMod(this.displayX)
-    const pby = PAD + WorldSceneController.wrapMod(this.displayY)
+    const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
+    const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
     const ctx = this.ctx
     for (const node of this.lastNodes) {
-      const lx = WorldSceneController.wrapDiff(node.x, this.displayX)
-      const ly = WorldSceneController.wrapDiff(node.y, this.displayY)
+      if (this.nodeTallProp(node.type)) continue // rendered as a prop entity
+      const lx = WorldSceneController.wrapDiff(node.x, pgx)
+      const ly = WorldSceneController.wrapDiff(node.y, pgy)
       if (Math.abs(lx) > 6 || Math.abs(ly) > 6) continue
-      const bx = pbx + lx
-      const by = pby + ly
+      const bx = this.player.tx + lx
+      const by = this.player.ty + ly
       const sx = Math.round(feetX(g, bx, by) - this.cam.x)
       const sy = Math.round(feetY(g, bx, by) - this.cam.y - 14)
       if (sx < -20 || sx > this.cam.w + 20 || sy < -20 || sy > this.cam.h + 20) continue
-      // Small diamond marker in the node's color.
       ctx.fillStyle = node.color
       ctx.globalAlpha = 0.92
       ctx.beginPath()
@@ -482,7 +824,6 @@ export class WorldSceneController {
       ctx.closePath()
       ctx.fill()
       ctx.globalAlpha = 1
-      // Glyph above.
       ctx.font = '7px ui-monospace, monospace'
       ctx.fillStyle = '#fff'
       ctx.textAlign = 'center'
@@ -498,10 +839,22 @@ export class WorldSceneController {
       f.t -= dt
       if (f.t <= 0) {
         f.el.style.opacity = '0'
+        f.el.textContent = ''
+        f.anchor = null
         continue
       }
-      const rise = (1.1 - f.t) * 26
-      const op = f.t < 0.3 ? f.t / 0.3 : 1
+      // Follow the anchor while it's alive; otherwise hold the last world spot.
+      if (f.anchor && f.anchor.active) {
+        f.wx = f.anchor.screenX
+        f.wy = f.anchor.screenY - f.anchor.sprite.frameH
+      }
+      const life = FLOATER_LIFE
+      const p = 1 - f.t / life           // 0→1 over the floater's life
+      const rise = p * 22                // gentle upward drift
+      // Quick rise-in, hold, then ease-out fade over the last ~45%.
+      let op: number
+      if (f.t > life * 0.55) op = 1
+      else op = (f.t / (life * 0.55)) ** 1.3
       f.el.style.opacity = String(op)
       f.el.style.transform =
         `translate(${(f.wx - this.cam.x) * CSS_SCALE}px, ${(f.wy - this.cam.y - rise) * CSS_SCALE}px)`

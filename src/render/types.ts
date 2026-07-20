@@ -52,4 +52,36 @@ export interface TileMapData {
   w: number
   h: number
   tiles: Uint8Array // frame index into the tileset sprite, row-major
+  /** Per-tile elevation (0..MAX_ELEV), same shape as `tiles`. Optional → flat. */
+  heights?: Uint8Array
+  /** Flat ground-clutter props in BUFFER-tile coords (Phase D), built by the adapter
+   *  from ZoneMap.props (game coords) so they wrap with the padded border. Stamped
+   *  interleaved in bakeGround's painter loop. Optional → no clutter. */
+  props?: { bx: number; by: number; artId: number }[]
+}
+
+/**
+ * A tile animation cycle (environment-plan Phase B). A cell whose baked frame is in
+ * `frames` reblits through that list every `dur` seconds — the FFTA VRAM-slot-swap
+ * behavior re-implemented as per-cell drawImage over the static ground blit. Cell-based
+ * (not slot-based) because our bake is per-cell. Defined where the tileset is authored
+ * (placeholderArt `TILE_ANIMS`) and handed to `bakeGround`.
+ */
+export interface TileAnimCycle {
+  frames: number[]
+  dur: number
+}
+
+/**
+ * A resolved animated ground cell on a baked `GroundBuffer`: the buffer-space rect to
+ * reblit, the frame cycle, and the frame duration. Precomputed at bake time so the
+ * per-frame reblit is a single `drawImage` with no projection math.
+ */
+export interface GroundAnim {
+  /** Buffer-space left edge of the cell's frame. */
+  dx: number
+  /** Buffer-space top edge of the cell's frame (height-aware, same as the bake). */
+  dy: number
+  frames: number[]
+  dur: number
 }

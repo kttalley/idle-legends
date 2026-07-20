@@ -8,7 +8,7 @@
 import { bakedSheetCount } from '../palette'
 import { getPalette } from '../palettes'
 import { loadSpriteOrPlaceholder } from '../indexedSprite'
-import { makeBeastRig, makeHumanoidRig, makeTileset, TILE } from '../placeholderArt'
+import { makeBeastRig, makeHumanoidRig, makeTileset, makePropSheet, TILE, TILE_ANIMS, PROP } from '../placeholderArt'
 import { bakeGround, feetX, feetY, type GroundBuffer } from '../tilemap'
 import { Scene, type Camera, type Entity } from '../scene'
 import type { Facing, TileMapData } from '../types'
@@ -43,7 +43,19 @@ function buildMap(): TileMapData {
       }
     }
   }
-  return { w: MAP_W, h: MAP_H, tiles }
+  // Scatter flat props on land tiles (Phase D) so the harness previews clutter.
+  const kinds = [PROP.TUFT, PROP.FLOWER, PROP.PEBBLE, PROP.MUSHROOM, PROP.TUFT]
+  const props: { bx: number; by: number; artId: number }[] = []
+  for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      const t = tiles[y * MAP_W + x]
+      if (t === TILE.WATER || t === TILE.CLIFF) continue
+      if (hash2(x + 7, y + 3) < 160) {
+        props.push({ bx: x, by: y, artId: kinds[hash2(x + 51, y - 11) % kinds.length] })
+      }
+    }
+  }
+  return { w: MAP_W, h: MAP_H, tiles, props }
 }
 
 function withAltWater(map: TileMapData): TileMapData {
@@ -51,7 +63,7 @@ function withAltWater(map: TileMapData): TileMapData {
   for (let i = 0; i < tiles.length; i++) {
     if (tiles[i] === TILE.WATER) tiles[i] = TILE.WATER_ALT
   }
-  return { w: map.w, h: map.h, tiles }
+  return { w: map.w, h: map.h, tiles, props: map.props }
 }
 
 // ── Damage floater pool (DOM, fixed size, zero per-frame allocation) ─────────
@@ -129,6 +141,7 @@ async function main(): Promise<void> {
   const redcapRig = await loadSpriteOrPlaceholder(`${scaffold}redcap.json`, () => makeBeastRig('rig/redcap'))
   const bombRig = await loadSpriteOrPlaceholder(`${scaffold}bomb.json`, () => makeBeastRig('rig/bomb'))
   const tileset = makeTileset()
+  const propSheet = makePropSheet()
   document.getElementById('artpath')!.textContent =
     heroRig.id.startsWith('rig/') ? 'art: programmatic placeholders' : 'art: ffta scaffold (local-only)'
 
@@ -147,7 +160,8 @@ async function main(): Promise<void> {
       cctx.imageSmoothingEnabled = false
       cctx.drawImage(img, 0, 0, c.width, c.height)
       // Origin tuned so the demo choreography (tiles ~20–44) lands on the map's ground.
-      return { canvas: c, originX: 520, planeOffsetY: 170, width: c.width, height: c.height }
+      return { canvas: c, originX: 520, planeOffsetY: 170, width: c.width, height: c.height, heights: null, bw: 0,
+               sheet: null, sheetCols: 0, sheetFrameW: 0, sheetFrameH: 0, anims: [], elapsed: 0 }
     } catch {
       return null
     }
@@ -155,8 +169,10 @@ async function main(): Promise<void> {
 
   const scaffoldGround = await loadScaffoldGround(`${scaffold}map1.png`)
   const map = buildMap()
-  const groundA = scaffoldGround ?? bakeGround(map, tileset, 'biome/meadow', getPalette('biome/meadow'))
-  const groundB = scaffoldGround ?? bakeGround(withAltWater(map), tileset, 'biome/meadow', getPalette('biome/meadow'))
+  // groundA animates water (2↔3); groundB stays a static WATER_ALT preview (the alt
+  // frame alone), so the two panes contrast live shimmer vs. the second frame.
+  const groundA = scaffoldGround ?? bakeGround(map, tileset, 'biome/meadow', getPalette('biome/meadow'), TILE_ANIMS, propSheet)
+  const groundB = scaffoldGround ?? bakeGround(withAltWater(map), tileset, 'biome/meadow', getPalette('biome/meadow'), undefined, propSheet)
 
   const scene = new Scene()
   const floaters = makeFloaters()
@@ -320,7 +336,7 @@ async function main(): Promise<void> {
     cam.y = Math.max(0, Math.min(ground.height - vh, feetY(ground, player.tx, player.ty) - vh / 2))
 
     scene.update(dt)
-    scene.render(ctx, cam, ground)
+    scene.render(ctx, cam, ground, dt)
 
     // ── player marker: gold chevron above the followed unit ──
     const px = Math.round(player.screenX - cam.x)

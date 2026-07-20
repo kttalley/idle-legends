@@ -176,6 +176,17 @@ body {
     transition: color 0.1s;
   }
   .app-drawer-close:hover { color: #ffd700; border-color: #6b5020; }
+
+  /* Pin the ability bar above the FAB bar so it's always visible/tappable on
+     mobile — the flex:1 world scene can squeeze a flow-positioned bar on short
+     viewports, and the FAB bar (z-index 60) would otherwise cover it. */
+  .skill-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 56px;
+    z-index: 55;
+  }
 }
 
 /* ── FAB buttons ─────────────────────────────────────────────────────────────── */

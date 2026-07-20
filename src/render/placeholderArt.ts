@@ -3,7 +3,7 @@
 // gitignored FFTA scaffold and later gen-AI/hand-drawn art replace it file-by-file with
 // zero code changes. Slot usage follows the semantic contract (graphics-spec §5.1).
 
-import type { AnimationSet, IndexedSprite } from './types'
+import type { AnimationSet, IndexedSprite, TileAnimCycle } from './types'
 
 // ── Tiny pixel-painting helpers over a frame-major Uint8Array ────────────────
 
@@ -37,17 +37,21 @@ const H_FRAMES = 22
 const HW = 24
 const HH = 32
 
-function drawHumanoid(p: Painter, f: number, opts: { back: boolean; bob: number; legPhase: number; armReach: number; recoil: number }): void {
-  const { back, bob, legPhase, armReach, recoil } = opts
+function drawHumanoid(p: Painter, f: number, opts: { back: boolean; bob: number; legPhase: number; armSwing: number; armReach: number; recoil: number }): void {
+  const { back, bob, legPhase, armSwing, armReach, recoil } = opts
   const cx = 12 - recoil // hit frames knock the body back a pixel or two
   const top = 6 + bob
 
-  // Legs — secondary material (9–12); walk swings via legPhase (-1, 0, 1).
+  // Legs — secondary material (9–12); walk swings via legPhase (±2 contact ↔ 0 pass).
+  // The lifting leg shortens by 1px on passing frames so a stride reads as stepping,
+  // not as a shiver — the difference between "walking" and "flinching in place".
   const legY = 24
-  p.rect(f, cx - 4 + legPhase, legY, 3, 6, 10)
-  p.rect(f, cx + 1 - legPhase, legY, 3, 6, 11)
-  p.rect(f, cx - 4 + legPhase, legY + 5, 3, 1, 9) // boots shadow line
-  p.rect(f, cx + 1 - legPhase, legY + 5, 3, 1, 9)
+  const liftL = legPhase === 0 ? 1 : 0   // left leg lifts when legs come together
+  const liftR = legPhase === 0 ? 1 : 0
+  p.rect(f, cx - 4 + legPhase, legY, 3, 6 - liftL, 10)
+  p.rect(f, cx + 1 - legPhase, legY, 3, 6 - liftR, 11)
+  p.rect(f, cx - 4 + legPhase, legY + 5 - liftL, 3, 1, 9) // boots shadow line
+  p.rect(f, cx + 1 - legPhase, legY + 5 - liftR, 3, 1, 9)
 
   // Torso — primary material (5–8), simple left-lit shading.
   p.rect(f, cx - 5, top + 8, 10, 10, 6)
@@ -55,10 +59,11 @@ function drawHumanoid(p: Painter, f: number, opts: { back: boolean; bob: number;
   p.rect(f, cx + 3, top + 8, 2, 10, 5) // shade edge
   p.rect(f, cx - 5, top + 17, 10, 1, 5) // belt line
 
-  // Arms — skin at hands, primary sleeves. Attack extends the weapon arm.
+  // Arms — skin at hands, primary sleeves. The back arm swings opposite the legs
+  // (armSwing); the weapon arm reaches forward on attack frames (armReach).
   const armY = top + 9
-  p.rect(f, cx - 7, armY, 2, 7, 6)
-  p.rect(f, cx - 7, armY + 6, 2, 2, 3) // hand
+  p.rect(f, cx - 7 + armSwing, armY, 2, 7, 6)
+  p.rect(f, cx - 7 + armSwing, armY + 6, 2, 2, 3) // hand
   const reach = armReach // 0..5 px extension on attack frames
   p.rect(f, cx + 5, armY, 2, 6 - Math.min(3, reach), 6)
   p.rect(f, cx + 5 + reach, armY + 4 - reach, 2, 2, 3)
@@ -104,17 +109,20 @@ export function makeHumanoidRig(id = 'rig/humanoid'): IndexedSprite {
   const p = new Painter(HW, HH, H_FRAMES)
   for (const back of [false, true]) {
     const o = back ? 11 : 0
-    drawHumanoid(p, o + 0, { back, bob: 0, legPhase: 0, armReach: 0, recoil: 0 })
-    drawHumanoid(p, o + 1, { back, bob: 1, legPhase: 0, armReach: 0, recoil: 0 })
-    drawHumanoid(p, o + 2, { back, bob: 0, legPhase: -1, armReach: 0, recoil: 0 })
-    drawHumanoid(p, o + 3, { back, bob: 1, legPhase: 0, armReach: 0, recoil: 0 })
-    drawHumanoid(p, o + 4, { back, bob: 0, legPhase: 1, armReach: 0, recoil: 0 })
-    drawHumanoid(p, o + 5, { back, bob: 1, legPhase: 0, armReach: 0, recoil: 0 })
-    drawHumanoid(p, o + 6, { back, bob: 0, legPhase: 0, armReach: 1, recoil: 0 })
-    drawHumanoid(p, o + 7, { back, bob: 0, legPhase: -1, armReach: 4, recoil: 0 })
-    drawHumanoid(p, o + 8, { back, bob: 0, legPhase: 0, armReach: 2, recoil: 0 })
-    drawHumanoid(p, o + 9, { back, bob: 0, legPhase: 0, armReach: 0, recoil: 2 })
-    drawHumanoid(p, o + 10, { back, bob: 1, legPhase: 0, armReach: 0, recoil: 1 })
+    drawHumanoid(p, o + 0, { back, bob: 0, legPhase: 0, armSwing: 0, armReach: 0, recoil: 0 })
+    drawHumanoid(p, o + 1, { back, bob: 1, legPhase: 0, armSwing: 0, armReach: 0, recoil: 0 })
+    // Walk: ±2px stride + 2px bob + back-arm swing opposite the legs. Contact
+    // frames (legs apart) sit low; passing frames (legs together) rise — the
+    // vertical bob is what sells forward motion when the camera locks to the unit.
+    drawHumanoid(p, o + 2, { back, bob: 0, legPhase: -2, armSwing: 2, armReach: 0, recoil: 0 })
+    drawHumanoid(p, o + 3, { back, bob: 2, legPhase: 0, armSwing: 0, armReach: 0, recoil: 0 })
+    drawHumanoid(p, o + 4, { back, bob: 0, legPhase: 2, armSwing: -2, armReach: 0, recoil: 0 })
+    drawHumanoid(p, o + 5, { back, bob: 2, legPhase: 0, armSwing: 0, armReach: 0, recoil: 0 })
+    drawHumanoid(p, o + 6, { back, bob: 0, legPhase: 0, armSwing: 0, armReach: 1, recoil: 0 })
+    drawHumanoid(p, o + 7, { back, bob: 0, legPhase: -1, armSwing: 0, armReach: 4, recoil: 0 })
+    drawHumanoid(p, o + 8, { back, bob: 0, legPhase: 0, armSwing: 0, armReach: 2, recoil: 0 })
+    drawHumanoid(p, o + 9, { back, bob: 0, legPhase: 0, armSwing: 0, armReach: 0, recoil: 2 })
+    drawHumanoid(p, o + 10, { back, bob: 1, legPhase: 0, armSwing: 0, armReach: 0, recoil: 1 })
   }
   return {
     id,
@@ -166,10 +174,10 @@ export function makeBeastRig(id = 'rig/beast'): IndexedSprite {
     const o = back ? 11 : 0
     drawBeast(p, o + 0, { back, bob: 0, legPhase: 0, lunge: 0, recoil: 0 })
     drawBeast(p, o + 1, { back, bob: 1, legPhase: 0, lunge: 0, recoil: 0 })
-    drawBeast(p, o + 2, { back, bob: 0, legPhase: -1, lunge: 0, recoil: 0 })
-    drawBeast(p, o + 3, { back, bob: 1, legPhase: 0, lunge: 0, recoil: 0 })
-    drawBeast(p, o + 4, { back, bob: 0, legPhase: 1, lunge: 0, recoil: 0 })
-    drawBeast(p, o + 5, { back, bob: 1, legPhase: 0, lunge: 0, recoil: 0 })
+    drawBeast(p, o + 2, { back, bob: 0, legPhase: -2, lunge: 0, recoil: 0 })
+    drawBeast(p, o + 3, { back, bob: 2, legPhase: 0, lunge: 0, recoil: 0 })
+    drawBeast(p, o + 4, { back, bob: 0, legPhase: 2, lunge: 0, recoil: 0 })
+    drawBeast(p, o + 5, { back, bob: 2, legPhase: 0, lunge: 0, recoil: 0 })
     drawBeast(p, o + 6, { back, bob: 0, legPhase: 0, lunge: 1, recoil: 0 })
     drawBeast(p, o + 7, { back, bob: 0, legPhase: 1, lunge: 4, recoil: 0 })
     drawBeast(p, o + 8, { back, bob: 0, legPhase: 0, lunge: 2, recoil: 0 })
@@ -190,8 +198,11 @@ export function makeBeastRig(id = 'rig/beast'): IndexedSprite {
 
 // ── Tileset: 32×24 frames (bottom 16 = ground diamond, top 8 = raised detail) ─
 // Frames: 0 grass · 1 grass alt · 2 water · 3 water alt · 4 cliff · 5 path
+//         6 sand · 7 rock · 8 snow · 9 moss · 10 flower · 11 path alt
+// All palette-indexed so Phase A biome palettes tint them via their semantic channels
+// (earth 1-4, veg 5-8, water 9-12, stone 13-15).
 
-const T_FRAMES = 6
+const T_FRAMES = 12
 const TW = 32
 const TH = 24
 const DIAMOND_TOP = 8 // ground diamond occupies y 8..23
@@ -256,6 +267,45 @@ export function makeTileset(id = 'tileset/base'): IndexedSprite {
     const s = speck(x, y, 5)
     return s < 15 ? 4 : s < 40 ? 3 : 2
   })
+  // 6: sand — pale earth ramp (dust/wastes/desert). Lighter and more uniform than path.
+  fillDiamond(p, 6, (x, y) => {
+    if (y >= 14) return 2
+    const s = speck(x, y, 6)
+    return s < 10 ? 2 : s < 45 ? 3 : 4
+  })
+  // 7: rock — stone/accent ramp (badlands/peaks/cinder). Flat diamond of bare stone.
+  fillDiamond(p, 7, (x, y) => {
+    if (y >= 14) return 13
+    const s = speck(x, y, 7)
+    return s < 20 ? 15 : s < 50 ? 14 : 13
+  })
+  // 8: snow — palest accent ramp (future snow biome). Reads white under a cool palette.
+  fillDiamond(p, 8, (x, y) => {
+    if (y >= 14) return 14
+    const s = speck(x, y, 8)
+    return s < 15 ? 13 : s < 50 ? 14 : 15
+  })
+  // 9: moss — darker vegetation ramp (jungle/swamp/forest floor). Leans 5-6 vs grass 6-8.
+  fillDiamond(p, 9, (x, y) => {
+    if (y >= 14) return 5
+    const s = speck(x, y, 9)
+    return s < 12 ? 5 : s < 30 ? 6 : 7
+  })
+  // 10: flower — grass base (6-8) with sparse bright accent (15) blooms. Tints with the
+  // biome's lightest accent, so meadow = cream blooms, venom = pale purple, etc.
+  fillDiamond(p, 10, (x, y) => {
+    if (y >= 14) return 5
+    if (speck(x, y, 71) < 5) return 15
+    if (speck(x, y, 72) < 3) return 12
+    const s = speck(x, y, 10)
+    return s < 8 ? 8 : s < 22 ? 7 : 6
+  })
+  // 11: path alt — darker earth ramp (worn/trampled dirt).
+  fillDiamond(p, 11, (x, y) => {
+    if (y >= 14) return 1
+    const s = speck(x, y, 11)
+    return s < 15 ? 1 : s < 40 ? 2 : 3
+  })
 
   const still = (frame: number) => ({
     se: { frames: [frame], fps: 1, loop: true },
@@ -273,7 +323,169 @@ export function makeTileset(id = 'tileset/base'): IndexedSprite {
   }
 }
 
-export const TILE = { GRASS: 0, GRASS_ALT: 1, WATER: 2, WATER_ALT: 3, CLIFF: 4, PATH: 5 } as const
+export const TILE = {
+  GRASS: 0, GRASS_ALT: 1, WATER: 2, WATER_ALT: 3, CLIFF: 4, PATH: 5,
+  SAND: 6, ROCK: 7, SNOW: 8, MOSS: 9, FLOWER: 10, PATH_ALT: 11,
+} as const
+
+// Animated ground cycles (environment-plan Phase B): water shimmers between its two
+// authored frames. Any tileset cell baked as WATER or WATER_ALT reblits through this
+// cycle; the second water frame (WATER_ALT) is authored but otherwise unused, so this
+// wires it up the FFTA slot-swap way without rebaking the whole ground. ~0.4s/flip.
+export const TILE_ANIMS: TileAnimCycle[] = [
+  { frames: [TILE.WATER, TILE.WATER_ALT], dur: 0.4 },
+]
+
+// ── Flat prop sheet (environment-plan Phase D) ────────────────────────────────
+// Small (≤ one tile footprint) ground clutter: tufts, pebbles, flowers, crystals,
+// mushrooms, bones, cattails, rocks. Frames are 32×24 (same canvas as tiles) with
+// transparent margins and a 4–6px motif sitting on the diamond's lower-center, so
+// stamping at a tile's (dx, dy) lands the prop on that tile's surface (and raises
+// with it, since dy is height-aware). Palette-indexed → biome palettes tint props.
+// artId order must match data/types PROP_KIND.
+
+// Render-side prop art-id contract — mirrors data/types PROP_KIND (the data layer owns
+// the id taxonomy; the render layer owns the art). mapAdapter/combatAdapter bridge them.
+export const PROP = { TUFT: 0, PEBBLE: 1, FLOWER: 2, CRYSTAL: 3, MUSHROOM: 4, BONE: 5, CATTAIL: 6, ROCK: 7 } as const
+const P_FRAMES = 8
+
+export function makePropSheet(id = 'props/base'): IndexedSprite {
+  const p = new Painter(TW, TH, P_FRAMES)
+  const stamp = (f: number, pxs: readonly [number, number, number][]) => {
+    for (const [x, y, s] of pxs) p.px(f, x, y, s)
+  }
+  // TUFT — a small fan of grass blades (veg ramp).
+  stamp(PROP.TUFT, [
+    [15, 16, 6], [16, 15, 7], [17, 16, 6], [16, 17, 5], [14, 17, 6], [18, 17, 6], [16, 14, 8],
+  ])
+  // PEBBLE — a few stone pixels (accent ramp).
+  stamp(PROP.PEBBLE, [
+    [15, 18, 14], [16, 18, 15], [17, 18, 13], [16, 19, 13],
+  ])
+  // FLOWER — green stem + bright accent bloom.
+  stamp(PROP.FLOWER, [
+    [16, 17, 6], [16, 18, 5], [16, 15, 15], [15, 15, 12], [17, 15, 12],
+  ])
+  // CRYSTAL — a tiny faceted gem (accent ramp).
+  stamp(PROP.CRYSTAL, [
+    [16, 14, 15], [15, 15, 14], [16, 15, 15], [17, 15, 14], [16, 16, 13],
+  ])
+  // MUSHROOM — earth stem + accent cap.
+  stamp(PROP.MUSHROOM, [
+    [16, 17, 2], [16, 18, 1], [15, 16, 14], [16, 16, 15], [17, 16, 14], [16, 15, 15],
+  ])
+  // BONE — a small pale diagonal bone.
+  stamp(PROP.BONE, [
+    [14, 18, 15], [15, 18, 15], [16, 17, 15], [15, 19, 15], [17, 17, 15],
+  ])
+  // CATTAIL — tall green spike with an earth-brown head (swamp/wetland).
+  stamp(PROP.CATTAIL, [
+    [16, 16, 6], [16, 17, 6], [16, 18, 6], [16, 19, 5], [16, 14, 3], [16, 15, 3],
+  ])
+  // ROCK — a low stone cluster (accent ramp).
+  stamp(PROP.ROCK, [
+    [15, 18, 14], [16, 18, 13], [17, 18, 14], [16, 17, 14], [15, 19, 13], [17, 19, 13],
+  ])
+
+  const still = (frame: number) => ({
+    se: { frames: [frame], fps: 1, loop: true },
+    ne: { frames: [frame], fps: 1, loop: true },
+  })
+  return {
+    id,
+    frameW: TW,
+    frameH: TH,
+    cols: P_FRAMES,
+    frameCount: P_FRAMES,
+    indices: p.data,
+    anchor: { x: 16, y: 20 },
+    animations: { idle: still(0), walk: still(0), attack: still(0), hit: still(0) },
+  }
+}
+
+// ── Tall prop entities (environment-plan Phase E) ─────────────────────────────
+// Trees / rocks / crystals / structures with a feet anchor so the scene's painter
+// sort places them by screen-Y against units — a unit walking "above" a tree is
+// occluded by it, "below" it draws in front (FFTA BG1 "prop-in-front" behaviour).
+// Each kind is its own single-frame IndexedSprite (the Animator pins frame 0 for a
+// 1-frame still sprite, so per-kind sprites are the clean way to give each node a
+// distinct look). 32×48 frames, base ~y40, anchor (16,40) → base sits on the tile's
+// feet point and the art rises above the plane. Palette-indexed → biome palettes tint.
+
+export const TALL_PROP = {
+  TREE: 0, ROCK_BIG: 1, CRYSTAL_CLUSTER: 2, LAIR: 3, HERB_BUSH: 4, ORE_OUTCROP: 5, CAIRN: 6,
+} as const
+
+const TP_W = 32
+const TP_H = 48
+const TP_N = 7
+
+export function makePropEntities(): Record<number, IndexedSprite> {
+  const p = new Painter(TP_W, TP_H, TP_N)
+  // 0 TREE — trunk + canopy.
+  p.rect(TALL_PROP.TREE, 15, 36, 2, 6, 2)
+  p.rect(TALL_PROP.TREE, 15, 42, 2, 2, 1)
+  p.rect(TALL_PROP.TREE, 9, 16, 14, 10, 6)
+  p.rect(TALL_PROP.TREE, 12, 10, 8, 7, 7)
+  p.rect(TALL_PROP.TREE, 8, 22, 16, 5, 5)
+  p.px(TALL_PROP.TREE, 14, 12, 8); p.px(TALL_PROP.TREE, 18, 14, 8); p.px(TALL_PROP.TREE, 12, 18, 8)
+  // 1 ROCK_BIG — large boulder.
+  p.rect(TALL_PROP.ROCK_BIG, 8, 30, 16, 12, 14)
+  p.rect(TALL_PROP.ROCK_BIG, 10, 26, 12, 5, 15)
+  p.rect(TALL_PROP.ROCK_BIG, 7, 38, 18, 4, 13)
+  p.px(TALL_PROP.ROCK_BIG, 12, 28, 15); p.px(TALL_PROP.ROCK_BIG, 18, 30, 15)
+  p.px(TALL_PROP.ROCK_BIG, 14, 34, 13); p.px(TALL_PROP.ROCK_BIG, 15, 35, 13)
+  // 2 CRYSTAL_CLUSTER — three faceted crystals.
+  p.rect(TALL_PROP.CRYSTAL_CLUSTER, 9, 32, 4, 8, 14); p.px(TALL_PROP.CRYSTAL_CLUSTER, 11, 30, 15); p.px(TALL_PROP.CRYSTAL_CLUSTER, 10, 40, 13)
+  p.rect(TALL_PROP.CRYSTAL_CLUSTER, 15, 24, 4, 16, 15); p.px(TALL_PROP.CRYSTAL_CLUSTER, 17, 22, 15); p.px(TALL_PROP.CRYSTAL_CLUSTER, 16, 40, 13)
+  p.rect(TALL_PROP.CRYSTAL_CLUSTER, 21, 30, 4, 10, 14); p.px(TALL_PROP.CRYSTAL_CLUSTER, 23, 28, 15); p.px(TALL_PROP.CRYSTAL_CLUSTER, 22, 40, 13)
+  p.rect(TALL_PROP.CRYSTAL_CLUSTER, 8, 40, 18, 2, 13)
+  // 3 LAIR — dark stone structure with an ominous glow (boss lair).
+  p.rect(TALL_PROP.LAIR, 7, 34, 18, 8, 13)
+  p.rect(TALL_PROP.LAIR, 9, 28, 14, 6, 14)
+  p.rect(TALL_PROP.LAIR, 14, 34, 4, 8, 1)
+  p.px(TALL_PROP.LAIR, 16, 30, 15); p.px(TALL_PROP.LAIR, 15, 31, 15); p.px(TALL_PROP.LAIR, 17, 31, 15)
+  p.px(TALL_PROP.LAIR, 9, 27, 15); p.px(TALL_PROP.LAIR, 22, 27, 15)
+  // 4 HERB_BUSH — low leafy bush with berry accents (herb node).
+  p.rect(TALL_PROP.HERB_BUSH, 10, 34, 12, 8, 6)
+  p.rect(TALL_PROP.HERB_BUSH, 12, 32, 8, 4, 7)
+  p.px(TALL_PROP.HERB_BUSH, 13, 34, 8); p.px(TALL_PROP.HERB_BUSH, 18, 35, 8)
+  p.px(TALL_PROP.HERB_BUSH, 12, 36, 12); p.px(TALL_PROP.HERB_BUSH, 19, 37, 12); p.px(TALL_PROP.HERB_BUSH, 15, 39, 12)
+  // 5 ORE_OUTCROP — rock with bright ore veins (ore node).
+  p.rect(TALL_PROP.ORE_OUTCROP, 8, 32, 16, 10, 13)
+  p.rect(TALL_PROP.ORE_OUTCROP, 10, 28, 12, 5, 14)
+  p.px(TALL_PROP.ORE_OUTCROP, 12, 34, 15); p.px(TALL_PROP.ORE_OUTCROP, 13, 35, 15)
+  p.px(TALL_PROP.ORE_OUTCROP, 18, 36, 15); p.px(TALL_PROP.ORE_OUTCROP, 19, 37, 15)
+  p.px(TALL_PROP.ORE_OUTCROP, 15, 38, 15); p.px(TALL_PROP.ORE_OUTCROP, 14, 32, 12)
+  // 6 CAIRN — stacked-stone waymarker (mob spawn).
+  p.rect(TALL_PROP.CAIRN, 11, 36, 10, 6, 14)
+  p.rect(TALL_PROP.CAIRN, 13, 30, 6, 6, 13)
+  p.rect(TALL_PROP.CAIRN, 14, 25, 4, 5, 15)
+  p.px(TALL_PROP.CAIRN, 15, 26, 15)
+
+  const still = (frame: number) => ({
+    se: { frames: [frame], fps: 1, loop: true },
+    ne: { frames: [frame], fps: 1, loop: true },
+  })
+  const slice = (f: number, id: string): IndexedSprite => {
+    const indices = new Uint8Array(TP_W * TP_H)
+    indices.set(p.data.subarray(f * TP_W * TP_H, (f + 1) * TP_W * TP_H))
+    return {
+      id, frameW: TP_W, frameH: TP_H, cols: 1, frameCount: 1, indices,
+      anchor: { x: 16, y: 40 },
+      animations: { idle: still(0), walk: still(0), attack: still(0), hit: still(0) },
+    }
+  }
+  return {
+    [TALL_PROP.TREE]: slice(TALL_PROP.TREE, 'props/tall/tree'),
+    [TALL_PROP.ROCK_BIG]: slice(TALL_PROP.ROCK_BIG, 'props/tall/rock'),
+    [TALL_PROP.CRYSTAL_CLUSTER]: slice(TALL_PROP.CRYSTAL_CLUSTER, 'props/tall/crystal'),
+    [TALL_PROP.LAIR]: slice(TALL_PROP.LAIR, 'props/tall/lair'),
+    [TALL_PROP.HERB_BUSH]: slice(TALL_PROP.HERB_BUSH, 'props/tall/herb'),
+    [TALL_PROP.ORE_OUTCROP]: slice(TALL_PROP.ORE_OUTCROP, 'props/tall/ore'),
+    [TALL_PROP.CAIRN]: slice(TALL_PROP.CAIRN, 'props/tall/cairn'),
+  }
+}
 
 // ── Spell effects: bolt (looping projectile) + burst (one-shot impact) ───────
 // Drawn entirely in the accent channel (13–15) + primary core, so spell schools are

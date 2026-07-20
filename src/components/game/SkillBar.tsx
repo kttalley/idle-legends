@@ -117,11 +117,12 @@ export function SkillBar() {
 
   return (
     <div
-      className="flex items-center justify-center gap-2 py-1"
+      className="skill-bar flex items-center justify-center gap-2 py-1"
       style={{
         background: 'rgba(0,0,0,0.4)',
         borderTop: '1px solid #2a1f08',
         borderBottom: '1px solid #2a1f08',
+        flexShrink: 0,
       }}
     >
       <span style={{
