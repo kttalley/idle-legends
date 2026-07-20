@@ -31,6 +31,9 @@ import type { ThoughtEvent } from '../engine/nameGen'
 
 const SAVE_KEY = 'idle_legends_save_v2'
 const LOG_MAX  = 150
+// Cast pushback: seconds added to a channel per mob hit, and the per-cast cap.
+const CAST_PUSHBACK_PER_HIT = 0.5
+const CAST_PUSHBACK_CAP     = 2.0
 
 function hashStr(s: string): number {
   let h = 0
@@ -217,6 +220,7 @@ interface GameActions {
   deallocateTalent: (talentId: string) => void
   resetTalents: () => void
   activateAbility: (abilityId: string) => void
+  finishCast: (abilityId: string) => void
   respawnNow: () => void
   dismissFloatingNumber: (id: string) => void
   triggerThought: (event: ThoughtEvent, extra?: string) => void
@@ -280,6 +284,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       saved.activeDoTs    = []
       saved.activeBuffs   = []
       saved.procState     = defaultProcState()
+      saved.castState     = null
       saved.skillCooldowns = {}
       // New fields — default if missing
       saved.gameMode      = 'combat'
@@ -499,7 +504,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     let {
       stats, currentMob, persistedBoss, isAlive, respawnTimer, mobRespawnTimer,
       gold, xp, level, inventory, equipment, activeDoTs, activeBuffs,
-      procState, floatingNumbers, totalZoneKills, zoneKillCounts,
+      procState, castState, floatingNumbers, totalZoneKills, zoneKillCounts,
       bossesDefeated, unlockedZones, currentZone, skillCooldowns, talentAllocs,
     } = state
 
@@ -510,7 +515,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     activeDoTs     = activeDoTs.map(d => ({ ...d }))
     activeBuffs    = activeBuffs.map(b => ({ ...b }))
     procState      = { ...procState }
+    castState      = castState ? { ...castState } : null
     floatingNumbers = [...floatingNumbers]
+    // Ability id whose channel completes this tick — its effects are applied via
+    // finishCast() after the main set() (reuses the instant-cast resolution path).
+    let castCompletedId: string | null = null
     totalZoneKills  = { ...totalZoneKills }
     zoneKillCounts  = { ...zoneKillCounts }
     bossesDefeated  = [...bossesDefeated]
@@ -540,6 +549,22 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if (procState.mobFrozenTimer <= 0) procState.mobFrozen = false
     }
 
+    // ── Advance the player's spell cast ─────────────────────────────────────
+    // Interrupt if the caster dies or the target is gone; otherwise fill the bar.
+    // When it completes, mark the ability for finishCast() (applied after set()).
+    if (castState) {
+      if (!isAlive || !currentMob) {
+        newLogs.push(log('ability_use', `${castState.name} interrupted.`, '#aa7766'))
+        castState = null
+      } else {
+        castState.remaining -= deltaSeconds
+        if (castState.remaining <= 0) {
+          castCompletedId = castState.abilityId
+          castState = null
+        }
+      }
+    }
+
     // ── Player respawn ──────────────────────────────────────────────────────
     if (!isAlive) {
       respawnTimer = Math.max(0, respawnTimer - deltaSeconds)
@@ -551,7 +576,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         newLogs.push(log('player_respawn', 'You rise from the grave...', '#aaaaff'))
         resetCombatAccumulators()
       }
-      set({ stats, isAlive, respawnTimer, skillCooldowns,
+      set({ stats, isAlive, respawnTimer, skillCooldowns, castState: null,
             combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX) })
       return
     }
@@ -583,7 +608,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           resetCombatAccumulators()
         }
       }
-      set({ currentMob, persistedBoss, mobRespawnTimer, procState, skillCooldowns,
+      set({ currentMob, persistedBoss, mobRespawnTimer, procState, skillCooldowns, castState,
             combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX) })
       return
     }
@@ -808,6 +833,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           newFns.push(fn(mobDmg, false, true, false))
           newLogs.push(log('mob_attack', `${currentMob.name} hits you for ${mobDmg}`, '#ff8888'))
 
+          // Cast pushback: a hit while channelling delays the cast (WoW-style),
+          // capped per-cast so a fast mob can't lock you out forever.
+          if (castState && castState.pushback < CAST_PUSHBACK_CAP) {
+            const pb = Math.min(CAST_PUSHBACK_PER_HIT, CAST_PUSHBACK_CAP - castState.pushback)
+            castState.pushback += pb
+            castState.remaining = Math.min(castState.total, castState.remaining + pb)
+          }
+
           // Ice Block: immune when near death
           if (fx.iceBlockEnabled && !procState.iceBlockUsed && stats.currentHp / stats.maxHp < 0.15) {
             procState.iceBlockUsed = true
@@ -838,6 +871,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             isAlive = false
             respawnTimer = RESPAWN_TIMER_SECONDS
             stats.currentHp = 0
+            castState = null   // death interrupts any channel
             if (currentMob?.isBoss) {
               persistedBoss = currentMob
             }
@@ -899,7 +933,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     set({
       stats, gold, xp, level, currentMob, persistedBoss, isAlive, respawnTimer, mobRespawnTimer,
-      inventory, equipment, activeDoTs, activeBuffs, procState, skillCooldowns,
+      inventory, equipment, activeDoTs, activeBuffs, procState, castState, skillCooldowns,
       floatingNumbers: allFns,
       totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones, currentZone,
       totalPlayTime: state.totalPlayTime + deltaSeconds,
@@ -909,6 +943,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       gameMode: nextGameMode,
       gatheringTimer: nextGameMode === 'gathering' ? 5 : state.gatheringTimer,
     })
+
+    // A channel completed this tick → resolve its effects now (own get()/set(),
+    // reads the just-committed state; reuses the instant-cast path + cooldown).
+    if (castCompletedId) get().finishCast(castCompletedId)
   },
 
   // ── Equipment ────────────────────────────────────────────────────────────────
@@ -1028,11 +1066,32 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   // ── Skill Bar ────────────────────────────────────────────────────────────────
   activateAbility: (abilityId) => {
     const s = get()
+    if (!s.isAlive) return
+    if (s.castState) return                       // one cast at a time — no spam/queue
     if ((s.skillCooldowns[abilityId] ?? 0) > 0) return
     const ability = ACTIVE_ABILITIES.find(a => a.id === abilityId)
     if (!ability || !ability.classes.includes(s.playerClass)) return
     // Allow self-target abilities (hot/heals) even without a mob; block others
     if (!s.currentMob && !ability.effects.some(e => e.type === 'hot')) return
+
+    // Timed ability → begin a channel. The effect fires in tick when the cast bar
+    // fills; cooldown starts on completion so an interrupt doesn't burn it.
+    const castTime = ability.castTimeSeconds ?? 0
+    if (castTime > 0) {
+      set({ castState: { abilityId, name: ability.name, icon: ability.icon, total: castTime, remaining: castTime, pushback: 0 } })
+      return
+    }
+
+    // Instant ability → resolve now.
+    get().finishCast(abilityId)
+  },
+
+  // Apply an ability's effects and start its cooldown. Called directly for instant
+  // abilities, and by tick when a channelled cast completes.
+  finishCast: (abilityId) => {
+    const s = get()
+    const ability = ACTIVE_ABILITIES.find(a => a.id === abilityId)
+    if (!ability) return
 
     const newFns: FloatingNumber[] = []
     const newLogs: CombatLogEntry[] = []
