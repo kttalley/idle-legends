@@ -1030,7 +1030,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if ((s.skillCooldowns[abilityId] ?? 0) > 0) return
     const ability = ACTIVE_ABILITIES.find(a => a.id === abilityId)
     if (!ability || !ability.classes.includes(s.playerClass)) return
-    if (!s.currentMob && ability.effects.every(e => e.type !== 'hot')) return // no target for damaging abilities
+    // Allow self-target abilities (hot/heals) even without a mob; block others
+    if (!s.currentMob && !ability.effects.some(e => e.type === 'hot')) return
 
     const newFns: FloatingNumber[] = []
     const newLogs: CombatLogEntry[] = []

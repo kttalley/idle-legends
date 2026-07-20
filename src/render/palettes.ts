@@ -61,7 +61,9 @@ reg('gear/t4', composePalette(BASE_UNIT, {
 }))
 
 // ── Rarity: accent channel (13–15) ONLY — composes with any gear tier ────────
-const RARITY_ACCENTS: Record<string, Partial<Record<number, string>>> = {
+// Exported for runtime composition (race skin + rarity signal on the player, or
+// team/enemy + legendary on a boss). Game-free: keyed by palette-id suffix strings.
+export const RARITY_ACCENTS: Record<string, Partial<Record<number, string>>> = {
   common: { 13: '#4a4a52', 14: '#8a8a96', 15: '#c8c8d4' },
   uncommon: { 13: '#1e5c2a', 14: '#2e8c42', 15: '#48c464' },
   rare: { 13: '#1c4a8c', 14: '#2e6cc4', 15: '#5494ec' },

@@ -9,6 +9,7 @@ import { SkillBar } from './SkillBar'
 import { StatusEffects } from './StatusEffects'
 import { ThoughtBubble } from './ThoughtBubble'
 import { WorldMapView } from './WorldMapView'
+import { DimetricWorldScene } from './DimetricWorldScene'
 import { TravelOverlay } from './TravelOverlay'
 import { GatheringPanel } from './GatheringPanel'
 import { CraftingPanel } from './CraftingPanel'
@@ -18,6 +19,10 @@ import { CombatParticles } from './CombatParticles'
 import type { CombatParticlesHandle } from './CombatParticles'
 import { ZONE_TOWN } from '../../data/towns'
 import { TOWNS } from '../../data/towns'
+
+// Phase 2: the unified dimetric world scene replaces the ASCII strip + combat
+// arena. Flip to false to fall back to the original presentation path.
+const DIMETRIC_ENABLED = true
 
 export function CombatView() {
   const {
@@ -89,6 +94,7 @@ export function CombatView() {
   const prevFnIds = useRef<Set<string>>(new Set())
 
   useEffect(() => {
+    if (DIMETRIC_ENABLED) return // the dimetric host owns the FN combat-event feed
     const newFns = floatingNumbers.filter(fn => !prevFnIds.current.has(fn.id))
     prevFnIds.current = new Set(floatingNumbers.map(fn => fn.id))
 
@@ -140,16 +146,20 @@ export function CombatView() {
         minHeight: 0,
       }}
     >
-      <CombatParticles
-        ref={particlesRef}
-        playerRef={playerAvatarRef}
-        mobRef={mobAvatarRef}
-        containerRef={combatContainerRef}
-      />
-      {/* ── World Map — always visible at top ── */}
-      <div style={{ padding: '4px 4px 0 4px', flexShrink: 0 }}>
-        <WorldMapView />
-      </div>
+      {!DIMETRIC_ENABLED && (
+        <CombatParticles
+          ref={particlesRef}
+          playerRef={playerAvatarRef}
+          mobRef={mobAvatarRef}
+          containerRef={combatContainerRef}
+        />
+      )}
+      {/* ── World Map — always visible at top (legacy path only) ── */}
+      {!DIMETRIC_ENABLED && (
+        <div style={{ padding: '4px 4px 0 4px', flexShrink: 0 }}>
+          <WorldMapView />
+        </div>
+      )}
 
       {/* ── Thin zone info + status + override buttons ── */}
       <div style={{
@@ -223,6 +233,14 @@ export function CombatView() {
         </div>
       </div>
 
+      {/* ── Unified dimetric world scene (Phase 2) — the always-visible backdrop ── */}
+      {DIMETRIC_ENABLED && (
+        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+          <DimetricWorldScene />
+        </div>
+      )}
+      {DIMETRIC_ENABLED && gameMode === 'combat' && <SkillBar />}
+
       {/* ── Traveling overlay ── */}
       {gameMode === 'traveling' && <TravelOverlay />}
 
@@ -235,8 +253,8 @@ export function CombatView() {
       {/* ── Town panel ── */}
       {gameMode === 'in_town' && currentTown && <TownView />}
 
-      {/* ── Combat arena ── */}
-      {gameMode === 'combat' && (
+      {/* ── Combat arena (legacy path only) ── */}
+      {!DIMETRIC_ENABLED && gameMode === 'combat' && (
         <>
           <div className="flex-1 flex items-center justify-around px-4 pt-1 pb-1" style={{ minHeight: 140 }}>
 
@@ -367,29 +385,35 @@ export function CombatView() {
         </>
       )}
 
-      {/* Floating damage numbers — always rendered on top */}
-      {floatingNumbers.map(fn => (
-        <div
-          key={fn.id}
-          className="damage-float absolute"
-          style={{
-            left: `${fn.x}%`,
-            top: `${fn.y}%`,
-            color: fn.isMobDamage
-              ? '#ff6666'
-              : fn.isDoT
-                ? (fn.color ?? '#aa88ff')
-                : fn.isCrit
-                  ? '#ffcc00'
-                  : '#88bbff',
-            fontSize: fn.isCrit ? '1.1rem' : '0.9rem',
-            pointerEvents: 'none',
-          }}
-        >
-          {fn.isMobDamage ? '-' : ''}{fn.value}
-          {fn.isCrit && !fn.isDoT ? '!' : ''}
-        </div>
-      ))}
+      {/* Floating damage numbers — always rendered on top (legacy path only;
+          the dimetric host owns its own floater pool) */}
+      {!DIMETRIC_ENABLED && (
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
+        {floatingNumbers.map(fn => (
+          <div
+            key={fn.id}
+            className="damage-float"
+            style={{
+              position: 'absolute',
+              left: `${fn.x}%`,
+              top: `${fn.y}%`,
+              color: fn.isMobDamage
+                ? '#ff6666'
+                : fn.isDoT
+                  ? (fn.color ?? '#aa88ff')
+                  : fn.isCrit
+                    ? '#ffcc00'
+                    : '#88bbff',
+              fontSize: fn.isCrit ? '1.1rem' : '0.9rem',
+              pointerEvents: 'none',
+            }}
+          >
+            {fn.isMobDamage ? '-' : ''}{fn.value}
+            {fn.isCrit && !fn.isDoT ? '!' : ''}
+          </div>
+        ))}
+      </div>
+      )}
 
       {/* XP / Level bar at bottom */}
       <div className="px-2 pb-1" style={{ flexShrink: 0 }}>
