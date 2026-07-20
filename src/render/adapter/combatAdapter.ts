@@ -34,6 +34,7 @@ const AUTO_LERP_K = 6         // exp-approach rate for auto-follow (1/s); tracks
                               // store's drift/travel with a small steady-state lag
 const JUMP_DURATION = 0.55    // seconds, apex at the midpoint
 const JUMP_HEIGHT = 16        // px lift at apex
+const SHAKE_DURATION = 0.26   // seconds a rumble decays over
 const LUNGE_MAX = 1.35        // tiles; the attack lunge never exceeds this (no slingshot)
 const ENGAGE_DIST = 1.5       // mob "engaged" threshold (matches the store's mobEngaged)
 // Engagement gap from the player, in per-axis diagonal tiles. The store shrinks
@@ -159,7 +160,7 @@ export class WorldSceneController {
   private boltRig!: IndexedSprite
   // In-flight projectiles; retired on arrival. Small list — splice on retirement
   // is fine (events are infrequent, not per-entity-per-frame).
-  private bolts: { entity: Entity; fromX: number; fromY: number; toX: number; toY: number; t: number; palette: string }[] = []
+  private bolts: { entity: Entity; fromX: number; fromY: number; toX: number; toY: number; t: number; palette: string; impact: Entity | null; mag: number }[] = []
 
   private ground: GroundBuffer | null = null
   private zone: string | null = null
@@ -188,6 +189,14 @@ export class WorldSceneController {
   private mobApproachDy = Math.SQRT1_2
 
   private cam: Camera = { x: 0, y: 0, w: 0, h: 0 }
+
+  // Screen shake / rumble — impact juice. shakeMag is buffer-px amplitude; it decays
+  // over shakeT and is applied as a per-frame random camera offset (render-only, so
+  // Math.random is fine here — no gameplay determinism impact). A brief hit-stop
+  // (hitStopT) freezes the sim for a few ms on big hits so the blow reads.
+  private shakeMag = 0
+  private shakeT = 0
+  private hitStopT = 0
 
   // Manual control + jump state. manualMode is true while any WASD key is held.
   private input: InputState = { up: false, down: false, left: false, right: false }
@@ -319,11 +328,28 @@ export class WorldSceneController {
     e.shadow = false
   }
 
-  private spawnBolt(fromX: number, fromY: number, toX: number, toY: number, paletteId: string): void {
+  private spawnBolt(fromX: number, fromY: number, toX: number, toY: number, paletteId: string, impact: Entity | null = null, mag = 0): void {
     const e = this.scene.spawn(this.boltRig, paletteId, fromX, fromY)
     e.animator.set('idle') // looping pulse
     e.shadow = false
-    this.bolts.push({ entity: e, fromX, fromY, toX, toY, t: 0, palette: paletteId })
+    this.bolts.push({ entity: e, fromX, fromY, toX, toY, t: 0, palette: paletteId, impact, mag })
+  }
+
+  /** Impact reaction shared by melee and projectile hits: flash + recoil the target,
+   *  pop a burst, kick the camera. */
+  private impactHit(target: Entity, palette: string, burstPalette: string, mag: number, stop = 0): void {
+    if (target === this.mob) { this.mobFlashT = 0.13 } else { this.playerFlashT = 0.13 }
+    target.paletteId = 'fx/hitflash'
+    target.animator.set('hit')
+    target.animator.restart()
+    this.spawnBurst(target.tx, target.ty, burstPalette)
+    this.punch(mag, stop)
+  }
+
+  /** Kick the camera (rumble) and optionally freeze the sim briefly (hit-stop). */
+  private punch(mag: number, stop = 0): void {
+    if (mag > this.shakeMag) { this.shakeMag = mag; this.shakeT = SHAKE_DURATION }
+    if (stop > this.hitStopT) this.hitStopT = stop
   }
 
   // Classify a floating-number event → the right visual. The store's FN feed is the
@@ -505,6 +531,8 @@ export class WorldSceneController {
     this.mob.animator.set('hit')
     this.mob.animator.restart()
     if (fn.isCrit) this.spawnBurst(this.mob.tx, this.mob.ty, 'spell/holy')
+    // Rumble scales with the hit: crits kick hard + a brief hit-stop; normal a nudge.
+    this.punch(fn.isCrit ? 3.6 : 1.3, fn.isCrit ? 0.05 : 0)
     this.spawnFloater(
       this.mob, `${fn.value}${fn.isCrit ? '!' : ''}`, fn.isCrit,
       fn.color ?? (fn.isCrit ? '#ffcc00' : '#88bbff'),
@@ -513,15 +541,17 @@ export class WorldSceneController {
 
   triggerShadowBolt(fn: FloatingNumber): void {
     if (!this.mob || !this.ground) return
-    // Cast recoil — a small back-step + swing pose, not a full melee lunge.
+    // Cast: a swing pose + a charge burst at the caster's hand, then a heavy bolt that
+    // flashes/recoils the mob on arrival (impactHit) — the payoff is the landing.
     this.player.animator.set('attack')
     this.player.animator.restart()
     this.faceToward(this.player, this.mob.tx, this.mob.ty)
     const r = WorldSceneController.FX_RISE
+    this.spawnBurst(this.player.tx - r, this.player.ty - r, 'spell/shadow')
     this.spawnBolt(
       this.player.tx - r, this.player.ty - r,
       this.mob.tx - r, this.mob.ty - r,
-      'spell/shadow',
+      'spell/shadow', this.mob, 4.2,
     )
     this.spawnFloater(this.mob, `${fn.value}!`, true, fn.color ?? SHADOW_BOLT_COLOR)
   }
@@ -537,24 +567,23 @@ export class WorldSceneController {
     if (!this.mob || !this.ground) return
     this.faceToward(this.mob, this.player.tx, this.player.ty)
     if (this.mobIsRanged) {
-      // Ranged: stand-off cast — a traveling bolt instead of a melee lunge.
+      // Ranged: stand-off cast — a traveling bolt that lands on the player (impactHit
+      // fires the flash/recoil/rumble on arrival, not at cast time).
       this.mob.animator.set('attack')
       this.mob.animator.restart()
       const r = WorldSceneController.FX_RISE
       this.spawnBolt(
         this.mob.tx - r, this.mob.ty - r,
         this.player.tx - r, this.player.ty - r,
-        'spell/shadow',
+        'spell/shadow', this.player, 2.6,
       )
     } else {
+      // Melee: lunge in and the hit lands immediately.
       this.beginLunge(this.mobLunge, this.mob, this.player)
       this.mob.animator.set('attack')
       this.mob.animator.restart()
+      this.impactHit(this.player, 'fx/hitflash', 'spell/shadow', 2.0)
     }
-    this.playerFlashT = 0.13
-    this.player.paletteId = 'fx/hitflash'
-    this.player.animator.set('hit')
-    this.player.animator.restart()
     this.spawnFloater(this.player, `-${fn.value}`, false, '#ff6666')
   }
 
@@ -575,6 +604,12 @@ export class WorldSceneController {
   renderFrame(dt: number): void {
     if (!this.ground || !this.rigs) return
     const g = this.ground
+
+    // Hit-stop: freeze the sim (dt→0) for a few ms on big hits so the blow lands,
+    // while rendering + camera shake keep going (decayed on real time).
+    const realDt = dt
+    if (this.hitStopT > 0) { this.hitStopT -= realDt; dt = 0 }
+    if (this.shakeT > 0) this.shakeT -= realDt
 
     // Advance lunges (0→1→0 triangle over ~0.31s; contact visually at the apex).
     this.advanceLunge(this.playerLunge, this.player, dt)
@@ -673,7 +708,10 @@ export class WorldSceneController {
         b.t += dt * 5.5 // ~0.18s flight
         if (b.t >= 1) {
           b.entity.active = false
-          this.spawnBurst(b.toX, b.toY, b.palette)
+          // Impact reaction on arrival (this is where a spell should *land* and feel
+          // heavy) — flash/recoil the target, burst, rumble; else just a burst.
+          if (b.impact && b.impact.active) this.impactHit(b.impact, b.palette, b.palette, b.mag, 0.05)
+          else this.spawnBurst(b.toX, b.toY, b.palette)
           this.bolts.splice(i, 1)
         } else {
           b.entity.tx = b.fromX + (b.toX - b.fromX) * b.t
@@ -691,6 +729,13 @@ export class WorldSceneController {
     // Camera centered on the player's feet (height-aware → follows up hills).
     this.cam.x = feetX(g, this.player.tx, this.player.ty) - this.cam.w / 2
     this.cam.y = feetY(g, this.player.tx, this.player.ty) - this.cam.h / 2
+
+    // Rumble: decaying random kick applied after centering (so it doesn't accumulate).
+    if (this.shakeT > 0) {
+      const k = this.shakeMag * (this.shakeT / SHAKE_DURATION)
+      this.cam.x += (Math.random() * 2 - 1) * k
+      this.cam.y += (Math.random() * 2 - 1) * k
+    }
 
     // Pin tall-prop entities to the wrapped copy nearest the player before the sort
     // so they depth-correct against the player/mob as the player moves (Phase E).
