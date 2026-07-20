@@ -20,7 +20,7 @@ import { heroPaletteId } from './heroWardrobe'
 import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
 import type { Facing, IndexedSprite } from '../types'
 import type {
-  GameState, MobInstance, RaceType, Rarity, FloatingNumber, MapNode,
+  GameState, MobInstance, RaceType, Rarity, FloatingNumber, MapNode, MapScenery, WeatherType, ZoneId,
 } from '../../data/types'
 
 export const CSS_SCALE = 2
@@ -149,6 +149,30 @@ function fxColors(pal: string): { core: string; glow: string } {
   return FX_COLORS[pal] ?? { core: '#eaf0ff', glow: '#7fb0ff' }
 }
 
+// Per-biome ambient particle character (environment life). Purely decorative canvas
+// glow (additive) — no game state. rise<0 floats up (embers/fireflies); drift is the
+// horizontal wind. Biomes not listed have no ambient emitter.
+interface AmbientCfg { color: string; count: number; rise: number; drift: number; size: number; twinkle?: boolean }
+const BIOME_AMBIENT: Partial<Record<ZoneId, AmbientCfg>> = {
+  thornvale_jungle:  { color: '#a8ff60', count: 14, rise: -18, drift: 8,  size: 1.6, twinkle: true }, // fireflies
+  grimshade_forest:  { color: '#9a7cff', count: 10, rise: -8,  drift: 6,  size: 1.4, twinkle: true }, // spirit motes
+  ashfire_peaks:     { color: '#ff7020', count: 20, rise: -26, drift: 10, size: 1.5 },                // embers
+  cinderfall_wastes: { color: '#ff8828', count: 18, rise: -24, drift: 12, size: 1.5 },                // ash embers
+  dustwind_plains:   { color: '#d8c890', count: 14, rise: -2,  drift: 34, size: 1.3 },                // dust
+  ironcrag_badlands: { color: '#c89060', count: 12, rise: -2,  drift: 30, size: 1.3 },                // grit
+  warsong_mesa:      { color: '#d0a070', count: 12, rise: -2,  drift: 30, size: 1.3 },                // grit
+  venom_hollows:     { color: '#b0ff50', count: 13, rise: -10, drift: 6,  size: 1.6, twinkle: true }, // toxic spores
+  the_maw_eternal:   { color: '#60ff90', count: 12, rise: -12, drift: 5,  size: 1.5, twinkle: true }, // corrupt wisps
+  the_bloodfields:   { color: '#ff5555', count: 9,  rise: -6,  drift: 10, size: 1.3 },                // war embers
+}
+
+// Biomes whose scenery reads as dead/rocky (grey wood, charred stone) vs. living
+// (green foliage). Drives the scenery prop palette choice.
+const BARREN_SCENERY = new Set<ZoneId>([
+  'dustwind_plains', 'ironcrag_badlands', 'warsong_mesa', 'ashfire_peaks',
+  'the_bloodfields', 'cinderfall_wastes', 'the_maw_eternal',
+])
+
 export class WorldSceneController {
   private scene = new Scene()
   private canvas: HTMLCanvasElement
@@ -180,7 +204,14 @@ export class WorldSceneController {
   /** Tall prop sprite per kind (Phase E), spawned as depth-sorted entities at nodes. */
   private tallProps: Record<number, IndexedSprite>
   /** Spawned tall-prop entities + the node each represents; retired on zone change. */
-  private propEntities: { entity: Entity; node: MapNode }[] = []
+  private propEntities: { entity: Entity; gx: number; gy: number }[] = []
+
+  // Weather + ambience: synced from game state; phases advanced on real time in render.
+  private weatherType: WeatherType = 'clear'
+  private currentZone: ZoneId = 'sunhollow_meadows'
+  private cloudPhase = 0
+  private rainT = 0
+  private ambientT = 0
 
   // The player entity's buffer position is the visual source of truth. In auto mode
   // it sits at the zone-snap spot; in manual mode WASD drives it (clamped to the
@@ -500,6 +531,9 @@ export class WorldSceneController {
   sync(state: GameState): void {
     if (!this.rigs) return
 
+    this.weatherType = state.weatherState?.type ?? 'clear'
+    this.currentZone = state.currentZone
+
     // Zone change → rebake ground, snap the player into the new zone's player tile.
     if (state.currentZone !== this.zone) {
       // Retire the previous zone's tall-prop entities first (even if the new zone's
@@ -528,6 +562,9 @@ export class WorldSceneController {
         // Spawn tall-prop entities at each node (Phase E) — depth-sorted with units,
         // replacing the old flat glyph overlay. Tinted with the biome palette.
         this.spawnPropEntities(zm.nodes, palId)
+        // Plus scattered biome scenery (trees/boulders/spires/mounds/ruins) so the
+        // world reads as populated FFTA-style terrain, not a bare tile grid.
+        this.spawnScenery(zm.scenery ?? [])
       }
     }
 
@@ -942,8 +979,86 @@ export class WorldSceneController {
     this.ctx.closePath()
     this.ctx.fill()
 
+    // Ambient particles (biome life) then weather overlay — drawn over the world,
+    // under the DOM HUD. Advanced on real time so they flow through hit-stop.
+    this.drawAmbient(realDt)
+    this.drawWeather(realDt)
+
     // Floaters (DOM pool).
     this.updateFloaters(dt)
+  }
+
+  // ── Weather overlay (dimetric scene) ──────────────────────────────────────────
+  // Brings the store's weatherState into the world: an overcast dim + drifting cloud
+  // shadows for cloudy/rain, plus animated rain streaks. Pure canvas overlay — no new
+  // state, no game-logic touch.
+  private drawWeather(dt: number): void {
+    const t = this.weatherType
+    if (t === 'clear') return
+    const ctx = this.ctx
+    const W = this.cam.w, H = this.cam.h
+
+    // Overcast dim + slow-drifting soft cloud shadows.
+    ctx.save()
+    ctx.globalAlpha = t === 'rain' ? 0.20 : 0.11
+    ctx.fillStyle = t === 'rain' ? '#0a1420' : '#1c1c26'
+    ctx.fillRect(0, 0, W, H)
+    this.cloudPhase = (this.cloudPhase + dt * 7) % (W + 260)
+    ctx.globalAlpha = 0.08
+    ctx.fillStyle = '#000'
+    for (let i = 0; i < 3; i++) {
+      const cx = ((this.cloudPhase * (0.6 + i * 0.25) + i * 110) % (W + 260)) - 130
+      const cy = 24 + i * 46
+      ctx.beginPath()
+      ctx.ellipse(cx, cy, 96, 30, 0, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.restore()
+
+    if (t === 'rain') {
+      this.rainT += dt
+      ctx.save()
+      ctx.strokeStyle = 'rgba(160,190,225,0.34)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      for (let i = 0; i < 64; i++) {
+        const speed = 260 + (i % 5) * 46
+        const x = ((i * 97) + this.rainT * 46) % W
+        const y = (((i * 61) + this.rainT * speed) % (H + 24)) - 12
+        ctx.moveTo(x, y)
+        ctx.lineTo(x - 3, y + 10)
+      }
+      ctx.stroke()
+      ctx.restore()
+    }
+  }
+
+  // ── Ambient life (biome particles) ────────────────────────────────────────────
+  // A handful of drifting glow motes give each biome idle motion — fireflies, embers,
+  // dust, toxic spores. Additive blend for a soft bloom; positions are closed-form in
+  // (index, time) so there is no per-frame particle state to allocate.
+  private drawAmbient(dt: number): void {
+    const cfg = BIOME_AMBIENT[this.currentZone]
+    if (!cfg) return
+    this.ambientT += dt
+    const ctx = this.ctx, W = this.cam.w, H = this.cam.h, t = this.ambientT
+    const mod = (v: number, m: number) => ((v % m) + m) % m
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.fillStyle = cfg.color
+    for (let i = 0; i < cfg.count; i++) {
+      const s = (i * 1103515245 + 12345) & 0x7fffffff
+      const bx = (s % 1000) / 1000
+      const by = ((s >> 9) % 1000) / 1000
+      const px = mod(bx * W + t * cfg.drift * (0.5 + (i % 3) * 0.3) + Math.sin(t * 0.8 + i) * 8, W)
+      const py = mod(by * H + t * cfg.rise, H)
+      const a = cfg.twinkle ? 0.28 + 0.42 * (0.5 + 0.5 * Math.sin(t * 3 + i * 1.7)) : 0.5
+      ctx.globalAlpha = a
+      ctx.beginPath(); ctx.arc(px, py, cfg.size, 0, Math.PI * 2); ctx.fill()
+      ctx.globalAlpha = a * 0.3
+      ctx.beginPath(); ctx.arc(px, py, cfg.size * 2.4, 0, Math.PI * 2); ctx.fill()  // glow halo
+    }
+    ctx.restore()
   }
 
   /** Torus-aware exponential approach toward the store's playerMapPos (autoTx/autoTy).
@@ -1016,7 +1131,27 @@ export class WorldSceneController {
       )
       e.shadow = false
       e.animator.set('idle')
-      this.propEntities.push({ entity: e, node })
+      this.propEntities.push({ entity: e, gx: node.x, gy: node.y })
+    }
+  }
+
+  // Tall biome scenery (trees, boulders, spires, mounds, ruins) — depth-sorted so a
+  // unit can walk behind them, and shadowed to sit on the ground (FFTA-diorama look).
+  // Props carry their OWN palette (verdant/barren), not the biome ground palette, so
+  // they read as distinct objects instead of camouflaging into the terrain.
+  private spawnScenery(scenery: MapScenery[]): void {
+    const spal = BARREN_SCENERY.has(this.currentZone) ? 'prop/barren' : 'prop/verdant'
+    for (const sc of scenery) {
+      const sprite = this.tallProps[sc.kind]
+      if (!sprite) continue
+      const e = this.scene.spawn(
+        sprite, spal,
+        PAD + WorldSceneController.wrapMod(sc.x),
+        PAD + WorldSceneController.wrapMod(sc.y),
+      )
+      e.shadow = true
+      e.animator.set('idle')
+      this.propEntities.push({ entity: e, gx: sc.x, gy: sc.y })
     }
   }
 
@@ -1027,8 +1162,8 @@ export class WorldSceneController {
     for (const pe of this.propEntities) {
       // Pin to the wrapped copy nearest the player so the prop is always on the
       // visible side of the torus (mirrors drawNodes' wrapDiff logic).
-      pe.entity.tx = this.player.tx + WorldSceneController.wrapDiff(pe.node.x, pgx)
-      pe.entity.ty = this.player.ty + WorldSceneController.wrapDiff(pe.node.y, pgy)
+      pe.entity.tx = this.player.tx + WorldSceneController.wrapDiff(pe.gx, pgx)
+      pe.entity.ty = this.player.ty + WorldSceneController.wrapDiff(pe.gy, pgy)
     }
   }
 

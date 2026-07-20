@@ -402,11 +402,27 @@ export interface MapProp {
   artId: number   // PROP_KIND.*
 }
 
+// Tall depth-sorted scenery (trees, boulders, spires, mounds, bushes, ruins). Values
+// mirror the renderer's TALL_PROP ids (the data layer owns placement, the render layer
+// owns the art — same split as PROP_KIND ↔ PROP).
+export const SCENERY_KIND = {
+  TREE: 0, ROCK_BIG: 1, PINE: 7, BOULDER: 8, SPIRE: 9, MOUND: 10,
+  BUSH: 11, FLOWERBED: 12, PILLAR: 13, DEADTREE: 14, STUMP: 15, REEDS: 16,
+} as const
+
+export interface MapScenery {
+  x: number
+  y: number
+  kind: number    // SCENERY_KIND.* (== TALL_PROP.* on the render side)
+}
+
 export interface ZoneMap {
   tiles: MapTile[][]   // [row][col], 64×64
   nodes: MapNode[]
   /** Flat ground clutter (Phase D); optional for forward-compat with old saves. */
   props?: MapProp[]
+  /** Tall depth-sorted scenery scattered per biome; optional for old saves. */
+  scenery?: MapScenery[]
 }
 
 export type WeatherType = 'clear' | 'cloudy' | 'rain'

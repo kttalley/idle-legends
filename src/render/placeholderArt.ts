@@ -496,12 +496,16 @@ export function makePropSheet(id = 'props/base'): IndexedSprite {
 // feet point and the art rises above the plane. Palette-indexed → biome palettes tint.
 
 export const TALL_PROP = {
+  // node markers (0–6, kept)
   TREE: 0, ROCK_BIG: 1, CRYSTAL_CLUSTER: 2, LAIR: 3, HERB_BUSH: 4, ORE_OUTCROP: 5, CAIRN: 6,
+  // scenery (7+) — scattered per biome for a populated, FFTA-diorama world
+  PINE: 7, BOULDER: 8, SPIRE: 9, MOUND: 10, BUSH: 11, FLOWERBED: 12,
+  PILLAR: 13, DEADTREE: 14, STUMP: 15, REEDS: 16,
 } as const
 
 const TP_W = 32
 const TP_H = 48
-const TP_N = 7
+const TP_N = 17
 
 export function makePropEntities(): Record<number, IndexedSprite> {
   const p = new Painter(TP_W, TP_H, TP_N)
@@ -546,6 +550,62 @@ export function makePropEntities(): Record<number, IndexedSprite> {
   p.rect(TALL_PROP.CAIRN, 14, 25, 4, 5, 15)
   p.px(TALL_PROP.CAIRN, 15, 26, 15)
 
+  // ── Scenery (7+): scattered per biome. Foliage on veg slots (5–8), wood on earth
+  // (1–2), stone on 13–15, mounds on earth (2–4) — so the biome palette tints each to
+  // its zone (forest pine vs. venom pine, sand mound vs. ash mound, etc.). ──────────
+
+  // 7 PINE — layered conifer.
+  p.rect(TALL_PROP.PINE, 15, 34, 2, 8, 2)
+  p.rect(TALL_PROP.PINE, 9, 30, 14, 4, 5)
+  p.rect(TALL_PROP.PINE, 11, 24, 10, 5, 6)
+  p.rect(TALL_PROP.PINE, 13, 18, 6, 5, 6)
+  p.rect(TALL_PROP.PINE, 14, 13, 4, 5, 7)
+  p.px(TALL_PROP.PINE, 15, 12, 8); p.px(TALL_PROP.PINE, 12, 27, 7); p.px(TALL_PROP.PINE, 19, 31, 7)
+  // 8 BOULDER — rounded multi-facet rock.
+  p.rect(TALL_PROP.BOULDER, 9, 30, 14, 10, 14)
+  p.rect(TALL_PROP.BOULDER, 11, 26, 10, 5, 15)
+  p.rect(TALL_PROP.BOULDER, 8, 37, 16, 3, 13)
+  p.px(TALL_PROP.BOULDER, 13, 29, 15); p.px(TALL_PROP.BOULDER, 19, 31, 13); p.px(TALL_PROP.BOULDER, 16, 34, 13)
+  // 9 SPIRE — tall jagged rock spike.
+  p.rect(TALL_PROP.SPIRE, 13, 34, 6, 8, 13)
+  p.rect(TALL_PROP.SPIRE, 14, 22, 4, 12, 14)
+  p.rect(TALL_PROP.SPIRE, 15, 13, 2, 9, 15)
+  p.px(TALL_PROP.SPIRE, 14, 18, 15); p.px(TALL_PROP.SPIRE, 17, 27, 13)
+  // 10 MOUND — low rounded earth/sand/ash pile (earth slots → matches ground).
+  p.rect(TALL_PROP.MOUND, 8, 36, 16, 5, 3)
+  p.rect(TALL_PROP.MOUND, 11, 33, 10, 4, 4)
+  p.rect(TALL_PROP.MOUND, 7, 40, 18, 2, 2)
+  p.px(TALL_PROP.MOUND, 13, 34, 4); p.px(TALL_PROP.MOUND, 18, 35, 2)
+  // 11 BUSH — dense round shrub.
+  p.rect(TALL_PROP.BUSH, 10, 32, 12, 9, 5)
+  p.rect(TALL_PROP.BUSH, 12, 29, 8, 4, 6)
+  p.px(TALL_PROP.BUSH, 13, 31, 7); p.px(TALL_PROP.BUSH, 18, 33, 7); p.px(TALL_PROP.BUSH, 15, 30, 7)
+  // 12 FLOWERBED — leafy clump studded with blooms (accents 8/12/15).
+  p.rect(TALL_PROP.FLOWERBED, 9, 36, 14, 5, 6)
+  p.rect(TALL_PROP.FLOWERBED, 10, 38, 12, 3, 5)
+  p.px(TALL_PROP.FLOWERBED, 11, 35, 15); p.px(TALL_PROP.FLOWERBED, 14, 34, 8); p.px(TALL_PROP.FLOWERBED, 17, 35, 12)
+  p.px(TALL_PROP.FLOWERBED, 20, 36, 15); p.px(TALL_PROP.FLOWERBED, 12, 37, 8); p.px(TALL_PROP.FLOWERBED, 18, 38, 15)
+  // 13 PILLAR — broken stone column (ruin).
+  p.rect(TALL_PROP.PILLAR, 12, 20, 8, 20, 14)
+  p.rect(TALL_PROP.PILLAR, 12, 20, 3, 20, 15)   // lit edge
+  p.rect(TALL_PROP.PILLAR, 11, 38, 10, 4, 13)   // base block
+  p.rect(TALL_PROP.PILLAR, 12, 20, 8, 2, 15)    // broken cap
+  p.px(TALL_PROP.PILLAR, 18, 25, 13); p.px(TALL_PROP.PILLAR, 17, 31, 13)
+  // 14 DEADTREE — bare branching trunk.
+  p.rect(TALL_PROP.DEADTREE, 15, 18, 2, 24, 2)
+  p.rect(TALL_PROP.DEADTREE, 15, 18, 1, 24, 1)  // shade edge
+  p.rect(TALL_PROP.DEADTREE, 10, 22, 5, 2, 2); p.px(TALL_PROP.DEADTREE, 9, 20, 1)
+  p.rect(TALL_PROP.DEADTREE, 17, 27, 5, 2, 2); p.px(TALL_PROP.DEADTREE, 22, 25, 1)
+  // 15 STUMP — cut log with rings.
+  p.rect(TALL_PROP.STUMP, 12, 34, 8, 7, 2)
+  p.rect(TALL_PROP.STUMP, 12, 33, 8, 2, 3)
+  p.px(TALL_PROP.STUMP, 15, 33, 4); p.px(TALL_PROP.STUMP, 16, 33, 4)
+  // 16 REEDS — tall water-edge reeds.
+  p.rect(TALL_PROP.REEDS, 12, 28, 1, 14, 6); p.px(TALL_PROP.REEDS, 12, 27, 8)
+  p.rect(TALL_PROP.REEDS, 15, 24, 1, 18, 7); p.px(TALL_PROP.REEDS, 15, 23, 8)
+  p.rect(TALL_PROP.REEDS, 18, 30, 1, 12, 6); p.px(TALL_PROP.REEDS, 18, 29, 8)
+  p.rect(TALL_PROP.REEDS, 20, 26, 1, 16, 7); p.px(TALL_PROP.REEDS, 20, 25, 8)
+
   const still = (frame: number) => ({
     se: { frames: [frame], fps: 1, loop: true },
     ne: { frames: [frame], fps: 1, loop: true },
@@ -567,6 +627,16 @@ export function makePropEntities(): Record<number, IndexedSprite> {
     [TALL_PROP.HERB_BUSH]: slice(TALL_PROP.HERB_BUSH, 'props/tall/herb'),
     [TALL_PROP.ORE_OUTCROP]: slice(TALL_PROP.ORE_OUTCROP, 'props/tall/ore'),
     [TALL_PROP.CAIRN]: slice(TALL_PROP.CAIRN, 'props/tall/cairn'),
+    [TALL_PROP.PINE]: slice(TALL_PROP.PINE, 'props/tall/pine'),
+    [TALL_PROP.BOULDER]: slice(TALL_PROP.BOULDER, 'props/tall/boulder'),
+    [TALL_PROP.SPIRE]: slice(TALL_PROP.SPIRE, 'props/tall/spire'),
+    [TALL_PROP.MOUND]: slice(TALL_PROP.MOUND, 'props/tall/mound'),
+    [TALL_PROP.BUSH]: slice(TALL_PROP.BUSH, 'props/tall/bush'),
+    [TALL_PROP.FLOWERBED]: slice(TALL_PROP.FLOWERBED, 'props/tall/flowerbed'),
+    [TALL_PROP.PILLAR]: slice(TALL_PROP.PILLAR, 'props/tall/pillar'),
+    [TALL_PROP.DEADTREE]: slice(TALL_PROP.DEADTREE, 'props/tall/deadtree'),
+    [TALL_PROP.STUMP]: slice(TALL_PROP.STUMP, 'props/tall/stump'),
+    [TALL_PROP.REEDS]: slice(TALL_PROP.REEDS, 'props/tall/reeds'),
   }
 }
 

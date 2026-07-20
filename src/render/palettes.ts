@@ -216,6 +216,29 @@ reg('biome/maw', biome({
   s: ['#2c2c1c', '#3c3c24', '#4c4c30'],
 }))
 
+// ── Scenery prop palettes ─────────────────────────────────────────────────────
+// Props carry their OWN palettes (like FFTA) rather than the biome ground palette,
+// so they read as distinct objects instead of blending into the terrain. The prop
+// art uses the semantic slots — wood/earth (1–4), foliage (5–8), water/accent (9–12),
+// stone (13–15) — so one well-chosen palette renders trees, rocks, mounds and reeds
+// all correctly and with contrast on any ground.
+// 'verdant' = living biomes (green foliage); 'barren' = dead/ashen biomes (grey wood,
+// charred stone) so the same rig reads as a dead snag or bare rock, not a lush tree.
+reg('prop/verdant', paletteFromHex([
+  '',
+  '#3a2614', '#5c3c22', '#7c5432', '#9c7048', // 1–4 wood / earth (trunk, mound)
+  '#1c4a1c', '#2c6e2c', '#3c9440', '#6cc85c', // 5–8 foliage (leaves)
+  '#2c4a6c', '#3c6a94', '#5a90c4', '#a8d8f0', // 9–12 water/blue (reeds, crystal, bloom)
+  '#5c5c64', '#8c8c96', '#c4c4d0',            // 13–15 stone (rock, ruins)
+]))
+reg('prop/barren', paletteFromHex([
+  '',
+  '#2c2018', '#463424', '#5e4832', '#7a5e42', // 1–4 grey-brown deadwood
+  '#3a3a2a', '#50503a', '#66664a', '#80805e', // 5–8 dry/dead scrub
+  '#3a2a2a', '#583838', '#7a5050', '#e86030', // 9–12 dark + ember accent
+  '#4c4c54', '#74747e', '#a4a4b0',            // 13–15 charred stone
+]))
+
 export function getPalette(id: string): Palette {
   const p = REGISTRY.get(id)
   if (!p) {

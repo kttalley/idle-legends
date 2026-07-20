@@ -1,4 +1,4 @@
-import { PROP_KIND, type ZoneId, type ZoneMap, type MapTile, type MapNode, type MapProp, type TileType } from '../data/types'
+import { PROP_KIND, SCENERY_KIND, type ZoneId, type ZoneMap, type MapTile, type MapNode, type MapProp, type MapScenery, type TileType } from '../data/types'
 
 // ── Seeded PRNG ───────────────────────────────────────────────────────────────
 function hashStr(s: string): number {
@@ -218,6 +218,25 @@ const BIOME_PROPS: Record<ZoneId, { density: number; kinds: number[] }> = {
 
 const MAP_SIZE = 64
 
+// Tall scenery scattered per biome (trees, boulders, spires, mounds, bushes, ruins).
+// Sparse (these occlude and are depth-sorted entities, not baked). `kinds` is the
+// weighted pool (repeat an id to weight it); REEDS auto-restrict to water edges.
+const SK = SCENERY_KIND
+const BIOME_SCENERY: Record<ZoneId, { density: number; kinds: number[] }> = {
+  sunhollow_meadows:  { density: 0.020, kinds: [SK.TREE, SK.BUSH, SK.FLOWERBED, SK.BUSH, SK.TREE, SK.MOUND] },
+  shattered_crossing: { density: 0.024, kinds: [SK.TREE, SK.PINE, SK.BUSH, SK.STUMP, SK.PILLAR] },
+  thornvale_jungle:   { density: 0.030, kinds: [SK.TREE, SK.BUSH, SK.FLOWERBED, SK.TREE, SK.REEDS] },
+  the_maw_eternal:    { density: 0.026, kinds: [SK.DEADTREE, SK.PILLAR, SK.SPIRE, SK.REEDS, SK.DEADTREE] },
+  dustwind_plains:    { density: 0.016, kinds: [SK.MOUND, SK.BOULDER, SK.DEADTREE, SK.MOUND] },
+  ironcrag_badlands:  { density: 0.022, kinds: [SK.BOULDER, SK.SPIRE, SK.MOUND, SK.BOULDER] },
+  warsong_mesa:       { density: 0.020, kinds: [SK.BOULDER, SK.SPIRE, SK.MOUND, SK.PILLAR] },
+  ashfire_peaks:      { density: 0.024, kinds: [SK.SPIRE, SK.BOULDER, SK.DEADTREE, SK.SPIRE] },
+  the_bloodfields:    { density: 0.022, kinds: [SK.DEADTREE, SK.BOULDER, SK.PILLAR, SK.MOUND] },
+  cinderfall_wastes:  { density: 0.024, kinds: [SK.SPIRE, SK.PILLAR, SK.DEADTREE, SK.BOULDER] },
+  grimshade_forest:   { density: 0.028, kinds: [SK.DEADTREE, SK.PINE, SK.BUSH, SK.STUMP, SK.DEADTREE] },
+  venom_hollows:      { density: 0.026, kinds: [SK.DEADTREE, SK.BUSH, SK.REEDS, SK.MOUND, SK.DEADTREE] },
+}
+
 // ── CA terrain generation ─────────────────────────────────────────────────────
 function countNeighbours(grid: number[][], r: number, c: number): number {
   let count = 0
@@ -363,5 +382,27 @@ export function generateZoneMap(zoneId: ZoneId): ZoneMap {
     }
   }
 
-  return { tiles, nodes, props }
+  // Step 6: scatter tall depth-sorted scenery (trees, boulders, spires, mounds, ruins).
+  // Sparse; never on water/cliff or on a node tile. REEDS require a water neighbour so
+  // they read as bank vegetation. Deterministic per tile.
+  const scfg = BIOME_SCENERY[zoneId]
+  const nodeSet = new Set(nodes.map(n => n.y * MAP_SIZE + n.x))
+  const isWater = (r: number, c: number) =>
+    r >= 0 && r < MAP_SIZE && c >= 0 && c < MAP_SIZE && tiles[r][c].type === 'water'
+  const scenery: MapScenery[] = []
+  for (let r = 0; r < MAP_SIZE; r++) {
+    for (let c = 0; c < MAP_SIZE; c++) {
+      const t = tiles[r][c].type
+      if (t === 'water' || t === 'cliff') continue
+      const k = r * MAP_SIZE + c
+      if (nodeSet.has(k)) continue
+      if (seededRand(seed + 500, k) >= scfg.density) continue
+      const kind = scfg.kinds[Math.floor(seededRand(seed + 600, k) * scfg.kinds.length)]
+      if (kind === SCENERY_KIND.REEDS &&
+          !(isWater(r - 1, c) || isWater(r + 1, c) || isWater(r, c - 1) || isWater(r, c + 1))) continue
+      scenery.push({ x: c, y: r, kind })
+    }
+  }
+
+  return { tiles, nodes, props, scenery }
 }
