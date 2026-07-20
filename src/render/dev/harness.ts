@@ -7,11 +7,11 @@
 
 import { bakedSheetCount } from '../palette'
 import { getPalette } from '../palettes'
-import { loadSpriteOrPlaceholder } from '../indexedSprite'
+import { loadSpriteOrPlaceholder, decompose } from '../indexedSprite'
 import { makeBeastRig, makeHumanoidRig, makeTileset, makePropSheet, TILE, TILE_ANIMS, PROP } from '../placeholderArt'
 import { bakeGround, feetX, feetY, type GroundBuffer } from '../tilemap'
 import { Scene, type Camera, type Entity } from '../scene'
-import type { Facing, TileMapData } from '../types'
+import type { Facing, TileMapData, SpriteManifest } from '../types'
 
 const MAP_W = 64
 const MAP_H = 64
@@ -147,34 +147,120 @@ async function main(): Promise<void> {
   document.getElementById('artpath')!.textContent =
     heroRig.id.startsWith('ffa_') ? 'art: auto-exported FFTA roster' : 'art: programmatic placeholders'
 
-  // Ground: FFTA scaffold map if present (2× scale makes its 16×8 diamonds exactly our
-  // 32×16 footprint), else the programmatic tileset. Same GroundBuffer contract either way.
-  async function loadScaffoldGround(url: string): Promise<GroundBuffer | null> {
+  // Ground: auto-exported FFTA field map if present, else the programmatic tileset.
+  // The FFTA assets are 8×8 tiles with per-cell palette banks; we recolor the sheet
+  // once per bank and draw the visible 64×32 window (2× scale so 16×8 FFTA diamonds
+  // match our 32×16 footprint). Falls back to procedural tiles if the scaffold is absent.
+  interface TileEntry { t: number; h: boolean; v: boolean; b: number }
+
+  function hexToRgb(hex: string): [number, number, number] {
+    return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
+  }
+
+  async function loadFFTAGround(baseUrl: string): Promise<GroundBuffer | null> {
     try {
-      const res = await fetch(url)
-      if (!res.ok) return null
-      const blob = await res.blob()
-      const img = await createImageBitmap(blob)
-      const c = document.createElement('canvas')
-      c.width = img.width * 2
-      c.height = img.height * 2
-      const cctx = c.getContext('2d')!
-      cctx.imageSmoothingEnabled = false
-      cctx.drawImage(img, 0, 0, c.width, c.height)
+      const [tilesRes, arrRes, palRes] = await Promise.all([
+        fetch(`${baseUrl}tiles.json`),
+        fetch(`${baseUrl}arrangement.json`),
+        fetch(`${baseUrl}palette_lcda.json`),
+      ])
+      if (!tilesRes.ok || !arrRes.ok || !palRes.ok) return null
+      const manifest = (await tilesRes.json()) as SpriteManifest
+      const arrangement = (await arrRes.json()) as { w: number; h: number; layer0: TileEntry[]; layer1: TileEntry[] }
+      const fullPalette = (await palRes.json()) as string[]
+
+      const imgRes = await fetch(`${baseUrl}${manifest.image}`)
+      if (!imgRes.ok) return null
+      const blob = await imgRes.blob()
+      const bmp = await createImageBitmap(blob)
+      const imgCanvas = document.createElement('canvas')
+      imgCanvas.width = bmp.width
+      imgCanvas.height = bmp.height
+      const ictx = imgCanvas.getContext('2d')!
+      ictx.drawImage(bmp, 0, 0)
+      const sprite = decompose(manifest, imgCanvas)
+      const { frameW, frameH, cols, frameCount, indices } = sprite
+
+      // Recolor the slot-index sheet once per palette bank. `decompose` returns
+      // frame-major indices, so we rebuild each frame at its visual sheet position.
+      const banks = Math.min(16, Math.floor(fullPalette.length / 16))
+      const bankSheets: HTMLCanvasElement[] = []
+      const sheetW = cols * frameW
+      const sheetH = Math.ceil(frameCount / cols) * frameH
+      const rows = Math.ceil(frameCount / cols)
+      for (let bank = 0; bank < banks; bank++) {
+        const c = document.createElement('canvas')
+        c.width = sheetW
+        c.height = sheetH
+        const cx = c.getContext('2d')!
+        const idata = cx.createImageData(sheetW, sheetH)
+        const d = idata.data
+        for (let f = 0; f < frameCount; f++) {
+          const gx = (f % cols) * frameW
+          const gy = Math.floor(f / cols) * frameH
+          for (let y = 0; y < frameH; y++) {
+            for (let x = 0; x < frameW; x++) {
+              const slot = indices[f * frameW * frameH + y * frameW + x]
+              if (slot === 0) continue
+              const hex = fullPalette[bank * 16 + slot]
+              if (!hex) continue
+              const [r, g, b] = hexToRgb(hex)
+              const p = ((gy + y) * sheetW + (gx + x)) * 4
+              d[p] = r; d[p + 1] = g; d[p + 2] = b; d[p + 3] = 255
+            }
+          }
+        }
+        cx.putImageData(idata, 0, 0)
+        bankSheets.push(c)
+      }
+      const defaultSheet = bankSheets[0]
+
+      const out = document.createElement('canvas')
+      out.width = arrangement.w * frameW * 2
+      out.height = arrangement.h * frameH * 2
+      const octx = out.getContext('2d')!
+      octx.imageSmoothingEnabled = false
+      octx.scale(2, 2)
+
+      function drawLayer(layer: TileEntry[]) {
+        for (let i = 0; i < layer.length; i++) {
+          const e = layer[i]
+          if (e.t === 0 || e.t >= frameCount) continue
+          const sheet = bankSheets[e.b] ?? defaultSheet
+          const sx = (e.t % cols) * frameW
+          const sy = Math.floor(e.t / cols) * frameH
+          const dx = (i % arrangement.w) * frameW
+          const dy = Math.floor(i / arrangement.w) * frameH
+          octx.save()
+          octx.translate(dx + (e.h ? frameW : 0), dy + (e.v ? frameH : 0))
+          octx.scale(e.h ? -1 : 1, e.v ? -1 : 1)
+          octx.drawImage(sheet, sx, sy, frameW, frameH, 0, 0, frameW, frameH)
+          octx.restore()
+        }
+      }
+
+      drawLayer(arrangement.layer0)
+      drawLayer(arrangement.layer1)
+
       // Origin tuned so the demo choreography (tiles ~20–44) lands on the map's ground.
-      return { canvas: c, originX: 520, planeOffsetY: 170, width: c.width, height: c.height, heights: null, bw: 0,
-               sheet: null, sheetCols: 0, sheetFrameW: 0, sheetFrameH: 0, anims: [], elapsed: 0 }
-    } catch {
+      return {
+        canvas: out, originX: 520, planeOffsetY: 170,
+        width: out.width, height: out.height,
+        heights: null, bw: 0,
+        sheet: null, sheetCols: 0, sheetFrameW: 0, sheetFrameH: 0,
+        anims: [], elapsed: 0,
+      }
+    } catch (e) {
+      console.error('loadFFTAGround failed', e)
       return null
     }
   }
 
-  const scaffoldGround = await loadScaffoldGround(`${scaffold}map1.png`)
+  const ffaGround = await loadFFTAGround(`${scaffold}maps/1/`)
   const map = buildMap()
-  // groundA animates water (2↔3); groundB stays a static WATER_ALT preview (the alt
-  // frame alone), so the two panes contrast live shimmer vs. the second frame.
-  const groundA = scaffoldGround ?? bakeGround(map, tileset, 'biome/meadow', getPalette('biome/meadow'), TILE_ANIMS, propSheet)
-  const groundB = scaffoldGround ?? bakeGround(withAltWater(map), tileset, 'biome/meadow', getPalette('biome/meadow'), undefined, propSheet)
+  // No animated tile cycles yet for the FFTA ground, so both buffers are the same static map.
+  const groundA = ffaGround ?? bakeGround(map, tileset, 'biome/meadow', getPalette('biome/meadow'), TILE_ANIMS, propSheet)
+  const groundB = ffaGround ?? bakeGround(withAltWater(map), tileset, 'biome/meadow', getPalette('biome/meadow'), undefined, propSheet)
 
   const scene = new Scene()
   const floaters = makeFloaters()
