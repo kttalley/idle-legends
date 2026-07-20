@@ -1,16 +1,18 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../../../store/gameStore'
 import { ZONES } from '../../../data/zones'
+import { ZoneSelector } from '../ZoneSelector'
 import type { ZoneMap, TileType } from '../../../data/types'
 
-// Top-left "radar": the current zone's 64×64 ZoneMap baked to a small north-up canvas,
-// with live player / mob / node blips over it. The terrain bake is cached per zone
-// (it never changes); only the blips redraw per tick. Static north-up (not rotating)
-// keeps it cheap and legible — the player dot moves across a fixed map.
+// Top-right circular radar: the current zone's 64×64 ZoneMap baked to an offscreen
+// canvas (cached per zone), player-centered so the player sits at the disc center with
+// the world scrolling under it, clipped to a circle. Compact (~0.5 the old size). A map
+// button opens the zone fast-travel list.
 
 const MAP = 64
-const PX = 2                 // pixels per tile
-const SIZE = MAP * PX        // 128px canvas
+const SRC = 128          // offscreen bake resolution (2px/tile)
+const VIEW = 74          // on-screen disc diameter (css px)
+const SPAN = 30          // tiles visible across the disc (player-centered window)
 
 function tileColor(type: TileType): string {
   switch (type) {
@@ -21,24 +23,22 @@ function tileColor(type: TileType): string {
     case 'snow':   return '#c2c8d0'
     case 'moss':   return '#2f4a26'
     case 'flower': return '#4a6236'
-    default:       return '#3c5730' // terrain / grass
+    default:       return '#3c5730'
   }
 }
 
-/** Bake the terrain to an offscreen canvas once per zone. */
 function bakeTerrain(zm: ZoneMap): HTMLCanvasElement {
   const c = document.createElement('canvas')
-  c.width = SIZE
-  c.height = SIZE
+  c.width = SRC; c.height = SRC
   const ctx = c.getContext('2d')!
+  const s = SRC / MAP
   for (let y = 0; y < MAP; y++) {
     const row = zm.tiles[y]
     if (!row) continue
     for (let x = 0; x < MAP; x++) {
-      const t = row[x]
-      if (!t) continue
+      const t = row[x]; if (!t) continue
       ctx.fillStyle = tileColor(t.type)
-      ctx.fillRect(x * PX, y * PX, PX, PX)
+      ctx.fillRect(x * s, y * s, s, s)
     }
   }
   return c
@@ -54,6 +54,7 @@ export function MinimapRadar() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const bakedRef  = useRef<{ zone: string; canvas: HTMLCanvasElement } | null>(null)
+  const [mapOpen, setMapOpen] = useState(false)
 
   const zm = zoneMaps[currentZone]
   const zoneName = zoneNames[currentZone] ?? ZONES[currentZone]?.name ?? 'Unknown'
@@ -62,72 +63,114 @@ export function MinimapRadar() {
     const canvas = canvasRef.current
     if (!canvas || !zm) return
     const ctx = canvas.getContext('2d')!
-
-    // Rebake terrain only when the zone changes.
     if (!bakedRef.current || bakedRef.current.zone !== currentZone) {
       bakedRef.current = { zone: currentZone, canvas: bakeTerrain(zm) }
     }
-    ctx.clearRect(0, 0, SIZE, SIZE)
-    ctx.drawImage(bakedRef.current.canvas, 0, 0)
 
-    // Node blips (ore/herb/mob spawn/boss lair) — use the node's own color.
+    // Player-centered window: draw a SPAN-tile region of the baked map around the
+    // player into the VIEW disc. px/tile on screen:
+    const scale = VIEW / SPAN
+    const srcPerTile = SRC / MAP
+    ctx.clearRect(0, 0, VIEW, VIEW)
+    ctx.imageSmoothingEnabled = false
+    // Source rect centered on the player (in offscreen px), torus-wrapped by drawing
+    // the baked canvas at three offsets so edges are seamless.
+    const cxTile = playerPos.x, cyTile = playerPos.y
+    for (let ox = -1; ox <= 1; ox++) {
+      for (let oy = -1; oy <= 1; oy++) {
+        const sx = (cxTile + ox * MAP - SPAN / 2) * srcPerTile
+        const sy = (cyTile + oy * MAP - SPAN / 2) * srcPerTile
+        ctx.drawImage(bakedRef.current.canvas,
+          sx, sy, SPAN * srcPerTile, SPAN * srcPerTile,
+          0, 0, VIEW, VIEW)
+      }
+    }
+
+    const toDisc = (tx: number, ty: number) => ({
+      x: VIEW / 2 + (tx - cxTile) * scale,
+      y: VIEW / 2 + (ty - cyTile) * scale,
+    })
+
+    // Node blips within range.
     for (const node of zm.nodes) {
+      // nearest wrapped copy
+      let dx = node.x - cxTile; dx = ((dx + MAP / 2 + MAP) % MAP) - MAP / 2
+      let dy = node.y - cyTile; dy = ((dy + MAP / 2 + MAP) % MAP) - MAP / 2
+      if (Math.abs(dx) > SPAN / 2 || Math.abs(dy) > SPAN / 2) continue
       ctx.fillStyle = node.color
-      ctx.fillRect(node.x * PX - 1, node.y * PX - 1, PX + 1, PX + 1)
+      ctx.fillRect(VIEW / 2 + dx * scale - 1, VIEW / 2 + dy * scale - 1, 2, 2)
     }
 
-    // Mob blip (player pos + offset, torus-wrapped).
+    // Mob blip.
     if (hasMob) {
-      const mx = (((playerPos.x + mobOffset.dx) % MAP) + MAP) % MAP
-      const my = (((playerPos.y + mobOffset.dy) % MAP) + MAP) % MAP
+      const p = toDisc(cxTile + mobOffset.dx, cyTile + mobOffset.dy)
       ctx.fillStyle = '#ff3b30'
-      ctx.beginPath()
-      ctx.arc(mx * PX, my * PX, 2.5, 0, Math.PI * 2)
-      ctx.fill()
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2); ctx.fill()
     }
 
-    // Player blip (gold, ringed).
-    const px = playerPos.x * PX
-    const py = playerPos.y * PX
+    // Player at center.
     ctx.fillStyle = '#ffd54a'
-    ctx.beginPath()
-    ctx.arc(px, py, 2.8, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.strokeStyle = '#7a5a10'
-    ctx.lineWidth = 1
-    ctx.stroke()
+    ctx.beginPath(); ctx.arc(VIEW / 2, VIEW / 2, 2.8, 0, Math.PI * 2); ctx.fill()
+    ctx.strokeStyle = '#7a5a10'; ctx.lineWidth = 1; ctx.stroke()
   }, [currentZone, zm, playerPos, mobOffset, hasMob])
 
   return (
-    <div
-      style={{
-        pointerEvents: 'auto',
-        background: 'rgba(8,8,14,0.82)',
-        border: '1px solid #3a3630',
-        borderRadius: 6,
-        padding: 5,
-        width: SIZE + 10,
-      }}
-    >
-      <canvas
-        ref={canvasRef}
-        width={SIZE}
-        height={SIZE}
-        style={{ display: 'block', borderRadius: 3, imageRendering: 'pixelated', width: SIZE, height: SIZE }}
-      />
+    <div style={{ pointerEvents: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+      <div style={{ position: 'relative', width: VIEW, height: VIEW }}>
+        <canvas
+          ref={canvasRef}
+          width={VIEW}
+          height={VIEW}
+          style={{
+            width: VIEW, height: VIEW, display: 'block',
+            borderRadius: '50%',
+            border: '2px solid #3a3630',
+            boxShadow: '0 0 0 1px #000, inset 0 0 8px rgba(0,0,0,0.6)',
+            background: '#0a0e14',
+          }}
+        />
+        {/* Map / fast-travel button, tucked on the disc edge */}
+        <button
+          onClick={() => setMapOpen(true)}
+          title="World map — fast travel"
+          style={{
+            position: 'absolute', right: -4, bottom: -4,
+            width: 22, height: 22, borderRadius: '50%',
+            border: '1px solid #6b5020', background: 'rgba(20,16,8,0.95)',
+            color: '#ffd700', fontSize: 12, cursor: 'pointer', lineHeight: '20px', padding: 0,
+          }}
+        >
+          🗺
+        </button>
+      </div>
       <div style={{
-        fontSize: 10,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        color: '#b8a878',
-        marginTop: 4,
-        textAlign: 'center',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
+        fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#c8b890',
+        textShadow: '0 1px 2px #000', maxWidth: VIEW + 12, textAlign: 'center',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
         {zoneName}
       </div>
+
+      {mapOpen && (
+        <div
+          onClick={() => setMapOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ width: 'min(340px, 92vw)' }}>
+            <ZoneSelector />
+            <button
+              onClick={() => setMapOpen(false)}
+              className="rp-button"
+              style={{ marginTop: 6, width: '100%', fontSize: '0.7rem' }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

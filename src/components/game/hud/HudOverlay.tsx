@@ -11,11 +11,11 @@ import { ActionBar } from './ActionBar'
 export function HudOverlay() {
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
-      <div style={{ position: 'absolute', top: 10, left: 10 }}>
-        <MinimapRadar />
-      </div>
-      <div style={{ position: 'absolute', top: 10, right: 10 }}>
+      <div style={{ position: 'absolute', top: 8, left: 8 }}>
         <UnitFrames />
+      </div>
+      <div style={{ position: 'absolute', top: 8, right: 8 }}>
+        <MinimapRadar />
       </div>
       <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)' }}>
         <ActionBar />

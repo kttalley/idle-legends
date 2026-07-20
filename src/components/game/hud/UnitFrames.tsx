@@ -6,53 +6,24 @@ import { CLASS_DEFINITIONS } from '../../../data/classes'
 import { xpForLevel } from '../../../engine/progression'
 import type { CastState } from '../../../data/types'
 
-const CARD: React.CSSProperties = {
-  pointerEvents: 'auto',
-  width: 172,
-  background: 'rgba(8,8,14,0.82)',
-  border: '1px solid #3a3630',
-  borderRadius: 6,
-  padding: '7px 9px',
-}
+// Compact, background-less unit read-outs (mobile-friendly). Just bars + text + status
+// icons floating over the world — no card panel. The HP/XP bar tracks provide their own
+// contrast; text carries a shadow for legibility.
 
-const NAME_ROW: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  marginBottom: 5,
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'baseline',
-  gap: 6,
-}
+const TEXT_SHADOW = '0 1px 2px #000, 0 0 2px #000'
+const WIDTH = 150
 
-/** Slim cast-progress bar — fills toward completion; shows the spell icon + name. */
 function CastBar({ cast }: { cast: CastState }) {
   const pct = cast.total > 0 ? Math.max(0, Math.min(1, 1 - cast.remaining / cast.total)) : 0
   return (
-    <div style={{ marginTop: 4 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, position: 'relative', height: 12 }}>
-        <div style={{ position: 'absolute', inset: 0, background: '#100d18', borderRadius: 2, overflow: 'hidden' }}>
-          <div style={{
-            height: '100%',
-            width: `${pct * 100}%`,
-            background: 'linear-gradient(180deg, #ffe27a, #c8901c)',
-            transition: 'width 0.06s linear',
-          }} />
-        </div>
-        <span style={{ position: 'relative', fontSize: 9, marginLeft: 3, lineHeight: '12px' }}>{cast.icon}</span>
-        <span style={{
-          position: 'relative', fontSize: 8, color: '#fff8e0', fontWeight: 600,
-          lineHeight: '12px', textShadow: '0 1px 1px #000', whiteSpace: 'nowrap',
-        }}>
-          {cast.name}
-        </span>
-        <span style={{
-          position: 'absolute', right: 4, fontSize: 8, color: '#fff8e0',
-          lineHeight: '12px', textShadow: '0 1px 1px #000',
-        }}>
-          {cast.remaining.toFixed(1)}s
-        </span>
-      </div>
+    <div style={{ position: 'relative', height: 10, borderRadius: 2, overflow: 'hidden', background: 'rgba(8,6,14,0.7)' }}>
+      <div style={{ height: '100%', width: `${pct * 100}%`, background: 'linear-gradient(180deg, #ffe27a, #c8901c)' }} />
+      <span style={{ position: 'absolute', left: 3, top: 0, fontSize: 8, lineHeight: '10px', color: '#fff8e0', fontWeight: 600, textShadow: TEXT_SHADOW, whiteSpace: 'nowrap' }}>
+        {cast.icon} {cast.name}
+      </span>
+      <span style={{ position: 'absolute', right: 3, top: 0, fontSize: 8, lineHeight: '10px', color: '#fff8e0', textShadow: TEXT_SHADOW }}>
+        {cast.remaining.toFixed(1)}s
+      </span>
     </div>
   )
 }
@@ -71,81 +42,53 @@ export function UnitFrames() {
   const combo = procState.comboPoints
 
   return (
-    <div style={{ display: 'flex', gap: 8 }}>
-      {/* ── Player frame ── */}
-      <div style={CARD}>
-        <div style={NAME_ROW}>
-          <span className={classDef.colorClass} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+    <div style={{ width: WIDTH, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* ── Player ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 10, textShadow: TEXT_SHADOW }}>
+          <span className={classDef.colorClass} style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {playerName || classDef.name}
           </span>
-          <span style={{ color: '#8a8578', fontWeight: 400, flexShrink: 0 }}>Lv {level}</span>
+          <span style={{ color: '#cdbf9a', flexShrink: 0 }}>Lv {level}</span>
         </div>
-
-        <HealthBar current={Math.max(0, Math.round(stats.currentHp))} max={stats.maxHp} type="hp" height={11} />
-        <div style={{ height: 3 }} />
-        <HealthBar current={xp} max={xpNeeded} type="xp" height={7} showText={false} />
-
+        <HealthBar current={Math.max(0, Math.round(stats.currentHp))} max={stats.maxHp} type="hp" height={9} />
+        <HealthBar current={xp} max={xpNeeded} type="xp" height={3} showText={false} />
         {castState && <CastBar cast={castState} />}
-
         {combo > 0 && (
-          <div style={{ marginTop: 4, fontSize: 9, color: '#ff8800', letterSpacing: 1 }}>
+          <div style={{ fontSize: 9, color: '#ff8800', letterSpacing: 1, textShadow: TEXT_SHADOW }}>
             {'●'.repeat(combo)}{'○'.repeat(Math.max(0, 5 - combo))}
           </div>
         )}
-
-        {activeBuffs.length > 0 && (
-          <div style={{ marginTop: 4 }}>
-            <StatusEffects buffs={activeBuffs} />
-          </div>
-        )}
-
+        {activeBuffs.length > 0 && <div style={{ display: 'flex', justifyContent: 'flex-start' }}><StatusEffects buffs={activeBuffs} /></div>}
         {!isAlive && (
-          <div style={{ marginTop: 5, fontSize: 10, color: '#ff5555', display: 'flex', alignItems: 'center', gap: 6 }}>
-            💀 Slain — {Math.ceil(respawnTimer)}s
-            <button
-              onClick={respawnNow}
-              style={{
-                fontSize: 9, padding: '1px 6px', borderRadius: 3,
-                border: '1px solid #6a2c24', background: '#2a1210', color: '#ffb0a0', cursor: 'pointer',
-              }}
-            >
+          <div style={{ fontSize: 10, color: '#ff6a5a', display: 'flex', alignItems: 'center', gap: 6, textShadow: TEXT_SHADOW }}>
+            💀 {Math.ceil(respawnTimer)}s
+            <button onClick={respawnNow} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, border: '1px solid #6a2c24', background: 'rgba(42,18,16,0.9)', color: '#ffb0a0', cursor: 'pointer' }}>
               Respawn
             </button>
           </div>
         )}
       </div>
 
-      {/* ── Target frame ── */}
+      {/* ── Target ── */}
       {currentMob && (
-        <div style={{ ...CARD, borderColor: currentMob.isBoss ? '#8a5a1c' : currentMob.isElite ? '#5a2c8a' : '#6a2c24' }}>
-          <div style={NAME_ROW}>
-            <span style={{
-              color: currentMob.isBoss ? '#ff9a3c' : currentMob.isElite ? '#c78af0' : '#e0b0a0',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {currentMob.isBoss ? '☠ ' : currentMob.isElite ? '★ ' : ''}{currentMob.name}
-            </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, textShadow: TEXT_SHADOW,
+            color: currentMob.isBoss ? '#ff9a3c' : currentMob.isElite ? '#c78af0' : '#e0b0a0',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {currentMob.isBoss ? '☠ ' : currentMob.isElite ? '★ ' : ''}{currentMob.name}
           </div>
-
           {mobApproaching ? (
-            <div style={{ fontSize: 9, color: '#c89a6a', padding: '3px 0' }}>
-              ↘ approaching… ~{Math.round(mobDist / 2.5)}s
-            </div>
+            <div style={{ fontSize: 9, color: '#c89a6a', textShadow: TEXT_SHADOW }}>↘ approaching… ~{Math.round(mobDist / 2.5)}s</div>
           ) : (
-            <HealthBar current={Math.max(0, currentMob.currentHp)} max={currentMob.maxHp} type="mob-hp" height={11} />
+            <HealthBar current={Math.max(0, currentMob.currentHp)} max={currentMob.maxHp} type="mob-hp" height={9} />
           )}
-
           {procState.mobFrozen && (
-            <div style={{ marginTop: 4, fontSize: 9, color: '#6ab0ff' }}>
-              🥶 Frozen {procState.mobFrozenTimer.toFixed(1)}s
-            </div>
+            <div style={{ fontSize: 9, color: '#6ab0ff', textShadow: TEXT_SHADOW }}>🥶 {procState.mobFrozenTimer.toFixed(1)}s</div>
           )}
-
-          {activeDoTs.length > 0 && (
-            <div style={{ marginTop: 4 }}>
-              <StatusEffects dots={activeDoTs} />
-            </div>
-          )}
+          {activeDoTs.length > 0 && <div style={{ display: 'flex', justifyContent: 'flex-start' }}><StatusEffects dots={activeDoTs} /></div>}
         </div>
       )}
     </div>
