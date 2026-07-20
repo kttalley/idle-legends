@@ -326,7 +326,7 @@ export class WorldSceneController {
     this.ctx = canvas.getContext('2d')!
     this.ctx.imageSmoothingEnabled = false
     this.floatersHost = floatersHost
-    this.tileset = makeTileset()
+    this.tileset = makeTileset()   // programmatic default; init() may swap in the scaffold
     this.propSheet = makePropSheet()
     this.tallProps = makePropEntities()
   }
@@ -338,6 +338,10 @@ export class WorldSceneController {
     const mobHumanoid = await loadSpriteOrPlaceholder(`${scaffold}enemy1.json`, () => makeHumanoidRig('rig/mob-humanoid'))
     const mobBeast = await loadSpriteOrPlaceholder(`${scaffold}goblin.json`, () => makeBeastRig('rig/mob-beast'))
     this.rigs = { player, mobHumanoid, mobBeast }
+    // FFTA-traced ground tiles (gitignored dev scaffold); falls back to the programmatic
+    // tileset set in the constructor. Traced tiles are indexed to our semantic slots, so
+    // biome palettes still recolor them.
+    this.tileset = await loadSpriteOrPlaceholder(`${scaffold}tiles.json`, makeTileset)
     this.burstRig = makeBurstRig('fx/burst')
     this.boltRig = makeBoltRig('fx/bolt')
 
