@@ -188,37 +188,20 @@ const ALLIANCE_RACES: RaceType[] = ['human', 'dwarf', 'elf']
 const HORDE_RACES: RaceType[] = ['orc', 'troll', 'goblin']
 // Weighted toward common so a rare/epic/legendary drop-in reads as special.
 const AMBIENT_RARITY: Rarity[] = ['common', 'common', 'common', 'uncommon', 'uncommon', 'rare', 'epic', 'legendary']
-const AMBIENT_MEMBER_LEASH = 3.2   // how far a member roams from its group's anchor
-const AMBIENT_GROUP_SPREAD = 9     // how far group anchors sit from the player (in view)
-const AMBIENT_RECYCLE_DIST = 24    // anchor this far past the player recycles ahead
-
-// Encounter-group templates (heroes h, monsters m). Weighted so the world reads as a
-// mix — parties fighting a mob, a lone monster, a 1v1 duel, a hero patrol — instead of
-// one uniform crowd. `fight` groups start their members trading attack anims.
-const AMBIENT_GROUPS: { h: number; m: number; fight: boolean; w: number }[] = [
-  { h: 2, m: 1, fight: true,  w: 3 },  // party vs monster
-  { h: 1, m: 1, fight: true,  w: 3 },  // 1v1 duel
-  { h: 2, m: 0, fight: false, w: 2 },  // hero patrol (2)
-  { h: 1, m: 0, fight: false, w: 2 },  // lone hero
-  { h: 0, m: 1, fight: false, w: 3 },  // lone/peripheral monster
-  { h: 0, m: 2, fight: false, w: 1 },  // monster pack
-]
-// Group counts by context — the open world is moderate; town/capital is a busy hub.
-const AMBIENT_GROUPS_WORLD = 5
-const AMBIENT_GROUPS_TOWN = 9
+// How far ambient actors roam from the player's tile (keeps the crowd on-camera).
+const AMBIENT_LEASH = 11
 
 interface Ambient {
   e: Entity
   kind: 'hero' | 'mob'
   gx: number; gy: number    // wrapping game-tile position (0..64)
-  tgx: number; tgy: number  // current wander target (near the group anchor)
+  tgx: number; tgy: number  // current wander target
   t: number                 // seconds until repick
   fightT: number            // >0 → skirmishing (attack anims, no wander)
   atkCd: number
   name: string
   level: number
   faction: FactionType
-  grp: number               // index into ambientGroups (its encounter cluster)
 }
 
 /** Movement vector → dimetric facing (se:+x, sw:+y, nw:−x, ne:−y). */
@@ -259,9 +242,8 @@ export class WorldSceneController {
   /** Spawned tall-prop entities + the node each represents; retired on zone change. */
   private propEntities: { entity: Entity; gx: number; gy: number }[] = []
 
-  // Simulated MMO ambience — other heroes/monsters roaming the zone in encounter groups.
+  // Simulated MMO ambience — other heroes/monsters roaming the zone.
   private ambient: Ambient[] = []
-  private ambientGroups: { gx: number; gy: number; fight: boolean }[] = []
   private ambientSkirmishCd = 0
 
   // Weather + ambience: synced from game state; phases advanced on real time in render.
@@ -596,9 +578,8 @@ export class WorldSceneController {
     this.weatherType = state.weatherState?.type ?? 'clear'
     this.currentZone = state.currentZone
 
-    // Zone change (or a never-baked ground — closes any first-bake race that would
-    // otherwise leave a black viewport) → rebake ground + repopulate the zone.
-    if (state.currentZone !== this.zone || !this.ground) {
+    // Zone change → rebake ground, snap the player into the new zone's player tile.
+    if (state.currentZone !== this.zone) {
       // Retire the previous zone's tall-prop + ambient entities first (even if the
       // new zone's map isn't ready yet, so stale entities never linger).
       this.retirePropEntities()
@@ -1022,9 +1003,8 @@ export class WorldSceneController {
     // Pin tall-prop entities to the wrapped copy nearest the player before the sort
     // so they depth-correct against the player/mob as the player moves (Phase E).
     this.updatePropEntities()
-    // Advance roaming heroes/monsters. Guarded so a stray ambient error can never
-    // take down the whole scene render (belt-and-suspenders around the new code).
-    try { this.updateAmbient(realDt) } catch (err) { console.error('[ambient] update failed:', err) }
+    // Advance roaming heroes/monsters + pin them to the near torus copy.
+    this.updateAmbient(realDt)
 
     this.scene.render(this.ctx, this.cam, g, dt)
 
@@ -1038,7 +1018,7 @@ export class WorldSceneController {
     this.drawNodes(g)
 
     // Faction-coloured nameplates over roaming ambient heroes (sells "other players").
-    try { this.drawAmbientNameplates() } catch (err) { console.error('[ambient] nameplate failed:', err) }
+    this.drawAmbientNameplates()
 
     // Player chevron — gold marker above the followed unit (rides above the jump).
     const px = Math.round(this.player.screenX - this.cam.x)
@@ -1250,111 +1230,67 @@ export class WorldSceneController {
   private retireAmbient(): void {
     for (const a of this.ambient) a.e.active = false
     this.ambient = []
-    this.ambientGroups = []
   }
 
-  // Place a group anchor a spread's distance from the player's tile, in a seeded
-  // direction, so encounters sit around (not on top of) the player.
-  private ambientAnchor(dirRnd: number, distRnd: number): { gx: number; gy: number } {
-    const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
-    const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
-    const ang = dirRnd * Math.PI * 2
-    const dist = AMBIENT_GROUP_SPREAD * (0.5 + 0.5 * distRnd)
-    return { gx: WorldSceneController.wrapMod(pgx + Math.cos(ang) * dist),
-             gy: WorldSceneController.wrapMod(pgy + Math.sin(ang) * dist) }
-  }
-
-  private spawnAmbient(groupCount = AMBIENT_GROUPS_WORLD): void {
+  private spawnAmbient(): void {
     if (!this.rigs) return
     const seed = this.zoneSeed()
     const rnd = (n: number) => { const x = Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453; return x - Math.floor(x) }
-    const totalW = AMBIENT_GROUPS.reduce((a, g) => a + g.w, 0)
-    const jitter = (b: number) => (rnd(b) * 2 - 1) * 2.2   // member offset within a group
-    for (let gi = 0; gi < groupCount; gi++) {
-      // Weighted-pick this encounter's shape.
-      let r = rnd(gi * 13) * totalW
-      let tmpl = AMBIENT_GROUPS[0]
-      for (const g of AMBIENT_GROUPS) { if ((r -= g.w) < 0) { tmpl = g; break } }
-      const a = this.ambientAnchor(rnd(gi * 13 + 1), rnd(gi * 13 + 2))
-      this.ambientGroups.push({ gx: a.gx, gy: a.gy, fight: tmpl.fight })
-      for (let k = 0; k < tmpl.h; k++) {
-        const s = gi * 100 + k * 11 + 3
-        const faction: FactionType = rnd(s) < 0.5 ? 'alliance' : 'horde'
-        const races = faction === 'alliance' ? ALLIANCE_RACES : HORDE_RACES
-        const race = races[Math.floor(rnd(s + 1) * races.length)]
-        const cls = AMBIENT_CLASSES[Math.floor(rnd(s + 2) * AMBIENT_CLASSES.length)]
-        const rarity = AMBIENT_RARITY[Math.floor(rnd(s + 3) * AMBIENT_RARITY.length)]
-        const gx = WorldSceneController.wrapMod(a.gx + jitter(s + 4))
-        const gy = WorldSceneController.wrapMod(a.gy + jitter(s + 5))
-        const e = this.scene.spawn(this.rigs.player, heroPaletteId(cls, race, faction, rarity),
-          PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
-        e.shadow = true; e.animator.set('idle')  // idle tag IS the gait (walk is flinchy)
-        this.ambient.push({
-          e, kind: 'hero', gx, gy, tgx: gx, tgy: gy, t: rnd(s + 8) * 3,
-          fightT: tmpl.fight ? 3 + rnd(s + 6) * 3 : 0, atkCd: rnd(s + 7) * 0.6,
-          name: AMBIENT_NAMES[Math.floor(rnd(s + 9) * AMBIENT_NAMES.length)],
-          level: 1 + Math.floor(rnd(s + 10) * 60), faction, grp: gi,
-        })
-      }
-      for (let k = 0; k < tmpl.m; k++) {
-        const s = gi * 100 + k * 11 + 60
-        const rig = rnd(s) < 0.5 ? this.rigs.mobBeast : this.rigs.mobHumanoid
-        const pal = rnd(s + 1) < 0.25 ? 'elite' : 'team/enemy'
-        const gx = WorldSceneController.wrapMod(a.gx + jitter(s + 2))
-        const gy = WorldSceneController.wrapMod(a.gy + jitter(s + 3))
-        const e = this.scene.spawn(rig, pal, PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
-        e.shadow = true; e.animator.set('idle')
-        this.ambient.push({
-          e, kind: 'mob', gx, gy, tgx: gx, tgy: gy, t: rnd(s + 4) * 3,
-          fightT: tmpl.fight ? 3 + rnd(s + 5) * 3 : 0, atkCd: rnd(s + 6) * 0.6,
-          name: '', level: 0, faction: 'neutral', grp: gi,
-        })
-      }
+    // Cluster the crowd around the player's tile (who stays camera-centred) so several
+    // are always in view; they roam within a leash that follows the player (below).
+    const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
+    const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
+    const near = (n: number) => (rnd(n) * 2 - 1) * AMBIENT_LEASH
+    const HEROES = 6, MOBS = 4
+    for (let i = 0; i < HEROES; i++) {
+      const faction: FactionType = rnd(i * 9 + 1) < 0.5 ? 'alliance' : 'horde'
+      const races = faction === 'alliance' ? ALLIANCE_RACES : HORDE_RACES
+      const race = races[Math.floor(rnd(i * 9 + 2) * races.length)]
+      const cls = AMBIENT_CLASSES[Math.floor(rnd(i * 9 + 3) * AMBIENT_CLASSES.length)]
+      const rarity = AMBIENT_RARITY[Math.floor(rnd(i * 9 + 4) * AMBIENT_RARITY.length)]
+      const gx = WorldSceneController.wrapMod(pgx + near(i * 9 + 5))
+      const gy = WorldSceneController.wrapMod(pgy + near(i * 9 + 6))
+      const e = this.scene.spawn(this.rigs.player, heroPaletteId(cls, race, faction, rarity),
+        PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
+      e.shadow = true; e.animator.set('idle')  // idle tag IS the gait (walk tag is flinchy)
+      this.ambient.push({
+        e, kind: 'hero', gx, gy, tgx: gx, tgy: gy, t: 0, fightT: 0, atkCd: 0,
+        name: AMBIENT_NAMES[Math.floor(rnd(i * 9 + 7) * AMBIENT_NAMES.length)],
+        level: 1 + Math.floor(rnd(i * 9 + 8) * 60), faction,
+      })
+    }
+    for (let i = 0; i < MOBS; i++) {
+      const rig = rnd(100 + i) < 0.5 ? this.rigs.mobBeast : this.rigs.mobHumanoid
+      const pal = rnd(200 + i) < 0.25 ? 'elite' : 'team/enemy'
+      const gx = WorldSceneController.wrapMod(pgx + near(300 + i))
+      const gy = WorldSceneController.wrapMod(pgy + near(400 + i))
+      const e = this.scene.spawn(rig, pal, PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
+      e.shadow = true; e.animator.set('idle')  // idle tag IS the gait (walk tag is flinchy)
+      this.ambient.push({ e, kind: 'mob', gx, gy, tgx: gx, tgy: gy, t: 0, fightT: 0, atkCd: 0, name: '', level: 0, faction: 'neutral' })
     }
   }
 
   private updateAmbient(dt: number): void {
-    if (!this.ambient.length || !this.player) return
+    if (!this.ambient.length) return
     const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
     const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
-    const SPEED = 1.3
-
-    // Recycle groups that fall too far behind the player → re-anchor ahead so density
-    // stays roughly constant and fresh encounters appear as you travel.
-    for (let gi = 0; gi < this.ambientGroups.length; gi++) {
-      const grp = this.ambientGroups[gi]
-      if (Math.hypot(WorldSceneController.wrapDiff(grp.gx, pgx), WorldSceneController.wrapDiff(grp.gy, pgy)) <= AMBIENT_RECYCLE_DIST) continue
-      const ang = Math.random() * Math.PI * 2
-      const dist = AMBIENT_GROUP_SPREAD * (0.7 + 0.4 * Math.random())
-      grp.gx = WorldSceneController.wrapMod(pgx + Math.cos(ang) * dist)
-      grp.gy = WorldSceneController.wrapMod(pgy + Math.sin(ang) * dist)
-      for (const a of this.ambient) {
-        if (a.grp !== gi) continue
-        a.gx = WorldSceneController.wrapMod(grp.gx + (Math.random() * 2 - 1) * 2.2)
-        a.gy = WorldSceneController.wrapMod(grp.gy + (Math.random() * 2 - 1) * 2.2)
-        a.tgx = a.gx; a.tgy = a.gy; a.t = Math.random() * 3
-        if (grp.fight) { a.fightT = 3 + Math.random() * 3; a.atkCd = Math.random() * 0.6 }
-      }
-    }
-
+    const SPEED = 1.4
     for (const a of this.ambient) {
-      if (!a.e) continue
-      const anchor = this.ambientGroups[a.grp]
-      if (!anchor) continue
       if (a.fightT > 0) {
         a.fightT -= dt
         a.atkCd -= dt
         if (a.atkCd <= 0) { a.e.animator.set('attack'); a.e.animator.restart(); a.atkCd = 0.6 + Math.random() * 0.5 }
         else if (a.e.animator.finished) a.e.animator.set('idle')
-        if (a.fightT <= 0) a.e.animator.set('idle')
+        if (a.fightT <= 0) a.e.animator.set('idle')  // resume the gait (idle tag), not flinchy walk
       } else {
-        // Wander within a short leash of the group's anchor (keeps the cluster tight).
+        // Torus-shortest delta to the target; repick a target near the PLAYER so the
+        // crowd follows the camera-centred player and stays roughly in view.
         const dx = WorldSceneController.wrapDiff(a.tgx, a.gx)
         const dy = WorldSceneController.wrapDiff(a.tgy, a.gy)
         const d = Math.hypot(dx, dy)
-        if (d < 0.4 || a.t <= 0) {
-          a.tgx = WorldSceneController.wrapMod(anchor.gx + (Math.random() * 2 - 1) * AMBIENT_MEMBER_LEASH)
-          a.tgy = WorldSceneController.wrapMod(anchor.gy + (Math.random() * 2 - 1) * AMBIENT_MEMBER_LEASH)
+        if (d < 0.5 || a.t <= 0) {
+          a.tgx = WorldSceneController.wrapMod(pgx + (Math.random() * 2 - 1) * AMBIENT_LEASH)
+          a.tgy = WorldSceneController.wrapMod(pgy + (Math.random() * 2 - 1) * AMBIENT_LEASH)
           a.t = 2 + Math.random() * 4
         } else {
           a.gx = WorldSceneController.wrapMod(a.gx + dx / d * SPEED * dt)
@@ -1366,46 +1302,43 @@ export class WorldSceneController {
       a.e.tx = this.player.tx + WorldSceneController.wrapDiff(a.gx, pgx)
       a.e.ty = this.player.ty + WorldSceneController.wrapDiff(a.gy, pgy)
     }
-
-    // Keep fight groups skirmishing: when a group's members finish their attack burst,
-    // restart it (facing hero↔mob) so duels/party fights read as ongoing.
+    // Occasionally start a hero↔mob skirmish when one wanders near a monster.
     this.ambientSkirmishCd -= dt
     if (this.ambientSkirmishCd <= 0) {
-      this.ambientSkirmishCd = 2 + Math.random() * 2
-      for (let gi = 0; gi < this.ambientGroups.length; gi++) {
-        if (!this.ambientGroups[gi].fight) continue
-        const members = this.ambient.filter(a => a.grp === gi)
-        if (members.some(a => a.fightT > 0)) continue
-        const h = members.find(a => a.kind === 'hero'), m = members.find(a => a.kind === 'mob')
-        for (const a of members) { a.fightT = 2.5 + Math.random() * 2.5; a.atkCd = Math.random() * 0.5 }
-        if (h && m) {
-          h.e.animator.face(faceFromVec(m.gx - h.gx, m.gy - h.gy))
-          m.e.animator.face(faceFromVec(h.gx - m.gx, h.gy - m.gy))
+      for (const h of this.ambient) {
+        if (h.kind !== 'hero' || h.fightT > 0) continue
+        for (const m of this.ambient) {
+          if (m.kind !== 'mob' || m.fightT > 0) continue
+          if (Math.hypot(h.gx - m.gx, h.gy - m.gy) < 3) {
+            h.fightT = m.fightT = 2.5 + Math.random() * 2.5
+            h.e.animator.face(faceFromVec(m.gx - h.gx, m.gy - h.gy))
+            m.e.animator.face(faceFromVec(h.gx - m.gx, h.gy - m.gy))
+            this.ambientSkirmishCd = 1.5
+            break
+          }
         }
       }
     }
   }
 
-  // Nameplates over ambient heroes — match the HUD's own-hero text: small, crisp,
-  // heavy black outline (mirrors the HUD TEXT_SHADOW) so they read at any biome without
-  // a muddy box. Faction-tinted; name only (no level) to keep the viewport clean.
   private drawAmbientNameplates(): void {
     if (!this.ambient.length) return
     const ctx = this.ctx
     ctx.save()
-    ctx.font = '600 8px system-ui, -apple-system, "Segoe UI", sans-serif'
+    ctx.font = '7px ui-monospace, monospace'
     ctx.textAlign = 'center'
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = 3
-    ctx.strokeStyle = 'rgba(0,0,0,0.95)'
     for (const a of this.ambient) {
       if (a.kind !== 'hero') continue
       const sx = Math.round(a.e.screenX - this.cam.x)
-      const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 2)
-      if (sx < -40 || sx > this.cam.w + 40 || sy < 6 || sy > this.cam.h) continue
-      ctx.strokeText(a.name, sx, sy)
-      ctx.fillStyle = a.faction === 'horde' ? '#ff8a7a' : '#8ac0ff'
-      ctx.fillText(a.name, sx, sy)
+      const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 3)
+      if (sx < -40 || sx > this.cam.w + 40 || sy < 2 || sy > this.cam.h) continue
+      const col = a.faction === 'horde' ? '#e07060' : '#70a8e8'
+      const label = `${a.name} ${a.level}`
+      const w = ctx.measureText(label).width + 6
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'
+      ctx.fillRect(sx - w / 2, sy - 8, w, 9)
+      ctx.fillStyle = col
+      ctx.fillText(label, sx, sy - 7)
     }
     ctx.restore()
   }
