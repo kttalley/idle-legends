@@ -138,6 +138,9 @@ export interface ActiveAbilityDef {
   description: string
   icon: string
   cooldownSeconds: number
+  /** Seconds of channel before the effect fires. Omit/0 = instant. Casting can be
+   *  interrupted (death/target-loss) and pushed back by taking damage. */
+  castTimeSeconds?: number
   classes: ClassType[]
   slot: 1 | 2 | 3
   effects: AbilityEffectDef[]
@@ -173,6 +176,18 @@ export interface ActiveBuff {
   value: number
   stacks?: number
   durationRemaining: number
+}
+
+// Player spell-cast in progress. Timed abilities (castTimeSeconds > 0) set this while
+// channelling; the tick advances `remaining` and fires the effect at 0. Taking damage
+// pushes `remaining` back (capped); death/target-loss clears it (interrupt).
+export interface CastState {
+  abilityId: string
+  name: string
+  icon: string
+  total: number      // total cast time (seconds)
+  remaining: number  // seconds left until the effect fires
+  pushback: number   // accumulated pushback seconds this cast (capped)
 }
 
 export interface CombatProcState {
@@ -324,6 +339,7 @@ export interface GameState {
   activeDoTs: ActiveDoT[]
   activeBuffs: ActiveBuff[]
   procState: CombatProcState
+  castState: CastState | null   // active player spell-cast (null when not casting)
   floatingNumbers: FloatingNumber[]
   unlockedZones: ZoneId[]
   zoneKillCounts: Record<string, number>

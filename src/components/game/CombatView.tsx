@@ -10,6 +10,7 @@ import { StatusEffects } from './StatusEffects'
 import { ThoughtBubble } from './ThoughtBubble'
 import { WorldMapView } from './WorldMapView'
 import { DimetricWorldScene } from './DimetricWorldScene'
+import { HudOverlay } from './hud/HudOverlay'
 import { TravelOverlay } from './TravelOverlay'
 import { GatheringPanel } from './GatheringPanel'
 import { CraftingPanel } from './CraftingPanel'
@@ -23,6 +24,11 @@ import { TOWNS } from '../../data/towns'
 // Phase 2: the unified dimetric world scene replaces the ASCII strip + combat
 // arena. Flip to false to fall back to the original presentation path.
 const DIMETRIC_ENABLED = true
+
+// Phase 3: the WoW/Diablo HUD shell (minimap radar, unit frames, docked action bar) as
+// a DOM overlay on the dimetric world. Flip to false to fall back to the top zone strip
+// + inline SkillBar + bottom XP bar. Requires DIMETRIC_ENABLED.
+const HUD_SHELL_ENABLED = true
 
 export function CombatView() {
   const {
@@ -161,7 +167,9 @@ export function CombatView() {
         </div>
       )}
 
-      {/* ── Thin zone info + status + override buttons ── */}
+      {/* ── Thin zone info + status + override buttons (hidden in HUD-shell mode —
+             the radar shows the zone and the action bar owns the mode buttons) ── */}
+      {!HUD_SHELL_ENABLED && (
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -232,14 +240,17 @@ export function CombatView() {
           )}
         </div>
       </div>
+      )}
 
-      {/* ── Unified dimetric world scene (Phase 2) — the always-visible backdrop ── */}
+      {/* ── Unified dimetric world scene (Phase 2) — the always-visible backdrop.
+             In HUD-shell mode the WoW/Diablo overlay is painted on top of it. ── */}
       {DIMETRIC_ENABLED && (
         <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
           <DimetricWorldScene />
+          {HUD_SHELL_ENABLED && <HudOverlay />}
         </div>
       )}
-      {DIMETRIC_ENABLED && gameMode === 'combat' && <SkillBar />}
+      {DIMETRIC_ENABLED && !HUD_SHELL_ENABLED && gameMode === 'combat' && <SkillBar />}
 
       {/* ── Traveling overlay ── */}
       {gameMode === 'traveling' && <TravelOverlay />}
@@ -415,7 +426,8 @@ export function CombatView() {
       </div>
       )}
 
-      {/* XP / Level bar at bottom */}
+      {/* XP / Level bar at bottom (hidden in HUD-shell mode — the player frame shows it) */}
+      {!HUD_SHELL_ENABLED && (
       <div className="px-2 pb-1" style={{ flexShrink: 0 }}>
         <div className="flex justify-between text-xs mb-0.5" style={{ color: '#9d9d9d', fontSize: '0.6rem' }}>
           <span className={classDef.colorClass}>{classDef.name}</span>
@@ -424,6 +436,7 @@ export function CombatView() {
         </div>
         <HealthBar current={xp} max={xpNeeded} type="xp" height={8} showText={false} />
       </div>
+      )}
     </div>
   )
 }

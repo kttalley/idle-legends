@@ -89,9 +89,14 @@ function drawHumanoid(p: Painter, f: number, opts: { back: boolean; bob: number;
 }
 
 function humanoidAnimations(): AnimationSet {
+  // The gentle 2-frame bob (0,1) is the good-looking gait — it reads as a walk, so
+  // it drives ALL movement (map traversal + combat approach). Idle is the same bob,
+  // slower, so a standing unit still breathes. The old big-stride frames (2–5) read
+  // as a flinchy jitter, so they're retired from walk; the dedicated recoil frames
+  // (9,10) are the on-hit flinch the adapter triggers via 'hit'.
   const dir = (o: number) => ({
     idle: { frames: [o + 0, o + 1], fps: 2, loop: true },
-    walk: { frames: [o + 2, o + 3, o + 4, o + 5], fps: 8, loop: true },
+    walk: { frames: [o + 0, o + 1], fps: 6, loop: true },
     attack: { frames: [o + 6, o + 7, o + 8], fps: 12, loop: false },
     hit: { frames: [o + 9, o + 10], fps: 10, loop: false },
   })

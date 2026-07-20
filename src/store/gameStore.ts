@@ -90,6 +90,7 @@ function defaultState(): GameState {
     activeDoTs: [],
     activeBuffs: [],
     procState: defaultProcState(),
+    castState: null,
     floatingNumbers: [],
     unlockedZones: ['sunhollow_meadows'],
     zoneKillCounts: {},

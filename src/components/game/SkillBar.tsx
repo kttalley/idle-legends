@@ -96,7 +96,7 @@ function SkillSlot({ ability, remaining, onActivate }: SlotProps) {
   )
 }
 
-export function SkillBar() {
+export function SkillBar({ embedded = false }: { embedded?: boolean } = {}) {
   const { playerClass, skillCooldowns, activateAbility, currentMob, isAlive } = useGameStore()
   const abilities = getClassAbilities(playerClass)
 
@@ -114,6 +114,23 @@ export function SkillBar() {
   }, [abilities, activateAbility])
 
   if (abilities.length === 0) return null
+
+  // Embedded (inside the HUD ActionBar): no fixed positioning, no background strip —
+  // the ActionBar owns the panel. Standalone: the legacy fixed bottom strip.
+  if (embedded) {
+    return (
+      <div className="flex items-center justify-center gap-2">
+        {abilities.map(ability => (
+          <SkillSlot
+            key={ability.id}
+            ability={ability}
+            remaining={skillCooldowns[ability.id] ?? 0}
+            onActivate={() => isAlive && activateAbility(ability.id)}
+          />
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div

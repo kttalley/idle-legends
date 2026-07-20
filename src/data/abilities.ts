@@ -47,6 +47,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     description: 'Deal 200% damage and freeze the enemy for 4 seconds (cannot attack).',
     icon: '❄',
     cooldownSeconds: 10,
+    castTimeSeconds: 1.5,
     classes: ['mage'],
     slot: 1,
     effects: [
@@ -116,6 +117,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     description: 'Hurl a bolt of void energy for 300% weapon damage.',
     icon: '☠',
     cooldownSeconds: 8,
+    castTimeSeconds: 2.0,
     classes: ['warlock'],
     slot: 1,
     effects: [{ type: 'shadow_bolt', value: 3.0 }],
