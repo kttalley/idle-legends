@@ -3,7 +3,7 @@ import { CLASS_DEFINITIONS } from '../../data/classes'
 import { RACE_DEFINITIONS } from '../../data/races'
 import { FACTION_DEFINITIONS } from '../../data/factions'
 import { ZONES } from '../../data/zones'
-import { AvatarRenderer, CLASS_PALETTES, hashStr } from '../sprites/AvatarRenderer'
+import { HeroAvatar } from '../sprites/HeroAvatar'
 import { MAX_SLOTS } from '../../store/saveSlots'
 import type { SaveSlotMeta } from '../../store/saveSlots'
 
@@ -12,13 +12,6 @@ interface CharacterSelectProps {
   onContinue: (id: string) => void
   onCreate:   () => void
   onDelete:   (id: string) => void
-}
-
-// Matches CombatView's player-avatar seed (class + level), so the portrait here is
-// the same character the player sees in-world. Equipment isn't in the summary, so
-// the seed only reflects class + level — close enough for a select-screen thumbnail.
-function slotSeed(playerClass: string, level: number): number {
-  return hashStr(playerClass) ^ (level * 7)
 }
 
 function relativeTime(ts: number): string {
@@ -81,10 +74,12 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
               style={{ width: 220, padding: 16, textAlign: 'center', position: 'relative' }}
             >
               <div className="flex justify-center mb-3">
-                <AvatarRenderer
-                  seed={slotSeed(s.playerClass, s.level)}
-                  palette={CLASS_PALETTES[s.playerClass] ?? CLASS_PALETTES.warrior}
-                  cellSize={11}
+                <HeroAvatar
+                  race={s.playerRace}
+                  playerClass={s.playerClass}
+                  name={s.playerName}
+                  faction={s.playerFaction}
+                  size={72}
                   animate={false}
                   circle
                 />

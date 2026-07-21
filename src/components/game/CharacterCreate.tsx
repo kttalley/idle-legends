@@ -86,7 +86,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
       </div>
 
       {/* ── Live dimetric preview ── */}
-      <HeroPreview playerClass={cls} race={race} faction={effectiveFaction} size={172} />
+      <HeroPreview playerClass={cls} race={race} faction={effectiveFaction} name={name} size={172} />
 
       {/* ── Name (generated + reroll/edit) ── */}
       <div className="flex items-center gap-2 mt-3 mb-1" style={{ width: '100%', maxWidth: 340 }}>

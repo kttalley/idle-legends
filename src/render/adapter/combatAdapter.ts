@@ -18,6 +18,8 @@ import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../p
 import { composePalette } from '../palette'
 import { heroPaletteId } from './heroWardrobe'
 import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
+import { Animator } from '../animation'
+import { HERO_SPRITES, MONSTER_SPRITES, resolveMobSprite, isMonsterSprite, heroSpriteId } from './fftaRoster'
 import type { Facing, IndexedSprite } from '../types'
 import type {
   GameState, MobInstance, ClassType, RaceType, FactionType, Rarity, FloatingNumber, MapNode, MapScenery, WeatherType, ZoneId,
@@ -52,12 +54,6 @@ const RANGED_GAP_TILES = 5
 
 const RARITY_RANK: Record<Rarity, number> = {
   common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4,
-}
-
-const BEAST_RE = /wolf|boar|raptor|tiger|vulture|bomb|beast|whelp|dragon|worg|serpent|spider|hydra|cat|raptor|devourer|hound|wyrm|basilisk/
-function isBeastMob(mob: MobInstance): boolean {
-  const k = `${mob.templateId} ${mob.spriteKey}`.toLowerCase()
-  return BEAST_RE.test(k)
 }
 
 // Ranged/caster mobs keep a multi-tile engagement distance and cast (spawn a bolt)
@@ -220,39 +216,10 @@ const TOWN_CROWD = 12           // idle heroes milling in the square
 
 interface TownFolk { e: Entity; hx: number; hy: number; tx: number; ty: number; t: number; name: string; faction: FactionType }
 
-// ── FFTA roster variety ───────────────────────────────────────────────────────
-// Hero job sprites per class, indexed by race for per-race silhouette variety (the
-// race/rarity palette is still applied on top — that's the wardrobe). Monsters are a
-// keyword-mapped bestiary rendered in their NATURAL colours (loadSprite registers a
-// `src/<id>` palette from each sheet). All optional scaffold; each falls back to a
-// programmatic placeholder rig so tear-out (and ?noffta) still renders.
-const HERO_JOBS: Record<ClassType, string[]> = {
-  warrior: ['ffa_soldier', 'ffa_warrior', 'ffa_fighter', 'ffa_gladiator', 'ffa_defender', 'ffa_mog_knight', 'ffa_paladin', 'ffa_templar'],
-  mage:    ['ffa_black_mage', 'ffa_white_mage', 'ffa_sage', 'ffa_time_mage', 'ffa_red_mage', 'ffa_illusionist', 'ffa_bishop', 'ffa_summoner'],
-  rogue:   ['ffa_ninja', 'ffa_thief', 'ffa_assassin', 'ffa_hunter', 'ffa_fencer', 'ffa_gadgeteer', 'ffa_archer', 'ffa_sniper'],
-  warlock: ['ffa_elementalist', 'ffa_blue_mage', 'ffa_animist', 'ffa_alchemist', 'ffa_morpher', 'ffa_beastmaster', 'ffa_dragoon', 'ffa_juggler'],
-}
-const RACE_ORDER: RaceType[] = ['human', 'dwarf', 'elf', 'orc', 'troll', 'goblin', 'gnome', 'tauren']
-// Monster bestiary + name-keyword → sprite mapping (first match wins).
-const MONSTERS = [
-  'ffa_red_panther', 'ffa_icedrake', 'ffa_bomb', 'ffa_jelly', 'ffa_lamia', 'ffa_malboro',
-  'ffa_floateye', 'ffa_zombie', 'ffa_vampire', 'ffa_goblin', 'ffa_antlion', 'ffa_tonberry', 'ffa_toughskin',
-]
-const MOB_KEYWORDS: [RegExp, string][] = [
-  [/wolf|hound|panther|cat|tiger|worg|lion/, 'ffa_red_panther'],
-  [/drake|dragon|wyrm|whelp|hydra|basilisk/, 'ffa_icedrake'],
-  [/bomb|elemental|flame|ember|fire|magma/, 'ffa_bomb'],
-  [/slime|jelly|ooze|gel|pudding|blob/, 'ffa_jelly'],
-  [/snake|serpent|lamia|naga|viper|cobra/, 'ffa_lamia'],
-  [/plant|flower|malboro|vine|shambler|treant|fungus|mushroom/, 'ffa_malboro'],
-  [/eye|beholder|gazer|watcher|devourer/, 'ffa_floateye'],
-  [/zombie|undead|ghoul|corpse|rot|skeleton|wraith/, 'ffa_zombie'],
-  [/vampire|bat|blood|nosferatu/, 'ffa_vampire'],
-  [/goblin|imp|kobold|gremlin|sprite/, 'ffa_goblin'],
-  [/ant|bug|insect|spider|scorpion|beetle|mantis/, 'ffa_antlion'],
-  [/lizard|tonberry|newt|gecko|raptor/, 'ffa_tonberry'],
-  [/ogre|troll|brute|golem|toughskin|giant|ettin/, 'ffa_toughskin'],
-]
+// ── FFTA scaffold cache ────────────────────────────────────────────────────────
+// Race/class and monster sprite selection lives in fftaRoster.ts.  This cache holds
+// the loaded IndexedSprites so the same art can be reused across the player, mobs, and
+// the ambient/town crowds.  Missing entries fall back to the programmatic rigs below.
 
 function strHash(s: string): number {
   let h = 0
@@ -288,13 +255,16 @@ export class WorldSceneController {
 
   private player!: Entity
   private mob: Entity | null = null
-  private mobRigIsBeast = false
 
   private rigs: {
     player: IndexedSprite
     mobHumanoid: IndexedSprite
     mobBeast: IndexedSprite
   } | null = null
+  /** Loaded FFTA scaffold sprites keyed by manifest id. Empty = use the placeholder rigs. */
+  private spriteCache: Record<string, IndexedSprite> = {}
+  /** Currently equipped player sprite id so sync() can swap on class/race change. */
+  private playerSpriteId: string | null = null
 
   // Spell/impact FX rigs (accent-channel only → palette id picks the school).
   private burstRig!: IndexedSprite
@@ -437,11 +407,30 @@ export class WorldSceneController {
     const noFFTA = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noffta')
     const load = (url: string, make: () => IndexedSprite): Promise<IndexedSprite> =>
       noFFTA ? Promise.resolve(make()) : loadSpriteOrPlaceholder(url, make)
-    // Auto-exported FFTA roster replaces the small manual scaffold; placeholders stay
-    // as the tear-out fallback so the repo always builds without gitignored assets.
-    const player = await load(`${ffaUnits}ffa_soldier.json`, () => makeHumanoidRig('rig/humanoid'))
-    const mobHumanoid = await load(`${ffaUnits}ffa_white_monk.json`, () => makeHumanoidRig('rig/mob-humanoid'))
-    const mobBeast = await load(`${ffaUnits}ffa_bomb.json`, () => makeBeastRig('rig/mob-beast'))
+    // Curated FFTA scaffold: load the race/class hero sprites + named monster sprites
+    // in parallel. Missing entries fall back to humanoid/beast placeholders per id.
+    if (!noFFTA) {
+      const unitIds = new Set<string>()
+      for (const race of ['human', 'dwarf', 'elf', 'orc', 'troll', 'goblin', 'gnome', 'tauren'] as RaceType[]) {
+        for (const cls of ['warrior', 'mage', 'rogue', 'warlock'] as ClassType[]) {
+          for (const id of HERO_SPRITES[race][cls]) unitIds.add(id)
+        }
+      }
+      for (const id of MONSTER_SPRITES) unitIds.add(id)
+      const loadUnit = (id: string) => load(`${ffaUnits}${id}.json`, () =>
+        isMonsterSprite(id) ? makeBeastRig(`rig/${id}`) : makeHumanoidRig(`rig/${id}`))
+      const entries = await Promise.all(
+        Array.from(unitIds).map(async (id): Promise<[string, IndexedSprite]> => [id, await loadUnit(id)])
+      )
+      this.spriteCache = Object.fromEntries(entries)
+    }
+
+    // Programmatic fallback rigs. When the scaffold is absent (or ?noffta), these are
+    // the only rigs; otherwise they backstop any missing individual sprite.
+    const player = this.spriteCache['ffa_soldier'] ?? makeHumanoidRig('rig/humanoid')
+    const mobHumanoid = this.spriteCache['ffa_white_monk'] ?? makeHumanoidRig('rig/mob-humanoid')
+    const mobBeast = this.spriteCache['ffa_bomb'] ?? makeBeastRig('rig/mob-beast')
+
     // FFTA-traced ground tiles (gitignored dev scaffold); falls back to the programmatic
     // tileset set in the constructor. Traced tiles are indexed to our semantic slots, so
     // biome palettes still recolor them.
@@ -461,6 +450,21 @@ export class WorldSceneController {
     // live, player-less controller whose renderFrame throws every frame = black map.
     // (This is the intermittent race behind the recurring "black viewport".)
     this.rigs = { player, mobHumanoid, mobBeast }
+  }
+
+  /** Swap an entity's sprite at runtime (race/class/mob changes). Preserves position and
+   *  state; resets the animator to the new sprite's idle facing. Missing sprites fall back
+   *  to the appropriate placeholder rig (player for the hero, beast/humanoid for mobs). */
+  private swapEntitySprite(e: Entity, id: string): void {
+    if (e.sprite.id === id) return
+    const isPlayer = e === this.player
+    const fallback = isPlayer
+      ? this.rigs!.player
+      : (isMonsterSprite(id) ? this.rigs!.mobBeast : this.rigs!.mobHumanoid)
+    const sprite = this.spriteCache[id] ?? fallback
+    e.sprite = sprite
+    e.animator = new Animator(sprite)
+    e.animator.set('idle')
   }
 
   private makeFloaters(): Floater[] {
@@ -756,7 +760,12 @@ export class WorldSceneController {
     this.autoTx = PAD + WorldSceneController.wrapMod(this.storeMapX + this.autoOffsetDx)
     this.autoTy = PAD + WorldSceneController.wrapMod(this.storeMapY + this.autoOffsetDy)
 
-    // Player palette: race + best-equipment rarity accent.
+    // Player look: race/class sprite + race/equipment palette.
+    const wantedPlayerSprite = heroSpriteId(state.playerRace, state.playerClass, state.playerName)
+    if (this.playerSpriteId !== wantedPlayerSprite) {
+      this.playerSpriteId = wantedPlayerSprite
+      this.swapEntitySprite(this.player, wantedPlayerSprite)
+    }
     this.playerBasePalette = heroPaletteId(
       state.playerClass, state.playerRace, state.playerFaction, bestEquipmentRarity(state),
     )
@@ -788,21 +797,21 @@ export class WorldSceneController {
         this.mobPlacedDy = this.mobApproachDy * gapMag
       }
 
-      const wantBeast = isBeastMob(mob)
+      const wantedMobSprite = resolveMobSprite(mob.name)
       if (!this.mob) {
+        const sprite = this.spriteCache[wantedMobSprite] ??
+          (isMonsterSprite(wantedMobSprite) ? this.rigs.mobBeast : this.rigs.mobHumanoid)
         this.mob = this.scene.spawn(
-          wantBeast ? this.rigs.mobBeast : this.rigs.mobHumanoid,
-          mobPaletteId(mob), this.player.tx + this.mobPlacedDx, this.player.ty + this.mobPlacedDy,
+          sprite, mobPaletteId(mob), this.player.tx + this.mobPlacedDx, this.player.ty + this.mobPlacedDy,
         )
-        this.mobRigIsBeast = wantBeast
-      } else if (wantBeast !== this.mobRigIsBeast) {
-        // Swap rig if the kind changed (rare; keeps the pool entity but re-spawns).
+      } else if (this.mob.sprite.id !== wantedMobSprite) {
+        // Swap sprite when the mob template changes (rare; keeps the pool entity but re-spawns).
         this.mob.active = false
+        const sprite = this.spriteCache[wantedMobSprite] ??
+          (isMonsterSprite(wantedMobSprite) ? this.rigs.mobBeast : this.rigs.mobHumanoid)
         this.mob = this.scene.spawn(
-          wantBeast ? this.rigs.mobBeast : this.rigs.mobHumanoid,
-          mobPaletteId(mob), this.player.tx + this.mobPlacedDx, this.player.ty + this.mobPlacedDy,
+          sprite, mobPaletteId(mob), this.player.tx + this.mobPlacedDx, this.player.ty + this.mobPlacedDy,
         )
-        this.mobRigIsBeast = wantBeast
       }
       if (this.mob) {
         this.mobBasePalette = mobPaletteId(mob)
@@ -1474,25 +1483,28 @@ export class WorldSceneController {
         const race = races[Math.floor(rnd(s + 1) * races.length)]
         const cls = AMBIENT_CLASSES[Math.floor(rnd(s + 2) * AMBIENT_CLASSES.length)]
         const rarity = AMBIENT_RARITY[Math.floor(rnd(s + 3) * AMBIENT_RARITY.length)]
+        const name = AMBIENT_NAMES[Math.floor(rnd(s + 9) * AMBIENT_NAMES.length)]
+        const spriteId = heroSpriteId(race, cls, name)
+        const sprite = this.spriteCache[spriteId] ?? this.rigs.player
         const gx = WorldSceneController.wrapMod(a.gx + jitter(s + 4))
         const gy = WorldSceneController.wrapMod(a.gy + jitter(s + 5))
-        const e = this.scene.spawn(this.rigs.player, heroPaletteId(cls, race, faction, rarity),
+        const e = this.scene.spawn(sprite, heroPaletteId(cls, race, faction, rarity),
           PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
         e.shadow = true; e.animator.set('idle')  // idle tag IS the gait (walk is flinchy)
         this.ambient.push({
           e, kind: 'hero', gx, gy, tgx: gx, tgy: gy, t: rnd(s + 8) * 3,
           fightT: tmpl.fight ? 3 + rnd(s + 6) * 3 : 0, atkCd: rnd(s + 7) * 0.6,
-          name: AMBIENT_NAMES[Math.floor(rnd(s + 9) * AMBIENT_NAMES.length)],
-          level: 1 + Math.floor(rnd(s + 10) * 60), faction, grp: gi,
+          name, level: 1 + Math.floor(rnd(s + 10) * 60), faction, grp: gi,
         })
       }
       for (let k = 0; k < tmpl.m; k++) {
         const s = gi * 100 + k * 11 + 60
-        const rig = rnd(s) < 0.5 ? this.rigs.mobBeast : this.rigs.mobHumanoid
+        const monsterId = MONSTER_SPRITES[Math.floor(rnd(s) * MONSTER_SPRITES.length)]
+        const sprite = this.spriteCache[monsterId] ?? this.rigs.mobBeast
         const pal = rnd(s + 1) < 0.25 ? 'elite' : 'team/enemy'
         const gx = WorldSceneController.wrapMod(a.gx + jitter(s + 2))
         const gy = WorldSceneController.wrapMod(a.gy + jitter(s + 3))
-        const e = this.scene.spawn(rig, pal, PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
+        const e = this.scene.spawn(sprite, pal, PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
         e.shadow = true; e.animator.set('idle')
         this.ambient.push({
           e, kind: 'mob', gx, gy, tgx: gx, tgy: gy, t: rnd(s + 4) * 3,
@@ -1576,11 +1588,14 @@ export class WorldSceneController {
       const race = races[i % races.length]
       const cls = AMBIENT_CLASSES[i % AMBIENT_CLASSES.length]
       const rarity = AMBIENT_RARITY[i % AMBIENT_RARITY.length]
-      const e = this.scene.spawn(this.rigs.player, heroPaletteId(cls, race, faction, rarity), hx, hy)
+      const name = AMBIENT_NAMES[i % AMBIENT_NAMES.length]
+      const spriteId = heroSpriteId(race, cls, name)
+      const sprite = this.spriteCache[spriteId] ?? this.rigs.player
+      const e = this.scene.spawn(sprite, heroPaletteId(cls, race, faction, rarity), hx, hy)
       e.shadow = true
       e.animator.set('idle')
       e.animator.face(i % 2 ? 'se' : 'sw')
-      this.townCrowd.push({ e, hx, hy, tx: hx, ty: hy, t: Math.random() * 3, name: AMBIENT_NAMES[i % AMBIENT_NAMES.length], faction })
+      this.townCrowd.push({ e, hx, hy, tx: hx, ty: hy, t: Math.random() * 3, name, faction })
     }
   }
 
