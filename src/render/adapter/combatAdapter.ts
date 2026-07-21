@@ -369,15 +369,22 @@ export class WorldSceneController {
     const base = import.meta.env.BASE_URL
     const scaffold = `${base}local-assets/ffta-scaffold/`
     const ffaUnits = `${scaffold}ffta-units/`
+    // Dev A/B: `?noffta` forces the committed programmatic placeholder art (skips the
+    // gitignored FFTA scaffold entirely) so the shippable, tear-out look can be compared
+    // side-by-side without deleting local-assets/. `load` returns the placeholder
+    // directly when set, else loads the scaffold with placeholder as the fallback.
+    const noFFTA = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noffta')
+    const load = (url: string, make: () => IndexedSprite): Promise<IndexedSprite> =>
+      noFFTA ? Promise.resolve(make()) : loadSpriteOrPlaceholder(url, make)
     // Auto-exported FFTA roster replaces the small manual scaffold; placeholders stay
     // as the tear-out fallback so the repo always builds without gitignored assets.
-    const player = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_soldier.json`, () => makeHumanoidRig('rig/humanoid'))
-    const mobHumanoid = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_white_monk.json`, () => makeHumanoidRig('rig/mob-humanoid'))
-    const mobBeast = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_bomb.json`, () => makeBeastRig('rig/mob-beast'))
+    const player = await load(`${ffaUnits}ffa_soldier.json`, () => makeHumanoidRig('rig/humanoid'))
+    const mobHumanoid = await load(`${ffaUnits}ffa_white_monk.json`, () => makeHumanoidRig('rig/mob-humanoid'))
+    const mobBeast = await load(`${ffaUnits}ffa_bomb.json`, () => makeBeastRig('rig/mob-beast'))
     // FFTA-traced ground tiles (gitignored dev scaffold); falls back to the programmatic
     // tileset set in the constructor. Traced tiles are indexed to our semantic slots, so
     // biome palettes still recolor them.
-    this.tileset = await loadSpriteOrPlaceholder(`${scaffold}tiles.json`, makeTileset)
+    this.tileset = await load(`${scaffold}tiles.json`, makeTileset)
     this.burstRig = makeBurstRig('fx/burst')
     this.boltRig = makeBoltRig('fx/bolt')
 
@@ -1400,19 +1407,34 @@ export class WorldSceneController {
     }
   }
 
+  /** Radius (in tiles) from the player to a screen corner at the current zoom — the
+   *  max tile-distance that can be on screen. Keeps ambient recycling off-frame so
+   *  re-anchored groups slide in rather than pop (feet projection is flat-ground). */
+  private visibleTileRadius(): number {
+    const A = (this.cam.w / 2) / HALF_W
+    const B = (this.cam.h / 2) / HALF_H
+    return Math.hypot((A + B) / 2, (B - A) / 2)
+  }
+
   private updateAmbient(dt: number): void {
     if (!this.ambient.length || !this.player) return
     const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
     const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
     const SPEED = 1.3
 
-    // Recycle groups that fall too far behind the player → re-anchor ahead so density
-    // stays roughly constant and fresh encounters appear as you travel.
+    // Recycle groups that drift beyond the (zoom-aware) visible radius → re-anchor them
+    // just past the screen edge, in the forward hemisphere of travel, so a fresh
+    // encounter SLIDES into view instead of popping in. The ring scales with the FOV:
+    // now that the world zooms out, a fixed 24-tile ring sat inside the frame (visible
+    // radius to a screen corner is ~21 tiles at 1.5×), which is what caused the pop.
+    const R = this.visibleTileRadius()
+    const recycleAt = R + 9
+    const travelAng = Math.atan2(this.lastFaceDy, this.lastFaceDx)
     for (let gi = 0; gi < this.ambientGroups.length; gi++) {
       const grp = this.ambientGroups[gi]
-      if (Math.hypot(WorldSceneController.wrapDiff(grp.gx, pgx), WorldSceneController.wrapDiff(grp.gy, pgy)) <= AMBIENT_RECYCLE_DIST) continue
-      const ang = Math.random() * Math.PI * 2
-      const dist = AMBIENT_GROUP_SPREAD * (0.7 + 0.4 * Math.random())
+      if (Math.hypot(WorldSceneController.wrapDiff(grp.gx, pgx), WorldSceneController.wrapDiff(grp.gy, pgy)) <= recycleAt) continue
+      const ang = travelAng + (Math.random() - 0.5) * Math.PI // ±90° of travel = ahead
+      const dist = R + 2 + Math.random() * 5                  // just beyond the edge
       grp.gx = WorldSceneController.wrapMod(pgx + Math.cos(ang) * dist)
       grp.gy = WorldSceneController.wrapMod(pgy + Math.sin(ang) * dist)
       for (const a of this.ambient) {
