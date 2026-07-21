@@ -26,10 +26,12 @@ export function DimetricWorldScene() {
       controller.sync(useGameStore.getState())
     })
 
-    // Zoom: narrow mobile viewports get a smaller world-scale so more of the dimetric
-    // field is visible (the FOV is otherwise too tight on a phone). Desktop keeps 1:1.
+    // Zoom: a wider dimetric FOV reads better everywhere (the dense living-world crowd
+    // looks like a busy server), so BOTH breakpoints zoom out from the 2× default —
+    // phones a touch wider since their viewport is narrowest. Tune these two to taste.
+    const ZOOM_MOBILE = 1.4, ZOOM_DESKTOP = 1.5
     const mq = window.matchMedia('(max-width: 640px)')
-    const applyZoom = () => controller.setZoom(mq.matches ? 1.5 : CSS_SCALE)
+    const applyZoom = () => controller.setZoom(mq.matches ? ZOOM_MOBILE : ZOOM_DESKTOP)
 
     // Resize → controller canvas buffer size (CSS px / current zoom).
     const resize = () => {
