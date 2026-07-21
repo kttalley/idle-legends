@@ -374,7 +374,6 @@ export class WorldSceneController {
     const player = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_soldier.json`, () => makeHumanoidRig('rig/humanoid'))
     const mobHumanoid = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_white_monk.json`, () => makeHumanoidRig('rig/mob-humanoid'))
     const mobBeast = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_bomb.json`, () => makeBeastRig('rig/mob-beast'))
-    this.rigs = { player, mobHumanoid, mobBeast }
     // FFTA-traced ground tiles (gitignored dev scaffold); falls back to the programmatic
     // tileset set in the constructor. Traced tiles are indexed to our semantic slots, so
     // biome palettes still recolor them.
@@ -384,8 +383,16 @@ export class WorldSceneController {
 
     this.player = this.scene.spawn(player, 'team/player', PAD + 32, PAD + 32)
     this.player.animator.set('idle')
-
     this.floaters = this.makeFloaters()
+
+    // Assign this.rigs LAST — it is the flag sync()'s `if (!this.rigs) return` guard
+    // uses to gate the first ground bake. The game's tick loop fires the store
+    // subscription continuously; if rigs were set before the tiles.json await above,
+    // a sync() landing in that await window would pass the guard while this.player was
+    // still undefined, bake the ground, then throw on `this.player.tx = …` — leaving a
+    // live, player-less controller whose renderFrame throws every frame = black map.
+    // (This is the intermittent race behind the recurring "black viewport".)
+    this.rigs = { player, mobHumanoid, mobBeast }
   }
 
   private makeFloaters(): Floater[] {
@@ -611,7 +618,7 @@ export class WorldSceneController {
   // ── Read-only state sync (called by the host on store change) ──────────────
 
   sync(state: GameState): void {
-    if (!this.rigs) return
+    if (!this.rigs || !this.player) return // both are set only when init() fully completes
 
     this.weatherType = state.weatherState?.type ?? 'clear'
     this.currentZone = state.currentZone
