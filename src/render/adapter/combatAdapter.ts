@@ -207,6 +207,19 @@ const AMBIENT_GROUPS: { h: number; m: number; fight: boolean; w: number }[] = [
 const AMBIENT_GROUPS_WORLD = 5
 const AMBIENT_GROUPS_TOWN = 9
 
+// ── Town hub (capital-as-a-busy-hub) ──────────────────────────────────────────
+// In-town swaps to a flat pre-rendered FFTA town map as a static backdrop with a
+// CLAMPED, non-wrapping camera, a dense idle crowd, and labeled building anchors you
+// walk to (blacksmith / witch-doctor / tavern / stash). Town entities use RAW tile
+// coords (no PAD/torus) — a distinct mode from the wrapping open world.
+// LOCAL DEV SCAFFOLD ONLY (gitignored map art); launch-blocker to replace with original art.
+const TOWN_MAP_FILE = 'map40.png'
+const TOWN_SCALE = 1.6          // upscale the 512² town PNG to match sprite footprint
+const TOWN_WALK_RADIUS = 6.5    // raw tiles the player may roam from town centre
+const TOWN_CROWD = 12           // idle heroes milling in the square
+
+interface TownFolk { e: Entity; hx: number; hy: number; tx: number; ty: number; t: number; name: string; faction: FactionType }
+
 interface Ambient {
   e: Entity
   kind: 'hero' | 'mob'
@@ -263,6 +276,14 @@ export class WorldSceneController {
   private ambient: Ambient[] = []
   private ambientGroups: { gx: number; gy: number; fight: boolean }[] = []
   private ambientSkirmishCd = 0
+
+  // Town-hub mode: flat FFTA town backdrop + clamped camera + idle crowd + building
+  // anchors. Town entities use RAW tile coords (no PAD/wrap). townMode is entered on
+  // gameMode 'in_town'; the scene is "ready" once this.ground === this.townGround.
+  private townMode = false
+  private townGround: GroundBuffer | null = null
+  private townCrowd: TownFolk[] = []
+  private townBuildings: { label: string; tx: number; ty: number }[] = []
 
   // Weather + ambience: synced from game state; phases advanced on real time in render.
   private weatherType: WeatherType = 'clear'
@@ -630,6 +651,21 @@ export class WorldSceneController {
     this.weatherType = state.weatherState?.type ?? 'clear'
     this.currentZone = state.currentZone
 
+    // ── Town-hub transitions ──────────────────────────────────────────────────
+    // Entering a town swaps the whole scene to the flat FFTA town backdrop + crowd;
+    // leaving forces a clean zone rebake (leaveTownScene nulls this.zone). While in
+    // town we skip all zone/mob sync (no torus follow, no combat).
+    const inTown = state.gameMode === 'in_town'
+    if (inTown && !this.townMode) {
+      this.townMode = true
+      this.enterTownScene().catch(err => console.error('[town] enter failed', err))
+      return
+    }
+    if (!inTown && this.townMode) {
+      this.leaveTownScene() // nulls this.zone → the zone-rebake block below re-runs
+    }
+    if (this.townMode) return // town scene owns everything until we leave
+
     // Zone change (or a never-baked ground — closes any first-bake race that would
     // otherwise leave a black viewport) → rebake ground + repopulate the zone.
     if (state.currentZone !== this.zone || !this.ground) {
@@ -917,8 +953,10 @@ export class WorldSceneController {
     // Invert feetX/feetY (height 0): A = tx−ty, B = tx+ty.
     const A = (bufX - g.originX - HALF_W) / HALF_W
     const B = (bufY - g.planeOffsetY - HALF_H) / HALF_H
-    const tx = clamp((A + B) / 2, PAD + 1, PAD + MAP_SIZE - 1)
-    const ty = clamp((B - A) / 2, PAD + 1, PAD + MAP_SIZE - 1)
+    const lo = this.townMode ? -TOWN_WALK_RADIUS : PAD + 1
+    const hi = this.townMode ? TOWN_WALK_RADIUS : PAD + MAP_SIZE - 1
+    const tx = clamp((A + B) / 2, lo, hi)
+    const ty = clamp((B - A) / 2, lo, hi)
     this.tapTx = tx
     this.tapTy = ty
     this.tapMoveActive = true
@@ -958,6 +996,9 @@ export class WorldSceneController {
     this.tapPulse += realDt
     let moving = false
     let mvx = 0, mvy = 0
+    // Movement bounds: raw town box in-town, else the padded zone interior (torus).
+    const loB = this.townMode ? -TOWN_WALK_RADIUS : PAD + 1
+    const hiB = this.townMode ? TOWN_WALK_RADIUS : PAD + MAP_SIZE - 1
     if (this.manualMode) {
       let dx = 0, dy = 0
       if (this.input.up) { dx -= 1; dy -= 1 }
@@ -967,8 +1008,8 @@ export class WorldSceneController {
       const len = Math.hypot(dx, dy)
       if (len > 0) {
         dx /= len; dy /= len
-        this.player.tx = clamp(this.player.tx + dx * MANUAL_SPEED * dt, PAD + 1, PAD + MAP_SIZE - 1)
-        this.player.ty = clamp(this.player.ty + dy * MANUAL_SPEED * dt, PAD + 1, PAD + MAP_SIZE - 1)
+        this.player.tx = clamp(this.player.tx + dx * MANUAL_SPEED * dt, loB, hiB)
+        this.player.ty = clamp(this.player.ty + dy * MANUAL_SPEED * dt, loB, hiB)
         moving = true; mvx = dx; mvy = dy
       }
     } else if (this.tapMoveActive && !this.playerLunge.active && !this.mobEngaged) {
@@ -980,27 +1021,27 @@ export class WorldSceneController {
       const d = Math.hypot(dx, dy)
       if (d < 0.25) {
         this.tapMoveActive = false
-        this.syncOffset()
+        if (!this.townMode) this.syncOffset()
       } else {
         const ux = dx / d, uy = dy / d
-        this.player.tx = clamp(this.player.tx + ux * MANUAL_SPEED * dt, PAD + 1, PAD + MAP_SIZE - 1)
-        this.player.ty = clamp(this.player.ty + uy * MANUAL_SPEED * dt, PAD + 1, PAD + MAP_SIZE - 1)
+        this.player.tx = clamp(this.player.tx + ux * MANUAL_SPEED * dt, loB, hiB)
+        this.player.ty = clamp(this.player.ty + uy * MANUAL_SPEED * dt, loB, hiB)
         moving = true; mvx = ux; mvy = uy
-        this.syncOffset()
+        if (!this.townMode) this.syncOffset()
       }
-    } else if (!this.playerLunge.active && !this.mobEngaged) {
+    } else if (!this.townMode && !this.playerLunge.active && !this.mobEngaged) {
       // Auto: torus-aware lerp toward the store's playerMapPos (plus offset) so the
       // player walks and the camera-followed world scrolls past. Frozen while a mob
-      // is engaged (stand and fight) or mid-attack-lunge.
+      // is engaged (stand and fight) or mid-attack-lunge. Never in town (no torus follow).
       const a = this.approachAuto(dt)
       moving = a.moving; mvx = a.mvx; mvy = a.mvy
-    } else {
+    } else if (!this.townMode) {
       // Frozen (mid-lunge or in melee): pin the auto target to the entity by
       // absorbing the store's drift into the offset, so resuming auto-follow
       // continues from here instead of yanking the player forward on disengage.
       this.syncOffset()
     }
-    if (this.manualMode) this.syncOffset()
+    if (this.manualMode && !this.townMode) this.syncOffset()
 
     // Jump arc (independent of horizontal movement). sin(πt) lifts and lands softly.
     if (this.jumpActive) {
@@ -1099,9 +1140,18 @@ export class WorldSceneController {
       }
     }
 
-    // Camera centered on the player's feet (height-aware → follows up hills).
-    this.cam.x = feetX(g, this.player.tx, this.player.ty) - this.cam.w / 2
-    this.cam.y = feetY(g, this.player.tx, this.player.ty) - this.cam.h / 2
+    // Camera: follow the player's feet. In town the map is finite → CLAMP to its bounds
+    // (no torus) so you never scroll past the edge into void; centre it if the map is
+    // smaller than the viewport. In the open world, centre freely (wrapped ground).
+    if (this.townMode && this.ground === this.townGround) {
+      const cx = feetX(g, this.player.tx, this.player.ty) - this.cam.w / 2
+      const cy = feetY(g, this.player.tx, this.player.ty) - this.cam.h / 2
+      this.cam.x = g.width <= this.cam.w ? (g.width - this.cam.w) / 2 : clamp(cx, 0, g.width - this.cam.w)
+      this.cam.y = g.height <= this.cam.h ? (g.height - this.cam.h) / 2 : clamp(cy, 0, g.height - this.cam.h)
+    } else {
+      this.cam.x = feetX(g, this.player.tx, this.player.ty) - this.cam.w / 2
+      this.cam.y = feetY(g, this.player.tx, this.player.ty) - this.cam.h / 2
+    }
 
     // Rumble: decaying random kick applied after centering (so it doesn't accumulate).
     if (this.shakeT > 0) {
@@ -1110,12 +1160,16 @@ export class WorldSceneController {
       this.cam.y += (Math.random() * 2 - 1) * k
     }
 
-    // Pin tall-prop entities to the wrapped copy nearest the player before the sort
-    // so they depth-correct against the player/mob as the player moves (Phase E).
-    this.updatePropEntities()
-    // Advance roaming heroes/monsters. Guarded so a stray ambient error can never
-    // take down the whole scene render (belt-and-suspenders around the new code).
-    try { this.updateAmbient(realDt) } catch (err) { console.error('[ambient] update failed:', err) }
+    // Advance the population: the roaming open-world crowd, or the idle town crowd.
+    if (this.townMode) {
+      try { this.updateTownCrowd(realDt) } catch (err) { console.error('[town] crowd update failed:', err) }
+    } else {
+      // Pin tall-prop entities to the wrapped copy nearest the player before the sort
+      // so they depth-correct against the player/mob as the player moves (Phase E).
+      this.updatePropEntities()
+      // Guarded so a stray ambient error can never take down the whole scene render.
+      try { this.updateAmbient(realDt) } catch (err) { console.error('[ambient] update failed:', err) }
+    }
 
     this.scene.render(this.ctx, this.cam, g, dt)
 
@@ -1124,15 +1178,17 @@ export class WorldSceneController {
     this.updateParticles(realDt)
     this.drawParticles()
 
-    // Fallback glyphs for any node type without a tall-prop sprite (Phase E: the
-    // mapped node types — ore/herb/boss_lair/mob_spawn — are now depth-sorted props).
-    this.drawNodes(g)
+    // Fallback glyphs for any node type without a tall-prop sprite (open world only).
+    if (!this.townMode) this.drawNodes(g)
 
     // Tap/click-to-move destination marker (over the world, under the HUD/nameplates).
     this.drawMoveMarker(g)
 
-    // Faction-coloured nameplates over roaming ambient heroes (sells "other players").
-    try { this.drawAmbientNameplates() } catch (err) { console.error('[ambient] nameplate failed:', err) }
+    // Nameplates: building destinations + idle crowd in town, else roaming heroes.
+    try {
+      if (this.townMode) this.drawTownLabels(g)
+      else this.drawAmbientNameplates()
+    } catch (err) { console.error('[nameplate] draw failed:', err) }
 
     // Player chevron — gold marker above the followed unit (rides above the jump).
     const px = Math.round(this.player.screenX - this.cam.x)
@@ -1405,6 +1461,137 @@ export class WorldSceneController {
         })
       }
     }
+  }
+
+  // ── Town hub ────────────────────────────────────────────────────────────────
+  // Load the flat FFTA town PNG once as a static GroundBuffer (cached). tile (0,0)'s
+  // feet land ~centre so the crowd + player + building anchors sit on the square; the
+  // origin is tuned by eye. LOCAL DEV SCAFFOLD ONLY (gitignored art), tear-out safe.
+  private async loadTownGround(): Promise<GroundBuffer | null> {
+    if (this.townGround) return this.townGround
+    try {
+      const base = import.meta.env.BASE_URL
+      const res = await fetch(`${base}local-assets/ffta-scaffold/${TOWN_MAP_FILE}`)
+      if (!res.ok) return null
+      const bmp = await createImageBitmap(await res.blob())
+      const c = document.createElement('canvas')
+      c.width = Math.round(bmp.width * TOWN_SCALE)
+      c.height = Math.round(bmp.height * TOWN_SCALE)
+      const cx = c.getContext('2d')!
+      cx.imageSmoothingEnabled = false
+      cx.drawImage(bmp, 0, 0, c.width, c.height)
+      this.townGround = {
+        canvas: c, originX: c.width / 2 - HALF_W, planeOffsetY: c.height * 0.5 - HALF_H,
+        width: c.width, height: c.height, heights: null, bw: 0,
+        sheet: null, sheetCols: 0, sheetFrameW: 0, sheetFrameH: 0, anims: [], elapsed: 0,
+      }
+      return this.townGround
+    } catch (e) {
+      console.error('[town] loadTownGround failed', e)
+      return null
+    }
+  }
+
+  private async enterTownScene(): Promise<void> {
+    // Clear the open-world population + any lingering combat before the swap.
+    this.retireAmbient()
+    this.retirePropEntities()
+    if (this.mob) { this.mob.active = false; this.mob = null }
+    this.manualMode = false
+    this.tapMoveActive = false
+    this.input = { up: false, down: false, left: false, right: false }
+    const g = await this.loadTownGround()
+    if (!g || !this.townMode) return // failed, or the player already left during load
+    this.ground = g
+    this.player.tx = 0
+    this.player.ty = 0
+    this.player.z = 0
+    this.player.animator.set('idle')
+    this.spawnTownCrowd()
+    this.townBuildings = [
+      { label: '⚒ Blacksmith', tx: -4, ty: -2.5 },
+      { label: '☠ Witch-Doctor', tx: 3.5, ty: -3 },
+      { label: '🍺 Tavern', tx: -3, ty: 3.5 },
+      { label: '📦 Stash', tx: 4, ty: 2.5 },
+    ]
+  }
+
+  private leaveTownScene(): void {
+    for (const a of this.townCrowd) a.e.active = false
+    this.townCrowd = []
+    this.townBuildings = []
+    this.townMode = false
+    this.zone = null // force a clean zone rebake (repositions player, respawns crowd/props)
+  }
+
+  private spawnTownCrowd(): void {
+    if (!this.rigs) return
+    for (let i = 0; i < TOWN_CROWD; i++) {
+      const ang = (i / TOWN_CROWD) * Math.PI * 2 + (i % 3)
+      const r = 2 + (i % 4) * 1.15
+      const hx = Math.cos(ang) * r
+      const hy = Math.sin(ang) * r
+      const faction: FactionType = i % 2 === 0 ? 'alliance' : 'horde'
+      const races = faction === 'alliance' ? ALLIANCE_RACES : HORDE_RACES
+      const race = races[i % races.length]
+      const cls = AMBIENT_CLASSES[i % AMBIENT_CLASSES.length]
+      const rarity = AMBIENT_RARITY[i % AMBIENT_RARITY.length]
+      const e = this.scene.spawn(this.rigs.player, heroPaletteId(cls, race, faction, rarity), hx, hy)
+      e.shadow = true
+      e.animator.set('idle')
+      e.animator.face(i % 2 ? 'se' : 'sw')
+      this.townCrowd.push({ e, hx, hy, tx: hx, ty: hy, t: Math.random() * 3, name: AMBIENT_NAMES[i % AMBIENT_NAMES.length], faction })
+    }
+  }
+
+  private updateTownCrowd(dt: number): void {
+    const SPEED = 1.0
+    for (const a of this.townCrowd) {
+      const dx = a.tx - a.e.tx, dy = a.ty - a.e.ty
+      const d = Math.hypot(dx, dy)
+      if (d < 0.3 || a.t <= 0) {
+        a.tx = a.hx + (Math.random() * 2 - 1) * 1.6
+        a.ty = a.hy + (Math.random() * 2 - 1) * 1.6
+        a.t = 2 + Math.random() * 4
+      } else {
+        a.e.tx += dx / d * SPEED * dt
+        a.e.ty += dy / d * SPEED * dt
+        a.e.animator.face(faceFromVec(dx, dy))
+      }
+      a.t -= dt
+    }
+  }
+
+  // Building destination labels + crowd nameplates (town). Same crisp outlined text as
+  // the open-world nameplates; buildings gold, folk faction-tinted.
+  private drawTownLabels(g: GroundBuffer): void {
+    const ctx = this.ctx
+    ctx.save()
+    ctx.textAlign = 'center'
+    ctx.lineJoin = 'round'
+    ctx.font = '700 10px system-ui, -apple-system, "Segoe UI", sans-serif'
+    for (const b of this.townBuildings) {
+      const sx = Math.round(feetX(g, b.tx, b.ty) - this.cam.x)
+      const sy = Math.round(feetY(g, b.tx, b.ty) - this.cam.y - 22)
+      if (sx < -60 || sx > this.cam.w + 60) continue
+      ctx.lineWidth = 3.5
+      ctx.strokeStyle = 'rgba(0,0,0,0.95)'
+      ctx.strokeText(b.label, sx, sy)
+      ctx.fillStyle = '#ffe08a'
+      ctx.fillText(b.label, sx, sy)
+    }
+    ctx.font = '600 8px system-ui, -apple-system, "Segoe UI", sans-serif'
+    ctx.lineWidth = 3
+    for (const a of this.townCrowd) {
+      const sx = Math.round(a.e.screenX - this.cam.x)
+      const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 2)
+      if (sx < -40 || sx > this.cam.w + 40 || sy < 0 || sy > this.cam.h) continue
+      ctx.strokeStyle = 'rgba(0,0,0,0.95)'
+      ctx.strokeText(a.name, sx, sy)
+      ctx.fillStyle = a.faction === 'horde' ? '#ff8a7a' : '#8ac0ff'
+      ctx.fillText(a.name, sx, sy)
+    }
+    ctx.restore()
   }
 
   /** Radius (in tiles) from the player to a screen corner at the current zoom — the
