@@ -38,8 +38,17 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
 
   return (
     <div
-      className="flex flex-col items-center justify-center min-h-screen py-8"
-      style={{ background: 'radial-gradient(ellipse at center, #1e1a10 0%, #0d0b05 100%)' }}
+      className="flex flex-col items-center py-8"
+      style={{
+        // Own scroll container: the app shell locks body to 100dvh/overflow-hidden, so
+        // with several hero cards the list must scroll here. Dropped justify-center +
+        // min-h-screen — centering pushed tall content off both ends unreachably, and
+        // 100vh exceeds 100dvh on mobile (URL bar), overflowing the locked body.
+        height: '100dvh',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        background: 'radial-gradient(ellipse at center, #1e1a10 0%, #0d0b05 100%)',
+      }}
     >
       <div className="mb-8 text-center">
         <h1 style={{

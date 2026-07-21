@@ -53,8 +53,17 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
 
   return (
     <div
-      className="flex flex-col items-center min-h-screen py-6 px-4"
-      style={{ background: 'radial-gradient(ellipse at center, #1e1a10 0%, #0d0b05 100%)' }}
+      className="flex flex-col items-center py-6 px-4"
+      style={{
+        // Definite viewport height + internal scroll: the app shell locks body to
+        // 100dvh/overflow-hidden, so this screen must own its own scroll or tall
+        // content (small phones) clips unreachably. min-h-screen (100vh) is a trap
+        // here — it exceeds 100dvh by the mobile URL bar and overflows the locked body.
+        height: '100dvh',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        background: 'radial-gradient(ellipse at center, #1e1a10 0%, #0d0b05 100%)',
+      }}
     >
       <div className="text-center mb-4" style={{ width: '100%', maxWidth: 460 }}>
         {onBack && (
