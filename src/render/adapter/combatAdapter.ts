@@ -220,6 +220,46 @@ const TOWN_CROWD = 12           // idle heroes milling in the square
 
 interface TownFolk { e: Entity; hx: number; hy: number; tx: number; ty: number; t: number; name: string; faction: FactionType }
 
+// ── FFTA roster variety ───────────────────────────────────────────────────────
+// Hero job sprites per class, indexed by race for per-race silhouette variety (the
+// race/rarity palette is still applied on top — that's the wardrobe). Monsters are a
+// keyword-mapped bestiary rendered in their NATURAL colours (loadSprite registers a
+// `src/<id>` palette from each sheet). All optional scaffold; each falls back to a
+// programmatic placeholder rig so tear-out (and ?noffta) still renders.
+const HERO_JOBS: Record<ClassType, string[]> = {
+  warrior: ['ffa_soldier', 'ffa_warrior', 'ffa_fighter', 'ffa_gladiator', 'ffa_defender', 'ffa_mog_knight', 'ffa_paladin', 'ffa_templar'],
+  mage:    ['ffa_black_mage', 'ffa_white_mage', 'ffa_sage', 'ffa_time_mage', 'ffa_red_mage', 'ffa_illusionist', 'ffa_bishop', 'ffa_summoner'],
+  rogue:   ['ffa_ninja', 'ffa_thief', 'ffa_assassin', 'ffa_hunter', 'ffa_fencer', 'ffa_gadgeteer', 'ffa_archer', 'ffa_sniper'],
+  warlock: ['ffa_elementalist', 'ffa_blue_mage', 'ffa_animist', 'ffa_alchemist', 'ffa_morpher', 'ffa_beastmaster', 'ffa_dragoon', 'ffa_juggler'],
+}
+const RACE_ORDER: RaceType[] = ['human', 'dwarf', 'elf', 'orc', 'troll', 'goblin', 'gnome', 'tauren']
+// Monster bestiary + name-keyword → sprite mapping (first match wins).
+const MONSTERS = [
+  'ffa_red_panther', 'ffa_icedrake', 'ffa_bomb', 'ffa_jelly', 'ffa_lamia', 'ffa_malboro',
+  'ffa_floateye', 'ffa_zombie', 'ffa_vampire', 'ffa_goblin', 'ffa_antlion', 'ffa_tonberry', 'ffa_toughskin',
+]
+const MOB_KEYWORDS: [RegExp, string][] = [
+  [/wolf|hound|panther|cat|tiger|worg|lion/, 'ffa_red_panther'],
+  [/drake|dragon|wyrm|whelp|hydra|basilisk/, 'ffa_icedrake'],
+  [/bomb|elemental|flame|ember|fire|magma/, 'ffa_bomb'],
+  [/slime|jelly|ooze|gel|pudding|blob/, 'ffa_jelly'],
+  [/snake|serpent|lamia|naga|viper|cobra/, 'ffa_lamia'],
+  [/plant|flower|malboro|vine|shambler|treant|fungus|mushroom/, 'ffa_malboro'],
+  [/eye|beholder|gazer|watcher|devourer/, 'ffa_floateye'],
+  [/zombie|undead|ghoul|corpse|rot|skeleton|wraith/, 'ffa_zombie'],
+  [/vampire|bat|blood|nosferatu/, 'ffa_vampire'],
+  [/goblin|imp|kobold|gremlin|sprite/, 'ffa_goblin'],
+  [/ant|bug|insect|spider|scorpion|beetle|mantis/, 'ffa_antlion'],
+  [/lizard|tonberry|newt|gecko|raptor/, 'ffa_tonberry'],
+  [/ogre|troll|brute|golem|toughskin|giant|ettin/, 'ffa_toughskin'],
+]
+
+function strHash(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+
 interface Ambient {
   e: Entity
   kind: 'hero' | 'mob'
