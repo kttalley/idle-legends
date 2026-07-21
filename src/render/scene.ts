@@ -35,6 +35,11 @@ export interface Entity {
   // Computed each frame (buffer space):
   screenX: number
   screenY: number
+  /** Set each render: is the sprite's bounding box within the viewport (+margin)?
+   *  Off-screen entities are still projected + sorted (cheap) but skip the expensive
+   *  shadow fill / palette lookup / drawImage. With 100+ entities per zone this is the
+   *  bulk of the frame cost. */
+  onScreen: boolean
 }
 
 export class Scene {
@@ -54,6 +59,7 @@ export class Scene {
         e.shadow = true
         e.z = 0
         e.alpha = 1
+        e.onScreen = false
         return e
       }
     }
@@ -69,6 +75,7 @@ export class Scene {
       alpha: 1,
       screenX: 0,
       screenY: 0,
+      onScreen: false,
     }
     this.entities.push(e)
     this.order.push(this.entities.length - 1)
@@ -112,12 +119,21 @@ export class Scene {
     const es = this.entities
     const order = this.order
 
-    // 2. Project feet anchors into buffer space.
+    // 2. Project feet anchors into buffer space + viewport-cull test. The sprite box is
+    //    ~[screenX ± frameW/2] × [screenY − frameH − z, screenY + shadow]; onScreen is
+    //    the overlap of that box with the camera rect (+small margin). Off-screen
+    //    entities skip the shadow/body draws below (steps 4–5).
+    const camR = cam.x + cam.w, camB = cam.y + cam.h
     for (let i = 0; i < es.length; i++) {
       const e = es[i]
       if (!e.active) continue
       e.screenX = feetX(ground, e.tx, e.ty)
       e.screenY = feetY(ground, e.tx, e.ty)
+      const halfW = e.sprite.frameW * 0.5 + 4
+      const top = e.sprite.frameH + e.z + 4
+      e.onScreen =
+        e.screenX + halfW > cam.x && e.screenX - halfW < camR &&
+        e.screenY + 6 > cam.y && e.screenY - top < camB
     }
 
     // 3. Painter's sort by feet Y — in-place insertion sort on the index array.
@@ -137,7 +153,7 @@ export class Scene {
     ctx.fillStyle = 'rgba(0,0,0,0.30)'
     for (let i = 0; i < order.length; i++) {
       const e = es[order[i]]
-      if (!e.active || !e.shadow) continue
+      if (!e.active || !e.shadow || !e.onScreen) continue
       const dx = e.screenX - cam.x
       const dy = e.screenY - cam.y
       const shr = e.z > 0 ? Math.max(0.5, 1 - e.z / 40) : 1
@@ -151,7 +167,7 @@ export class Scene {
 
     for (let i = 0; i < order.length; i++) {
       const e = es[order[i]]
-      if (!e.active) continue
+      if (!e.active || !e.onScreen) continue
       const s = e.sprite
       const sheet = bakedSheet(s, e.paletteId, getPalette(e.paletteId))
       const f = e.animator.frame
