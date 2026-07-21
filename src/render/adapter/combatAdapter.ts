@@ -11,7 +11,7 @@
 // anchor and lunges can never slingshot across the screen.
 
 import { Scene, type Camera, type Entity } from '../scene'
-import { bakeGround, feetX, feetY, type GroundBuffer } from '../tilemap'
+import { bakeGround, feetX, feetY, HALF_W, HALF_H, type GroundBuffer } from '../tilemap'
 import { loadSpriteOrPlaceholder } from '../indexedSprite'
 import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeBoltRig, makeBurstRig, TILE_ANIMS } from '../placeholderArt'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
@@ -290,6 +290,22 @@ export class WorldSceneController {
 
   private cam: Camera = { x: 0, y: 0, w: 0, h: 0 }
 
+  // Render zoom: world-px → CSS-px factor (also the buffer downscale). Higher = more
+  // zoomed in / fewer tiles visible. Owned here (not the module const) so the host can
+  // zoom out on narrow mobile viewports where the dimetric FOV is otherwise too tight.
+  private scale = CSS_SCALE
+  private lastCssW = 0
+  private lastCssH = 0
+
+  // Tap / click-to-move (D2-style): a tapped ground point becomes a walk target the
+  // player paths to at manual speed, then auto-follow resumes. WASD or a zone change
+  // cancels it. Marker VFX (spawn flash + a pulsing destination ring) sell the input.
+  private tapMoveActive = false
+  private tapTx = 0
+  private tapTy = 0
+  private tapFlashT = 0    // one-shot expanding "click" flash (seconds remaining)
+  private tapPulse = 0     // free-running clock for the destination ring pulse
+
   // Screen shake / rumble — impact juice. shakeMag is buffer-px amplitude; it decays
   // over shakeT and is applied as a per-frame random camera offset (render-only, so
   // Math.random is fine here — no gameplay determinism impact). A brief hit-stop
@@ -422,6 +438,7 @@ export class WorldSceneController {
     }
     if (handled) {
       this.manualMode = this.input.up || this.input.down || this.input.left || this.input.right
+      if (this.manualMode) this.tapMoveActive = false // WASD overrides a tap target
     }
   }
 
@@ -622,6 +639,7 @@ export class WorldSceneController {
         this.manualMode = false
         this.jumpActive = false
         this.jumpT = 0
+        this.tapMoveActive = false // drop any tap target from the previous zone
         this.input = { up: false, down: false, left: false, right: false }
         // Player snapped to the new zone's playerMapPos — clear the visual offset.
         this.autoOffsetDx = 0
@@ -849,8 +867,10 @@ export class WorldSceneController {
   // ── Frame loop ─────────────────────────────────────────────────────────────
 
   setSize(cssW: number, cssH: number): void {
-    const vw = Math.max(1, Math.floor(cssW / CSS_SCALE))
-    const vh = Math.max(1, Math.floor(cssH / CSS_SCALE))
+    this.lastCssW = cssW
+    this.lastCssH = cssH
+    const vw = Math.max(1, Math.floor(cssW / this.scale))
+    const vh = Math.max(1, Math.floor(cssH / this.scale))
     if (this.canvas.width !== vw || this.canvas.height !== vh) {
       this.canvas.width = vw
       this.canvas.height = vh
@@ -858,6 +878,38 @@ export class WorldSceneController {
     }
     this.cam.w = vw
     this.cam.h = vh
+  }
+
+  /** Set the render zoom (world-px → CSS-px). The host picks a smaller value on narrow
+   *  mobile breakpoints so more of the world is visible. Re-applies the buffer size. */
+  setZoom(scale: number): void {
+    const s = clamp(scale, 1, 3)
+    if (s === this.scale) return
+    this.scale = s
+    if (this.lastCssW > 0) this.setSize(this.lastCssW, this.lastCssH)
+  }
+
+  /** Tap / click-to-move: project a viewport point (CSS px, page-relative) onto the
+   *  ground plane and set it as the walk target. Ignored while downed. Screen→buffer
+   *  uses the canvas's own rect ratio so it's correct at any zoom; buffer→tile inverts
+   *  the flat-ground feet projection (elevation is ignored — close enough to path to). */
+  moveTo(clientX: number, clientY: number): void {
+    const g = this.ground
+    if (!g || this.playerDead) return
+    const rect = this.canvas.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0) return
+    const bufX = (clientX - rect.left) * (this.canvas.width / rect.width) + this.cam.x
+    const bufY = (clientY - rect.top) * (this.canvas.height / rect.height) + this.cam.y
+    // Invert feetX/feetY (height 0): A = tx−ty, B = tx+ty.
+    const A = (bufX - g.originX - HALF_W) / HALF_W
+    const B = (bufY - g.planeOffsetY - HALF_H) / HALF_H
+    const tx = clamp((A + B) / 2, PAD + 1, PAD + MAP_SIZE - 1)
+    const ty = clamp((B - A) / 2, PAD + 1, PAD + MAP_SIZE - 1)
+    this.tapTx = tx
+    this.tapTy = ty
+    this.tapMoveActive = true
+    this.tapFlashT = 0.42
+    this.manualMode = false
   }
 
   renderFrame(dt: number): void {
@@ -884,7 +936,12 @@ export class WorldSceneController {
       if (this.mobFlashT <= 0 && this.mob) this.mob.paletteId = this.mobBasePalette
     }
 
-    // ── Player movement (manual WASD, else auto-follow the store's map pos) + jump ──
+    // ── Player movement (manual WASD, else tap-target, else auto-follow) + jump ──
+    // Engagement / death cancels any pending tap target (don't resume walking to a
+    // stale point after a fight ends).
+    if (this.mobEngaged || this.playerDead) this.tapMoveActive = false
+    if (this.tapFlashT > 0) this.tapFlashT -= realDt
+    this.tapPulse += realDt
     let moving = false
     let mvx = 0, mvy = 0
     if (this.manualMode) {
@@ -899,6 +956,23 @@ export class WorldSceneController {
         this.player.tx = clamp(this.player.tx + dx * MANUAL_SPEED * dt, PAD + 1, PAD + MAP_SIZE - 1)
         this.player.ty = clamp(this.player.ty + dy * MANUAL_SPEED * dt, PAD + 1, PAD + MAP_SIZE - 1)
         moving = true; mvx = dx; mvy = dy
+      }
+    } else if (this.tapMoveActive && !this.playerLunge.active && !this.mobEngaged) {
+      // Tap/click-to-move: path straight to the tapped ground point at manual speed,
+      // then hand back to auto-follow (syncOffset pins the auto target here so there's
+      // no slingshot). Arrival snaps the target off; the marker VFX clears with it.
+      const dx = this.tapTx - this.player.tx
+      const dy = this.tapTy - this.player.ty
+      const d = Math.hypot(dx, dy)
+      if (d < 0.25) {
+        this.tapMoveActive = false
+        this.syncOffset()
+      } else {
+        const ux = dx / d, uy = dy / d
+        this.player.tx = clamp(this.player.tx + ux * MANUAL_SPEED * dt, PAD + 1, PAD + MAP_SIZE - 1)
+        this.player.ty = clamp(this.player.ty + uy * MANUAL_SPEED * dt, PAD + 1, PAD + MAP_SIZE - 1)
+        moving = true; mvx = ux; mvy = uy
+        this.syncOffset()
       }
     } else if (!this.playerLunge.active && !this.mobEngaged) {
       // Auto: torus-aware lerp toward the store's playerMapPos (plus offset) so the
@@ -1039,6 +1113,9 @@ export class WorldSceneController {
     // Fallback glyphs for any node type without a tall-prop sprite (Phase E: the
     // mapped node types — ore/herb/boss_lair/mob_spawn — are now depth-sorted props).
     this.drawNodes(g)
+
+    // Tap/click-to-move destination marker (over the world, under the HUD/nameplates).
+    this.drawMoveMarker(g)
 
     // Faction-coloured nameplates over roaming ambient heroes (sells "other players").
     try { this.drawAmbientNameplates() } catch (err) { console.error('[ambient] nameplate failed:', err) }
@@ -1413,6 +1490,36 @@ export class WorldSceneController {
     ctx.restore()
   }
 
+  // D2-style click/tap feedback: a one-shot expanding flash at the moment of the tap,
+  // plus a pulsing destination ring while the player is still walking there. On the
+  // dimetric plane rings are flattened ellipses (ry = rx/2) so they lie on the ground.
+  private drawMoveMarker(g: GroundBuffer): void {
+    if (!this.tapMoveActive && this.tapFlashT <= 0) return
+    const ctx = this.ctx
+    const sx = feetX(g, this.tapTx, this.tapTy) - this.cam.x
+    const sy = feetY(g, this.tapTx, this.tapTy) - this.cam.y
+    if (sx < -30 || sx > this.cam.w + 30 || sy < -30 || sy > this.cam.h + 30) return
+    ctx.save()
+    if (this.tapMoveActive) {
+      const pulse = 0.5 + 0.5 * Math.sin(this.tapPulse * 6)
+      const rx = 7 + pulse * 2
+      ctx.strokeStyle = 'rgba(244,200,74,0.9)'
+      ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.ellipse(sx, sy, rx, rx * 0.5, 0, 0, Math.PI * 2); ctx.stroke()
+      ctx.fillStyle = 'rgba(255,230,140,0.85)'
+      ctx.beginPath(); ctx.ellipse(sx, sy, 1.6, 0.9, 0, 0, Math.PI * 2); ctx.fill()
+    }
+    if (this.tapFlashT > 0) {
+      const p = 1 - this.tapFlashT / 0.42
+      const rx = 6 + p * 16
+      ctx.globalAlpha = 1 - p
+      ctx.strokeStyle = '#ffe58a'
+      ctx.lineWidth = 2
+      ctx.beginPath(); ctx.ellipse(sx, sy, rx, rx * 0.5, 0, 0, Math.PI * 2); ctx.stroke()
+    }
+    ctx.restore()
+  }
+
   /** Fallback glyph overlay for node types without a tall-prop sprite (Phase E: the
    *  mapped types are now depth-sorted entities, so this draws nothing for them). */
   private drawNodes(g: GroundBuffer): void {
@@ -1473,7 +1580,7 @@ export class WorldSceneController {
       else op = (f.t / (life * 0.55)) ** 1.3
       f.el.style.opacity = String(op)
       f.el.style.transform =
-        `translate(${(f.wx - this.cam.x) * CSS_SCALE}px, ${(f.wy - this.cam.y - rise) * CSS_SCALE}px)`
+        `translate(${(f.wx - this.cam.x) * this.scale}px, ${(f.wy - this.cam.y - rise) * this.scale}px)`
     }
   }
 }

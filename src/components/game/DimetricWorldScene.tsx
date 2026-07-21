@@ -26,13 +26,20 @@ export function DimetricWorldScene() {
       controller.sync(useGameStore.getState())
     })
 
-    // Resize → controller canvas buffer size (CSS px / CSS_SCALE).
+    // Zoom: narrow mobile viewports get a smaller world-scale so more of the dimetric
+    // field is visible (the FOV is otherwise too tight on a phone). Desktop keeps 1:1.
+    const mq = window.matchMedia('(max-width: 640px)')
+    const applyZoom = () => controller.setZoom(mq.matches ? 1.5 : CSS_SCALE)
+
+    // Resize → controller canvas buffer size (CSS px / current zoom).
     const resize = () => {
+      applyZoom()
       const r = container.getBoundingClientRect()
       controller.setSize(r.width, r.height)
     }
     const ro = new ResizeObserver(resize)
     ro.observe(container)
+    mq.addEventListener('change', resize)
     resize()
 
     // One store subscription drives both sync(state) and the floatingNumbers diff
@@ -77,6 +84,33 @@ export function DimetricWorldScene() {
     window.addEventListener('keyup', onKeyUp)
     window.addEventListener('blur', onBlur)
 
+    // Tap / click-to-move (touch + mouse) on the world canvas. A short, low-movement
+    // press sets a walk target; drags/scrolls are ignored so the HUD and future pan
+    // gestures aren't hijacked. Haptic on accept — navigator.vibrate is Android-web
+    // only; iOS ignores it (the Capacitor Haptics plugin covers the native wrap later).
+    let downX = 0, downY = 0, downT = 0, downId = -1, moved = false
+    const onPointerDown = (e: PointerEvent) => {
+      downId = e.pointerId; downX = e.clientX; downY = e.clientY
+      downT = performance.now(); moved = false
+    }
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerId !== downId) return
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 12) moved = true
+    }
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== downId) return
+      downId = -1
+      if (!moved && performance.now() - downT < 500) {
+        controller.moveTo(e.clientX, e.clientY)
+        navigator.vibrate?.(8)
+      }
+    }
+    const onPointerCancel = () => { downId = -1 }
+    canvas.addEventListener('pointerdown', onPointerDown)
+    canvas.addEventListener('pointermove', onPointerMove)
+    canvas.addEventListener('pointerup', onPointerUp)
+    canvas.addEventListener('pointercancel', onPointerCancel)
+
     const frame = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000)
       last = now
@@ -90,9 +124,14 @@ export function DimetricWorldScene() {
       cancelAnimationFrame(raf)
       unsub()
       ro.disconnect()
+      mq.removeEventListener('change', resize)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
+      canvas.removeEventListener('pointerdown', onPointerDown)
+      canvas.removeEventListener('pointermove', onPointerMove)
+      canvas.removeEventListener('pointerup', onPointerUp)
+      canvas.removeEventListener('pointercancel', onPointerCancel)
     }
   }, [])
 
@@ -113,6 +152,7 @@ export function DimetricWorldScene() {
         style={{
           width: '100%', height: '100%', display: 'block',
           imageRendering: 'pixelated',
+          touchAction: 'none', // taps drive move-to; don't let the browser scroll/zoom the canvas
         }}
       />
       <div ref={floatersRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }} />
