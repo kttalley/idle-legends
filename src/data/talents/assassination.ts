@@ -1,6 +1,6 @@
 import type { TalentNodeDef } from '../types'
 
-// ── Assassination Rogue ── Shadowed Edge Spec ─────────────────────────────────
+// ── Rogue ── Shadowed Edge Spec ─────────────────────────────────
 // Rebranded: "Shadowed Edge" spec — lethal precision, poison and blade
 export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
 
@@ -8,14 +8,14 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   {
     id: 'ass_improved_eviscerate',
     name: 'Vicious Cuts',
-    description: 'Increases Eviscerate (finisher) damage by 5% per rank.',
+    description: 'Increases Sever (finisher) damage by 5% per rank.',
     icon: '🗡',
     row: 1, col: 1, maxRanks: 3, requiresPoints: 0,
     effects: [{ type: 'stat', stat: 'weaponDps', valuePerRank: 1.5 }],
   },
   {
     id: 'ass_remorseless',
-    name: 'Remorseless Attacks',
+    name: 'Grim Momentum',
     description: 'After a kill, next attack has +4% crit per rank.',
     icon: '💀',
     row: 1, col: 2, maxRanks: 5, requiresPoints: 0,
@@ -23,7 +23,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'ass_malice',
-    name: 'Malice',
+    name: 'Ill Intent',
     description: 'Increases critical strike chance by 1% per rank.',
     icon: '😈',
     row: 1, col: 3, maxRanks: 5, requiresPoints: 0,
@@ -33,7 +33,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   // ── Row 2 (5 pts required) ────────────────────────────────────────────────
   {
     id: 'ass_ruthlessness',
-    name: 'Ruthlessness',
+    name: 'No Wasted Motion',
     description: 'Increases attack speed by 0.04s per rank.',
     icon: '⚡',
     row: 2, col: 1, maxRanks: 3, requiresPoints: 5,
@@ -41,7 +41,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'ass_murder',
-    name: 'Murder',
+    name: 'Red Work',
     description: 'Increases all damage dealt by 2% per rank.',
     icon: '🔪',
     row: 2, col: 2, maxRanks: 2, requiresPoints: 5,
@@ -49,7 +49,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'ass_slice_dice',
-    name: 'Slice and Dice',
+    name: 'Quickened Steel',
     description: 'Reduces attack interval by 0.05s per rank.',
     icon: '⚔',
     row: 2, col: 3, maxRanks: 3, requiresPoints: 5,
@@ -59,7 +59,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   // ── Row 3 (10 pts required) ───────────────────────────────────────────────
   {
     id: 'ass_expose_armor',
-    name: 'Expose Armor',
+    name: 'Find the Seam',
     description: 'Reduces enemy effective armor by 10 per rank.',
     icon: '🎯',
     row: 3, col: 1, maxRanks: 2, requiresPoints: 10,
@@ -68,7 +68,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'ass_lethality',
-    name: 'Lethality',
+    name: 'Killcraft',
     description: 'Increases critical strike damage bonus by 6% per rank.',
     icon: '💉',
     row: 3, col: 2, maxRanks: 5, requiresPoints: 10,
@@ -77,7 +77,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'ass_vile_poisons',
-    name: 'Vile Poisons',
+    name: 'Bitter Venoms',
     description: 'Attacks apply a poison DoT dealing 8 damage/tick per rank.',
     icon: '☠',
     row: 3, col: 3, maxRanks: 5, requiresPoints: 10,
@@ -87,7 +87,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   // ── Row 4 (15 pts required) ───────────────────────────────────────────────
   {
     id: 'ass_improved_poisons',
-    name: 'Improved Poisons',
+    name: 'Coated Blades',
     description: 'Increases poison proc chance by 2% per rank.',
     icon: '☠',
     row: 4, col: 1, maxRanks: 5, requiresPoints: 15,
@@ -95,8 +95,8 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'ass_cold_blood',
-    name: 'Cold Blood',
-    description: 'Unlocks the Cold Blood ability: your next attack is a guaranteed critical strike. 30s cooldown.',
+    name: 'Dead Calm',
+    description: 'Unlocks the Dead Calm ability: your next attack is a guaranteed critical strike. 30s cooldown.',
     icon: '🧊',
     row: 4, col: 2, maxRanks: 1, requiresPoints: 15,
     effects: [{ type: 'mechanic', mechanic: 'cold_blood', valuePerRank: 1 }],
@@ -105,8 +105,8 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   // ── Row 5 (20 pts required) ───────────────────────────────────────────────
   {
     id: 'ass_seal_fate',
-    name: 'Seal Fate',
-    description: 'Critical strikes add a Combo Point. Every 5 Combo Points trigger an Eviscerate for 300% weapon damage.',
+    name: 'Written in Blood',
+    description: 'Critical strikes add a Combo Point. Every 5 Combo Points trigger a Sever for 300% weapon damage.',
     icon: '🎴',
     row: 5, col: 2, maxRanks: 5, requiresPoints: 20,
     requires: 'ass_cold_blood',
@@ -116,7 +116,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
   // ── Row 6 (25 pts required) ───────────────────────────────────────────────
   {
     id: 'ass_vigor',
-    name: 'Vigor',
+    name: 'Deep Reserves',
     description: 'Increases agility by {n} and crit chance by 2%.',
     icon: '⚡',
     row: 6, col: 2, maxRanks: 1, requiresPoints: 25,

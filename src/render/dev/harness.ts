@@ -7,10 +7,11 @@
 
 import { bakedSheetCount } from '../palette'
 import { getPalette } from '../palettes'
-import { loadSpriteOrPlaceholder, decompose } from '../indexedSprite'
+import { loadSprite, loadSpriteOrPlaceholder, decompose } from '../indexedSprite'
 import { makeBeastRig, makeHumanoidRig, makeTileset, makePropSheet, TILE, TILE_ANIMS, PROP } from '../placeholderArt'
 import { bakeGround, feetX, feetY, type GroundBuffer } from '../tilemap'
 import { Scene, type Camera, type Entity } from '../scene'
+import { ORIGINAL_SPRITE } from '../adapter/fftaRoster'
 import type { Facing, TileMapData, SpriteManifest } from '../types'
 
 const MAP_W = 64
@@ -131,21 +132,31 @@ async function main(): Promise<void> {
   canvas.height = vh
   ctx.imageSmoothingEnabled = false
 
-  // Assets: auto-exported FFTA roster first (gitignored local-assets/ffta-scaffold/ffta-units/),
-  // with committed programmatic placeholders as the tear-out fallback.
+  // Assets. DEFAULT = the FFTA scaffold (gitignored local-assets/ffta-scaffold/ffta-units/);
+  // `?noffta` swaps each id for its ORIGINAL Idle Legends rig (public/sprites/units/) via
+  // ORIGINAL_SPRITE. Both fall back to the committed programmatic placeholder.
   const base = import.meta.env.BASE_URL
   const scaffold = `${base}local-assets/ffta-scaffold/`
   const ffaUnits = `${scaffold}ffta-units/`
-  const heroRig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_soldier.json`, makeHumanoidRig)
-  const hero2Rig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_white_monk.json`, () => makeHumanoidRig('rig/humanoid2'))
-  const enemyRig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_fencer.json`, () => makeHumanoidRig('rig/enemy'))
-  const goblinRig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_goblin.json`, () => makeBeastRig('rig/goblin'))
-  const redcapRig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_lamia.json`, () => makeBeastRig('rig/redcap'))
-  const bombRig = await loadSpriteOrPlaceholder(`${ffaUnits}ffa_bomb.json`, () => makeBeastRig('rig/bomb'))
+  const realUnits = `${base}sprites/units/`
+  const noFFTA = new URLSearchParams(location.search).has('noffta')
+  const loadUnit = async (id: string, make: () => import('../types').IndexedSprite) => {
+    if (noFFTA) {
+      const real = await loadSprite(`${realUnits}${ORIGINAL_SPRITE[id] ?? id}.json`)
+      return real ? { ...real, id } : make()
+    }
+    return loadSpriteOrPlaceholder(`${ffaUnits}${id}.json`, make)
+  }
+  const heroRig = await loadUnit('ffa_soldier', makeHumanoidRig)
+  const hero2Rig = await loadUnit('ffa_white_monk', () => makeHumanoidRig('rig/humanoid2'))
+  const enemyRig = await loadUnit('ffa_fencer', () => makeHumanoidRig('rig/enemy'))
+  const goblinRig = await loadUnit('ffa_goblin', () => makeBeastRig('rig/goblin'))
+  const redcapRig = await loadUnit('ffa_lamia', () => makeBeastRig('rig/redcap'))
+  const bombRig = await loadUnit('ffa_bomb', () => makeBeastRig('rig/bomb'))
   const tileset = makeTileset()
   const propSheet = makePropSheet()
   document.getElementById('artpath')!.textContent =
-    heroRig.id.startsWith('ffa_') ? 'art: auto-exported FFTA roster' : 'art: programmatic placeholders'
+    noFFTA ? 'art: original Idle Legends sprites (?noffta)' : 'art: FFTA scaffold'
 
   // Ground: auto-exported FFTA field map if present, else the programmatic tileset.
   // The FFTA assets are 8×8 tiles with per-cell palette banks; we recolor the sheet

@@ -91,17 +91,29 @@ export class Scene {
 
   render(ctx: CanvasRenderingContext2D, cam: Camera, ground: GroundBuffer, dt = 0): void {
     // 1. Ground blit (the entire static map cost per frame is this one drawImage).
+    //    Clamp the source rect to the ground buffer: an out-of-bounds drawImage source
+    //    throws IndexSizeError on WebKit/iOS (Blink silently clips), which — thrown from
+    //    the frame loop — would blank the whole scene until reload. The camera can sit
+    //    partly past the (wrapped) buffer edge, and a runtime zoom/resize changes cam.w/h
+    //    mid-frame, so guard it. In-bounds pixels map 1:1 exactly as before; the
+    //    letterbox stays the cleared void.
     ctx.clearRect(0, 0, cam.w, cam.h)
-    ctx.drawImage(ground.canvas, cam.x, cam.y, cam.w, cam.h, 0, 0, cam.w, cam.h)
+    let sx = cam.x, sy = cam.y, sw = cam.w, sh = cam.h
+    let dx = 0, dy = 0
+    if (sx < 0) { dx = -sx; sw += sx; sx = 0 }
+    if (sy < 0) { dy = -sy; sh += sy; sy = 0 }
+    if (sx + sw > ground.width) sw = ground.width - sx
+    if (sy + sh > ground.height) sh = ground.height - sy
+    if (sw > 0 && sh > 0) ctx.drawImage(ground.canvas, sx, sy, sw, sh, dx, dy, sw, sh)
 
     // 1b. Animated ground cells (Phase B): reblit just the water (etc.) cells' current
     // frames over the static blit. One shared clock advances all cells in sync (the
     // FFTA slot-swap reads the same way); off-screen cells are culled. The count is
     // small and bounded by the viewport, so this stays well clear of a perf cliff.
     const anims = ground.anims
-    if (anims.length) {
+    if (anims.length && ground.sheet) {
       ground.elapsed += dt
-      const sheet = ground.sheet!
+      const sheet = ground.sheet
       const fw = ground.sheetFrameW, fh = ground.sheetFrameH, cols = ground.sheetCols
       const t = ground.elapsed
       const camR = cam.x + cam.w, camB = cam.y + cam.h

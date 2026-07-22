@@ -1,0 +1,122 @@
+{
+  "id": "mob_ashdrake",
+  "image": "mob_ashdrake.png",
+  "frameW": 36,
+  "frameH": 26,
+  "anchor": {
+    "x": 20,
+    "y": 24
+  },
+  "sourcePalette": [
+    "",
+    "#3a3230",
+    "#544a46",
+    "#6e625c",
+    "#8a7c74",
+    "#26242c",
+    "#3c3a46",
+    "#545260",
+    "#706e7e",
+    "#402420",
+    "#5e342a",
+    "#7c4836",
+    "#9a6046",
+    "#8a2c1c",
+    "#d05a24",
+    "#f0a04c"
+  ],
+  "animations": {
+    "idle": {
+      "se": {
+        "frames": [
+          0,
+          1
+        ],
+        "fps": 3,
+        "loop": true
+      },
+      "ne": {
+        "frames": [
+          0,
+          1
+        ],
+        "fps": 3,
+        "loop": true
+      }
+    },
+    "walk": {
+      "se": {
+        "frames": [
+          2,
+          3
+        ],
+        "fps": 6,
+        "loop": true
+      },
+      "ne": {
+        "frames": [
+          2,
+          3
+        ],
+        "fps": 6,
+        "loop": true
+      }
+    },
+    "attack": {
+      "se": {
+        "frames": [
+          4,
+          5,
+          6
+        ],
+        "fps": 8,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          4,
+          5,
+          6
+        ],
+        "fps": 8,
+        "loop": false
+      }
+    },
+    "hit": {
+      "se": {
+        "frames": [
+          7,
+          8
+        ],
+        "fps": 10,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          7,
+          8
+        ],
+        "fps": 10,
+        "loop": false
+      }
+    },
+    "death": {
+      "se": {
+        "frames": [
+          9,
+          10
+        ],
+        "fps": 5,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          9,
+          10
+        ],
+        "fps": 5,
+        "loop": false
+      }
+    }
+  }
+}

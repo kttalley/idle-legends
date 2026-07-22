@@ -1,13 +1,13 @@
 import type { TalentNodeDef } from '../types'
 
-// ── Frost Mage ── Glacial Rite Spec ───────────────────────────────────────────
+// ── Mage ── Glacial Rite Spec ───────────────────────────────────────────
 // Rebranded: "Glacial Rite" spec — absolute zero, death by a thousand shards
 export const FROST_TALENTS: TalentNodeDef[] = [
 
   // ── Row 1 (0 pts required) ────────────────────────────────────────────────
   {
     id: 'frost_warding',
-    name: 'Frost Warding',
+    name: 'Rimeguard',
     description: 'Increases armor by {n} per rank.',
     icon: '🧊',
     row: 1, col: 1, maxRanks: 2, requiresPoints: 0,
@@ -23,7 +23,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'frost_ice_shards',
-    name: 'Ice Shards',
+    name: 'Jagged Rime',
     description: 'Increases critical strike damage bonus by 20% per rank.',
     icon: '💎',
     row: 1, col: 3, maxRanks: 5, requiresPoints: 0,
@@ -33,7 +33,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   // ── Row 2 (5 pts required) ────────────────────────────────────────────────
   {
     id: 'frost_frostbite',
-    name: 'Frostbite',
+    name: 'Creeping Freeze',
     description: 'Gives your attacks a 5/10/15% chance to freeze the target for 4s (mob cannot attack).',
     icon: '🥶',
     row: 2, col: 1, maxRanks: 3, requiresPoints: 5,
@@ -49,7 +49,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'frost_permafrost',
-    name: 'Permafrost',
+    name: 'Long Winter',
     description: 'Reduces enemy attack speed by 4% per rank.',
     icon: '🌡',
     row: 2, col: 3, maxRanks: 3, requiresPoints: 5,
@@ -60,7 +60,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   // ── Row 3 (10 pts required) ───────────────────────────────────────────────
   {
     id: 'frost_piercing_ice',
-    name: 'Piercing Ice',
+    name: 'Keening Cold',
     description: 'Increases all spell damage by 2% per rank.',
     icon: '🗡',
     row: 3, col: 1, maxRanks: 3, requiresPoints: 10,
@@ -68,7 +68,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'frost_cold_snap',
-    name: 'Cold Snap',
+    name: 'Sudden Winter',
     description: 'Passive: Every 45s your next attack is a guaranteed critical strike.',
     icon: '⚡',
     row: 3, col: 2, maxRanks: 1, requiresPoints: 10,
@@ -76,7 +76,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'frost_imp_blizzard',
-    name: 'Blizzard',
+    name: 'Snowsquall',
     description: 'Increases weapon DPS by {n} per rank. Ice storms lash the target.',
     icon: '🌨',
     row: 3, col: 3, maxRanks: 3, requiresPoints: 10,
@@ -86,7 +86,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   // ── Row 4 (15 pts required) ───────────────────────────────────────────────
   {
     id: 'frost_arctic_reach',
-    name: 'Arctic Reach',
+    name: 'Farfrost',
     description: 'Increases weapon DPS by {n} per rank.',
     icon: '🎯',
     row: 4, col: 1, maxRanks: 2, requiresPoints: 15,
@@ -94,7 +94,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'frost_channeling',
-    name: 'Frost Channeling',
+    name: 'Winter Discipline',
     description: 'Reduces damage taken by 5% per rank.',
     icon: '📡',
     row: 4, col: 2, maxRanks: 3, requiresPoints: 15,
@@ -102,7 +102,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'frost_shatter',
-    name: 'Shatter',
+    name: 'Brittlebreak',
     description: 'Increases crit chance against frozen targets by 10% per rank.',
     icon: '💥',
     row: 4, col: 3, maxRanks: 5, requiresPoints: 15,
@@ -112,7 +112,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   // ── Row 5 (20 pts required) ───────────────────────────────────────────────
   {
     id: 'frost_ice_block',
-    name: 'Ice Block',
+    name: 'Glacial Tomb',
     description: 'Once per combat: when HP drops below 15%, become immune to damage for 5s.',
     icon: '🧊',
     row: 5, col: 1, maxRanks: 1, requiresPoints: 20,
@@ -120,7 +120,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'frost_cone_of_cold',
-    name: 'Cone of Cold',
+    name: 'Breath of Winter',
     description: 'Increases intellect by {n} and crit chance by 1% per rank.',
     icon: '🌬',
     row: 5, col: 2, maxRanks: 3, requiresPoints: 20,
@@ -133,7 +133,7 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   // ── Row 6 (25 pts required) ───────────────────────────────────────────────
   {
     id: 'frost_ice_barrier',
-    name: 'Ice Barrier',
+    name: 'Winterward',
     description: 'At the start of each combat, you gain an absorb shield worth 80 HP per rank.',
     icon: '🛡',
     row: 6, col: 1, maxRanks: 1, requiresPoints: 25,
@@ -143,8 +143,8 @@ export const FROST_TALENTS: TalentNodeDef[] = [
   // ── Row 7 (30 pts required) ───────────────────────────────────────────────
   {
     id: 'frost_winters_chill',
-    name: "Winter's Chill",
-    description: 'Each attack stacks Winter\'s Chill: +2% crit per stack, up to 5 stacks.',
+    name: 'Deepening Cold',
+    description: 'Each attack stacks Deepening Cold: +2% crit per stack, up to 5 stacks.',
     icon: '❄',
     row: 7, col: 2, maxRanks: 5, requiresPoints: 30,
     effects: [{ type: 'mechanic', mechanic: 'winters_chill', valuePerRank: 1 }],

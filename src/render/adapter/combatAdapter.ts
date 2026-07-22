@@ -12,14 +12,14 @@
 
 import { Scene, type Camera, type Entity } from '../scene'
 import { bakeGround, feetX, feetY, HALF_W, HALF_H, type GroundBuffer } from '../tilemap'
-import { loadSpriteOrPlaceholder } from '../indexedSprite'
+import { loadSprite, loadSpriteOrPlaceholder } from '../indexedSprite'
 import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeBoltRig, makeBurstRig, TILE_ANIMS } from '../placeholderArt'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { composePalette } from '../palette'
 import { heroPaletteId } from './heroWardrobe'
 import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
 import { Animator } from '../animation'
-import { HERO_SPRITES, MONSTER_SPRITES, resolveMobSprite, isMonsterSprite, heroSpriteId } from './fftaRoster'
+import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId } from './fftaRoster'
 import type { Facing, IndexedSprite } from '../types'
 import type {
   GameState, MobInstance, ClassType, RaceType, FactionType, Rarity, FloatingNumber, MapNode, MapScenery, WeatherType, ZoneId,
@@ -28,7 +28,7 @@ import type {
 export const CSS_SCALE = 2
 
 // FN color → spell school, for VFX classification (game-free; the store already
-// tags Shadow Bolt hits with this exact color).
+// tags Umbral Bolt hits with this exact color).
 const SHADOW_BOLT_COLOR = '#cc44ff'
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
@@ -180,8 +180,8 @@ const AMBIENT_NAMES = [
   'Roan', 'Sable', 'Torin', 'Ulla', 'Vesk', 'Wren', 'Yorick', 'Zara',
 ]
 const AMBIENT_CLASSES: ClassType[] = ['warrior', 'mage', 'rogue', 'warlock']
-const ALLIANCE_RACES: RaceType[] = ['human', 'dwarf', 'elf']
-const HORDE_RACES: RaceType[] = ['orc', 'troll', 'goblin']
+const CONCORD_RACES: RaceType[] = ['human', 'dwarf', 'elf']
+const ASHMARCH_RACES: RaceType[] = ['orc', 'troll', 'goblin']
 // Weighted toward common so a rare/epic/legendary drop-in reads as special.
 const AMBIENT_RARITY: Rarity[] = ['common', 'common', 'common', 'uncommon', 'uncommon', 'rare', 'epic', 'legendary']
 const AMBIENT_MEMBER_LEASH = 3.2   // how far a member roams from its group's anchor
@@ -400,33 +400,37 @@ export class WorldSceneController {
     const base = import.meta.env.BASE_URL
     const scaffold = `${base}local-assets/ffta-scaffold/`
     const ffaUnits = `${scaffold}ffta-units/`
-    // Dev A/B: `?noffta` forces the committed programmatic placeholder art (skips the
-    // gitignored FFTA scaffold entirely) so the shippable, tear-out look can be compared
-    // side-by-side without deleting local-assets/. `load` returns the placeholder
-    // directly when set, else loads the scaffold with placeholder as the fallback.
+    // Art source. DEFAULT = the FFTA scaffold (gitignored dev asset). The `?noffta`
+    // modifier swaps each scaffold id for its ORIGINAL Idle Legends rig (public/sprites/
+    // units/, the zero-FFTA-pixel set) via ORIGINAL_SPRITE. Both fall back to the
+    // programmatic placeholder if their file is missing. Entities are cached by the
+    // roster's scaffold id in either mode, so swap/lookup stays id-stable.
     const noFFTA = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noffta')
-    const load = (url: string, make: () => IndexedSprite): Promise<IndexedSprite> =>
-      noFFTA ? Promise.resolve(make()) : loadSpriteOrPlaceholder(url, make)
-    // Curated FFTA scaffold: load the race/class hero sprites + named monster sprites
-    // in parallel. Missing entries fall back to humanoid/beast placeholders per id.
-    if (!noFFTA) {
-      const unitIds = new Set<string>()
-      for (const race of ['human', 'dwarf', 'elf', 'orc', 'troll', 'goblin', 'gnome', 'tauren'] as RaceType[]) {
-        for (const cls of ['warrior', 'mage', 'rogue', 'warlock'] as ClassType[]) {
-          for (const id of HERO_SPRITES[race][cls]) unitIds.add(id)
-        }
+    const realUnits = `${base}sprites/units/`
+    const unitIds = new Set<string>()
+    for (const race of ['human', 'dwarf', 'elf', 'orc', 'troll', 'goblin', 'gnome', 'tauren'] as RaceType[]) {
+      for (const cls of ['warrior', 'mage', 'rogue', 'warlock'] as ClassType[]) {
+        for (const id of HERO_SPRITES[race][cls]) unitIds.add(id)
       }
-      for (const id of MONSTER_SPRITES) unitIds.add(id)
-      const loadUnit = (id: string) => load(`${ffaUnits}${id}.json`, () =>
-        isMonsterSprite(id) ? makeBeastRig(`rig/${id}`) : makeHumanoidRig(`rig/${id}`))
-      const entries = await Promise.all(
-        Array.from(unitIds).map(async (id): Promise<[string, IndexedSprite]> => [id, await loadUnit(id)])
-      )
-      this.spriteCache = Object.fromEntries(entries)
     }
+    for (const id of MONSTER_SPRITES) unitIds.add(id)
+    const loadUnit = async (id: string): Promise<IndexedSprite> => {
+      if (noFFTA) {
+        const origId = ORIGINAL_SPRITE[id] ?? id
+        const make = () => (isMonsterSprite(id) && !isHumanoidMonster(origId)) ? makeBeastRig(`rig/${id}`) : makeHumanoidRig(`rig/${id}`)
+        const real = await loadSprite(`${realUnits}${origId}.json`)
+        // keep the roster id as the sprite's id so cache key === entity sprite id
+        return real ? { ...real, id } : make()
+      }
+      return loadSpriteOrPlaceholder(`${ffaUnits}${id}.json`, () =>
+        isMonsterSprite(id) ? makeBeastRig(`rig/${id}`) : makeHumanoidRig(`rig/${id}`))
+    }
+    const entries = await Promise.all(
+      Array.from(unitIds).map(async (id): Promise<[string, IndexedSprite]> => [id, await loadUnit(id)])
+    )
+    this.spriteCache = Object.fromEntries(entries)
 
-    // Programmatic fallback rigs. When the scaffold is absent (or ?noffta), these are
-    // the only rigs; otherwise they backstop any missing individual sprite.
+    // Programmatic fallback rigs backstop any missing individual sprite (either mode).
     const player = this.spriteCache['ffa_soldier'] ?? makeHumanoidRig('rig/humanoid')
     const mobHumanoid = this.spriteCache['ffa_white_monk'] ?? makeHumanoidRig('rig/mob-humanoid')
     const mobBeast = this.spriteCache['ffa_bomb'] ?? makeBeastRig('rig/mob-beast')
@@ -434,7 +438,7 @@ export class WorldSceneController {
     // FFTA-traced ground tiles (gitignored dev scaffold); falls back to the programmatic
     // tileset set in the constructor. Traced tiles are indexed to our semantic slots, so
     // biome palettes still recolor them.
-    this.tileset = await load(`${scaffold}tiles.json`, makeTileset)
+    this.tileset = noFFTA ? makeTileset() : await loadSpriteOrPlaceholder(`${scaffold}tiles.json`, makeTileset)
     this.burstRig = makeBurstRig('fx/burst')
     this.boltRig = makeBoltRig('fx/bolt')
 
@@ -1479,7 +1483,7 @@ export class WorldSceneController {
       for (let k = 0; k < tmpl.h; k++) {
         const s = gi * 100 + k * 11 + 3
         const faction: FactionType = rnd(s) < 0.5 ? 'alliance' : 'horde'
-        const races = faction === 'alliance' ? ALLIANCE_RACES : HORDE_RACES
+        const races = faction === 'alliance' ? CONCORD_RACES : ASHMARCH_RACES
         const race = races[Math.floor(rnd(s + 1) * races.length)]
         const cls = AMBIENT_CLASSES[Math.floor(rnd(s + 2) * AMBIENT_CLASSES.length)]
         const rarity = AMBIENT_RARITY[Math.floor(rnd(s + 3) * AMBIENT_RARITY.length)]
@@ -1584,7 +1588,7 @@ export class WorldSceneController {
       const hx = Math.cos(ang) * r
       const hy = Math.sin(ang) * r
       const faction: FactionType = i % 2 === 0 ? 'alliance' : 'horde'
-      const races = faction === 'alliance' ? ALLIANCE_RACES : HORDE_RACES
+      const races = faction === 'alliance' ? CONCORD_RACES : ASHMARCH_RACES
       const race = races[i % races.length]
       const cls = AMBIENT_CLASSES[i % AMBIENT_CLASSES.length]
       const rarity = AMBIENT_RARITY[i % AMBIENT_RARITY.length]

@@ -88,7 +88,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       },
       {
         id: 'harvest_golem',
-        name: 'Harvest Golem',
+        name: 'Harrowfield Golem',
         hp: 180,
         damage: 22,
         xpReward: 60,
@@ -128,7 +128,7 @@ export const ZONES: Record<string, ZoneConfig> = {
   grimshade_forest: {
     id: 'grimshade_forest',
     name: 'Grimshade Forest',
-    description: 'A cursed wood where the dead do not rest and pale-furred worgen stalk the moonlit paths.',
+    description: 'A cursed wood where the dead do not rest and pale-furred wolfkin stalk the moonlit paths.',
     levelRange: [20, 30],
     bgColor: '#1a1a2a',
     unlockKills: 70,
@@ -150,7 +150,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       },
       {
         id: 'grimshade_worgen',
-        name: 'Grimshade Worgen',
+        name: 'Grimshade Wolfkin',
         hp: 320,
         damage: 42,
         xpReward: 120,
@@ -236,7 +236,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       },
       {
         id: 'troll_warchief',
-        name: 'Warchief Zul\'thak',
+        name: 'Warchief Vor\'thak',
         hp: 600,
         damage: 180,
         xpReward: 3000,
@@ -442,7 +442,7 @@ export const ZONES: Record<string, ZoneConfig> = {
   ironcrag_badlands: {
     id: 'ironcrag_badlands',
     name: 'Ironcrag Badlands',
-    description: 'Jagged iron-red badlands, stronghold of the first Horde clans. Orcish raiders patrol every ridge.',
+    description: 'Jagged iron-red badlands, stronghold of the first Ashmarch clans. Orcish raiders patrol every ridge.',
     levelRange: [55, 70],
     bgColor: '#2e1a0a',
     unlockKills: 120,
@@ -465,7 +465,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       },
       {
         id: 'goblin_sapper',
-        name: 'Goblin Sapper',
+        name: 'Goblin Demolitionist',
         hp: 1100,
         damage: 160,
         xpReward: 420,
@@ -489,7 +489,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       },
       {
         id: 'ironcrag_overlord',
-        name: 'Overlord Grommash Ironjaw',
+        name: 'Overlord Drogmar Ironjaw',
         hp: 1750,
         damage: 700,
         xpReward: 44000,
@@ -552,7 +552,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       },
       {
         id: 'venom_hexlord',
-        name: 'Hexlord Zal\'grak the Venomous',
+        name: 'Hexcaller Zal\'grak the Venomous',
         hp: 2000,
         damage: 800,
         xpReward: 60000,
@@ -567,8 +567,8 @@ export const ZONES: Record<string, ZoneConfig> = {
 
   warsong_mesa: {
     id: 'warsong_mesa',
-    name: 'Warsong Mesa',
-    description: 'High plateaus of red stone where orc war-drums echo endlessly. The Warsong clan rules here with iron fists.',
+    name: 'Wardrum Mesa',
+    description: 'High plateaus of red stone where orc war-drums echo endlessly. The Wardrum clan rules here with iron fists.',
     levelRange: [75, 90],
     bgColor: '#2a1008',
     unlockKills: 130,
@@ -579,7 +579,7 @@ export const ZONES: Record<string, ZoneConfig> = {
     mobs: [
       {
         id: 'warsong_grunt',
-        name: 'Warsong Grunt',
+        name: 'Wardrum Grunt',
         hp: 1875,
         damage: 187,
         xpReward: 600,
@@ -615,7 +615,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       },
       {
         id: 'warsong_chieftain',
-        name: 'Chieftain Rok\'nar Bloodscream',
+        name: 'Chieftain Rok\'nar Bloodroar',
         hp: 2250,
         damage: 900,
         xpReward: 80000,
@@ -678,7 +678,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       },
       {
         id: 'cinder_dreadlord',
-        name: 'Dreadlord Ashvael the Burning',
+        name: 'Balelord Ashvael the Burning',
         hp: 2500,
         damage: 1020,
         xpReward: 100000,
@@ -694,7 +694,7 @@ export const ZONES: Record<string, ZoneConfig> = {
   the_maw_eternal: {
     id: 'the_maw_eternal',
     name: 'The Maw Eternal',
-    description: 'The abyss at the world\'s edge. The Horde\'s final fortress. Those who enter do not return unchanged.',
+    description: 'The abyss at the world\'s edge. The Ashmarch\'s final fortress. Those who enter do not return unchanged.',
     levelRange: [95, 100],
     bgColor: '#0a0a12',
     unlockKills: 140,

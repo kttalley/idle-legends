@@ -1,6 +1,6 @@
 import type { TalentNodeDef } from '../types'
 
-// ── Arms Warrior ── Ironcleave Spec ───────────────────────────────────────────
+// ── Warrior ── Ironcleave Spec ───────────────────────────────────────────
 // Rebranded: "Ironcleave" spec — the relentless two-handed warrior
 export const ARMS_TALENTS: TalentNodeDef[] = [
 
@@ -24,7 +24,7 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   {
     id: 'arms_improved_rend',
     name: 'Serrated Blade',
-    description: 'Your critical strikes apply a Rend bleed. Increases bleed damage per rank.',
+    description: 'Your critical strikes apply a serrated bleed. Increases bleed damage per rank.',
     icon: '🩸',
     row: 1, col: 3, maxRanks: 2, requiresPoints: 0,
     effects: [{ type: 'mechanic', mechanic: 'deep_wounds', valuePerRank: 0.08 }],
@@ -41,7 +41,7 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_tactical_mastery',
-    name: 'Tactical Mastery',
+    name: 'Veteran\'s Poise',
     description: 'Increases stamina and armor each rank. Grants combat resilience.',
     icon: '🧠',
     row: 2, col: 2, maxRanks: 5, requiresPoints: 5,
@@ -52,7 +52,7 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_thunder_clap',
-    name: 'Thunder Clap',
+    name: 'Stormpeal',
     description: 'Reduces enemy attack speed by 5% per rank (max 15%).',
     icon: '💥',
     row: 2, col: 3, maxRanks: 3, requiresPoints: 5,
@@ -63,7 +63,7 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   // ── Row 3 (10 pts required) ───────────────────────────────────────────────
   {
     id: 'arms_overpower',
-    name: 'Overpower',
+    name: 'Overbear',
     description: 'Increases crit chance by {n}% per rank.',
     icon: '💪',
     row: 3, col: 1, maxRanks: 2, requiresPoints: 10,
@@ -71,7 +71,7 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_anger_management',
-    name: 'Anger Management',
+    name: 'Banked Fury',
     description: 'Passively regenerates 1 HP/s in combat. Increases stamina.',
     icon: '🔥',
     row: 3, col: 2, maxRanks: 1, requiresPoints: 10,
@@ -83,7 +83,7 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_deep_wounds',
-    name: 'Deep Wounds',
+    name: 'Lasting Wounds',
     description: 'Critical strikes cause your target to bleed for {n}% weapon damage/s.',
     icon: '🩸',
     row: 3, col: 3, maxRanks: 3, requiresPoints: 10,
@@ -101,7 +101,7 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_impale',
-    name: 'Impale',
+    name: 'Run Through',
     description: 'Increases critical hit damage bonus by 10% per rank.',
     icon: '🗡',
     row: 4, col: 2, maxRanks: 2, requiresPoints: 15,
@@ -120,7 +120,7 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_sweeping_strikes',
-    name: 'Sweeping Strikes',
+    name: 'Reaping Arc',
     description: 'Every 30s your next 5 attacks deal double damage.',
     icon: '🌀',
     row: 5, col: 2, maxRanks: 1, requiresPoints: 20,
@@ -128,7 +128,7 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_sword_spec',
-    name: 'Blade Dance',
+    name: 'Turning Steel',
     description: 'Gives each attack a 1% chance per rank to strike again instantly.',
     icon: '✨',
     row: 5, col: 3, maxRanks: 5, requiresPoints: 20,
@@ -138,7 +138,7 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   // ── Row 6 (25 pts required) ───────────────────────────────────────────────
   {
     id: 'arms_hamstring',
-    name: 'Hamstring',
+    name: 'Hobbling Cut',
     description: 'Reduces enemy attack speed by an additional 3% per rank.',
     icon: '🦵',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
@@ -146,8 +146,8 @@ export const ARMS_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_mortal_strike',
-    name: 'Mortal Strike',
-    description: 'Unlocks the Mortal Strike ability: a crushing blow that deals 250% weapon damage on a 6s cooldown.',
+    name: 'Gravewound',
+    description: 'Unlocks the Gravewound ability: a crushing blow that deals 250% weapon damage on a 6s cooldown.',
     icon: '💀',
     row: 6, col: 3, maxRanks: 1, requiresPoints: 25,
     effects: [{ type: 'mechanic', mechanic: 'mortal_strike', valuePerRank: 1 }],

@@ -82,11 +82,11 @@ const ZONE_THEMES: Record<ZoneId, string> = {
   ashfire_peaks:      'volcanic mountain peaks shrouded in ash and flame, level 40-50, home to fire elementals and dragons',
   shattered_crossing: 'ruined bridge-town where two factions battle, levels 45-55',
   the_bloodfields:    'open war-torn plains littered with the dead, levels 50-60',
-  ironcrag_badlands:  'jagged iron-red badlands, first Horde stronghold, levels 55-70',
+  ironcrag_badlands:  'jagged iron-red badlands, first Ashmarch stronghold, levels 55-70',
   venom_hollows:      'fetid troll swamps reeking of poison, levels 65-80',
   warsong_mesa:       'red stone plateaus echoing with orc war-drums, levels 75-90',
   cinderfall_wastes:  'ash-choked ruins of a city burned in war, levels 85-100',
-  the_maw_eternal:    'the world-edge abyss, final Horde fortress, levels 95-100',
+  the_maw_eternal:    'the world-edge abyss, final Ashmarch fortress, levels 95-100',
 }
 
 async function ollamaGenerate(prompt: string): Promise<string> {
@@ -110,7 +110,7 @@ const TOWN_THEMES: Record<string, string> = {
   dustwind_post:     'a fortified military outpost on harsh arid plains, level 10-20',
   grimshade_refuge:  'a survivor encampment in a dark cursed forest, level 20-30',
   crossroads_market: 'a neutral war-profiteer trading hub at a ruined bridge-town, levels 45-55',
-  ironcrag_hold:     'the seat of the first Horde clan in jagged iron-red badlands, levels 55-70',
+  ironcrag_hold:     'the seat of the first Ashmarch clan in jagged iron-red badlands, levels 55-70',
   warsong_bastion:   'an orcish military bastion on red stone plateaus with war-drums, levels 75-90',
 }
 

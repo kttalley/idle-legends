@@ -12,20 +12,20 @@ export interface FactionDefinition {
 export const FACTION_DEFINITIONS: Record<FactionType, FactionDefinition> = {
   alliance: {
     id: 'alliance',
-    name: 'The Alliance',
+    name: 'The Lastlight Concord',
     color: '#4a90d9',
     opposingFaction: 'horde',
-    description: 'A coalition of humans, dwarves, and elves bound by honour and ancient oaths.',
-    motto: 'For the Alliance.',
+    description: 'Oath-bound kingdoms of humans, dwarves, and elves holding the last light against the dark.',
+    motto: 'Hold the last light.',
   },
 
   horde: {
     id: 'horde',
-    name: 'The Horde',
+    name: 'The Ashmarch',
     color: '#c0392b',
     opposingFaction: 'alliance',
-    description: 'Orcs, trolls, and goblins united by strength, survival, and the will to dominate.',
-    motto: 'Lok\'tar Ogar.',
+    description: 'Orcs, trolls, and goblins forged by fire and loss into one unstoppable column.',
+    motto: 'Ash behind us, fire ahead.',
   },
 
   neutral: {
@@ -33,7 +33,7 @@ export const FACTION_DEFINITIONS: Record<FactionType, FactionDefinition> = {
     name: 'Neutral',
     color: '#b8a070',
     opposingFaction: null,
-    description: 'Those who walk between factions — gnomes and tauren who answer to no banner.',
+    description: 'Those who walk between factions — gnomes and hornborn who answer to no banner.',
     motto: 'Gold has no allegiance.',
   },
 }

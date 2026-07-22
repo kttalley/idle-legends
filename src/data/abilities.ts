@@ -20,7 +20,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
   },
   {
     id: 'warrior_shield_wall',
-    name: 'Shield Wall',
+    name: 'Hold the Line',
     description: 'Reduce incoming damage by 60% for 8 seconds.',
     icon: '🛡',
     cooldownSeconds: 10,
@@ -30,7 +30,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
   },
   {
     id: 'warrior_bloodthirst',
-    name: 'Bloodthirst',
+    name: 'Red Harvest',
     description: 'Your next 3 critical hits heal you for 20% of damage dealt.',
     icon: '🩸',
     cooldownSeconds: 8,
@@ -43,7 +43,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
 
   {
     id: 'mage_frostbolt',
-    name: 'Frostbolt',
+    name: 'Rimebolt',
     description: 'Deal 200% damage and freeze the enemy for 4 seconds (cannot attack).',
     icon: '❄',
     cooldownSeconds: 4,
@@ -57,7 +57,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
   },
   {
     id: 'mage_combustion',
-    name: 'Combustion',
+    name: 'Cinderburst',
     description: 'Your next 3 spells are guaranteed critical strikes.',
     icon: '🔥',
     cooldownSeconds: 12,
@@ -67,7 +67,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
   },
   {
     id: 'mage_time_warp',
-    name: 'Time Warp',
+    name: 'The Unwound Hour',
     description: 'Reduce attack interval by 50% for 8 seconds.',
     icon: '⏳',
     cooldownSeconds: 15,
@@ -80,7 +80,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
 
   {
     id: 'rogue_sinister_strike',
-    name: 'Sinister Strike',
+    name: 'Cruel Stroke',
     description: 'Your next attack strikes twice.',
     icon: '🗡',
     cooldownSeconds: 2.5,
@@ -90,7 +90,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
   },
   {
     id: 'rogue_evasion',
-    name: 'Evasion',
+    name: 'Slip the Blade',
     description: 'Greatly increase armor for 10 seconds.',
     icon: '🌑',
     cooldownSeconds: 12,
@@ -100,7 +100,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
   },
   {
     id: 'rogue_shadow_step',
-    name: 'Shadow Step',
+    name: 'Duskstep',
     description: 'Teleport to enemy — next attack is a guaranteed crit and resets your attack timer.',
     icon: '💨',
     cooldownSeconds: 5,
@@ -113,7 +113,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
 
   {
     id: 'warlock_shadow_bolt',
-    name: 'Shadow Bolt',
+    name: 'Umbral Bolt',
     description: 'Hurl a bolt of void energy for 300% weapon damage.',
     icon: '☠',
     cooldownSeconds: 3,
@@ -124,7 +124,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
   },
   {
     id: 'warlock_drain_life',
-    name: 'Drain Life',
+    name: 'Red Thread',
     description: 'Drain vitality from your target, healing 25% of your max HP over 6 seconds.',
     icon: '💚',
     cooldownSeconds: 8,
@@ -134,7 +134,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
   },
   {
     id: 'warlock_dark_pact',
-    name: 'Dark Pact',
+    name: 'Bleak Bargain',
     description: 'All DoT damage doubled for 10 seconds.',
     icon: '🌑',
     cooldownSeconds: 12,

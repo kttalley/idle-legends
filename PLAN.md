@@ -264,7 +264,7 @@ brief by owner decision, under hard guardrails:
 snapshot: level/class/race/stats/equipment/talents + their *look* as `(spriteId,
 paletteId)` pairs) live in cloud accounts. A duel fetches an opponent snapshot and runs a
 **deterministic, seeded, headless combat sim** (the existing tick-based `combat.ts` logic
-run without UI) — both sides see the same result. Faction (rebranded Alliance/Horde)
+run without UI) — both sides see the same result. Faction (The Lastlight Concord / The Ashmarch)
 aggregates individual results into a **faction war leaderboard**; individual ladders per
 season alongside.
 
@@ -394,14 +394,45 @@ clan-and-order political fantasy of GBA tactics games crossed with bold two-fact
 conflict and punchy, vivid class fantasy. Never name or reference FF/WoW in-game or in
 store metadata (trademark mentions also trigger App Store rejection).
 
-Process (gen-AI-assisted, data-only, saves preserved):
-1. `docs/world-bible.md` — pillars, tone words, naming morphology (build on the existing
-   `nameGen.ts` phoneme voice and the original zone names as the seed style).
-2. Scripted audit → full rename inventory (factions, 1 race, abilities, talents, any items).
-3. Generate 3–5 candidates per term in the bible's voice; you pick; collision-check names
-   against existing game trademarks.
-4. Apply as **display-name-only** edits — internal ids (`arms`, `affliction`, `tauren`,
-   file names) stay unchanged so save data and code are untouched.
+**Status (2026-07-21): display-layer rebrand APPLIED.** `docs/art-direction.md` is the
+world bible + full art direction + rename inventory (produced and cross-verified by a
+multi-agent pass; supersedes the planned `docs/world-bible.md`).
+
+1. ~~World bible~~ → art-direction doc §1: **The Lastlight Concord** ("Hold the last
+   light.") vs **The Ashmarch** ("Ash behind us, fire ahead."); race Tauren → **Hornborn**
+   (palette id `race/hornborn` already shipped).
+2. ~~Rename inventory~~ → doc §6; a repo-verified IP sweep also caught zone/town display
+   data (Worgen, Warsong, Grommash, Hexlord, Bloodscream, Zul', Dreadlord — all renamed).
+3. ~~Apply display-name-only edits~~ → done across `src/data/` (factions, races, classes,
+   all four talent trees, abilities, zones, towns), `nameGen.ts` prose, and the hardcoded
+   combat-log strings in `gameStore.ts`. Internal ids untouched; saves preserved;
+   `npm run build` green; submission grep sweep clean except the `fftaRoster.ts` `ffa_*`
+   id tables (resolved by the art work below).
+
+**Original sprite production — DONE (2026-07-21), behind `?noffta`.** All **18 shippable
+sheets** live in `public/sprites/units/` (5 hero archetypes, 12 monster rigs, + `mob_grubkin`
+as a cogling art variant): 9 transcribed from the doc's verified idle grids, 7 designed from
+the §2.2 briefs, all imported through `importSprite.mjs` with no merge warnings. **The FFTA
+scaffold stays the DEFAULT art;** the `?noffta` URL modifier swaps every scaffold id for its
+original rig via `ORIGINAL_SPRITE` (fftaRoster.ts) — so the game renders FFTA by default and
+the zero-FFTA-pixel set on demand. All three loaders (combat adapter, UI avatar cache, dev
+harness) honor the toggle: default → scaffold → placeholder; `?noffta` → original → placeholder.
+Verified: all 47 roster ids map to an existing original; `npm run build` green; dev server
+serves `/`, `/?noffta`, harness, scaffold, and every original manifest at 200. Tooling fixed
+en route: `importSprite.mjs` accepts the `death` tag and a `--palette` flag preserving semantic
+slot order. Originals ship se-only (importer auto-reuses for the back facing). **For store
+submission this default must flip** — the FFTA scaffold is never shipped, so originals become
+default (or the roster swaps to `hero_*`/`mob_*` ids) before build.
+
+Remaining before store submission:
+- Art polish pass on the weakest rigs (the 7 brief-designed monsters are functional but
+  coarser than the spec rigs) and the optional distinct back-facing (`/ne`) rows.
+- The [Speculative] fork pool (dwarf stoutguard, hornborn horns, tuskhog boar, carrionkite
+  bird) — add on observed weak-read complaints.
+- Replace `palettes.ts` `biome/map080` (decoded from the FFTA map) with an original ramp.
+- Store-metadata sweep using the grep list in art-direction doc §6.4.
+- Post-launch, needs a save migration: retire coined words inside internal snake_case ids
+  (`warsong_mesa`, `grimshade_worgen`, `worgen_hide`) — not user-visible, exempt for now.
 
 Track R is independent of Phases 0–4 and can run in any gap; it must be complete before
 store submission.

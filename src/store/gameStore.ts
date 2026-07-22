@@ -63,6 +63,19 @@ function defaultProcState(): CombatProcState {
   }
 }
 
+// ── Zoom preference (global UI pref, persisted outside the per-character save slot) ──
+const ZOOM_KEY = 'il_zoom_level'
+const ZOOM_STEPS = 3
+function readZoomPref(): number {
+  try {
+    const n = Number(localStorage.getItem(ZOOM_KEY))
+    return Number.isFinite(n) ? Math.min(ZOOM_STEPS - 1, Math.max(0, Math.floor(n))) : 0
+  } catch { return 0 }
+}
+function writeZoomPref(n: number): void {
+  try { localStorage.setItem(ZOOM_KEY, String(n)) } catch { /* private mode / no storage */ }
+}
+
 // ── Default State ─────────────────────────────────────────────────────────────
 function defaultState(): GameState {
   return {
@@ -78,6 +91,7 @@ function defaultState(): GameState {
     currentThought: null,
     thoughtExpiresAt: 0,
     lastThoughtAt: 0,
+    zoomLevel: readZoomPref(),
     level: 1,
     xp: 0,
     stats: {} as Stats,
@@ -179,6 +193,7 @@ function rehydrateState(saved: GameState): GameState {
   saved.mobMapOffset       = { dx: 0, dy: 0 }
   saved.currentTown        = null
   saved.generatedTownNames = saved.generatedTownNames ?? {}
+  saved.zoomLevel          = readZoomPref()  // global UI pref, not per-slot
   return saved
 }
 
@@ -283,6 +298,7 @@ interface GameActions {
   triggerThought: (event: ThoughtEvent, extra?: string) => void
   beginTravel: (toZone: ZoneId) => void
   cancelTravel: () => void
+  cycleZoom: () => void
   setMode: (mode: GameMode) => void
   startCrafting: (recipeId: RecipeId) => void
   enterTown: (townId: TownId) => void
@@ -649,7 +665,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           const dist  = 10 + seededRandLocal(mobSeed, 1) * 5
           set({ mobMapOffset: { dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist } })
 
-          // Apply Ice Barrier absorb at combat start
+          // Apply Winterward absorb at combat start
           if (fx.iceBarrierAbsorb > 0 && procState.iceBarrierHp <= 0) {
             procState.iceBarrierHp = fx.iceBarrierAbsorb
           }
@@ -692,15 +708,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       newLogs.push(log('dot_tick', `Affliction deals ${totalDotDmg} damage`, '#aa88ff'))
     }
 
-    // Nightfall Shadow Bolt proc
+    // Gathering Dark Umbral Bolt proc
     if (nightfallProc && currentMob) {
       const boltDmg = makeShadowBoltHit(stats.weaponDps, stats.attackSpeedSeconds, 2.5)
       currentMob = { ...currentMob, currentHp: currentMob.currentHp - boltDmg }
       newFns.push(fn(boltDmg, true, false, false, '#cc44ff'))
-      newLogs.push(log('proc', `⚡ Nightfall! Shadow Bolt hits for ${boltDmg}`, '#cc44ff'))
+      newLogs.push(log('proc', `⚡ Gathering Dark! Umbral Bolt hits for ${boltDmg}`, '#cc44ff'))
     }
 
-    // ── Siphon Life ──────────────────────────────────────────────────────────
+    // ── Tithe of Wounds ──────────────────────────────────────────────────────
     if (fx.siphonLifeHpPerTick > 0) {
       siphonLifeAccum += deltaSeconds
       if (siphonLifeAccum >= 3) {
@@ -757,10 +773,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         const xtraHit = Math.round(stats.weaponDps * stats.attackSpeedSeconds * 0.7)
         currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - xtraHit }
         newFns.push(fn(xtraHit, false, false, false, '#aabbff'))
-        newLogs.push(log('proc', `⚡ Blade Dance! Extra strike for ${xtraHit}`, '#aabbff'))
+        newLogs.push(log('proc', `⚡ Turning Steel! Extra strike for ${xtraHit}`, '#aabbff'))
       }
 
-      // Seal Fate combo points
+      // Written in Blood combo points
       if (result.sealFatePoint) {
         procState.comboPoints++
         if (procState.comboPoints >= 5) {
@@ -768,18 +784,18 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           const finisherDmg = Math.round(stats.weaponDps * stats.attackSpeedSeconds * 3)
           currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - finisherDmg }
           newFns.push(fn(finisherDmg, true, false, false, '#ff8800'))
-          newLogs.push(log('proc', `🎴 Eviscerate! ${finisherDmg} damage!`, '#ff8800'))
+          newLogs.push(log('proc', `🎴 Sever! ${finisherDmg} damage!`, '#ff8800'))
         }
       }
 
-      // Frostbite freeze
+      // Creeping Freeze proc
       if (fx.frostbiteChance > 0 && !procState.mobFrozen && Math.random() < fx.frostbiteChance) {
         procState.mobFrozen = true
         procState.mobFrozenTimer = 4 + (talentAllocs['frost_permafrost'] ?? 0)
-        newLogs.push(log('proc', `🥶 Frostbite! Enemy frozen!`, '#66ccff'))
+        newLogs.push(log('proc', `🥶 Creeping Freeze! Enemy frozen!`, '#66ccff'))
       }
 
-      // Winter's Chill stacks
+      // Deepening Cold stacks
       if (fx.winterChillEnabled) {
         procState.winterChillStacks = Math.min(5, procState.winterChillStacks + 1)
       }
@@ -875,7 +891,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         mobAttackAccum -= currentMob.attackSpeedSeconds
         let mobDmg = resolveMobAttack(currentMob, stats.armor, fx.mobAttackSpeedFactor)
 
-        // Ice Barrier absorb
+        // Winterward absorb
         if (procState.iceBarrierHp > 0) {
           const absorbed = Math.min(procState.iceBarrierHp, mobDmg)
           procState.iceBarrierHp -= absorbed
@@ -895,13 +911,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             castState.remaining = Math.min(castState.total, castState.remaining + pb)
           }
 
-          // Ice Block: immune when near death
+          // Glacial Tomb: immune when near death
           if (fx.iceBlockEnabled && !procState.iceBlockUsed && stats.currentHp / stats.maxHp < 0.15) {
             procState.iceBlockUsed = true
             stats.currentHp = Math.ceil(stats.maxHp * 0.15)
             const iceBlockBuff: ActiveBuff = {
               id: `buff_ice_block_${Date.now()}`,
-              label: 'Ice Block',
+              label: 'Glacial Tomb',
               icon: '🧊',
               color: '#6699ff',
               type: 'armor_buff',
@@ -909,7 +925,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
               durationRemaining: 5,
             }
             activeBuffs.push(iceBlockBuff)
-            newLogs.push(log('proc', '🧊 Ice Block! Immune for 5s!', '#66ccff'))
+            newLogs.push(log('proc', '🧊 Glacial Tomb! Immune for 5s!', '#66ccff'))
           }
         }
 
@@ -920,7 +936,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
         if (stats.currentHp <= 0) {
           // Check ice block
-          const iceBuff = activeBuffs.find(b => b.label === 'Ice Block')
+          const iceBuff = activeBuffs.find(b => b.label === 'Glacial Tomb')
           if (!iceBuff) {
             isAlive = false
             respawnTimer = RESPAWN_TIMER_SECONDS
@@ -1180,7 +1196,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             const dmg = makeShadowBoltHit(stats.weaponDps, stats.attackSpeedSeconds, effect.value)
             currentMob.currentHp -= dmg
             newFns.push(fn(dmg, true, false, false, '#cc44ff'))
-            newLogs.push(log('ability_use', `☠ Shadow Bolt strikes for ${dmg}!`, '#cc44ff'))
+            newLogs.push(log('ability_use', `☠ Umbral Bolt strikes for ${dmg}!`, '#cc44ff'))
           }
           break
         case 'hot':
@@ -1201,7 +1217,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // If mob died from shadow bolt
     if (currentMob && currentMob.currentHp <= 0) {
       // Minimal kill handling — full path is in tick; just clear mob
-      newLogs.push(log('mob_death', `${currentMob.name} dies to Shadow Bolt!`, '#ff4444'))
+      newLogs.push(log('mob_death', `${currentMob.name} dies to Umbral Bolt!`, '#ff4444'))
       const loot = rollLoot(currentMob, s.level, stats.goldFindBonus)
       set(prev => ({
         currentMob: null, mobRespawnTimer: 3,
@@ -1283,6 +1299,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   cancelTravel: () => {
     set({ gameMode: 'combat', travelTarget: null, travelProgress: 0 })
     resetCombatAccumulators()
+  },
+
+  // Cycle the world-scene zoom: 0 (most out, default) → 1 → 2 (in) → 0. Persisted as a
+  // global UI pref (writeZoomPref); DimetricWorldScene maps the step to a render scale.
+  cycleZoom: () => {
+    const next = (get().zoomLevel + 1) % ZOOM_STEPS
+    writeZoomPref(next)
+    set({ zoomLevel: next })
   },
 
   setMode: (mode) => {

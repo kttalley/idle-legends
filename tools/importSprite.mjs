@@ -57,8 +57,18 @@ for (let i = 0; i < data.length; i += 4) {
   counts.set(key, (counts.get(key) ?? 0) + 1)
 }
 const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0])
-const kept = ranked.slice(0, maxColors - 1)
-if (ranked.length > kept.length) {
+// --palette "#rrggbb,#rrggbb,..." — hexes in SEMANTIC SLOT ORDER (slot 1 first; slot 0 is
+// always transparent). When given, the manifest's sourcePalette preserves slot semantics
+// (so registry palettes recolor the right channels) instead of frequency ranking; image
+// colors outside the list still merge to their nearest listed color.
+const paletteOpt = opt('palette', null)
+const kept = paletteOpt
+  ? paletteOpt.split(',').map(h => parseInt(h.trim().replace('#', ''), 16))
+  : ranked.slice(0, maxColors - 1)
+if (paletteOpt) {
+  const stray = ranked.filter(k => !kept.includes(k))
+  if (stray.length) console.warn(`importSprite: ${stray.length} image color(s) not in --palette, merging to nearest`)
+} else if (ranked.length > kept.length) {
   console.warn(`importSprite: ${ranked.length} unique colors, merging ${ranked.length - kept.length} into nearest of the top ${kept.length}`)
 }
 
@@ -100,17 +110,20 @@ const frameCount = cols * rows
 
 function parseAnims(spec) {
   const makeDef = (frames, fps, loop) => ({ frames, fps, loop })
-  const all = { idle: {}, walk: {}, attack: {}, hit: {} }
+  const all = { idle: {}, walk: {}, attack: {}, hit: {}, death: {} }
   for (const part of spec.split(';').filter(Boolean)) {
     const m = part.match(/^(\w+)(?:\/(ne))?:([\d,]+)@(\d+)(!?)$/)
     if (!m) fail(`bad --anims segment: "${part}"`)
     const [, name, facing, frameList, fps, noLoop] = m
-    if (!(name in all)) fail(`unknown animation "${name}" (idle|walk|attack|hit)`)
+    if (!(name in all)) fail(`unknown animation "${name}" (idle|walk|attack|hit|death)`)
     const frames = frameList.split(',').map(Number)
     for (const f of frames) if (f >= frameCount) fail(`frame ${f} out of range (sheet has ${frameCount})`)
     all[name][facing ?? 'se'] = makeDef(frames, Number(fps), !noLoop)
   }
   for (const name of Object.keys(all)) {
+    // death is optional (runtime falls back to hit) — omit it entirely when not authored
+    // instead of fabricating a default, so the manifest matches the AnimationSet contract.
+    if (name === 'death' && !all.death.se) { delete all.death; continue }
     if (!all[name].se) all[name].se = makeDef([0], 1, true)
     if (!all[name].ne) all[name].ne = all[name].se // scaffold default: reuse front row
   }

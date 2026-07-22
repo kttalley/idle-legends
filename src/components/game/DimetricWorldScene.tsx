@@ -6,10 +6,17 @@ import { WorldSceneController, CSS_SCALE } from '../../render/adapter/combatAdap
 // strip + the side-by-side combat arena. The controller (combatAdapter) owns all
 // imperative canvas work; this component only wires React → controller + rAF +
 // the floatingNumbers combat-event feed. Old path is behind CombatView's flag.
+// Per-step zoom multipliers over the breakpoint base (index = store zoomLevel).
+// 0 = most zoomed out (the default FOV) → 1 mid → 2 zoomed in. The controller clamps the
+// final scale to [1,3], so desktop tops out at 1.5×2 = 3.0 and mobile at 1.4×2 = 2.8.
+const ZOOM_MULT = [1, 1.5, 2] as const
+
 export function DimetricWorldScene() {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const floatersRef = useRef<HTMLDivElement>(null)
+  const reflowRef = useRef<() => void>(() => {})
+  const zoomLevel = useGameStore(s => s.zoomLevel)
 
   useEffect(() => {
     const canvas = canvasRef.current!
@@ -28,10 +35,15 @@ export function DimetricWorldScene() {
 
     // Zoom: a wider dimetric FOV reads better everywhere (the dense living-world crowd
     // looks like a busy server), so BOTH breakpoints zoom out from the 2× default —
-    // phones a touch wider since their viewport is narrowest. Tune these two to taste.
+    // phones a touch wider since their viewport is narrowest. The magnifier HUD button
+    // steps this base up via ZOOM_MULT[store.zoomLevel].
     const ZOOM_MOBILE = 1.4, ZOOM_DESKTOP = 1.5
     const mq = window.matchMedia('(max-width: 640px)')
-    const applyZoom = () => controller.setZoom(mq.matches ? ZOOM_MOBILE : ZOOM_DESKTOP)
+    const applyZoom = () => {
+      const base = mq.matches ? ZOOM_MOBILE : ZOOM_DESKTOP
+      const mult = ZOOM_MULT[useGameStore.getState().zoomLevel] ?? 1
+      controller.setZoom(base * mult)
+    }
 
     // Resize → controller canvas buffer size (CSS px / current zoom).
     const resize = () => {
@@ -39,6 +51,7 @@ export function DimetricWorldScene() {
       const r = container.getBoundingClientRect()
       controller.setSize(r.width, r.height)
     }
+    reflowRef.current = resize
     const ro = new ResizeObserver(resize)
     ro.observe(container)
     mq.addEventListener('change', resize)
@@ -113,11 +126,18 @@ export function DimetricWorldScene() {
     canvas.addEventListener('pointerup', onPointerUp)
     canvas.addEventListener('pointercancel', onPointerCancel)
 
+    // Schedule the NEXT frame BEFORE rendering so a thrown frame can never kill the loop
+    // (a permanent black screen that only a reload fixes). Log the first error only.
+    let loggedFrameErr = false
     const frame = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000)
       last = now
-      controller.renderFrame(dt)
       raf = requestAnimationFrame(frame)
+      try {
+        controller.renderFrame(dt)
+      } catch (err) {
+        if (!loggedFrameErr) { console.error('[scene] renderFrame threw:', err); loggedFrameErr = true }
+      }
     }
     raf = requestAnimationFrame(frame)
 
@@ -134,8 +154,12 @@ export function DimetricWorldScene() {
       canvas.removeEventListener('pointermove', onPointerMove)
       canvas.removeEventListener('pointerup', onPointerUp)
       canvas.removeEventListener('pointercancel', onPointerCancel)
+      reflowRef.current = () => {}
     }
   }, [])
+
+  // Zoom step changed (magnifier button) → re-apply scale + buffer size on the live controller.
+  useEffect(() => { reflowRef.current() }, [zoomLevel])
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#0a0a0f' }}>

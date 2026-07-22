@@ -1,7 +1,7 @@
 import type { RaceDefinition, RaceType } from './types'
 
 export const RACE_DEFINITIONS: Record<RaceType, RaceDefinition> = {
-  // ── Alliance ──────────────────────────────────────────────────────────────
+  // ── Lastlight Concord ──────────────────────────────────────────────────────────────
   human: {
     id: 'human',
     name: 'Human',
@@ -35,7 +35,7 @@ export const RACE_DEFINITIONS: Record<RaceType, RaceDefinition> = {
     lore: 'They do not miss. They simply choose when to hit.',
   },
 
-  // ── Horde ─────────────────────────────────────────────────────────────────
+  // ── Ashmarch ─────────────────────────────────────────────────────────────────
   orc: {
     id: 'orc',
     name: 'Orc',
@@ -83,12 +83,12 @@ export const RACE_DEFINITIONS: Record<RaceType, RaceDefinition> = {
 
   tauren: {
     id: 'tauren',
-    name: 'Tauren',
+    name: 'Hornborn',
     faction: 'neutral',
     allowedClasses: ['warrior'],
     racialPassive: { stamina: 6, armor: 5 },
     racialPassiveLabel: '+6 Stamina, +5 Armor',
-    description: 'Ancient and immovable. Tauren are living fortresses — slow to anger, impossible to stop.',
+    description: 'Ancient and immovable. The Hornborn are living fortresses — slow to anger, impossible to stop.',
     lore: 'The earth moves for them. Not the other way around.',
   },
 }

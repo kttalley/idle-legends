@@ -44,6 +44,8 @@ function bakeTerrain(zm: ZoneMap): HTMLCanvasElement {
   return c
 }
 
+const ZOOM_LABELS = ['Wide', 'Medium', 'Close'] // by zoom step (0 → 2)
+
 export function MinimapRadar() {
   const currentZone = useGameStore(s => s.currentZone)
   const zoneMaps    = useGameStore(s => s.zoneMaps)
@@ -51,6 +53,8 @@ export function MinimapRadar() {
   const mobOffset   = useGameStore(s => s.mobMapOffset)
   const hasMob      = useGameStore(s => s.currentMob !== null)
   const zoneNames   = useGameStore(s => s.generatedZoneNames)
+  const zoomLevel   = useGameStore(s => s.zoomLevel)
+  const cycleZoom   = useGameStore(s => s.cycleZoom)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const bakedRef  = useRef<{ zone: string; canvas: HTMLCanvasElement } | null>(null)
@@ -129,7 +133,7 @@ export function MinimapRadar() {
             background: '#0a0e14',
           }}
         />
-        {/* Map / fast-travel button, tucked on the disc edge */}
+        {/* Map / fast-travel button, tucked on the disc edge (bottom-right) */}
         <button
           onClick={() => setMapOpen(true)}
           title="World map — fast travel"
@@ -141,6 +145,29 @@ export function MinimapRadar() {
           }}
         >
           🗺
+        </button>
+        {/* Zoom cycle button, opposite the map (bottom-left): Wide → Medium → Close → Wide */}
+        <button
+          onClick={cycleZoom}
+          title={`Zoom: ${ZOOM_LABELS[zoomLevel]} — tap to ${zoomLevel === ZOOM_LABELS.length - 1 ? 'reset to Wide' : 'zoom in'}`}
+          style={{
+            position: 'absolute', left: -4, bottom: -4,
+            width: 22, height: 22, borderRadius: '50%',
+            border: '1px solid #6b5020', background: 'rgba(20,16,8,0.95)',
+            color: '#ffd700', fontSize: 12, cursor: 'pointer', lineHeight: '20px', padding: 0,
+          }}
+        >
+          🔍
+          {/* current step indicator (1–3) */}
+          <span style={{
+            position: 'absolute', right: -3, top: -3,
+            minWidth: 11, height: 11, borderRadius: 6,
+            background: '#3a2c0e', border: '1px solid #6b5020',
+            color: '#ffe9a8', fontSize: 8, fontWeight: 700, lineHeight: '10px',
+            textAlign: 'center', padding: '0 1px',
+          }}>
+            {zoomLevel + 1}
+          </span>
         </button>
       </div>
       <div style={{

@@ -46,11 +46,11 @@ export const TOWNS: Record<TownId, TownConfig> = {
     type: 'hostile',
     services: ['vendor'],
     linkedZone: 'ironcrag_badlands',
-    description: 'The seat of the first Horde clan. No mercy for outsiders.',
+    description: 'The seat of the first Ashmarch clan. No mercy for outsiders.',
   },
   warsong_bastion: {
     id: 'warsong_bastion',
-    name: 'Warsong Bastion',
+    name: 'Wardrum Bastion',
     faction: 'horde',
     type: 'hostile',
     services: ['vendor', 'repair'],

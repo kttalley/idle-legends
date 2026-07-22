@@ -8,7 +8,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
   warrior: {
     id: 'warrior',
     name: 'Warrior',
-    description: 'A plate-armored bruiser. Steady damage, high health, built to endure. Arms spec: cleave and shatter.',
+    description: 'A plate-armored bruiser. Steady damage, high health, built to endure. Ironcleave spec: cleave and shatter.',
     primaryStat: 'strength',
     colorClass: 'class-warrior',
     allowedRaces: ['human', 'dwarf', 'elf', 'orc', 'troll', 'tauren'],
@@ -28,7 +28,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
   mage: {
     id: 'mage',
     name: 'Mage',
-    description: 'An arcane glass cannon. Frost spec: freeze, shatter, and Winter\'s Chill stacks.',
+    description: 'An arcane glass cannon. Glacial Rite spec: freeze, shatter, and Deepening Cold stacks.',
     primaryStat: 'intellect',
     colorClass: 'class-mage',
     allowedRaces: ['human', 'elf', 'gnome', 'troll', 'goblin'],
@@ -48,7 +48,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
   rogue: {
     id: 'rogue',
     name: 'Rogue',
-    description: 'Shadow daggers and lethal precision. Assassination spec: poisons, combo points, Cold Blood.',
+    description: 'Shadow daggers and lethal precision. Shadowed Edge spec: poisons, combo points, Dead Calm.',
     primaryStat: 'agility',
     colorClass: 'class-rogue',
     allowedRaces: ['human', 'dwarf', 'elf', 'gnome', 'orc', 'troll', 'goblin'],
@@ -68,7 +68,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
   warlock: {
     id: 'warlock',
     name: 'Warlock',
-    description: 'Shadow curses and void corruption. Affliction spec: DoTs, Nightfall procs, Siphon Life.',
+    description: 'Shadow curses and void corruption. Bleakweave spec: DoTs, Gathering Dark procs, Tithe of Wounds.',
     primaryStat: 'intellect',
     colorClass: 'class-warlock',
     allowedRaces: ['human', 'gnome', 'orc', 'goblin', 'troll'],

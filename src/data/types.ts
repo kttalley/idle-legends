@@ -3,8 +3,8 @@
 export type ClassType = 'warrior' | 'mage' | 'rogue' | 'warlock'
 
 export type RaceType =
-  | 'human' | 'dwarf' | 'elf'          // Alliance
-  | 'orc'   | 'troll' | 'goblin'       // Horde
+  | 'human' | 'dwarf' | 'elf'          // Lastlight Concord
+  | 'orc'   | 'troll' | 'goblin'       // Ashmarch
   | 'gnome' | 'tauren'                  // Neutral
 
 export type FactionType = 'alliance' | 'horde' | 'neutral'
@@ -320,6 +320,7 @@ export interface GameState {
   currentThought: string | null
   thoughtExpiresAt: number   // ms timestamp
   lastThoughtAt: number      // ms timestamp, throttle gate
+  zoomLevel: number          // world-scene zoom step: 0 = most zoomed out (default) → 1 → 2 (in)
   level: number
   xp: number
   stats: Stats
