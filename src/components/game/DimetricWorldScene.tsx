@@ -46,10 +46,18 @@ export function DimetricWorldScene() {
     }
 
     // Resize → controller canvas buffer size (CSS px / current zoom).
+    // Batched via rAF so a chain of ResizeObserver notifications (e.g. mobile
+    // flex layout + canvas intrinsic size feedback) can't spiral into a
+    // loop of undelivered notifications / runaway buffer growth.
+    let pendingResize = 0
     const resize = () => {
-      applyZoom()
-      const r = container.getBoundingClientRect()
-      controller.setSize(r.width, r.height)
+      if (pendingResize) return
+      pendingResize = requestAnimationFrame(() => {
+        pendingResize = 0
+        applyZoom()
+        const r = container.getBoundingClientRect()
+        controller.setSize(r.width, r.height)
+      })
     }
     reflowRef.current = resize
     const ro = new ResizeObserver(resize)
@@ -144,6 +152,7 @@ export function DimetricWorldScene() {
     return () => {
       disposed = true
       cancelAnimationFrame(raf)
+      if (pendingResize) cancelAnimationFrame(pendingResize)
       unsub()
       ro.disconnect()
       mq.removeEventListener('change', resize)

@@ -89,6 +89,7 @@ body {
   .app-center {
     flex: 1;
     max-width: 100%;
+    min-height: 0; /* prevent the dimetric canvas from expanding the flex column */
   }
 
   /* ── Side drawers ── */
