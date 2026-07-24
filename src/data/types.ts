@@ -360,6 +360,8 @@ export interface GameState {
   craftingTimer: number
   // ── World Map ───────────────────────────────────────────────────────────────
   zoneMaps: Partial<Record<ZoneId, ZoneMap>>
+  /** Per-character world entropy; seeds terrain generation. 0 = the legacy fixed world. */
+  worldSeed: number
   playerMapPos: { x: number; y: number }   // float tile position
   weatherState: WeatherState
   mobMapOffset: { dx: number; dy: number } // tiles from player to mob

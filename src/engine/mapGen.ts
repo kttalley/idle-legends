@@ -284,9 +284,16 @@ function caSmooth(grid: number[][], threshold = 5): number[][] {
   return next
 }
 
-export function generateZoneMap(zoneId: ZoneId): ZoneMap {
+/**
+ * @param worldSeed Per-run entropy mixed into every layer of the generation — terrain,
+ *   node placement, clutter, scenery and landmarks. Zone identity previously WAS the
+ *   whole seed, so every character in every playthrough walked a byte-identical world
+ *   forever. 0 reproduces that original map exactly, which is what old saves pass so
+ *   their world doesn't shift underneath them.
+ */
+export function generateZoneMap(zoneId: ZoneId, worldSeed = 0): ZoneMap {
   const cfg  = BIOME_MAP_CONFIGS[zoneId]
-  const seed = hashStr(zoneId)
+  const seed = Math.abs(hashStr(zoneId) ^ Math.imul(worldSeed, 0x9E3779B9))
 
   // Step 1: Init grid — 1 = terrain, 0 = water
   let grid: number[][] = []

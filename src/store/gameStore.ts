@@ -153,6 +153,9 @@ function defaultState(): GameState {
     craftingTimer: 0,
     // World Map
     zoneMaps: {},
+    // Per-run world entropy. 0 = the original fixed world (what every save before this
+    // field had); initGame rolls a real one so each character gets their own terrain.
+    worldSeed: 0,
     playerMapPos: { x: 32, y: 32 },
     weatherState: { type: 'clear', timer: 45, cloudOffset: 0, rainPhase: 0 },
     mobMapOffset: { dx: 0, dy: 0 },
@@ -195,9 +198,10 @@ function rehydrateState(saved: GameState): GameState {
   saved.activeRecipe  = null
   saved.craftingTimer = 0
   // Generate maps for all unlocked zones
+  saved.worldSeed = saved.worldSeed ?? 0   // pre-worldSeed saves keep their original world
   const zoneMaps: GameState['zoneMaps'] = {}
   for (const zid of (saved.unlockedZones ?? ['sunhollow_meadows'])) {
-    zoneMaps[zid] = generateZoneMap(zid)
+    zoneMaps[zid] = generateZoneMap(zid, mapSeed(saved as GameState))
   }
   saved.zoneMaps      = zoneMaps
   saved.playerMapPos  = { x: 32, y: 32 }
@@ -237,6 +241,16 @@ function fn(value: number, isCrit: boolean, isMobDamage: boolean, isDoT: boolean
     y: 40 + (Math.random() - 0.5) * 12,
     createdAt: Date.now(),
   }
+}
+
+/**
+ * Seed every zone's terrain from the character's own world PLUS the prestige circuit, so
+ * a run has its own geography and each circuit through the world regenerates it rather
+ * than replaying the identical map. Both components are 0 on legacy saves, which
+ * reproduces the original fixed world exactly.
+ */
+export function mapSeed(s: Pick<GameState, 'worldSeed' | 'zoneCircuit'>): number {
+  return (s.worldSeed ?? 0) ^ Math.imul(s.zoneCircuit ?? 0, 0x85EBCA6B)
 }
 
 /**
@@ -356,7 +370,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     s.stats = compileStats(playerClass, 1, s.equipment, s.talentAllocs, RACE_DEFINITIONS[playerRace].racialPassive)
     s.stats.currentHp = s.stats.maxHp
     s.lastTickTimestamp = Date.now()
-    s.zoneMaps = { sunhollow_meadows: generateZoneMap('sunhollow_meadows') }
+    // Roll this character's world. Zone identity used to be the entire seed, so every
+    // playthrough shared one fixed map; now each hero gets their own terrain, node
+    // placement and scenery, and every prestige circuit re-rolls it again.
+    s.worldSeed = (Math.floor(Math.random() * 0xFFFFFFFF) ^ Date.now()) | 0
+    s.zoneMaps = { sunhollow_meadows: generateZoneMap('sunhollow_meadows', mapSeed(s)) }
     s.activeQuest = makeZoneQuest('sunhollow_meadows', s.playerFaction)
     s.completedQuestIds = []
     const nameSeed = Date.now() ^ Math.floor(Math.random() * 0xFFFFFF)
@@ -483,7 +501,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       const newX = ((state.playerMapPos.x + direction * 64 * deltaSeconds / state.travelDuration) + 64) % 64
       if (newProgress >= 1) {
         const dest = state.travelTarget
-        const destMap = state.zoneMaps[dest] ?? generateZoneMap(dest)
+        const destMap = state.zoneMaps[dest] ?? generateZoneMap(dest, mapSeed(state))
         const activeQuest = !state.bossesDefeated.includes(dest)
           ? makeZoneQuest(dest, state.playerFaction)
           : state.activeQuest
@@ -879,7 +897,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
               unlockedZones.push(zoneId)
               newLogs.push(log('zone_change', `New zone unlocked: ${ZONES[zoneId].name}!`, '#00ff88'))
               if (!state.zoneMaps[zoneId]) {
-                set(s => ({ zoneMaps: { ...s.zoneMaps, [zoneId]: generateZoneMap(zoneId) } }))
+                set(s => ({ zoneMaps: { ...s.zoneMaps, [zoneId]: generateZoneMap(zoneId, mapSeed(s)) } }))
               }
             }
           }
@@ -906,14 +924,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
               unlockedZones.push(nextZoneId)
               newLogs.push(log('zone_change', `★ Boss slain! ${ZONES[nextZoneId].name} unlocked!`, '#ff8000'))
               if (!state.zoneMaps[nextZoneId]) {
-                set(s => ({ zoneMaps: { ...s.zoneMaps, [nextZoneId]: generateZoneMap(nextZoneId) } }))
+                set(s => ({ zoneMaps: { ...s.zoneMaps, [nextZoneId]: generateZoneMap(nextZoneId, mapSeed(s)) } }))
               }
             } else if (!canEnterNext) {
               newLogs.push(log('zone_change', `${ZONES[nextZoneId].name} will unlock at level ${ZONES[nextZoneId].levelRange[0]}`, '#ff8800'))
             }
           } else {
-            // Final zone (the_maw_eternal) — circuit increment, loop back to start
-            set(s => ({ zoneCircuit: s.zoneCircuit + 1 }))
+            // Final zone (the_maw_eternal) — circuit increment, loop back to start.
+            // Drop the cached maps: mapSeed folds in the circuit, so the next lap through
+            // the world is generated fresh instead of replaying the same geography.
+            set(s => ({ zoneCircuit: s.zoneCircuit + 1, zoneMaps: {} }))
             bossesDefeated.length = 0  // reset all boss kills for the new circuit
             currentZone = 'sunhollow_meadows'
             activeQuest = makeZoneQuest('sunhollow_meadows', state.playerFaction)
@@ -1144,7 +1164,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   devJumpZone: (zoneId) => {
     const s = get()
     const unlockedZones = s.unlockedZones.includes(zoneId) ? s.unlockedZones : [...s.unlockedZones, zoneId]
-    const zoneMaps = s.zoneMaps[zoneId] ? s.zoneMaps : { ...s.zoneMaps, [zoneId]: generateZoneMap(zoneId) }
+    const zoneMaps = s.zoneMaps[zoneId] ? s.zoneMaps : { ...s.zoneMaps, [zoneId]: generateZoneMap(zoneId, mapSeed(s)) }
     resetCombatAccumulators()
     set({
       unlockedZones, zoneMaps, currentZone: zoneId,
