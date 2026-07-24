@@ -354,6 +354,7 @@ interface GameActions {
   restInTown: () => void
   claimQuestReward: (questId: string) => void
   dismissQuestReward: (questId: string) => void
+  engageTarget: () => void
 }
 
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
@@ -1467,6 +1468,19 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const canGo = !!quest.rewardZoneId && canEnterZone(quest.rewardZoneId, s.level, s.bossesDefeated)
     set({ activeQuest: { ...quest, claimed: true }, completedQuestIds })
     if (canGo) get().beginTravel(quest.rewardZoneId!)
+  },
+
+  /**
+   * The player walked their hero into a target they chose, so join the fight now instead
+   * of waiting out the scripted approach. Collapsing the offset is all that is needed —
+   * the tick derives engagement from it, so combat starts through the normal path with
+   * no special-cased "manual attack" branch.
+   */
+  engageTarget: () => {
+    const s = get()
+    if (!s.currentMob || s.gameMode !== 'combat' || !s.isAlive) return
+    if (s.mobMapOffset.dx === 0 && s.mobMapOffset.dy === 0) return
+    set({ mobMapOffset: { dx: 0, dy: 0 } })
   },
 
   dismissQuestReward: (questId) => {

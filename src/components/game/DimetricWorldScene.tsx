@@ -28,6 +28,10 @@ export function DimetricWorldScene() {
     let last = performance.now()
     let disposed = false
 
+    // Committed-target arrival → join the fight. Keeps the adapter read-only: it signals
+    // intent, the store owns the state change.
+    controller.onEngageTarget = () => useGameStore.getState().engageTarget()
+
     controller.init().then(() => {
       if (disposed) return
       controller.sync(useGameStore.getState())

@@ -367,6 +367,15 @@ export class WorldSceneController {
   private mobFadeT = 0
   // How long a tap-walk has been grinding against an obstacle (see the tap branch).
   private tapStuckT = 0
+  // Player-committed target. Tapping an enemy commits to it: the hero walks in and starts
+  // the fight, and no auto behaviour may wander off or re-pace that until the target dies
+  // or the player orders otherwise. Auto play still picks the fight when the player has
+  // expressed no intent — manual is an override, never a requirement.
+  private targetLocked = false
+  private engageSent = false
+  /** Fired once when the hero reaches a committed target; the host maps it to the store's
+   *  engageTarget(). The adapter stays read-only — it never touches the store itself. */
+  onEngageTarget: (() => void) | null = null
   // Cached routes. Straight-line movement plus collide-and-slide wedges against any
   // concave shoreline; these let a mover go AROUND a lake instead of grinding its edge.
   private playerPath: PathState = { pts: [], i: 0, gx: 0, gy: 0, cool: 0 }
@@ -1109,6 +1118,9 @@ export class WorldSceneController {
       this.mobBearingSet = false
       this.mobAggressive = false
       this.mobPath.pts = []
+      // The commitment ends with the target: "until the enemy is killed", not forever.
+      this.targetLocked = false
+      this.engageSent = false
     }
 
     this.mobWasPresent = this.showMob
@@ -1270,9 +1282,36 @@ export class WorldSceneController {
    *  ground plane and set it as the walk target. Ignored while downed. Screen→buffer
    *  uses the canvas's own rect ratio so it's correct at any zoom; buffer→tile inverts
    *  the flat-ground feet projection (elevation is ignored — close enough to path to). */
+  /** Screen-space hit test against a unit's sprite box (feet anchor + frame extents). */
+  private hitTestEntity(e: Entity, clientX: number, clientY: number): boolean {
+    const rect = this.canvas.getBoundingClientRect()
+    if (rect.width <= 0 || rect.height <= 0 || this.canvas.width <= 0) return false
+    const k = rect.width / this.canvas.width
+    const sx = (e.screenX - this.cam.x) * k + rect.left
+    const sy = (e.screenY - this.cam.y) * k + rect.top
+    const halfW = (e.sprite.frameW * 0.5 + 6) * k
+    const top = (e.sprite.frameH + e.z + 4) * k
+    return clientX >= sx - halfW && clientX <= sx + halfW &&
+           clientY <= sy + 8 * k && clientY >= sy - top
+  }
+
   moveTo(clientX: number, clientY: number): void {
     const g = this.ground
     if (!g || this.playerDead) return
+    // Tapping the enemy commits to IT, rather than walking to the patch of ground it
+    // happens to be standing on. Checked first so the target is never harder to click
+    // than the dirt beneath it.
+    if (this.mob && this.mob.active && this.showMob && this.hitTestEntity(this.mob, clientX, clientY)) {
+      this.targetLocked = true
+      this.engageSent = false
+      this.tapMoveActive = false
+      this.manualMode = false
+      this.playerPath.pts = []
+      return
+    }
+    // A ground order is the player changing their mind — it releases the commitment.
+    this.targetLocked = false
+    this.engageSent = false
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
     const bufX = (clientX - rect.left) * (this.canvas.width / rect.width) + this.cam.x
@@ -1319,6 +1358,8 @@ export class WorldSceneController {
     // Engagement / death cancels any pending tap target (don't resume walking to a
     // stale point after a fight ends).
     if (this.mobEngaged || this.playerDead) this.tapMoveActive = false
+    // Dying releases the commitment too — a corpse should not keep marching to its target.
+    if (this.playerDead) { this.targetLocked = false; this.engageSent = false }
     if (this.tapFlashT > 0) this.tapFlashT -= realDt
     this.tapPulse += realDt
     let moving = false
@@ -1342,6 +1383,28 @@ export class WorldSceneController {
         this.player.tx = clamp(s.x, loB, hiB)
         this.player.ty = clamp(s.y, loB, hiB)
         moving = true; mvx = dx; mvy = dy; playerDriving = true
+      }
+    } else if (
+      this.targetLocked && this.mob && this.showMob &&
+      !this.mobEngaged && !this.playerLunge.active && !this.townMode
+    ) {
+      // Committed: close on the target at the hero's own pace and start the fight on
+      // arrival, rather than waiting out the store's approach timer. Ranked above the
+      // auto branches so nothing can pull the hero off a target they chose.
+      const gapMag = Math.SQRT2 * (this.mobIsRanged ? RANGED_GAP_TILES : MELEE_GAP_TILES)
+      let ax = this.player.tx - this.mob.tx, ay = this.player.ty - this.mob.ty
+      const ad = Math.hypot(ax, ay) || 1
+      // Stand off on the side the hero is already approaching from.
+      const a = this.followPath(
+        this.player, this.playerPath,
+        this.mob.tx + (ax / ad) * gapMag, this.mob.ty + (ay / ad) * gapMag,
+        MANUAL_SPEED, dt,
+      )
+      moving = a.moving; mvx = a.mvx; mvy = a.mvy
+      this.syncOffset()
+      if (!this.engageSent && ad <= gapMag + 0.75) {
+        this.engageSent = true
+        this.onEngageTarget?.()   // store collapses the approach gap → combat begins
       }
     } else if (this.tapMoveActive && !this.playerLunge.active && !this.mobEngaged) {
       // Tap/click-to-move: path straight to the tapped ground point at manual speed,
@@ -2202,15 +2265,18 @@ export class WorldSceneController {
 
     const [r, gr, b] = WorldSceneController.RETICLE_TINT[this.mobTier]
     // 2:1 dimetric footprint, so the ellipse is half as tall as it is wide.
-    const pulse = 0.5 + 0.5 * Math.sin(this.tapPulse * (this.mobEngaged ? 5.2 : 2.4))
-    const rx = this.mobEngaged ? 10 + pulse * 1.6 : 13 + pulse * 2.4
-    const alpha = this.mobEngaged ? 0.75 + pulse * 0.25 : 0.3 + pulse * 0.16
+    // A committed target reads at full strength even before contact, so the player can
+    // see their order was taken while the hero is still walking in.
+    const committed = this.targetLocked || this.mobEngaged
+    const pulse = 0.5 + 0.5 * Math.sin(this.tapPulse * (committed ? 5.2 : 2.4))
+    const rx = committed ? 10 + pulse * 1.6 : 13 + pulse * 2.4
+    const alpha = committed ? 0.75 + pulse * 0.25 : 0.3 + pulse * 0.16
 
     ctx.save()
     ctx.lineWidth = 1.5
     ctx.strokeStyle = `rgba(${r},${gr},${b},${alpha.toFixed(3)})`
     ctx.beginPath(); ctx.ellipse(cx, cy, rx, rx * 0.5, 0, 0, Math.PI * 2); ctx.stroke()
-    if (this.mobEngaged) {
+    if (committed) {
       // Inner ring + four cardinal ticks — the "locked on" read.
       ctx.lineWidth = 1
       ctx.strokeStyle = `rgba(${r},${gr},${b},${(alpha * 0.55).toFixed(3)})`
