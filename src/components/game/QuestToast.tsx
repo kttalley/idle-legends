@@ -1,12 +1,15 @@
 import React from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { ZONES } from '../../data/zones'
+import { canEnterZone } from '../../engine/zoneProgression'
 
 export function QuestToast() {
   const activeQuest = useGameStore(s => s.activeQuest)
   const generatedZoneNames = useGameStore(s => s.generatedZoneNames)
   const claimQuestReward = useGameStore(s => s.claimQuestReward)
   const dismissQuestReward = useGameStore(s => s.dismissQuestReward)
+  const level = useGameStore(s => s.level)
+  const bossesDefeated = useGameStore(s => s.bossesDefeated)
 
   if (!activeQuest || !activeQuest.completed || activeQuest.claimed) return null
 
@@ -14,6 +17,11 @@ export function QuestToast() {
   const rewardName = rewardZone
     ? (generatedZoneNames[activeQuest.rewardZoneId!] ?? rewardZone.name)
     : undefined
+  // The boss is gated on kill count but the next zone is gated on LEVEL, so slaying a
+  // boss early leaves the reward zone still shut. Previously the toast offered "Venture
+  // Onward" anyway and the click silently did nothing — say what's actually required.
+  const canTravel = !!activeQuest.rewardZoneId && canEnterZone(activeQuest.rewardZoneId, level, bossesDefeated)
+  const levelNeeded = rewardZone?.levelRange[0] ?? 0
 
   return (
     <div
@@ -74,28 +82,32 @@ export function QuestToast() {
           <div
             style={{
               fontSize: '0.55rem',
-              color: '#ffaa44',
+              color: canTravel ? '#ffaa44' : '#b8a070',
               marginBottom: 10,
             }}
           >
-            Reward: passage to {rewardName}
+            {canTravel
+              ? `Reward: passage to ${rewardName}`
+              : `${rewardName} opens at level ${levelNeeded} — you are ${level}.`}
           </div>
         )}
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            className="rp-button flex-1"
-            style={{ fontSize: '0.62rem', background: 'linear-gradient(180deg, #6a5228, #4a3518)' }}
-            onClick={() => claimQuestReward(activeQuest.id)}
-          >
-            Venture Onward
-          </button>
+          {canTravel && (
+            <button
+              className="rp-button flex-1"
+              style={{ fontSize: '0.62rem', background: 'linear-gradient(180deg, #6a5228, #4a3518)' }}
+              onClick={() => claimQuestReward(activeQuest.id)}
+            >
+              Venture Onward
+            </button>
+          )}
           <button
             className="rp-button"
-            style={{ fontSize: '0.6rem', color: '#a09080' }}
+            style={{ fontSize: '0.6rem', color: canTravel ? '#a09080' : '#ffe9a8', flex: canTravel ? undefined : 1 }}
             onClick={() => dismissQuestReward(activeQuest.id)}
           >
-            Stay
+            {canTravel ? 'Stay' : 'Keep Hunting'}
           </button>
         </div>
       </div>

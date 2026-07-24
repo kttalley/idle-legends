@@ -1455,13 +1455,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const s = get()
     const quest = s.activeQuest
     if (!quest || quest.id !== questId || !quest.completed || quest.claimed) return
+    // Gate on canEnterZone, the same predicate beginTravel uses. Testing the stored
+    // `unlockedZones` array instead let the two disagree: the array is only appended on
+    // boss death when the level requirement already happened to be met, so a player who
+    // out-killed their level saw the button do nothing at all. The toast also hides the
+    // button in that case now — this keeps the store honest either way.
     const completedQuestIds = [...s.completedQuestIds, questId]
-    if (quest.rewardZoneId && s.unlockedZones.includes(quest.rewardZoneId)) {
-      set({ activeQuest: { ...quest, claimed: true }, completedQuestIds })
-      get().beginTravel(quest.rewardZoneId)
-    } else {
-      set({ activeQuest: { ...quest, claimed: true }, completedQuestIds })
-    }
+    const canGo = !!quest.rewardZoneId && canEnterZone(quest.rewardZoneId, s.level, s.bossesDefeated)
+    set({ activeQuest: { ...quest, claimed: true }, completedQuestIds })
+    if (canGo) get().beginTravel(quest.rewardZoneId!)
   },
 
   dismissQuestReward: (questId) => {
