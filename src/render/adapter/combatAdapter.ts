@@ -47,6 +47,14 @@ const ENGAGE_DIST = 1.5       // mob "engaged" threshold (matches the store's mo
 // back and casts. Sized for the dimetric projection: a diagonal step is only
 // TILE_H (16px) tall on screen while sprites are ~32px, so ~2 tiles keeps melee
 // bodies from overlapping even when the mob settles due-south of the player.
+// Mob convergence. The mob is never hard-placed: it eases toward its target so it can
+// always be SEEN covering ground. Floor keeps an exponential approach from crawling the
+// last fraction of a tile; fade hides the moment a spawn materialises inside the (wide)
+// visible radius.
+const MOB_CLOSE_K = 5          // approach rate while closing (1/s)
+const MOB_ENGAGE_K = 14        // faster once engaged, so the fighting gap settles quickly
+const MOB_MIN_CLOSE = 1.2      // tiles/sec floor
+const MOB_SPAWN_FADE = 0.4     // seconds
 const MELEE_GAP_TILES = 2
 const RANGED_GAP_TILES = 5
 
@@ -308,6 +316,9 @@ export class WorldSceneController {
   private mobOffsetDx = 0
   private mobOffsetDy = 0
   private mobEngaged = false
+  // Target-reticle tier tint; mirrors the HUD target frame's colors so the ring under
+  // the enemy and the frame naming it read as the same target.
+  private mobTier: 'normal' | 'elite' | 'boss' = 'normal'
   private showMob = false
   private mobIsRanged = false
   // Final engagement placement (buffer-tile offset from the player). While the mob
@@ -318,6 +329,13 @@ export class WorldSceneController {
   private mobPlacedDy = 0
   private mobApproachDx = Math.SQRT1_2
   private mobApproachDy = Math.SQRT1_2
+  // World spot the mob holds while the encounter closes. Captured once when the mob
+  // spawns, so the *hero* covers the ground between fights instead of standing still
+  // while the enemy slides in. Null until a mob spawns / after it's engaged or gone.
+  private mobAnchorX: number | null = null
+  private mobAnchorY: number | null = null
+  // Counts down from MOB_SPAWN_FADE while a freshly spawned mob fades in.
+  private mobFadeT = 0
 
   private cam: Camera = { x: 0, y: 0, w: 0, h: 0 }
 
@@ -382,6 +400,13 @@ export class WorldSceneController {
   private dyingMobs: { e: Entity; t: number }[] = []
   private mobWasPresent = false
   private playerDead = false
+  // The mob slain by the most recent sync(), held for exactly one floatingNumbers diff.
+  // The store clears `currentMob` in the SAME tick it pushes the killing blow's floating
+  // number, and the host runs sync() before diffing that feed — so without this the
+  // finishing hit of every fight hit the `!this.mob` guard and rendered no attack at all
+  // (no lunge, no cast, no bolt, no damage number). Kills are the payoff; they get the
+  // full treatment, retargeted onto the corpse.
+  private slainMob: Entity | null = null
 
   // Particle FX pool (bloom).
   private particles: Particle[] = []
@@ -552,13 +577,26 @@ export class WorldSceneController {
     this.bolts.push({ entity: e, fromX, fromY, toX, toY, t: 0, palette: paletteId, impact, mag })
   }
 
+  /** True while an entity is playing out its death fade — its pose, palette and alpha
+   *  belong to the fade, so hit reactions must not touch them. Scans a list that holds
+   *  at most a couple of corpses, and only on impact. */
+  private isDying(e: Entity): boolean {
+    for (const d of this.dyingMobs) if (d.e === e) return true
+    return false
+  }
+
   /** Impact reaction shared by melee and projectile hits: flash + recoil the target,
    *  pop a burst + particle explosion, kick the camera. Colors derive from `fxPalette`. */
   private impactHit(target: Entity, fxPalette: string, mag: number, stop = 0): void {
-    if (target === this.mob) { this.mobFlashT = 0.13 } else { this.playerFlashT = 0.13 }
-    target.paletteId = 'fx/hitflash'
-    target.animator.set('hit')
-    target.animator.restart()
+    // A corpse still takes the burst/rumble/particles, but keeps its death pose. Skipping
+    // the flash here also avoids stranding a dead target in 'fx/hitflash' forever — the
+    // restore below is keyed on `this.mob`, which is already null once it's dying.
+    if (!this.isDying(target)) {
+      if (target === this.mob) { this.mobFlashT = 0.13 } else { this.playerFlashT = 0.13 }
+      target.paletteId = 'fx/hitflash'
+      target.animator.set('hit')
+      target.animator.restart()
+    }
     this.spawnBurst(target.tx, target.ty, fxPalette)
     this.punch(mag, stop)
     const m = this.worldMid(target)
@@ -696,6 +734,9 @@ export class WorldSceneController {
   sync(state: GameState): void {
     if (!this.rigs || !this.player) return // both are set only when init() fully completes
 
+    // A kill is only "fresh" for the FN diff that immediately follows this sync.
+    this.slainMob = null
+
     this.weatherType = state.weatherState?.type ?? 'clear'
     this.currentZone = state.currentZone
 
@@ -784,6 +825,7 @@ export class WorldSceneController {
     if (this.showMob && state.currentMob) {
       const mob = state.currentMob
       this.mobIsRanged = isRangedMob(mob)
+      this.mobTier = mob.isBoss ? 'boss' : mob.isElite ? 'elite' : 'normal'
       // Engagement placement: follow the store offset while the mob is still closing
       // (remembering its approach direction), then hold a fixed diagonal gap so it
       // never parks on the player. The radial hold is continuous with the approach
@@ -808,6 +850,12 @@ export class WorldSceneController {
         this.mob = this.scene.spawn(
           sprite, mobPaletteId(mob), this.player.tx + this.mobPlacedDx, this.player.ty + this.mobPlacedDy,
         )
+        // Pin where it waits. From here the store's shrinking gap is spent moving the
+        // PLAYER toward this spot rather than dragging the mob toward the player.
+        this.mobAnchorX = this.mob.tx
+        this.mobAnchorY = this.mob.ty
+        this.mobFadeT = MOB_SPAWN_FADE
+        this.mob.alpha = 0
       } else if (this.mob.sprite.id !== wantedMobSprite) {
         // Swap sprite when the mob template changes (rare; keeps the pool entity but re-spawns).
         this.mob.active = false
@@ -833,6 +881,7 @@ export class WorldSceneController {
         e.animator.set('death')
         e.animator.restart()
         this.dyingMobs.push({ e, t: 0 })
+        this.slainMob = e                   // let the killing blow's VFX still find it
         this.spawnBurst(e.tx, e.ty, 'spell/holy') // loot/impact pop
         this.punch(2.6, 0.05)
         const dm = this.worldMid(e)
@@ -848,6 +897,9 @@ export class WorldSceneController {
       this.mobPlacedDy = 0
       this.mobApproachDx = Math.SQRT1_2
       this.mobApproachDy = Math.SQRT1_2
+      this.mobAnchorX = null
+      this.mobAnchorY = null
+      this.mobFadeT = 0
     }
 
     this.mobWasPresent = this.showMob
@@ -889,37 +941,49 @@ export class WorldSceneController {
     l.targetY = e.ty + ddy
   }
 
+  /** The entity a player-attack VFX should play against: the live mob, or — on the
+   *  killing blow, where the store has already cleared `currentMob` — the corpse sync()
+   *  just handed to the death fade. */
+  private vfxTarget(): Entity | null {
+    return this.mob ?? this.slainMob
+  }
+
   triggerPlayerAttack(fn: FloatingNumber): void {
-    if (!this.mob || !this.ground) return
-    this.beginLunge(this.playerLunge, this.player, this.mob)
+    const target = this.vfxTarget()
+    if (!target || !this.ground) return
+    const dying = this.isDying(target)
+    this.beginLunge(this.playerLunge, this.player, target)
     this.player.animator.set('attack')
     this.player.animator.restart()
-    this.faceToward(this.player, this.mob.tx, this.mob.ty)
-    // Impact: defender flashes + recoils + floater.
-    this.mobFlashT = 0.13
-    this.mob.paletteId = 'fx/hitflash'
-    this.mob.animator.set('hit')
-    this.mob.animator.restart()
-    if (fn.isCrit) this.spawnBurst(this.mob.tx, this.mob.ty, 'spell/holy')
+    this.faceToward(this.player, target.tx, target.ty)
+    // Impact: defender flashes + recoils + floater. A corpse keeps its death pose.
+    if (!dying) {
+      this.mobFlashT = 0.13
+      target.paletteId = 'fx/hitflash'
+      target.animator.set('hit')
+      target.animator.restart()
+    }
+    if (fn.isCrit) this.spawnBurst(target.tx, target.ty, 'spell/holy')
     // Rumble scales with the hit: crits kick hard + a brief hit-stop; normal a nudge.
     this.punch(fn.isCrit ? 3.6 : 1.3, fn.isCrit ? 0.05 : 0)
     // Melee spark spray — steel-white, gold on a crit.
-    const mm = this.worldMid(this.mob)
+    const mm = this.worldMid(target)
     const mc = fn.isCrit ? fxColors('spell/holy') : { core: '#eaf0ff', glow: '#7fb0ff' }
     this.emitImpact(mm.x, mm.y, mc.core, mc.glow, fn.isCrit ? 1.7 : 0.9)
     this.spawnFloater(
-      this.mob, `${fn.value}${fn.isCrit ? '!' : ''}`, fn.isCrit,
+      target, `${fn.value}${fn.isCrit ? '!' : ''}`, fn.isCrit,
       fn.color ?? (fn.isCrit ? '#ffcc00' : '#88bbff'),
     )
   }
 
   triggerShadowBolt(fn: FloatingNumber): void {
-    if (!this.mob || !this.ground) return
+    const target = this.vfxTarget()
+    if (!target || !this.ground) return
     // Cast: a swing pose + a charge burst at the caster's hand, then a heavy bolt that
     // flashes/recoils the mob on arrival (impactHit) — the payoff is the landing.
     this.player.animator.set('attack')
     this.player.animator.restart()
-    this.faceToward(this.player, this.mob.tx, this.mob.ty)
+    this.faceToward(this.player, target.tx, target.ty)
     const r = WorldSceneController.FX_RISE
     this.spawnBurst(this.player.tx - r, this.player.ty - r, 'spell/shadow')
     const cc = fxColors('spell/shadow')
@@ -927,20 +991,21 @@ export class WorldSceneController {
     this.emitCharge(pm.x, pm.y, cc.core, cc.glow)
     this.spawnBolt(
       this.player.tx - r, this.player.ty - r,
-      this.mob.tx - r, this.mob.ty - r,
-      'spell/shadow', this.mob, 4.2,
+      target.tx - r, target.ty - r,
+      'spell/shadow', target, 4.2,
     )
-    this.spawnFloater(this.mob, `${fn.value}!`, true, fn.color ?? SHADOW_BOLT_COLOR)
+    this.spawnFloater(target, `${fn.value}!`, true, fn.color ?? SHADOW_BOLT_COLOR)
   }
 
   triggerDotTick(fn: FloatingNumber): void {
-    if (!this.mob || !this.ground) return
+    const target = this.vfxTarget()
+    if (!target || !this.ground) return
     // Ongoing affliction: a small recurrent pulse on the mob, no attacker lunge.
-    this.spawnBurst(this.mob.tx, this.mob.ty, 'spell/shadow')
+    this.spawnBurst(target.tx, target.ty, 'spell/shadow')
     const dc = fxColors('spell/shadow')
-    const dm = this.worldMid(this.mob)
+    const dm = this.worldMid(target)
     this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 0.5)
-    this.spawnFloater(this.mob, `${fn.value}`, false, fn.color ?? '#aa88ff')
+    this.spawnFloater(target, `${fn.value}`, false, fn.color ?? '#aa88ff')
   }
 
   triggerMobAttack(fn: FloatingNumber): void {
@@ -1049,6 +1114,9 @@ export class WorldSceneController {
     this.tapPulse += realDt
     let moving = false
     let mvx = 0, mvy = 0
+    // True when the hero's position is player-driven this frame (WASD or tap-to-move).
+    // While it holds, the hero is NOT closing on the encounter, so the mob has to.
+    let playerDriving = false
     // Movement bounds: raw town box in-town, else the padded zone interior (torus).
     const loB = this.townMode ? -TOWN_WALK_RADIUS : PAD + 1
     const hiB = this.townMode ? TOWN_WALK_RADIUS : PAD + MAP_SIZE - 1
@@ -1063,7 +1131,7 @@ export class WorldSceneController {
         dx /= len; dy /= len
         this.player.tx = clamp(this.player.tx + dx * MANUAL_SPEED * dt, loB, hiB)
         this.player.ty = clamp(this.player.ty + dy * MANUAL_SPEED * dt, loB, hiB)
-        moving = true; mvx = dx; mvy = dy
+        moving = true; mvx = dx; mvy = dy; playerDriving = true
       }
     } else if (this.tapMoveActive && !this.playerLunge.active && !this.mobEngaged) {
       // Tap/click-to-move: path straight to the tapped ground point at manual speed,
@@ -1079,9 +1147,36 @@ export class WorldSceneController {
         const ux = dx / d, uy = dy / d
         this.player.tx = clamp(this.player.tx + ux * MANUAL_SPEED * dt, loB, hiB)
         this.player.ty = clamp(this.player.ty + uy * MANUAL_SPEED * dt, loB, hiB)
-        moving = true; mvx = ux; mvy = uy
+        moving = true; mvx = ux; mvy = uy; playerDriving = true
         if (!this.townMode) this.syncOffset()
       }
+    } else if (
+      !this.townMode && !this.playerLunge.active && !this.mobEngaged &&
+      this.mob && this.showMob && this.mobAnchorX !== null && this.mobAnchorY !== null
+    ) {
+      // Closing on an encounter: the hero walks out to the waiting enemy. The store
+      // still owns the distance (it shrinks mobMapOffset on its own schedule), so this
+      // changes only WHICH body covers the ground — engagement still begins at exactly
+      // the same moment. Deriving the player's spot from the store gap keeps the visual
+      // separation equal to the logical one, so attacks never land across a visible gap.
+      const gap = Math.hypot(this.mobPlacedDx, this.mobPlacedDy)
+      const tgtX = this.mobAnchorX - this.mobApproachDx * gap
+      const tgtY = this.mobAnchorY - this.mobApproachDy * gap
+      const dx = tgtX - this.player.tx
+      const dy = tgtY - this.player.ty
+      const d = Math.hypot(dx, dy)
+      if (d > 0.02) {
+        // Step toward the derived spot, capped so a big store correction (zone change,
+        // a resumed boss) walks rather than teleports.
+        const step = Math.min(d, MANUAL_SPEED * dt)
+        const ux = dx / d, uy = dy / d
+        this.player.tx = clamp(this.player.tx + ux * step, loB, hiB)
+        this.player.ty = clamp(this.player.ty + uy * step, loB, hiB)
+        moving = true; mvx = ux; mvy = uy
+      }
+      // Absorb the walk into the auto-follow offset so disengaging doesn't slingshot
+      // the player back to the store's playerMapPos.
+      this.syncOffset()
     } else if (!this.townMode && !this.playerLunge.active && !this.mobEngaged) {
       // Auto: torus-aware lerp toward the store's playerMapPos (plus offset) so the
       // player walks and the camera-followed world scrolls past. Frozen while a mob
@@ -1131,11 +1226,44 @@ export class WorldSceneController {
     }
     }
 
-    // ── Mob placement (glued to the player) + animation + facing ──
+    // ── Mob placement + animation + facing ──
+    // While closing, the mob HOLDS its anchor (the player is the one walking, above).
+    // Once engaged it goes back to being glued at a fixed gap from the player, so it
+    // stays put through lunges and any manual repositioning mid-fight.
     if (this.mob) {
       if (!this.mobLunge.active) {
-        this.mob.tx = this.player.tx + this.mobPlacedDx
-        this.mob.ty = this.player.ty + this.mobPlacedDy
+        // Where the mob WANTS to be. While the hero is auto-driven and closing, that's
+        // the anchor it's holding. But if the player took the wheel, the hero isn't
+        // covering the ground any more — so the mob has to close the gap itself.
+        const holding =
+          !this.mobEngaged && !playerDriving &&
+          this.mobAnchorX !== null && this.mobAnchorY !== null
+        const mtx = holding ? this.mobAnchorX! : this.player.tx + this.mobPlacedDx
+        const mty = holding ? this.mobAnchorY! : this.player.ty + this.mobPlacedDy
+
+        // Ease toward it — never hard-place. Assigning the target directly is what made a
+        // manually-moving player watch the mob TELEPORT to their side: it had been sitting
+        // on an anchor the hero walked away from, and the switch to the player-relative
+        // slot on engagement closed that whole distance in one frame. Converging means the
+        // mob is always seen walking it.
+        const mdx = mtx - this.mob.tx
+        const mdy = mty - this.mob.ty
+        const md = Math.hypot(mdx, mdy)
+        if (md > 0.001) {
+          const k = this.mobEngaged ? MOB_ENGAGE_K : MOB_CLOSE_K
+          const step = Math.min(md, Math.max(md * (1 - Math.exp(-k * dt)), MOB_MIN_CLOSE * dt))
+          this.mob.tx += (mdx / md) * step
+          this.mob.ty += (mdy / md) * step
+        }
+        // When the MOB is the one moving, the anchor rides along, so handing control back
+        // (player stops steering) resumes the hold from where it actually stands.
+        if (!holding) { this.mobAnchorX = this.mob.tx; this.mobAnchorY = this.mob.ty }
+      }
+      // Spawn fade — a mob materialises 10–15 tiles out, comfortably inside the visible
+      // radius at this zoom, so without it an enemy simply blinks into existence.
+      if (this.mobFadeT > 0) {
+        this.mobFadeT = Math.max(0, this.mobFadeT - realDt)
+        this.mob.alpha = 1 - this.mobFadeT / MOB_SPAWN_FADE
       }
       const mAnim = this.mob.animator.anim
       const mobInCombat = mAnim === 'attack' || mAnim === 'hit'
@@ -1224,7 +1352,7 @@ export class WorldSceneController {
       try { this.updateAmbient(realDt) } catch (err) { console.error('[ambient] update failed:', err) }
     }
 
-    this.scene.render(this.ctx, this.cam, g, dt)
+    this.scene.render(this.ctx, this.cam, g, dt, this.drawTargetReticle)
 
     // Particle FX over the world (bloom via additive compositing). Advanced on real
     // time so glows keep flowing through hit-stop.
@@ -1791,6 +1919,59 @@ export class WorldSceneController {
       ctx.strokeStyle = '#ffe58a'
       ctx.lineWidth = 2
       ctx.beginPath(); ctx.ellipse(sx, sy, rx, rx * 0.5, 0, 0, Math.PI * 2); ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  // Target reticle tint by tier — matches hud/UnitFrames' target-frame colors.
+  private static readonly RETICLE_TINT = {
+    normal: [224, 176, 160] as const,
+    elite:  [199, 138, 240] as const,
+    boss:   [255, 154,  60] as const,
+  }
+
+  /**
+   * The ring under the enemy you're fighting. Passed to `scene.render` as a ground
+   * decal so it paints on the terrain and under every body — the mob stands *in* it.
+   * Arrow property: bound once, so handing it to render() allocates nothing per frame.
+   *
+   * Reads engaged vs. closing: a tight solid double ring once the fight is joined, a
+   * wider faint single ring while the mob is still walking in. Elevation comes free —
+   * feetY is height-aware, so the ring sits on the hillside the mob is standing on.
+   */
+  private drawTargetReticle = (ctx: CanvasRenderingContext2D): void => {
+    const g = this.ground
+    const target = this.mob
+    if (!g || !target || !target.active || this.townMode || this.playerDead) return
+
+    const cx = feetX(g, target.tx, target.ty) - this.cam.x
+    const cy = feetY(g, target.tx, target.ty) - this.cam.y
+    // Cull if off-screen (the ring is small; a generous margin is fine).
+    if (cx < -32 || cx > this.cam.w + 32 || cy < -32 || cy > this.cam.h + 32) return
+
+    const [r, gr, b] = WorldSceneController.RETICLE_TINT[this.mobTier]
+    // 2:1 dimetric footprint, so the ellipse is half as tall as it is wide.
+    const pulse = 0.5 + 0.5 * Math.sin(this.tapPulse * (this.mobEngaged ? 5.2 : 2.4))
+    const rx = this.mobEngaged ? 10 + pulse * 1.6 : 13 + pulse * 2.4
+    const alpha = this.mobEngaged ? 0.75 + pulse * 0.25 : 0.3 + pulse * 0.16
+
+    ctx.save()
+    ctx.lineWidth = 1.5
+    ctx.strokeStyle = `rgba(${r},${gr},${b},${alpha.toFixed(3)})`
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx, rx * 0.5, 0, 0, Math.PI * 2); ctx.stroke()
+    if (this.mobEngaged) {
+      // Inner ring + four cardinal ticks — the "locked on" read.
+      ctx.lineWidth = 1
+      ctx.strokeStyle = `rgba(${r},${gr},${b},${(alpha * 0.55).toFixed(3)})`
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx * 0.62, rx * 0.31, 0, 0, Math.PI * 2); ctx.stroke()
+      ctx.strokeStyle = `rgba(255,255,255,${(alpha * 0.5).toFixed(3)})`
+      const tick = 3
+      ctx.beginPath()
+      ctx.moveTo(cx - rx, cy); ctx.lineTo(cx - rx + tick, cy)
+      ctx.moveTo(cx + rx, cy); ctx.lineTo(cx + rx - tick, cy)
+      ctx.moveTo(cx, cy - rx * 0.5); ctx.lineTo(cx, cy - rx * 0.5 + tick * 0.5)
+      ctx.moveTo(cx, cy + rx * 0.5); ctx.lineTo(cx, cy + rx * 0.5 - tick * 0.5)
+      ctx.stroke()
     }
     ctx.restore()
   }

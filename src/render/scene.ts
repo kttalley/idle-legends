@@ -89,7 +89,16 @@ export class Scene {
     }
   }
 
-  render(ctx: CanvasRenderingContext2D, cam: Camera, ground: GroundBuffer, dt = 0): void {
+  /**
+   * @param groundDecals Optional painter hook run after the ground (and its animated
+   *   cells) but before any shadow or body — i.e. decals that belong ON the terrain and
+   *   UNDER every unit, like a target reticle. Drawing these after render() instead
+   *   would paint them over the sprites standing on them.
+   */
+  render(
+    ctx: CanvasRenderingContext2D, cam: Camera, ground: GroundBuffer, dt = 0,
+    groundDecals?: (ctx: CanvasRenderingContext2D) => void,
+  ): void {
     // 1. Ground blit (the entire static map cost per frame is this one drawImage).
     //    Clamp the source rect to the ground buffer: an out-of-bounds drawImage source
     //    throws IndexSizeError on WebKit/iOS (Blink silently clips), which — thrown from
@@ -127,6 +136,9 @@ export class Scene {
         ctx.drawImage(sheet, sx, sy, fw, fh, Math.round(a.dx - cam.x), Math.round(a.dy - cam.y), fw, fh)
       }
     }
+
+    // 1c. Ground decals — on the terrain, under every unit.
+    if (groundDecals) groundDecals(ctx)
 
     const es = this.entities
     const order = this.order

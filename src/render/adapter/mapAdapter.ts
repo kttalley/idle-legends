@@ -15,9 +15,11 @@ export const PAD = 16
 export const PADDED_W = MAP_SIZE + 2 * PAD // 96
 
 // Per-tile elevation in "levels"; baked into the ground as raised diamonds + south-
-// face skirts so the flat torus reads with FFTA-style depth. 0..2 keeps hills gentle
-// and the skirt geometry cheap. feetY is height-aware (see tilemap.bakeGround).
-export const MAX_ELEV = 2
+// face skirts so the flat torus reads with FFTA-style depth. feetY is height-aware
+// (see tilemap.bakeGround). At ELEV_PX=8 per level this gives up to 40px of relief —
+// 2.5 tile-heights, enough for a ridge to actually occlude what's behind it.
+// Elevation is presentation-only: nothing in the game logic reads it.
+export const MAX_ELEV = 5
 
 // ── Tile-type → tileset frame index ───────────────────────────────────────────
 // Stable per-tile hash so grass gets texture variation and the wrapped border
@@ -54,27 +56,52 @@ function tileToFrame(type: string, x: number, y: number): number {
 }
 
 // ── Elevation ─────────────────────────────────────────────────────────────────
-// Periodic low-frequency bumps (sin waves at frequencies that divide MAP_SIZE) so
-// the heightmap is seamless across the 64-tile torus wrap. Tile type then overrides:
-// water stays low (0), cliffs sit on the hilltops (capped at MAX_ELEV). Deterministic
-// per tile — no Date/Math.random, so bakes are stable across reloads.
-function bumpHeight(x: number, y: number): number {
+// Landform field: summed sines whose frequencies are all integer multiples of the
+// map period, so the heightmap is seamless across the 64-tile torus wrap. The high
+// octaves carry the weight here — a field built only from map-wide waves puts its
+// few slope changes ~32 tiles apart, so any viewport-sized window of it is flat no
+// matter how large the amplitude. Mixed anisotropic terms (3×5, 5×3) break up the
+// checkerboard symmetry that same-frequency sin(x)cos(y) products otherwise give.
+// Deterministic per tile — no Date/Math.random, so bakes are stable across reloads.
+function landformNoise(x: number, y: number): number {
   const nx = (x / MAP_SIZE) * Math.PI * 2
   const ny = (y / MAP_SIZE) * Math.PI * 2
-  // Three wave layers; sum ∈ ~[-3,3], normalized to 0..MAX_ELEV.
   const n =
     Math.sin(nx * 1) * Math.cos(ny * 1) +
-    Math.sin(nx * 2 + 1.3) * Math.cos(ny * 2) * 0.5 +
-    Math.sin(nx * 4 + 0.7) * Math.cos(ny * 4 + 2.1) * 0.25
-  // Map n ∈ [-1.75, 1.75] → 0..MAX_ELEV, rounded.
-  const t = (n + 1.75) / 3.5
-  return Math.max(0, Math.min(MAX_ELEV, Math.round(t * MAX_ELEV)))
+    Math.sin(nx * 2 + 1.3) * Math.cos(ny * 2) * 0.55 +
+    Math.sin(nx * 3 - 0.4) * Math.cos(ny * 5 + 1.1) * 0.42 +
+    Math.sin(nx * 5 + 0.7) * Math.cos(ny * 3 + 2.1) * 0.42 +
+    Math.sin(nx * 8 + 2.2) * Math.cos(ny * 8 - 0.6) * 0.22
+  // Gain, not a normalization. Dividing by the sum of amplitudes (2.61) would be
+  // "correct" and useless: summed sines cluster near their mean, so the field would
+  // never approach ±1 and the top elevation bands would go unused — which is exactly
+  // why this map used to read flat. 1.4 is just inside the field's observed range
+  // (-1.94..1.59), so the tails clip: genuine flat plains at the bottom, flat mesa
+  // tops at the top, and the full 0..MAX_ELEV span in between.
+  return n / 1.4
+}
+
+/**
+ * Continuous field → discrete plateau level. The quantization IS the art direction:
+ * GBA-tactics maps read as *designed* because they're flat tables at integer heights
+ * joined by abrupt one-level steps. An unquantized field just tilts every tile a
+ * little differently and reads as noise, which is what this map used to do.
+ * The exponent biases toward the low plain so highlands stay the exception and most
+ * of the zone is flat ground to walk and fight on.
+ */
+function plateauLevel(x: number, y: number): number {
+  const t = Math.max(0, Math.min(1, (landformNoise(x, y) + 1) / 2))
+  return Math.max(0, Math.min(MAX_ELEV, Math.round(Math.pow(t, 1.6) * MAX_ELEV)))
 }
 
 function tileHeight(type: string, x: number, y: number): number {
-  const base = bumpHeight(x, y)
-  if (type === 'water') return 0            // water is the low plane
-  if (type === 'cliff') return Math.min(MAX_ELEV, Math.max(1, base)) // raised rock
+  const base = plateauLevel(x, y)
+  // Water sits one step below the land around it — a basin. Pinning it to a global
+  // sea floor (the old behaviour) rings every inland pond with a full-height cliff
+  // once the map has real relief.
+  if (type === 'water') return Math.max(0, base - 1)
+  // Rock and cliff read as outcrops: one step proud of the plateau they sit on.
+  if (type === 'cliff' || type === 'rock') return Math.min(MAX_ELEV, base + 1)
   return base
 }
 
@@ -100,7 +127,7 @@ export function zoneMapToTileMap(zm: ZoneMap): TileMapData {
       const tile = zm.tiles[gy]?.[gx]
       const i = by * PADDED_W + bx
       tiles[i] = tile ? tileToFrame(tile.type, gx, gy) : TILE.GRASS
-      heights[i] = tile ? tileHeight(tile.type, gx, gy) : bumpHeight(gx, gy)
+      heights[i] = tile ? tileHeight(tile.type, gx, gy) : plateauLevel(gx, gy)
       const artId = propByGame?.get(gy * MAP_SIZE + gx)
       if (artId !== undefined) props.push({ bx, by, artId })
     }

@@ -130,6 +130,8 @@ export function bakeGround(
   // biome's cliffs match its tileset. Lit face = light stone (14); shadow = mid (13).
   const skirtLit = slotCSS(palette, 14)
   const skirtShadow = darken(slotCSS(palette, 13), 0.72)
+  // Seam drawn at every level boundary down a face (see the strata pass below).
+  const strataSeam = darken(slotCSS(palette, 13), 0.48)
 
   // Animated-cell lookup: frame → the cycle that reblits it (Phase B). A frame belongs
   // to at most one cycle; the first match wins. Built once so the per-cell check is O(1).
@@ -181,6 +183,20 @@ export function bakeGround(
         ctx.beginPath()
         ctx.moveTo(rx, ry); ctx.lineTo(bx, by); ctx.lineTo(bx, byBase); ctx.lineTo(rx, ryBase)
         ctx.closePath(); ctx.fill()
+
+        // Strata: a seam at each level boundary, so a face that drops several levels
+        // at once reads as stacked terraces rather than one tall slab of flat colour.
+        // Follows the two lower diamond edges, offset down — bake-time only, 1px lines.
+        if (e > ELEV_PX) {
+          ctx.strokeStyle = strataSeam
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          for (let d = ELEV_PX; d < e; d += ELEV_PX) {
+            ctx.moveTo(lx, ly + d + 0.5); ctx.lineTo(bx, by + d + 0.5)
+            ctx.lineTo(rx, ry + d + 0.5)
+          }
+          ctx.stroke()
+        }
       }
 
       ctx.drawImage(sheet, sx, sy, frameW, frameH, dx, dy, frameW, frameH)

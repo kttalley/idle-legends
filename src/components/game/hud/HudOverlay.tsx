@@ -17,7 +17,10 @@ export function HudOverlay() {
       <div style={{ position: 'absolute', top: 8, right: 8 }}>
         <MinimapRadar />
       </div>
-      <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)' }}>
+      {/* Bottom dock, flush to the canvas edge and full-bleed: the XP strip is the last
+          row of the viewport (WoW-style) rather than a floating panel with world showing
+          under it, so the action bar eats the least world possible. */}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
         <ActionBar />
       </div>
     </div>

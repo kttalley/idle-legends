@@ -46,7 +46,8 @@ export function ActionBar() {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      gap: 6,
+      gap: 4,
+      width: '100%',
     }}>
       {/* Main action bar panel */}
       <div style={{
@@ -56,7 +57,7 @@ export function ActionBar() {
         background: 'rgba(8,8,14,0.6)',
         border: '1px solid #3a3630',
         borderRadius: 8,
-        padding: 7,
+        padding: 6,
       }}>
         {/* Mode / town toggles */}
         <div style={{ display: 'flex', gap: 4 }}>
@@ -92,18 +93,17 @@ export function ActionBar() {
         )}
       </div>
 
-      {/* XP bar below the action buttons, WoW-style */}
-      <div style={{ width: '100%', maxWidth: 420 }}>
+      {/* XP strip: full-bleed and flush to the very bottom edge. The old "N XP to level
+          M" caption below it was a second row of low-contrast text floating over the
+          world — its information now rides in the bar's own label, costing zero height. */}
+      <div style={{ width: '100%' }}>
         <HealthBar
           current={xp}
           max={xpNeeded}
           type="xp"
-          height={10}
-          label={`XP ${Math.floor(xp)} / ${xpNeeded}`}
+          height={11}
+          label={`XP ${Math.floor(xp)} / ${xpNeeded}  ·  ${xpNeeded - Math.floor(xp)} to L${level + 1}`}
         />
-        <div style={{ fontSize: '0.55rem', color: '#9d9d9d', marginTop: 2, textAlign: 'center' }}>
-          {xpNeeded - Math.floor(xp)} XP to level {level + 1}
-        </div>
       </div>
     </div>
   )
