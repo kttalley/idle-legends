@@ -1,4 +1,5 @@
 import { PROP_KIND, SCENERY_KIND, type ZoneId, type ZoneMap, type MapTile, type MapNode, type MapProp, type MapScenery, type TileType } from '../data/types'
+import { buildWalkMask, relocateStrandedNodes } from './walkability'
 
 // ── Seeded PRNG ───────────────────────────────────────────────────────────────
 function hashStr(s: string): number {
@@ -441,5 +442,11 @@ export function generateZoneMap(zoneId: ZoneId): ZoneMap {
     lmPlaced++
   }
 
-  return { tiles, nodes, props, scenery }
+  // Step 8: reachability pass. Build the walkable mask (which seals off small pockets)
+  // and pull any node that landed inside one back onto reachable ground. Steps 4 and 6
+  // only check the tile itself, so a node can sit on perfectly good land that happens to
+  // be a 3-tile island — reachable in neither direction.
+  const zoneMap: ZoneMap = { tiles, nodes, props, scenery }
+  relocateStrandedNodes(buildWalkMask(zoneMap), nodes)
+  return zoneMap
 }

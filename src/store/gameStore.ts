@@ -27,6 +27,7 @@ import {
   deriveActiveQuest,
   type ZoneQuest,
 } from '../engine/zoneProgression'
+import { getWalkMask, moveWithCollision, nearestWalkable } from '../engine/walkability'
 import {
   INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
   ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE,
@@ -236,6 +237,25 @@ function fn(value: number, isCrit: boolean, isMobDamage: boolean, isDoT: boolean
     y: 40 + (Math.random() - 0.5) * 12,
     createdAt: Date.now(),
   }
+}
+
+/**
+ * Apply a drift step to the LOGICAL map position, refusing to enter unwalkable ground.
+ *
+ * This is not cosmetic: `playerMapPos` drives resource-node proximity, so a hero drifting
+ * across a lake would trigger auto-gather from open water. It also self-heals a position
+ * that is already blocked — the zone spawn (32,32) sits on a blocked tile in two zones,
+ * and old saves can hold such a position — because a blocked start would otherwise refuse
+ * every step and strand the drift forever.
+ */
+function driftMapPos(state: GameState, dx: number, dy: number): { x: number; y: number } {
+  const wrap = (v: number) => ((v % 64) + 64) % 64
+  const zm = state.zoneMaps[state.currentZone]
+  if (!zm) return { x: wrap(state.playerMapPos.x + dx), y: wrap(state.playerMapPos.y + dy) }
+  const mask = getWalkMask(state.currentZone, zm)
+  const from = nearestWalkable(mask, state.playerMapPos.x, state.playerMapPos.y)
+  const moved = moveWithCollision(mask, from.x, from.y, dx, dy)
+  return { x: wrap(moved.x), y: wrap(moved.y) }
 }
 
 function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
@@ -488,10 +508,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       const gatherDriftAngle = state.totalPlayTime * 0.08
       const gatherDriftX = Math.cos(gatherDriftAngle) * 0.5 * deltaSeconds
       const gatherDriftY = Math.sin(gatherDriftAngle * 0.7) * 0.3 * deltaSeconds
-      const gatherMapPos = {
-        x: ((state.playerMapPos.x + gatherDriftX) + 64) % 64,
-        y: ((state.playerMapPos.y + gatherDriftY) + 64) % 64,
-      }
+      const gatherMapPos = driftMapPos(state, gatherDriftX, gatherDriftY)
       if (newTimer <= 0) {
         const matId: MaterialId = ZONE_MATERIALS[state.currentZone][state.playerClass]
         const newCount = (state.materials[matId] ?? 0) + 1
@@ -1020,10 +1037,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const driftAngle = state.totalPlayTime * 0.08
     const driftX = Math.cos(driftAngle) * 0.5 * deltaSeconds
     const driftY = Math.sin(driftAngle * 0.7) * 0.3 * deltaSeconds
-    const playerMapPos = {
-      x: ((state.playerMapPos.x + driftX) + 64) % 64,
-      y: ((state.playerMapPos.y + driftY) + 64) % 64,
-    }
+    const playerMapPos = driftMapPos(state, driftX, driftY)
 
     // ── Mob map approach lerp ─────────────────────────────────────────────────
     let { mobMapOffset } = state
