@@ -20,6 +20,14 @@ import {
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
 import {
+  canEnterZone,
+  getZoneProgression,
+  makeZoneQuest,
+  isZoneQuestComplete,
+  deriveActiveQuest,
+  type ZoneQuest,
+} from '../engine/zoneProgression'
+import {
   INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
   ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE,
   BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
@@ -150,6 +158,9 @@ function defaultState(): GameState {
     // Towns
     currentTown: null,
     generatedTownNames: {},
+    // Zone Quests
+    activeQuest: makeZoneQuest('sunhollow_meadows', 'alliance'),
+    completedQuestIds: [],
   }
 }
 
@@ -194,6 +205,9 @@ function rehydrateState(saved: GameState): GameState {
   saved.currentTown        = null
   saved.generatedTownNames = saved.generatedTownNames ?? {}
   saved.zoomLevel          = readZoomPref()  // global UI pref, not per-slot
+  // Zone quest fields (added after this save was written)
+  saved.activeQuest = saved.activeQuest ?? deriveActiveQuest(saved)
+  saved.completedQuestIds = saved.completedQuestIds ?? []
   return saved
 }
 
@@ -304,6 +318,8 @@ interface GameActions {
   enterTown: (townId: TownId) => void
   leaveTown: () => void
   restInTown: () => void
+  claimQuestReward: (questId: string) => void
+  dismissQuestReward: (questId: string) => void
 }
 
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
@@ -321,6 +337,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     s.stats.currentHp = s.stats.maxHp
     s.lastTickTimestamp = Date.now()
     s.zoneMaps = { sunhollow_meadows: generateZoneMap('sunhollow_meadows') }
+    s.activeQuest = makeZoneQuest('sunhollow_meadows', s.playerFaction)
+    s.completedQuestIds = []
     const nameSeed = Date.now() ^ Math.floor(Math.random() * 0xFFFFFF)
     s.factionNames = generateFactionNamesFallback(nameSeed)  // instant fallback shown immediately
     // A name chosen in creation is authoritative: set it now and mark naming done so
@@ -446,12 +464,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if (newProgress >= 1) {
         const dest = state.travelTarget
         const destMap = state.zoneMaps[dest] ?? generateZoneMap(dest)
+        const activeQuest = !state.bossesDefeated.includes(dest)
+          ? makeZoneQuest(dest, state.playerFaction)
+          : state.activeQuest
         resetCombatAccumulators()
         set({
           currentZone: dest, currentMob: null, mobRespawnTimer: 0,
           activeDoTs: [], gameMode: 'combat', travelTarget: null, travelProgress: 0,
           playerMapPos: { x: 32, y: 32 },
           zoneMaps: { ...state.zoneMaps, [dest]: destMap },
+          activeQuest,
         })
       } else {
         set({ travelProgress: newProgress, playerMapPos: { x: newX, y: state.playerMapPos.y } })
@@ -832,13 +854,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           // Gain a talent point
           set(s => ({ talentPoints: s.talentPoints + 1 }))
           get().triggerThought('level_up', `level ${level}`)
-          for (const [zid, zone] of Object.entries(ZONES)) {
-            if (!unlockedZones.includes(zid as ZoneId) && level >= zone.levelRange[0]) {
-              unlockedZones.push(zid as ZoneId)
-              newLogs.push(log('zone_change', `New zone unlocked: ${zone.name}!`, '#00ff88'))
-              // Generate map for newly unlocked zone
-              if (!state.zoneMaps[zid as ZoneId]) {
-                set(s => ({ zoneMaps: { ...s.zoneMaps, [zid]: generateZoneMap(zid as ZoneId) } }))
+          // Level-based unlock: only zones whose prerequisite boss is already down.
+          for (const rawId of ZONE_ORDER) {
+            const zoneId = rawId as ZoneId
+            if (unlockedZones.includes(zoneId)) continue
+            if (canEnterZone(zoneId, level, bossesDefeated)) {
+              unlockedZones.push(zoneId)
+              newLogs.push(log('zone_change', `New zone unlocked: ${ZONES[zoneId].name}!`, '#00ff88'))
+              if (!state.zoneMaps[zoneId]) {
+                set(s => ({ zoneMaps: { ...s.zoneMaps, [zoneId]: generateZoneMap(zoneId) } }))
               }
             }
           }
@@ -851,16 +875,36 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         if (deadMob.isBoss && !bossesDefeated.includes(currentZone)) {
           bossesDefeated.push(currentZone)
           const zone = ZONES[currentZone]
-          if (zone.nextZone && !unlockedZones.includes(zone.nextZone)) {
-            unlockedZones.push(zone.nextZone)
-            newLogs.push(log('zone_change', `★ Boss slain! ${ZONES[zone.nextZone!]?.name} unlocked!`, '#ff8000'))
-          } else if (!zone.nextZone) {
+          const nextZoneId = zone.nextZone
+
+          // Update the active quest for this zone to completed.
+          let activeQuest: ZoneQuest | null = state.activeQuest
+          if (activeQuest?.zoneId === currentZone) {
+            activeQuest = { ...activeQuest, completed: true }
+          }
+
+          if (nextZoneId) {
+            const canEnterNext = canEnterZone(nextZoneId, level, bossesDefeated)
+            if (canEnterNext && !unlockedZones.includes(nextZoneId)) {
+              unlockedZones.push(nextZoneId)
+              newLogs.push(log('zone_change', `★ Boss slain! ${ZONES[nextZoneId].name} unlocked!`, '#ff8000'))
+              if (!state.zoneMaps[nextZoneId]) {
+                set(s => ({ zoneMaps: { ...s.zoneMaps, [nextZoneId]: generateZoneMap(nextZoneId) } }))
+              }
+            } else if (!canEnterNext) {
+              newLogs.push(log('zone_change', `${ZONES[nextZoneId].name} will unlock at level ${ZONES[nextZoneId].levelRange[0]}`, '#ff8800'))
+            }
+          } else {
             // Final zone (the_maw_eternal) — circuit increment, loop back to start
             set(s => ({ zoneCircuit: s.zoneCircuit + 1 }))
             bossesDefeated.length = 0  // reset all boss kills for the new circuit
             currentZone = 'sunhollow_meadows'
+            activeQuest = makeZoneQuest('sunhollow_meadows', state.playerFaction)
             newLogs.push(log('zone_change', `The world resets. Stronger now. Circuit ${(state.zoneCircuit ?? 0) + 1} begins.`, '#cc88ff'))
           }
+
+          // Apply the completed quest to the local copy so it is persisted in the tick set().
+          state.activeQuest = activeQuest
         }
 
         if (loot.item) {
@@ -1012,6 +1056,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       playerMapPos,
       gameMode: nextGameMode,
       gatheringTimer: nextGameMode === 'gathering' ? 5 : state.gatheringTimer,
+      activeQuest: state.activeQuest,
+      completedQuestIds: state.completedQuestIds,
     })
 
     // A channel completed this tick → resolve its effects now (own get()/set(),
@@ -1071,9 +1117,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   // ── Zone ─────────────────────────────────────────────────────────────────────
   selectZone: (zoneId) => {
     const s = get()
-    if (!s.unlockedZones.includes(zoneId)) return
+    if (!canEnterZone(zoneId, s.level, s.bossesDefeated)) return
     resetCombatAccumulators()
-    set({ currentZone: zoneId, currentMob: null, mobRespawnTimer: 0, activeDoTs: [] })
+    const activeQuest = !s.bossesDefeated.includes(zoneId)
+      ? makeZoneQuest(zoneId, s.playerFaction)
+      : s.activeQuest
+    set({ currentZone: zoneId, currentMob: null, mobRespawnTimer: 0, activeDoTs: [], activeQuest })
   },
 
   // Dev-only override: jump to ANY zone (unlock + generate its map if needed), so the
@@ -1285,7 +1334,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   // ── Travel ────────────────────────────────────────────────────────────────────
   beginTravel: (toZone) => {
     const s = get()
-    if (!s.unlockedZones.includes(toZone)) return
+    if (!canEnterZone(toZone, s.level, s.bossesDefeated)) return
     if (toZone === s.currentZone) return
     const fromIdx = ZONE_ORDER.indexOf(s.currentZone)
     const toIdx   = ZONE_ORDER.indexOf(toZone)
@@ -1365,6 +1414,27 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         ...s.combatLog,
       ].slice(0, 150),
     })
+  },
+
+  // ── Quest rewards ─────────────────────────────────────────────────────────────
+  claimQuestReward: (questId) => {
+    const s = get()
+    const quest = s.activeQuest
+    if (!quest || quest.id !== questId || !quest.completed || quest.claimed) return
+    const completedQuestIds = [...s.completedQuestIds, questId]
+    if (quest.rewardZoneId && s.unlockedZones.includes(quest.rewardZoneId)) {
+      set({ activeQuest: { ...quest, claimed: true }, completedQuestIds })
+      get().beginTravel(quest.rewardZoneId)
+    } else {
+      set({ activeQuest: { ...quest, claimed: true }, completedQuestIds })
+    }
+  },
+
+  dismissQuestReward: (questId) => {
+    const s = get()
+    const quest = s.activeQuest
+    if (!quest || quest.id !== questId || !quest.completed || quest.claimed) return
+    set({ activeQuest: { ...quest, claimed: true }, completedQuestIds: [...s.completedQuestIds, questId] })
   },
 }))
 

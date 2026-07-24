@@ -368,6 +368,22 @@ export interface GameState {
   // ── Towns ──────────────────────────────────────────────────────────────────
   currentTown: TownId | null
   generatedTownNames: Record<TownId, string>
+  // ── Zone Quests ─────────────────────────────────────────────────────────────
+  activeQuest: ZoneQuest | null
+  completedQuestIds: string[]
+}
+
+export interface ZoneQuest {
+  id: string
+  zoneId: ZoneId
+  title: string
+  description: string
+  levelReq: number
+  killsReq: number
+  bossId: string
+  rewardZoneId?: ZoneId
+  completed: boolean
+  claimed: boolean
 }
 
 // ── World Map ─────────────────────────────────────────────────────────────────

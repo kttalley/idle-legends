@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { TOWNS } from '../../data/towns'
+import { isTownHostileToPlayer } from '../../engine/zoneProgression'
 
 const FACTION_COLOR: Record<string, string> = {
   alliance: '#6699ff',
@@ -21,7 +22,7 @@ const TYPE_COLOR: Record<string, string> = {
 }
 
 export function TownView() {
-  const { currentTown, generatedTownNames, restInTown, leaveTown } = useGameStore()
+  const { currentTown, generatedTownNames, restInTown, leaveTown, playerFaction } = useGameStore()
   const [restFeedback, setRestFeedback] = useState(false)
 
   if (!currentTown) return null
@@ -32,8 +33,10 @@ export function TownView() {
   const factionColor = FACTION_COLOR[town.faction] ?? '#d4b896'
   const typeLabel = TYPE_LABEL[town.type] ?? town.type
   const typeColor = TYPE_COLOR[town.type] ?? '#888'
+  const hostileToPlayer = isTownHostileToPlayer(currentTown, playerFaction)
 
   function handleRest() {
+    if (hostileToPlayer) return
     restInTown()
     setRestFeedback(true)
     setTimeout(() => setRestFeedback(false), 2000)
@@ -75,6 +78,12 @@ export function TownView() {
         {town.description}
       </div>
 
+      {hostileToPlayer && (
+        <div style={{ fontSize: '0.55rem', color: '#ff6666' }}>
+          The locals recognize you as an enemy of {town.faction === 'horde' ? 'the Ashmarch' : 'the Concord'}. Rest is denied here.
+        </div>
+      )}
+
       {/* Services */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
         {town.services.includes('rest') && (
@@ -82,6 +91,7 @@ export function TownView() {
             <button
               className="rp-button"
               onClick={handleRest}
+              disabled={hostileToPlayer}
               style={{ fontSize: '0.55rem', padding: '2px 8px' }}
             >
               Rest & Recover

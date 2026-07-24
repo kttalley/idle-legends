@@ -9,9 +9,12 @@ import { InventoryPanel } from './components/game/InventoryPanel'
 import { ZoneSelector } from './components/game/ZoneSelector'
 import { CombatLog } from './components/game/CombatLog'
 import { GoldDisplay } from './components/ui/GoldDisplay'
+import { QuestToast } from './components/game/QuestToast'
 import { slotStorage } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
 import { ZONES, ZONE_ORDER } from './data/zones'
+
+const SHOW_DEV_JUMP = new URLSearchParams(window.location.search).has('dev')
 
 type MobilePanel = 'left' | 'right' | 'log' | null
 
@@ -68,6 +71,8 @@ export default function App() {
 
   return (
     <div className="app-root">
+      <QuestToast />
+
       {/* ── Top bar ── */}
       <div className="rp-panel flex items-center justify-between px-3 py-1.5" style={{ flexShrink: 0 }}>
         <div style={{
@@ -81,18 +86,19 @@ export default function App() {
         </div>
         <GoldDisplay gold={gold} />
         <div className="flex items-center gap-2">
-          {/* DEV: jump to any biome to inspect it (bypasses unlock/progression). */}
-          <select
-            value={currentZone}
-            onChange={e => devJumpZone(e.target.value as typeof currentZone)}
-            title="DEV: jump to biome"
-            className="rp-button"
-            style={{ fontSize: '0.55rem', padding: '2px 4px', maxWidth: 130 }}
-          >
-            {ZONE_ORDER.map(z => (
-              <option key={z} value={z}>{ZONES[z]?.name ?? z}</option>
-            ))}
-          </select>
+          {SHOW_DEV_JUMP && (
+            <select
+              value={currentZone}
+              onChange={e => devJumpZone(e.target.value as typeof currentZone)}
+              title="DEV: jump to biome"
+              className="rp-button"
+              style={{ fontSize: '0.55rem', padding: '2px 4px', maxWidth: 130 }}
+            >
+              {ZONE_ORDER.map(z => (
+                <option key={z} value={z}>{ZONES[z]?.name ?? z}</option>
+              ))}
+            </select>
+          )}
           <button
             className="rp-button"
             style={{ fontSize: '0.6rem' }}

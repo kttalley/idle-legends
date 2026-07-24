@@ -1,6 +1,7 @@
 import React from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { ZONES, ZONE_ORDER } from '../../data/zones'
+import { getZoneProgression, getPrerequisiteZone } from '../../engine/zoneProgression'
 import type { ZoneId } from '../../data/types'
 
 export function ZoneSelector() {
@@ -10,6 +11,7 @@ export function ZoneSelector() {
   } = useGameStore()
 
   const isTraveling = gameMode === 'traveling'
+  const progression = getZoneProgression(level, bossesDefeated, unlockedZones)
 
   return (
     <div className="rp-panel" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -22,7 +24,8 @@ export function ZoneSelector() {
           const kills      = totalZoneKills[zoneId as ZoneId] ?? 0
           const active     = currentZone === zoneId
           const bossDown   = bossesDefeated.includes(zoneId as ZoneId)
-          const canEnter   = unlocked && level >= zone.levelRange[0]
+          const prog       = progression.find(p => p.zoneId === zoneId)!
+          const canEnter   = unlocked && prog.reason === 'available'
           const isDestination = travelTarget === zoneId
 
           // Travel time estimate
@@ -30,6 +33,20 @@ export function ZoneSelector() {
           const toIdx    = ZONE_ORDER.indexOf(zoneId)
           const dist     = Math.abs(fromIdx - toIdx)
           const travelSec = dist * 8
+
+          const lockReason = (() => {
+            if (canEnter) return null
+            if (prog.reason === 'locked_boss') {
+              const prereq = getPrerequisiteZone(zoneId as ZoneId)
+              const prereqName = prereq ? (generatedZoneNames[prereq] ?? ZONES[prereq]?.name ?? prereq) : ''
+              const prereqBoss = prereq ? ZONES[prereq]?.mobs.find(m => m.id === ZONES[prereq]?.bossId)?.name : ''
+              return `Defeat ${prereqBoss || 'the boss'} in ${prereqName}`
+            }
+            if (prog.reason === 'locked_level') {
+              return `Reach level ${prog.requiredLevel}`
+            }
+            return 'Locked'
+          })()
 
           return (
             <button
@@ -72,8 +89,10 @@ export function ZoneSelector() {
                   )}
                 </div>
               )}
-              {!unlocked && (
-                <div style={{ fontSize: '0.6rem', color: '#555' }}>🔒 Locked</div>
+              {!canEnter && lockReason && (
+                <div style={{ fontSize: '0.6rem', color: '#aa6644', marginTop: 2 }}>
+                  🔒 {lockReason}
+                </div>
               )}
             </button>
           )
