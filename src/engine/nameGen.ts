@@ -1,7 +1,15 @@
 import type { ClassType, ZoneId, FactionType, TownId } from '../data/types'
 
-const OLLAMA_BASE = import.meta.env.LLM_URL || 'http://localhost:11434'
+// Security: never default to localhost. A public build without VITE_LLM_URL must not
+// probe the visitor's machine. Only call out to an endpoint that was explicitly set
+// at build time (e.g. VITE_LLM_URL for a dedicated backend, or localhost during
+// intentional local dev).
+const OLLAMA_BASE = import.meta.env.VITE_LLM_URL as string | undefined
 const MODEL       = 'incept5/llama3.1-claude:latest'
+
+function isLlmConfigured(): boolean {
+  return typeof OLLAMA_BASE === 'string' && /^https?:\/\//.test(OLLAMA_BASE.trim())
+}
 
 export interface GeneratedNames {
   playerName: string
@@ -60,6 +68,58 @@ export function generatePlayerNameFallback(seed: number, playerClass: ClassType)
   return `${first} ${epithet}`
 }
 
+export function generateTraitsFallback(seed: number, playerClass: ClassType): string[] {
+  const pool = CLASS_TRAIT_POOLS[playerClass].split(', ')
+  return [
+    seededPick(pool, seed, 10),
+    seededPick(pool, seed, 11),
+    seededPick(pool, seed, 12),
+  ]
+}
+
+const ZONE_NAME_FALLBACKS: Record<ZoneId, string[]> = {
+  sunhollow_meadows:  ['Sunhollow Meadow', 'Brightglade', 'Dawnhollow'],
+  dustwind_plains:    ['Dustwind Expanse', 'Gritlands', 'Windscour Plain'],
+  grimshade_forest:   ['Grimshade Wood', 'Blackbriar Forest', 'Mourningwood'],
+  thornvale_jungle:   ['Thornvale Jungle', 'Razorvine Deep', 'Tanglemire'],
+  ashfire_peaks:      ['Ashfire Peaks', 'Cinderfell Mountains', 'Flametongue Rise'],
+  shattered_crossing: ['Shattered Crossing', 'Broken Bridge', 'Riven Ford'],
+  the_bloodfields:    ['The Bloodfields', 'Red March', 'Carrion Flats'],
+  ironcrag_badlands:  ['Ironcrag Badlands', 'Rustscar Wastes', 'Cragbone Desert'],
+  venom_hollows:      ['Venom Hollows', 'Fetid Mire', 'Mirefang Swamp'],
+  warsong_mesa:       ['Warsong Mesa', 'Redstone Plateau', 'Drumcrag Heights'],
+  cinderfall_wastes:  ['Cinderfall Wastes', 'Ashfall Ruins', 'Burned Reach'],
+  the_maw_eternal:    ['The Maw Eternal', 'Worldedge Abyss', 'Last Chasm'],
+}
+
+export function generateZoneNamesFallback(seed: number): Partial<Record<ZoneId, string>> {
+  const out: Partial<Record<ZoneId, string>> = {}
+  let i = 0
+  for (const id of Object.keys(ZONE_NAME_FALLBACKS) as ZoneId[]) {
+    out[id] = seededPick(ZONE_NAME_FALLBACKS[id], seed, 20 + i)
+    i++
+  }
+  return out
+}
+
+const TOWN_NAME_FALLBACKS: Record<string, string[]> = {
+  sunhollow_village: ['Sunhollow Village', 'Dawnstead', 'Meadowbrook'],
+  dustwind_post:     ['Dustwind Post', 'Gritwatch', 'Sandbreak Outpost'],
+  grimshade_refuge:  ['Grimshade Refuge', 'Hollow Haven', 'Nightrest'],
+  crossroads_market: ['Crossroads Market', 'Broken Bridge Bazaar', 'Wartrader Hub'],
+  ironcrag_hold:     ['Ironcrag Hold', 'Ashmarch Seat', 'Cragfort'],
+  warsong_bastion:   ['Warsong Bastion', 'Drumcrag Keep', 'Redstone Stronghold'],
+}
+
+export function generateTownNamesFallback(seed: number): Record<TownId, string> {
+  const out: Record<TownId, string> = {}
+  let i = 0
+  for (const id of Object.keys(TOWN_NAME_FALLBACKS)) {
+    out[id] = seededPick(TOWN_NAME_FALLBACKS[id], seed, 40 + i)
+  }
+  return out
+}
+
 const CLASS_FLAVOR: Record<ClassType, string> = {
   warrior: 'a battle-scarred Arms Warrior who fights with massive two-handed weapons',
   mage:    'a Frost Mage who wields ice and arcane magic',
@@ -90,7 +150,10 @@ const ZONE_THEMES: Record<ZoneId, string> = {
 }
 
 async function ollamaGenerate(prompt: string): Promise<string> {
-  const res = await fetch(`${OLLAMA_BASE}/api/generate`, {
+  if (!isLlmConfigured()) {
+    throw new Error('VITE_LLM_URL is not configured; skipping Ollama call')
+  }
+  const res = await fetch(`${OLLAMA_BASE!.trim()}/api/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -115,6 +178,19 @@ const TOWN_THEMES: Record<string, string> = {
 }
 
 export async function generateNames(playerClass: ClassType, seed: number): Promise<GeneratedNames> {
+  // No LLM configured → return deterministic fallback content immediately. This keeps
+  // public builds usable offline and prevents them from probing the visitor's machine.
+  if (!isLlmConfigured()) {
+    const fallbackFactions = generateFactionNamesFallback(seed)
+    return {
+      playerName: generatePlayerNameFallback(seed, playerClass),
+      traits: generateTraitsFallback(seed, playerClass),
+      factionNames: fallbackFactions,
+      zoneNames: generateZoneNamesFallback(seed),
+      townNames: generateTownNamesFallback(seed),
+    }
+  }
+
   const zoneDescriptions = Object.entries(ZONE_THEMES)
     .map(([id, theme]) => `    "${id}": "<unique 2-3 word evocative zone name for: ${theme}>"`)
     .join(',\n')
@@ -201,6 +277,19 @@ const EVENT_CONTEXT: Record<ThoughtEvent, string> = {
   crit:         'just landed a devastating critical strike',
 }
 
+const THOUGHT_FALLBACKS: Record<ThoughtEvent, string[]> = {
+  mob_kill:     ['Another one down.', 'Not worth remembering.', 'Quick and clean.'],
+  elite_kill:   ['That one had teeth.', 'A worthy kill.', 'Finally.'],
+  boss_kill:    ['It is done.', 'Victory, for now.', 'The beast falls.'],
+  near_death:   ['Not today.', 'Too close.', 'I still stand.'],
+  player_death: ['Darkness... again.', 'Back from the void.', 'Not the end.'],
+  level_up:     ['I grow stronger.', 'Power surges.', 'Another step forward.'],
+  boss_spawn:   ['Here comes the real test.', 'That thing looks hungry.', 'Stand firm.'],
+  long_fight:   ['How long can it last?', 'Just. Die. Already.', 'Wearing thin.'],
+  dot_proc:     ['Burn.', 'Bleed.', 'Fester.'],
+  crit:         ['A perfect strike.', 'Felt that one.', 'Bone and blade.'],
+}
+
 export async function generateThought(
   playerName: string,
   playerClass: ClassType,
@@ -208,6 +297,11 @@ export async function generateThought(
   event: ThoughtEvent,
   extra?: string,
 ): Promise<string> {
+  if (!isLlmConfigured()) {
+    const seed = (playerName.length * 31) ^ (event.length * 17) ^ (traits.length * 7)
+    return seededPick(THOUGHT_FALLBACKS[event] ?? THOUGHT_FALLBACKS.mob_kill, seed, 0)
+  }
+
   const traitStr = traits.length > 0 ? traits.join(', ') : CLASS_TRAIT_POOLS[playerClass].split(', ').slice(0, 2).join(', ')
   const eventDesc = EVENT_CONTEXT[event] ?? event
   const extraCtx = extra ? ` (${extra})` : ''

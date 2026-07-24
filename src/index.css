@@ -293,7 +293,7 @@ body {
 }
 
 .bar-hp       { background: linear-gradient(90deg, #8b0000, #cc2200); }
-.bar-xp       { background: linear-gradient(90deg, #003080, #0060cc); }
+.bar-xp       { background: linear-gradient(90deg, #5a3ec8, #9d71e8); box-shadow: 0 0 6px rgba(157,113,232,0.35); }
 .bar-mob-hp   { background: linear-gradient(90deg, #7a1a00, #c43000); }
 
 /* ── Rarity Colors ────────────────────────────────────────────────────────── */

@@ -27,7 +27,7 @@ export function HealthBar({ current, max, type = 'hp', showText = true, height =
           style={{
             fontSize: Math.max(9, height - 4),
             fontFamily: 'monospace',
-            color: 'rgba(255,255,255,0.9)',
+            color: type === 'xp' ? '#ffd700' : 'rgba(255,255,255,0.9)',
             textShadow: '0 1px 2px rgba(0,0,0,0.9)',
             pointerEvents: 'none',
             letterSpacing: 0,

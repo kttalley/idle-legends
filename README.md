@@ -20,7 +20,7 @@ Idle Legends is a fantasy idle RPG built with React and TypeScript. Your champio
 - **Map-Driven Idle Gameplay** — Combat and gathering are proximity-based; enemies approach from the map and engage automatically when in range.
 - **Zone Travel System** — Unlock and travel between multiple zones with escalating difficulty, each with unique biome aesthetics, mob rosters, and a zone boss.
 - **Offline Progression** — Catch-up mechanics calculate progress earned while the tab was closed.
-- **AI-Generated Names** (optional) — Zone and character names can be generated via a local Ollama instance for a unique experience each run.
+- **AI-Generated Names** (optional) — Zone and character names can be generated via an Ollama endpoint for a unique experience each run. Set `VITE_LLM_URL` at build time; without it the game uses deterministic fallback content and never calls out.
 
 ---
 

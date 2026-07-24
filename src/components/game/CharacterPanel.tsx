@@ -1,14 +1,17 @@
 import React, { useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { CLASS_DEFINITIONS } from '../../data/classes'
+import { xpForLevel } from '../../engine/progression'
 import { GoldDisplay } from '../ui/GoldDisplay'
+import { HealthBar } from '../ui/HealthBar'
 import { TalentTree } from './TalentTree'
 
 type Tab = 'stats' | 'talents'
 
 export function CharacterPanel() {
-  const { stats, level, playerClass, gold, talentPoints, playerName, nameGenStatus } = useGameStore()
+  const { stats, level, xp, playerClass, gold, talentPoints, playerName, nameGenStatus } = useGameStore()
   const classDef = CLASS_DEFINITIONS[playerClass]
+  const xpNeeded = xpForLevel(level)
   const [tab, setTab] = useState<Tab>('stats')
 
   return (
@@ -70,8 +73,20 @@ export function CharacterPanel() {
       <div className="flex-1 panel-scroll p-2" style={{ fontSize: '0.7rem' }}>
         {tab === 'stats' && (
           <div>
-            <div style={{ color: '#ffd700', marginBottom: 6, fontWeight: 700 }}>
+            <div style={{ color: '#ffd700', marginBottom: 4, fontWeight: 700 }}>
               Level {level} {classDef.name}
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <HealthBar
+                current={xp}
+                max={xpNeeded}
+                type="xp"
+                height={14}
+                label={`XP ${Math.floor(xp)} / ${xpNeeded}`}
+              />
+              <div style={{ fontSize: '0.55rem', color: '#9d9d9d', marginTop: 2, textAlign: 'right' }}>
+                {xpNeeded - Math.floor(xp)} XP to level {level + 1}
+              </div>
             </div>
             {[
               ['HP',           `${Math.floor(stats.currentHp)} / ${stats.maxHp}`],
