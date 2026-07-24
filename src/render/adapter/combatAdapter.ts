@@ -18,6 +18,7 @@ import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../p
 import { composePalette } from '../palette'
 import { heroPaletteId } from './heroWardrobe'
 import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
+import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } from '../../engine/walkability'
 import { Animator } from '../animation'
 import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId } from './fftaRoster'
 import type { Facing, IndexedSprite } from '../types'
@@ -51,6 +52,13 @@ const ENGAGE_DIST = 1.5       // mob "engaged" threshold (matches the store's mo
 // always be SEEN covering ground. Floor keeps an exponential approach from crawling the
 // last fraction of a tile; fade hides the moment a spawn materialises inside the (wide)
 // visible radius.
+// Footfall cadence. The rigs deliberately animate 'idle' while walking (their 'walk' tag
+// is a flinchy jitter), so a moving unit is otherwise pixel-identical to a standing one —
+// and because the camera is locked to the hero, that made "we walked to it" and "it walked
+// to us" look exactly the same on screen. A small vertical bounce is the cheapest honest
+// cue that a body is covering ground.
+const WALK_CADENCE = 9         // rad/s; abs(sin) → ~2.9 steps/sec
+const WALK_BOB_PX = 2
 const MOB_CLOSE_K = 5          // approach rate while closing (1/s)
 const MOB_ENGAGE_K = 14        // faster once engaged, so the fighting gap settles quickly
 const MOB_MIN_CLOSE = 1.2      // tiles/sec floor
@@ -68,6 +76,13 @@ const RARITY_RANK: Record<Rarity, number> = {
 // instead of lunging. Matched on the mob name so the bestiary's archers/shamans/
 // warlocks read as ranged without a data flag.
 const RANGED_RE = /archer|ranger|hunter|gunner|warlock|mage|magus|caster|spellcaster|shaman|priest|seer|oracle|necromancer|sorcerer|conjurer|elementalist|pyromancer|cryomancer/
+
+// Temperament. Predators and raiders CHARGE — they close the distance and you stand and
+// receive them. Everything else is territorial: it holds its ground and you have to walk
+// in and start the fight yourself, which is the more deliberate, hunt-like read. Bosses
+// never charge; you approach the lair. Matches the RANGED_RE idiom above so no per-mob
+// data authoring is needed across 12 zones.
+const AGGRESSIVE_RE = /wolf|worgen|raptor|tiger|stalker|boar|beast|berserker|marauder|raider|reaver|hound|vulture|swarm|prowler|savage|rabid|feral|thug|bandit|brute|charger/
 function isRangedMob(mob: MobInstance): boolean {
   return RANGED_RE.test(mob.name.toLowerCase())
 }
@@ -113,6 +128,14 @@ interface Floater {
 }
 
 // ── Lunge choreography (ported from the dev harness duel) ─────────────────────
+/** A cached A* route plus the goal it was computed for, so it only repaths when needed. */
+interface PathState {
+  pts: { x: number; y: number }[]   // game-coord waypoints, remaining
+  i: number                          // index of the waypoint being walked to
+  gx: number; gy: number             // goal the route was built for (game coords)
+  cool: number                       // seconds until a repath is allowed
+}
+
 interface Lunge {
   active: boolean
   t: number           // 0→1→0 triangle progress driver
@@ -329,6 +352,12 @@ export class WorldSceneController {
   private mobPlacedDy = 0
   private mobApproachDx = Math.SQRT1_2
   private mobApproachDy = Math.SQRT1_2
+  // Bearing is chosen once per encounter (see chooseMobBearing) and held until the mob goes.
+  private mobBearingSet = false
+  // Approach radius multiplier (≤1) when the encounter had to be staged nearer to find
+  // clear ground. Never >1: a visual gap wider than the store's would leave blows landing
+  // across open space.
+  private mobRadiusScale = 1
   // World spot the mob holds while the encounter closes. Captured once when the mob
   // spawns, so the *hero* covers the ground between fights instead of standing still
   // while the enemy slides in. Null until a mob spawns / after it's engaged or gone.
@@ -336,6 +365,12 @@ export class WorldSceneController {
   private mobAnchorY: number | null = null
   // Counts down from MOB_SPAWN_FADE while a freshly spawned mob fades in.
   private mobFadeT = 0
+  // How long a tap-walk has been grinding against an obstacle (see the tap branch).
+  private tapStuckT = 0
+  // Cached routes. Straight-line movement plus collide-and-slide wedges against any
+  // concave shoreline; these let a mover go AROUND a lake instead of grinding its edge.
+  private playerPath: PathState = { pts: [], i: 0, gx: 0, gy: 0, cool: 0 }
+  private mobPath: PathState = { pts: [], i: 0, gx: 0, gy: 0, cool: 0 }
 
   private cam: Camera = { x: 0, y: 0, w: 0, h: 0 }
 
@@ -393,6 +428,14 @@ export class WorldSceneController {
   private mobBasePalette = 'team/enemy'
 
   private lastNodes: MapNode[] = []
+  // Walkable mask for the current zone (game coords, 64×64). Null until a zone is baked.
+  private walkMask: Uint8Array | null = null
+  private worldSeed = 0
+  // Footfall phase per walker (see WALK_CADENCE).
+  private playerBob = { t: 0 }
+  private mobBob = { t: 0 }
+  // Does this mob charge the hero, or hold its ground and make the hero come to it?
+  private mobAggressive = false
 
   // Death choreography. A slain mob is moved off `this.mob` into dyingMobs so it keeps
   // rendering its 'death' pose while fading out, then retires. playerDead forces the
@@ -722,6 +765,149 @@ export class WorldSceneController {
     return ((v % MAP_SIZE) + MAP_SIZE) % MAP_SIZE
   }
 
+  // ── Collision ──────────────────────────────────────────────────────────────
+  // The mask is in GAME coords; the scene works in PAD-offset buffer coords, and
+  // isWalkable wraps internally, so subtracting PAD is the whole conversion.
+  // Town is exempt: it's a small hand-authored box already clamped by TOWN_WALK_RADIUS,
+  // with no tile mask of its own.
+
+  private walkableAt(bx: number, by: number): boolean {
+    if (this.townMode || !this.walkMask) return true
+    return isWalkable(this.walkMask, bx - PAD, by - PAD)
+  }
+
+  /** Collide-and-slide one step in buffer space: each axis applies only if it lands on
+   *  walkable ground, so brushing a shoreline slides along it instead of stopping dead. */
+  private slide(x: number, y: number, dx: number, dy: number): { x: number; y: number; blocked: boolean } {
+    let nx = x, ny = y, blocked = false
+    if (dx !== 0) { if (this.walkableAt(x + dx, y)) nx = x + dx; else blocked = true }
+    if (dy !== 0) { if (this.walkableAt(nx, y + dy)) ny = y + dy; else blocked = true }
+    return { x: nx, y: ny, blocked }
+  }
+
+  /**
+   * Pick the bearing this encounter closes along, preferring one with clear ground
+   * between hero and quarry.
+   *
+   * The store randomises the approach angle and only its *distance* drives engagement, so
+   * rotating the bearing is free — and it stops encounters being staged across a lake,
+   * which is what produced the hero pinned on the near bank while the mob swam over to
+   * meet the timer. Tries the store's own bearing first, then the nearest rotations, so
+   * the spawn direction stays as varied as before whenever the ground allows.
+   */
+  private chooseMobBearing(dist: number): void {
+    const baseAng = Math.atan2(this.mobOffsetDy, this.mobOffsetDx)
+    let ang = baseAng
+    this.mobRadiusScale = 1
+    if (this.walkMask && dist > 0.01) {
+      const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
+      const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
+      const clear = (a: number, r: number) => {
+        const ex = pgx + Math.cos(a) * r, ey = pgy + Math.sin(a) * r
+        return isWalkable(this.walkMask!, ex, ey) && hasLineOfWalk(this.walkMask!, pgx, pgy, ex, ey)
+      }
+      // Sweep bearings at full range, then pull the radius in. Water-heavy zones
+      // (venom_hollows is only 62% walkable) can have no clear line at all at 10–15
+      // tiles; staging the encounter nearer keeps it on the hero's own landmass. Pulling
+      // IN is always safe — a visual gap smaller than the store's never leaves attacks
+      // landing across open space, whereas a larger one would.
+      let done = false
+      for (const scale of [1, 0.75, 0.5]) {
+        for (let i = 0; i < 24 && !done; i++) {
+          const cand = baseAng + (i === 0 ? 0 : (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (Math.PI / 12))
+          if (!clear(cand, dist * scale)) continue
+          ang = cand
+          this.mobRadiusScale = scale
+          done = true
+        }
+        if (done) break
+      }
+      // Still nothing clear: keep the store bearing. The spawn nudge puts the mob on land
+      // and the routed approach walks it around whatever is in the way.
+    }
+    this.mobApproachDx = Math.cos(ang)
+    this.mobApproachDy = Math.sin(ang)
+  }
+
+  /** Advance a walker's footfall phase and return its vertical bounce in pixels. */
+  private walkBobZ(phase: { t: number }, moving: boolean, dt: number): number {
+    if (!moving) { phase.t = 0; return 0 }
+    phase.t += dt * WALK_CADENCE
+    return Math.abs(Math.sin(phase.t)) * WALK_BOB_PX
+  }
+
+  /** Buffer-space position of a game-coord point, on the wrapped copy nearest `nearBx`. */
+  private toBuffer(gx: number, gy: number, nearBx: number, nearBy: number): { x: number; y: number } {
+    return {
+      x: nearBx + WorldSceneController.wrapDiff(gx, WorldSceneController.wrapMod(nearBx - PAD)),
+      y: nearBy + WorldSceneController.wrapDiff(gy, WorldSceneController.wrapMod(nearBy - PAD)),
+    }
+  }
+
+  /**
+   * Walk an entity toward a buffer-space goal, routing around blocked ground.
+   *
+   * Straight-line movement is used while the goal is in plain sight — that keeps normal
+   * approaches perfectly direct. Only when something is in the way does it fall back to a
+   * cached A* route, repathing when the goal drifts or the route runs out. Without this,
+   * a lake between the two bodies pins the walker against the shore forever while the
+   * store's gap timer runs down regardless.
+   */
+  private followPath(
+    e: Entity, st: PathState, goalBx: number, goalBy: number, speed: number, dt: number,
+  ): { moving: boolean; mvx: number; mvy: number } {
+    const still = { moving: false, mvx: 0, mvy: 0 }
+    const stepLen = speed * dt
+    if (stepLen <= 0) return still
+
+    const gx = WorldSceneController.wrapMod(goalBx - PAD)
+    const gy = WorldSceneController.wrapMod(goalBy - PAD)
+    const ex = WorldSceneController.wrapMod(e.tx - PAD)
+    const ey = WorldSceneController.wrapMod(e.ty - PAD)
+
+    // Direct walk whenever the goal is actually in sight.
+    if (!this.walkMask || hasLineOfWalk(this.walkMask, ex, ey, gx, gy)) {
+      st.pts = []
+      const dx = goalBx - e.tx, dy = goalBy - e.ty
+      const d = Math.hypot(dx, dy)
+      if (d < 0.02) return still
+      const s = Math.min(d, stepLen)
+      const ux = dx / d, uy = dy / d
+      const r = this.slide(e.tx, e.ty, ux * s, uy * s)
+      e.tx = r.x; e.ty = r.y
+      return { moving: true, mvx: ux, mvy: uy }
+    }
+
+    st.cool -= dt
+    const goalMoved = Math.hypot(WorldSceneController.wrapDiff(gx, st.gx), WorldSceneController.wrapDiff(gy, st.gy)) > 1.5
+    if ((!st.pts.length || st.i >= st.pts.length || goalMoved) && st.cool <= 0) {
+      st.pts = findPath(this.walkMask, ex, ey, gx, gy) ?? []
+      st.i = 0
+      st.gx = gx; st.gy = gy
+      st.cool = 0.35   // cap repaths; the grid is tiny but this runs per mover
+    }
+    if (st.i >= st.pts.length) {
+      // No route (or still cooling down) — slide toward the goal so it at least tries.
+      const dx = goalBx - e.tx, dy = goalBy - e.ty
+      const d = Math.hypot(dx, dy)
+      if (d < 0.02) return still
+      const r = this.slide(e.tx, e.ty, dx / d * stepLen, dy / d * stepLen)
+      e.tx = r.x; e.ty = r.y
+      return { moving: true, mvx: dx / d, mvy: dy / d }
+    }
+
+    const wp = st.pts[st.i]
+    const b = this.toBuffer(wp.x, wp.y, e.tx, e.ty)
+    const dx = b.x - e.tx, dy = b.y - e.ty
+    const d = Math.hypot(dx, dy)
+    if (d < 0.3) { st.i++; return { moving: true, mvx: dx / (d || 1), mvy: dy / (d || 1) } }
+    const s = Math.min(d, stepLen)
+    const ux = dx / d, uy = dy / d
+    const r = this.slide(e.tx, e.ty, ux * s, uy * s)
+    e.tx = r.x; e.ty = r.y
+    return { moving: true, mvx: ux, mvy: uy }
+  }
+
   private static wrapDiff(a: number, b: number): number {
     let d = a - b
     d = ((d % MAP_SIZE) + MAP_SIZE) % MAP_SIZE
@@ -738,6 +924,8 @@ export class WorldSceneController {
     this.slainMob = null
 
     this.weatherType = state.weatherState?.type ?? 'clear'
+    // Read before the zone-change branch below, so a rebake uses this run's seed.
+    this.worldSeed = state.worldSeed ?? 0
     this.currentZone = state.currentZone
 
     // ── Town-hub transitions ──────────────────────────────────────────────────
@@ -772,8 +960,13 @@ export class WorldSceneController {
         )
         this.zone = state.currentZone
         this.lastNodes = zm.nodes
-        this.player.tx = PAD + WorldSceneController.wrapMod(state.playerMapPos.x)
-        this.player.ty = PAD + WorldSceneController.wrapMod(state.playerMapPos.y)
+        this.walkMask = getWalkMask(state.currentZone, zm)
+        // Land on walkable ground: the zone spawn (32,32) is itself blocked in
+        // grimshade_forest and venom_hollows, and an old save can hold a position that
+        // is now inside water.
+        const spawn = nearestWalkable(this.walkMask, state.playerMapPos.x, state.playerMapPos.y)
+        this.player.tx = PAD + WorldSceneController.wrapMod(spawn.x)
+        this.player.ty = PAD + WorldSceneController.wrapMod(spawn.y)
         // Cancel any in-flight manual movement/jump across the zone swap.
         this.manualMode = false
         this.jumpActive = false
@@ -820,12 +1013,19 @@ export class WorldSceneController {
     this.showMob = !!state.currentMob && state.gameMode === 'combat'
     this.mobOffsetDx = state.mobMapOffset.dx
     this.mobOffsetDy = state.mobMapOffset.dy
-    this.mobEngaged = Math.hypot(this.mobOffsetDx, this.mobOffsetDy) < ENGAGE_DIST
+    // Requires a mob to actually BE there. Distance alone reads "engaged" whenever the
+    // offset is zero — and the store zeroes it precisely when there is no mob — so with
+    // no mob present this latched true and froze the player's auto-follow. That is what
+    // killed the travel animation: the hero stayed pinned to the store position instead
+    // of walking, so the world never scrolled past on the way to the next zone.
+    this.mobEngaged = this.showMob && Math.hypot(this.mobOffsetDx, this.mobOffsetDy) < ENGAGE_DIST
 
     if (this.showMob && state.currentMob) {
       const mob = state.currentMob
       this.mobIsRanged = isRangedMob(mob)
       this.mobTier = mob.isBoss ? 'boss' : mob.isElite ? 'elite' : 'normal'
+      // Charging predators vs. things that hold their ground (see AGGRESSIVE_RE).
+      this.mobAggressive = !mob.isBoss && AGGRESSIVE_RE.test(mob.name.toLowerCase())
       // Engagement placement: follow the store offset while the mob is still closing
       // (remembering its approach direction), then hold a fixed diagonal gap so it
       // never parks on the player. The radial hold is continuous with the approach
@@ -833,15 +1033,15 @@ export class WorldSceneController {
       const gapTiles = this.mobIsRanged ? RANGED_GAP_TILES : MELEE_GAP_TILES
       const gapMag = Math.SQRT2 * gapTiles
       const offDist = Math.hypot(this.mobOffsetDx, this.mobOffsetDy)
-      if (offDist > gapMag) {
-        this.mobApproachDx = this.mobOffsetDx / offDist
-        this.mobApproachDy = this.mobOffsetDy / offDist
-        this.mobPlacedDx = this.mobOffsetDx
-        this.mobPlacedDy = this.mobOffsetDy
-      } else {
-        this.mobPlacedDx = this.mobApproachDx * gapMag
-        this.mobPlacedDy = this.mobApproachDy * gapMag
-      }
+      // Fix the bearing once per encounter, on ground you can actually walk. Only the
+      // DISTANCE feeds engagement timing, so the magnitude below still tracks the store
+      // exactly — the bearing is free to rotate.
+      if (!this.mobBearingSet) { this.chooseMobBearing(offDist); this.mobBearingSet = true }
+      // Scale only the approach leg — the melee/ranged hold distance is a floor, so a
+      // pulled-in encounter can never end up with the mob standing on the hero.
+      const mag = Math.max(gapMag, offDist * this.mobRadiusScale)
+      this.mobPlacedDx = this.mobApproachDx * mag
+      this.mobPlacedDy = this.mobApproachDy * mag
 
       const wantedMobSprite = resolveMobSprite(mob.name)
       if (!this.mob) {
@@ -850,8 +1050,14 @@ export class WorldSceneController {
         this.mob = this.scene.spawn(
           sprite, mobPaletteId(mob), this.player.tx + this.mobPlacedDx, this.player.ty + this.mobPlacedDy,
         )
-        // Pin where it waits. From here the store's shrinking gap is spent moving the
-        // PLAYER toward this spot rather than dragging the mob toward the player.
+        // Pin where it waits — on walkable ground, so nothing lies in wait mid-lake.
+        // Nudging the anchor keeps the encounter self-consistent: the hero's closing
+        // target is derived FROM the anchor, so the gap is preserved either way.
+        if (this.walkMask && !this.walkableAt(this.mob.tx, this.mob.ty)) {
+          const w = nearestWalkable(this.walkMask, this.mob.tx - PAD, this.mob.ty - PAD)
+          this.mob.tx = PAD + WorldSceneController.wrapMod(w.x)
+          this.mob.ty = PAD + WorldSceneController.wrapMod(w.y)
+        }
         this.mobAnchorX = this.mob.tx
         this.mobAnchorY = this.mob.ty
         this.mobFadeT = MOB_SPAWN_FADE
@@ -900,6 +1106,9 @@ export class WorldSceneController {
       this.mobAnchorX = null
       this.mobAnchorY = null
       this.mobFadeT = 0
+      this.mobBearingSet = false
+      this.mobAggressive = false
+      this.mobPath.pts = []
     }
 
     this.mobWasPresent = this.showMob
@@ -1129,8 +1338,9 @@ export class WorldSceneController {
       const len = Math.hypot(dx, dy)
       if (len > 0) {
         dx /= len; dy /= len
-        this.player.tx = clamp(this.player.tx + dx * MANUAL_SPEED * dt, loB, hiB)
-        this.player.ty = clamp(this.player.ty + dy * MANUAL_SPEED * dt, loB, hiB)
+        const s = this.slide(this.player.tx, this.player.ty, dx * MANUAL_SPEED * dt, dy * MANUAL_SPEED * dt)
+        this.player.tx = clamp(s.x, loB, hiB)
+        this.player.ty = clamp(s.y, loB, hiB)
         moving = true; mvx = dx; mvy = dy; playerDriving = true
       }
     } else if (this.tapMoveActive && !this.playerLunge.active && !this.mobEngaged) {
@@ -1144,14 +1354,17 @@ export class WorldSceneController {
         this.tapMoveActive = false
         if (!this.townMode) this.syncOffset()
       } else {
-        const ux = dx / d, uy = dy / d
-        this.player.tx = clamp(this.player.tx + ux * MANUAL_SPEED * dt, loB, hiB)
-        this.player.ty = clamp(this.player.ty + uy * MANUAL_SPEED * dt, loB, hiB)
-        moving = true; mvx = ux; mvy = uy; playerDriving = true
+        // Route around obstacles rather than grinding the near shore of a lake.
+        const a = this.followPath(this.player, this.playerPath, this.tapTx, this.tapTy, MANUAL_SPEED, dt)
+        this.player.tx = clamp(this.player.tx, loB, hiB)
+        this.player.ty = clamp(this.player.ty, loB, hiB)
+        if (!a.moving) { this.tapStuckT += dt; if (this.tapStuckT > 1.2) this.tapMoveActive = false }
+        else this.tapStuckT = 0
+        moving = a.moving; mvx = a.mvx; mvy = a.mvy; playerDriving = true
         if (!this.townMode) this.syncOffset()
       }
     } else if (
-      !this.townMode && !this.playerLunge.active && !this.mobEngaged &&
+      !this.townMode && !this.playerLunge.active && !this.mobEngaged && !this.mobAggressive &&
       this.mob && this.showMob && this.mobAnchorX !== null && this.mobAnchorY !== null
     ) {
       // Closing on an encounter: the hero walks out to the waiting enemy. The store
@@ -1162,18 +1375,12 @@ export class WorldSceneController {
       const gap = Math.hypot(this.mobPlacedDx, this.mobPlacedDy)
       const tgtX = this.mobAnchorX - this.mobApproachDx * gap
       const tgtY = this.mobAnchorY - this.mobApproachDy * gap
-      const dx = tgtX - this.player.tx
-      const dy = tgtY - this.player.ty
-      const d = Math.hypot(dx, dy)
-      if (d > 0.02) {
-        // Step toward the derived spot, capped so a big store correction (zone change,
-        // a resumed boss) walks rather than teleports.
-        const step = Math.min(d, MANUAL_SPEED * dt)
-        const ux = dx / d, uy = dy / d
-        this.player.tx = clamp(this.player.tx + ux * step, loB, hiB)
-        this.player.ty = clamp(this.player.ty + uy * step, loB, hiB)
-        moving = true; mvx = ux; mvy = uy
-      }
+      // Routed, so a lake between hero and quarry is walked around instead of pinning
+      // the hero on the near bank while the encounter timer expires anyway.
+      const a = this.followPath(this.player, this.playerPath, tgtX, tgtY, MANUAL_SPEED, dt)
+      this.player.tx = clamp(this.player.tx, loB, hiB)
+      this.player.ty = clamp(this.player.ty, loB, hiB)
+      moving = a.moving; mvx = a.mvx; mvy = a.mvy
       // Absorb the walk into the auto-follow offset so disengaging doesn't slingshot
       // the player back to the store's playerMapPos.
       this.syncOffset()
@@ -1197,7 +1404,7 @@ export class WorldSceneController {
       if (this.jumpT >= 1) { this.jumpT = 0; this.jumpActive = false; this.player.z = 0 }
       else this.player.z = Math.sin(this.jumpT * Math.PI) * JUMP_HEIGHT
     } else {
-      this.player.z = 0
+      this.player.z = this.walkBobZ(this.playerBob, moving && !this.playerDead, dt)
     }
 
     // ── Player animation + facing ──
@@ -1230,13 +1437,18 @@ export class WorldSceneController {
     // While closing, the mob HOLDS its anchor (the player is the one walking, above).
     // Once engaged it goes back to being glued at a fixed gap from the player, so it
     // stays put through lunges and any manual repositioning mid-fight.
+    let mobMoved = false, mobMvx = 0, mobMvy = 0
     if (this.mob) {
       if (!this.mobLunge.active) {
         // Where the mob WANTS to be. While the hero is auto-driven and closing, that's
         // the anchor it's holding. But if the player took the wheel, the hero isn't
         // covering the ground any more — so the mob has to close the gap itself.
+        // Exactly one body covers the ground. A territorial mob holds its anchor and the
+        // hero walks in (below); an aggressive one charges and the hero stands to receive
+        // it. Manual steering always forces the mob to close, since the hero plainly
+        // isn't.
         const holding =
-          !this.mobEngaged && !playerDriving &&
+          !this.mobEngaged && !playerDriving && !this.mobAggressive &&
           this.mobAnchorX !== null && this.mobAnchorY !== null
         const mtx = holding ? this.mobAnchorX! : this.player.tx + this.mobPlacedDx
         const mty = holding ? this.mobAnchorY! : this.player.ty + this.mobPlacedDy
@@ -1249,16 +1461,24 @@ export class WorldSceneController {
         const mdx = mtx - this.mob.tx
         const mdy = mty - this.mob.ty
         const md = Math.hypot(mdx, mdy)
+        mobMoved = false
         if (md > 0.001) {
           const k = this.mobEngaged ? MOB_ENGAGE_K : MOB_CLOSE_K
           const step = Math.min(md, Math.max(md * (1 - Math.exp(-k * dt)), MOB_MIN_CLOSE * dt))
-          this.mob.tx += (mdx / md) * step
-          this.mob.ty += (mdy / md) * step
+          // Routed and collided, like everything else that walks. This used to assign
+          // tx/ty outright with no ground check at all — which is why a mob would sail
+          // straight across a lake the instant the store declared the fight joined.
+          const r = this.followPath(this.mob, this.mobPath, mtx, mty, step / Math.max(dt, 1e-4), dt)
+          if (r.moving && md > 0.35) { mobMoved = true; mobMvx = r.mvx; mobMvy = r.mvy }
         }
         // When the MOB is the one moving, the anchor rides along, so handing control back
         // (player stops steering) resumes the hold from where it actually stands.
         if (!holding) { this.mobAnchorX = this.mob.tx; this.mobAnchorY = this.mob.ty }
       }
+      // Same footfall cue on the mob, so a CHARGING enemy visibly strides at you while a
+      // territorial one stands its ground — the distinction the temperament split exists
+      // to make, and which is invisible without it.
+      if (!this.mobLunge.active) this.mob.z = this.walkBobZ(this.mobBob, mobMoved, dt)
       // Spawn fade — a mob materialises 10–15 tiles out, comfortably inside the visible
       // radius at this zoom, so without it an enemy simply blinks into existence.
       if (this.mobFadeT > 0) {
@@ -1268,7 +1488,15 @@ export class WorldSceneController {
       const mAnim = this.mob.animator.anim
       const mobInCombat = mAnim === 'attack' || mAnim === 'hit'
       if (this.mob.animator.finished && this.mobLunge.t >= 1) this.mob.animator.set('idle')
-      this.faceToward(this.mob, this.player.tx, this.player.ty)
+      // Face where it's GOING while it walks a route (which may be around an obstacle,
+      // i.e. not at the player at all); face the player once engaged or standing. Facing
+      // the player unconditionally is what made a mob pinned against terrain spin on the
+      // spot — sub-tile jitter flipped its facing every frame.
+      if (mobMoved && !this.mobEngaged) {
+        this.faceToward(this.mob, this.mob.tx + mobMvx, this.mob.ty + mobMvy)
+      } else {
+        this.faceToward(this.mob, this.player.tx, this.player.ty)
+      }
       // 'idle' for both engaged and approaching — the 'walk' tag is the flinchy jitter
       // (see the player movement note); idle holds the good gait for these sprites.
       if (!mobInCombat) this.mob.animator.set('idle')
@@ -1575,7 +1803,9 @@ export class WorldSceneController {
     const s = this.currentZone
     let h = 0
     for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
-    return Math.abs(h)
+    // Fold in the run's world seed so the roaming crowd is arranged differently per
+    // character too — otherwise every playthrough meets the same heroes in the same spots.
+    return Math.abs(h ^ Math.imul(this.worldSeed, 0x9E3779B9))
   }
 
   private retireAmbient(): void {
@@ -1591,8 +1821,15 @@ export class WorldSceneController {
     const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
     const ang = dirRnd * Math.PI * 2
     const dist = AMBIENT_GROUP_SPREAD * (0.5 + 0.5 * distRnd)
-    return { gx: WorldSceneController.wrapMod(pgx + Math.cos(ang) * dist),
-             gy: WorldSceneController.wrapMod(pgy + Math.sin(ang) * dist) }
+    let gx = WorldSceneController.wrapMod(pgx + Math.cos(ang) * dist)
+    let gy = WorldSceneController.wrapMod(pgy + Math.sin(ang) * dist)
+    // Anchor on land — a group seeded mid-lake would have to wade out in full view.
+    if (this.walkMask && !this.walkableAt(gx + PAD, gy + PAD)) {
+      const w = nearestWalkable(this.walkMask, gx, gy)
+      gx = WorldSceneController.wrapMod(w.x)
+      gy = WorldSceneController.wrapMod(w.y)
+    }
+    return { gx, gy }
   }
 
   private spawnAmbient(groupCount = AMBIENT_GROUPS_WORLD): void {
@@ -1811,6 +2048,13 @@ export class WorldSceneController {
       const dist = R + 2 + Math.random() * 5                  // just beyond the edge
       grp.gx = WorldSceneController.wrapMod(pgx + Math.cos(ang) * dist)
       grp.gy = WorldSceneController.wrapMod(pgy + Math.sin(ang) * dist)
+      // Re-anchor onto walkable ground, else a whole group materialises mid-lake and
+      // then has to shuffle out of it in full view.
+      if (this.walkMask && !this.walkableAt(grp.gx + PAD, grp.gy + PAD)) {
+        const w = nearestWalkable(this.walkMask, grp.gx, grp.gy)
+        grp.gx = WorldSceneController.wrapMod(w.x)
+        grp.gy = WorldSceneController.wrapMod(w.y)
+      }
       for (const a of this.ambient) {
         if (a.grp !== gi) continue
         a.gx = WorldSceneController.wrapMod(grp.gx + (Math.random() * 2 - 1) * 2.2)
@@ -1840,8 +2084,15 @@ export class WorldSceneController {
           a.tgy = WorldSceneController.wrapMod(anchor.gy + (Math.random() * 2 - 1) * AMBIENT_MEMBER_LEASH)
           a.t = 2 + Math.random() * 4
         } else {
-          a.gx = WorldSceneController.wrapMod(a.gx + dx / d * SPEED * dt)
-          a.gy = WorldSceneController.wrapMod(a.gy + dy / d * SPEED * dt)
+          // Ambient positions are game coords; walkableAt takes buffer coords, hence +PAD.
+          // The crowd obeys the same ground rules as the hero — a dozen heroes wading
+          // across a lake undoes the "busy server" illusion faster than anything else.
+          const nx = WorldSceneController.wrapMod(a.gx + dx / d * SPEED * dt)
+          const ny = WorldSceneController.wrapMod(a.gy + dy / d * SPEED * dt)
+          const okX = this.walkableAt(nx + PAD, a.gy + PAD)
+          if (okX) a.gx = nx
+          if (this.walkableAt(a.gx + PAD, ny + PAD)) a.gy = ny
+          else if (!okX) a.t = 0   // boxed in → pick a fresh wander target next tick
           a.e.animator.face(faceFromVec(dx, dy))
         }
         a.t -= dt

@@ -1374,8 +1374,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const toIdx   = ZONE_ORDER.indexOf(toZone)
     const dist    = Math.abs(fromIdx - toIdx)
     const dur     = dist * 8  // 8s per zone step
+    // Clear the mob offset too: the travel tick returns before the approach lerp, so a
+    // leftover engagement distance would sit stale for the whole journey.
     set({ gameMode: 'traveling', travelTarget: toZone, travelProgress: 0, travelDuration: dur,
-          currentMob: null, activeDoTs: [], activeBuffs: [], mobRespawnTimer: 0 })
+          currentMob: null, activeDoTs: [], activeBuffs: [], mobRespawnTimer: 0,
+          mobMapOffset: { dx: 0, dy: 0 } })
     resetCombatAccumulators()
   },
 
