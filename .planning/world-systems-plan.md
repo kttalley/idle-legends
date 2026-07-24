@@ -197,6 +197,86 @@ decoration into a destination.
 
 ---
 
+---
+
+## Track C — manual targeting & player intent
+
+### The blocker, stated plainly
+
+`currentMob: MobInstance | null` — **the store models exactly one enemy at a time**, and
+`activeDoTs: ActiveDoT[]` is a single global list, not per-target. So "let the player pick
+which enemy to fight" currently has nothing to pick *between*. Manual targeting is not a UI
+feature here; it needs the combat model to hold more than one enemy first.
+
+### Governing principle
+
+Same rule as gathering (Track G): **manual is an override, never a requirement.** Auto-play
+picks a target when the player hasn't; the moment the player picks one, that choice is
+**locked until the target dies or is explicitly cancelled** — auto-retargeting must never
+steal intent mid-fight. An idle player who never touches the screen sees no change.
+
+### Staged
+
+**C1 — Intent lock (small, no model change).** Click an enemy to commit to it: the hero
+paths to it (routing already exists) and engages, and no auto behaviour may override that
+until it dies or the player cancels. Even with a single mob this fixes the "auto gameplay
+overrides what I wanted" complaint, because auto-approach and auto-wander currently do as
+they please. Ships as a `targetIntent` field plus a guard on the auto branches.
+
+**C2 — Multiple concurrent enemies (the real change).** `currentMob` → a keyed collection
+plus `targetMobId`; DoTs become per-target; `mobMapOffset` (currently one offset) becomes
+per-mob position. Auto-target picks the nearest when intent is unset. This is the bulk of
+the work and it destabilises offline progression maths, so it wants its own milestone and
+its own verification pass.
+
+**C3 — Promote the ambient crowd (the payoff).** The living-world crowd already exists as
+positioned, animated, depth-sorted entities that even skirmish with each other (`Ambient`,
+`fightT`) — they are simply not attackable. Promoting a subset into real spawns is the
+natural way to populate C2, and it is far better than bolting a multi-spawn timer onto the
+existing system: the world already *looks* full of enemies, so making those same bodies
+fightable is the shortest path to "hunt what you choose". It also collapses Track L's
+living-world work and the targeting work into one payoff.
+
+**Recommendation:** do C1 now (contained, fixes the intent complaint immediately), then
+treat C2+C3 as a single milestone rather than two — C2 without C3 gives multi-target with
+nothing interesting to target.
+
+---
+
+## Track F — flight paths between zones
+
+**Shape:** replace the current travel animation (the hero walks and the map scrolls past)
+with an aerial flight-path ride, old-WoW flight-master style. Faction-flavoured mounts:
+**gryphons for the Lastlight Concord, wyverns for the Ashmarch** — which is exactly the
+split Track R already established, so the mount reads as faction identity, not decoration.
+
+**Why this is cheap here.** Nearly every piece already exists:
+- `travelProgress` runs 0→1 over `travelDuration` (8s per zone step) and `TravelOverlay`
+  already renders it with a cancel action.
+- The scene already animates entity **altitude** — `player.z` drives the jump arc — so
+  lifting a rider off the ground is not new machinery.
+- The camera already follows the player's feet and the ground is a wrapped torus, so a
+  long scrolling overflight is the existing camera doing its normal job.
+- Two rigs (gryphon, wyvern) × the palette registry covers faction and rarity variants,
+  same content-multiplier trick as everything else.
+
+**Scope:**
+1. Mount rigs + a flap animation; rider composited above the mount (single-layer, matching
+   the existing one-weapon-layer simplification).
+2. Travel mode in the scene controller: takeoff arc → cruise at altitude with the ground
+   scrolling beneath → descent on arrival. Shadow scales with altitude (the scene already
+   draws shadows separately from bodies, so this is a size multiplier).
+3. Flight paths anchored at **town** nodes, which gives Track T's towns a genuine second
+   function and makes a flight master a natural NPC there.
+4. Keep the existing overlay as the skip/cancel affordance — never trap an idle player in
+   an 8-second cutscene they can't leave.
+
+**Risks:** flight is a *presentation* mode over an existing timer — it must not become a
+gate on progression, and `travelDuration` should stay untouched so throughput is unchanged.
+
+**Effort:** ~350–500 lines plus two rigs. Sequence after Track T's vendor (so towns are
+worth flying between) and after the gathering pass.
+
 ## Recommended order across tracks
 
 1. **Track W collision** (mask + collide-and-slide). It's the one that reads as *broken*
