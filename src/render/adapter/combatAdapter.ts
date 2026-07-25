@@ -386,6 +386,8 @@ export class WorldSceneController {
   // fade); these just stand in the world, depth-sorted and clickable, so the player has a
   // visible choice. World-anchored on spawn so they hold their ground as the hero moves.
   private otherMobEnts = new Map<string, { e: Entity; wx: number; wy: number }>()
+  /** Which mob `this.mob` currently represents. Identity, not sprite — see the handoff. */
+  private mobId: string | null = null
   // Cached routes. Straight-line movement plus collide-and-slide wedges against any
   // concave shoreline; these let a mover go AROUND a lake instead of grinding its edge.
   private playerPath: PathState = { pts: [], i: 0, gx: 0, gy: 0, cool: 0 }
@@ -855,6 +857,26 @@ export class WorldSceneController {
     return Math.abs(Math.sin(phase.t)) * WALK_BOB_PX
   }
 
+  /**
+   * Keep the hero inside the baked buffer.
+   *
+   * The open world is a TORUS, so the position wraps; town is a finite hand-authored box,
+   * so it clamps. Mixing the two is a teleport generator: clamping during a long
+   * committed walk pins the hero against the buffer edge, and then auto-follow — which
+   * has always wrapped — moves them a whole map width in one step. Wrapping by exactly
+   * MAP_SIZE lands on visually identical ground (that is what the padded border is for),
+   * so the wrap itself is invisible.
+   */
+  private confinePlayer(loB: number, hiB: number): void {
+    if (this.townMode) {
+      this.player.tx = clamp(this.player.tx, loB, hiB)
+      this.player.ty = clamp(this.player.ty, loB, hiB)
+    } else {
+      this.player.tx = PAD + WorldSceneController.wrapMod(this.player.tx - PAD)
+      this.player.ty = PAD + WorldSceneController.wrapMod(this.player.ty - PAD)
+    }
+  }
+
   /** Buffer-space position of a game-coord point, on the wrapped copy nearest `nearBx`. */
   private toBuffer(gx: number, gy: number, nearBx: number, nearBy: number): { x: number; y: number } {
     return {
@@ -883,6 +905,10 @@ export class WorldSceneController {
     const gy = WorldSceneController.wrapMod(goalBy - PAD)
     const ex = WorldSceneController.wrapMod(e.tx - PAD)
     const ey = WorldSceneController.wrapMod(e.ty - PAD)
+    // Aim at the wrapped copy of the goal nearest the walker. Measuring in raw buffer
+    // space instead sends it the long way round whenever the two straddle the seam.
+    const goal = this.townMode ? { x: goalBx, y: goalBy } : this.toBuffer(gx, gy, e.tx, e.ty)
+    goalBx = goal.x; goalBy = goal.y
 
     // Direct walk whenever the goal is actually in sight.
     if (!this.walkMask || hasLineOfWalk(this.walkMask, ex, ey, gx, gy)) {
@@ -1043,6 +1069,66 @@ export class WorldSceneController {
     // of walking, so the world never scrolled past on the way to the next zone.
     this.mobEngaged = this.showMob && Math.hypot(this.mobOffsetDx, this.mobOffsetDy) < ENGAGE_DIST
 
+    // ── Target handoff ────────────────────────────────────────────────────────
+    // The engaged mob is identified by ID, not by sprite. Without this the scene only
+    // knew "there is a mob": switching targets reused or respawned the entity using the
+    // PREVIOUS target's anchor and bearing (so a body teleported across the field), and
+    // syncOtherMobs then spawned a second body for the mob we had just left.
+    const newTargetId = state.currentMob?.id ?? null
+    if (newTargetId !== this.mobId) {
+      if (this.mob && this.mobId) {
+        const survived = state.mobs.some(m => m.id === this.mobId)
+        if (survived) {
+          // Still alive — hand its body to the bystander pool exactly where it stands.
+          this.otherMobEnts.set(this.mobId, { e: this.mob, wx: this.mob.tx, wy: this.mob.ty })
+        } else {
+          // It died. With a population, `currentMob` is refilled by auto-select on the
+          // same tick, so the old "no mob left" death test never fires any more — the
+          // kill choreography has to hang off the ID change instead, or corpses would
+          // silently become the next enemy.
+          const e = this.mob
+          e.paletteId = this.mobBasePalette
+          e.animator.set('death')
+          e.animator.restart()
+          this.dyingMobs.push({ e, t: 0 })
+          this.slainMob = e            // keep the killing blow's VFX target alive
+          this.spawnBurst(e.tx, e.ty, 'spell/holy')
+          this.punch(2.6, 0.05)
+          const dm = this.worldMid(e)
+          const dc = fxColors('spell/holy')
+          this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 1.7)
+        }
+      }
+      this.mob = null
+      // Per-encounter state belongs to the mob that just left.
+      this.mobAnchorX = null; this.mobAnchorY = null
+      this.mobBearingSet = false
+      this.mobRadiusScale = 1
+      this.mobFadeT = 0
+      this.mobFlashT = 0
+      this.mobLunge.active = false
+      this.mobPath.pts = []
+      this.playerPath.pts = []
+      this.engageSent = false
+      this.mobId = newTargetId
+      // If the new target is already standing in the world as a bystander, adopt that
+      // body and derive the encounter from where it ACTUALLY is. Re-deriving from the
+      // store offset instead is what made a freshly selected enemy jump.
+      const adopted = newTargetId ? this.otherMobEnts.get(newTargetId) : null
+      if (adopted) {
+        this.otherMobEnts.delete(newTargetId!)
+        this.mob = adopted.e
+        this.mobAnchorX = adopted.wx
+        this.mobAnchorY = adopted.wy
+        const ddx = adopted.wx - this.player.tx
+        const ddy = adopted.wy - this.player.ty
+        const dd = Math.hypot(ddx, ddy) || 1
+        this.mobApproachDx = ddx / dd
+        this.mobApproachDy = ddy / dd
+        this.mobBearingSet = true      // the geometry IS the bearing; don't re-roll it
+      }
+    }
+
     if (this.showMob && state.currentMob) {
       const mob = state.currentMob
       this.mobIsRanged = isRangedMob(mob)
@@ -1132,6 +1218,7 @@ export class WorldSceneController {
       this.mobBearingSet = false
       this.mobAggressive = false
       this.mobPath.pts = []
+      this.mobId = null
       // The commitment ends with the target: "until the enemy is killed", not forever.
       this.targetLocked = false
       this.engageSent = false
@@ -1387,8 +1474,12 @@ export class WorldSceneController {
       return
     }
     // A ground order is the player changing their mind — it releases the commitment.
+    // The cached route belonged to the old destination; keeping it makes the hero set off
+    // along the previous path for up to a repath interval before correcting.
     this.targetLocked = false
     this.engageSent = false
+    this.playerPath.pts = []
+    this.playerPath.cool = 0
     const rect = this.canvas.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
     const bufX = (clientX - rect.left) * (this.canvas.width / rect.width) + this.cam.x
@@ -1457,8 +1548,9 @@ export class WorldSceneController {
       if (len > 0) {
         dx /= len; dy /= len
         const s = this.slide(this.player.tx, this.player.ty, dx * MANUAL_SPEED * dt, dy * MANUAL_SPEED * dt)
-        this.player.tx = clamp(s.x, loB, hiB)
-        this.player.ty = clamp(s.y, loB, hiB)
+        this.player.tx = s.x
+        this.player.ty = s.y
+        this.confinePlayer(loB, hiB)
         moving = true; mvx = dx; mvy = dy; playerDriving = true
       }
     } else if (
@@ -1496,8 +1588,7 @@ export class WorldSceneController {
       } else {
         // Route around obstacles rather than grinding the near shore of a lake.
         const a = this.followPath(this.player, this.playerPath, this.tapTx, this.tapTy, MANUAL_SPEED, dt)
-        this.player.tx = clamp(this.player.tx, loB, hiB)
-        this.player.ty = clamp(this.player.ty, loB, hiB)
+        this.confinePlayer(loB, hiB)
         if (!a.moving) { this.tapStuckT += dt; if (this.tapStuckT > 1.2) this.tapMoveActive = false }
         else this.tapStuckT = 0
         moving = a.moving; mvx = a.mvx; mvy = a.mvy; playerDriving = true
@@ -1518,8 +1609,7 @@ export class WorldSceneController {
       // Routed, so a lake between hero and quarry is walked around instead of pinning
       // the hero on the near bank while the encounter timer expires anyway.
       const a = this.followPath(this.player, this.playerPath, tgtX, tgtY, MANUAL_SPEED, dt)
-      this.player.tx = clamp(this.player.tx, loB, hiB)
-      this.player.ty = clamp(this.player.ty, loB, hiB)
+      this.confinePlayer(loB, hiB)
       moving = a.moving; mvx = a.mvx; mvy = a.mvy
       // Absorb the walk into the auto-follow offset so disengaging doesn't slingshot
       // the player back to the store's playerMapPos.
