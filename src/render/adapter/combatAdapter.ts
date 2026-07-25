@@ -222,13 +222,16 @@ const AMBIENT_RECYCLE_DIST = 24    // anchor this far past the player recycles a
 // Encounter-group templates (heroes h, monsters m). Weighted so the world reads as a
 // mix — parties fighting a mob, a lone monster, a 1v1 duel, a hero patrol — instead of
 // one uniform crowd. `fight` groups start their members trading attack anims.
+// Decorative crowd. Monsters appear here only as the OPPONENT in someone else's fight —
+// that reads unmistakably as another hero's business, not as loose prey. The former
+// hero-less "lone monster" and "monster pack" groups are gone: real, selectable enemies
+// now populate the zone (store `mobs`), and a decorative monster standing next to a
+// clickable one is just a lie about what you can attack.
 const AMBIENT_GROUPS: { h: number; m: number; fight: boolean; w: number }[] = [
-  { h: 2, m: 1, fight: true,  w: 3 },  // party vs monster
-  { h: 1, m: 1, fight: true,  w: 3 },  // 1v1 duel
-  { h: 2, m: 0, fight: false, w: 2 },  // hero patrol (2)
-  { h: 1, m: 0, fight: false, w: 2 },  // lone hero
-  { h: 0, m: 1, fight: false, w: 3 },  // lone/peripheral monster
-  { h: 0, m: 2, fight: false, w: 1 },  // monster pack
+  { h: 2, m: 1, fight: true,  w: 4 },  // party vs monster
+  { h: 1, m: 1, fight: true,  w: 4 },  // 1v1 duel
+  { h: 2, m: 0, fight: false, w: 3 },  // hero patrol (2)
+  { h: 1, m: 0, fight: false, w: 3 },  // lone hero
 ]
 // Group counts by context — the open world is moderate; town/capital is a busy hub.
 const AMBIENT_GROUPS_WORLD = 5
@@ -376,6 +379,13 @@ export class WorldSceneController {
   /** Fired once when the hero reaches a committed target; the host maps it to the store's
    *  engageTarget(). The adapter stays read-only — it never touches the store itself. */
   onEngageTarget: (() => void) | null = null
+  /** Fired when the player clicks a DIFFERENT enemy; host maps it to setTarget(id). */
+  onSelectTarget: ((mobId: string) => void) | null = null
+  // Entities for the enemies the player is NOT currently fighting. The engaged one keeps
+  // its own dedicated machinery (`this.mob`: approach anchor, bearing, routing, death
+  // fade); these just stand in the world, depth-sorted and clickable, so the player has a
+  // visible choice. World-anchored on spawn so they hold their ground as the hero moves.
+  private otherMobEnts = new Map<string, { e: Entity; wx: number; wy: number }>()
   // Cached routes. Straight-line movement plus collide-and-slide wedges against any
   // concave shoreline; these let a mover go AROUND a lake instead of grinding its edge.
   private playerPath: PathState = { pts: [], i: 0, gx: 0, gy: 0, cool: 0 }
@@ -959,6 +969,10 @@ export class WorldSceneController {
       // new zone's map isn't ready yet, so stale entities never linger).
       this.retirePropEntities()
       this.retireAmbient()
+      // Enemies belong to the zone they stood in — their world anchors are meaningless
+      // once the ground is rebaked.
+      for (const rec of this.otherMobEnts.values()) rec.e.active = false
+      this.otherMobEnts.clear()
       const zm = state.zoneMaps[state.currentZone]
       if (zm) {
         const palId = biomePaletteId(state.currentZone)
@@ -1123,8 +1137,54 @@ export class WorldSceneController {
       this.engageSent = false
     }
 
+    this.syncOtherMobs(state)
+
     this.mobWasPresent = this.showMob
     this.playerDead = !state.isAlive
+  }
+
+  /**
+   * Give every un-targeted enemy a body in the world, so "pick who you fight" is a thing
+   * the player can see rather than an abstraction. They are pinned to the spot they
+   * spawned on and left to idle — approach, routing and combat choreography belong to the
+   * engaged target alone.
+   */
+  private syncOtherMobs(state: GameState): void {
+    const targetId = state.currentMob?.id
+    const alive = new Set<string>()
+    if (state.gameMode === 'combat' && state.isAlive && !this.townMode) {
+      for (const m of state.mobs) {
+        if (m.id === targetId) continue
+        alive.add(m.id)
+        let rec = this.otherMobEnts.get(m.id)
+        if (!rec || !rec.e.active) {
+          const spriteId = resolveMobSprite(m.name)
+          const sprite = this.spriteCache[spriteId] ??
+            (isMonsterSprite(spriteId) ? this.rigs!.mobBeast : this.rigs!.mobHumanoid)
+          // Place on walkable ground near its spawn offset, then keep that world spot.
+          let wx = this.player.tx + m.offset.dx
+          let wy = this.player.ty + m.offset.dy
+          if (this.walkMask && !this.walkableAt(wx, wy)) {
+            const w = nearestWalkable(this.walkMask, wx - PAD, wy - PAD)
+            wx = PAD + WorldSceneController.wrapMod(w.x)
+            wy = PAD + WorldSceneController.wrapMod(w.y)
+          }
+          const e = this.scene.spawn(sprite, mobPaletteId(m), wx, wy)
+          e.animator.set('idle')
+          rec = { e, wx, wy }
+          this.otherMobEnts.set(m.id, rec)
+        }
+        rec.e.tx = rec.wx
+        rec.e.ty = rec.wy
+        rec.e.paletteId = mobPaletteId(m)
+        this.faceToward(rec.e, this.player.tx, this.player.ty)
+      }
+    }
+    for (const [id, rec] of this.otherMobEnts) {
+      if (alive.has(id)) continue
+      rec.e.active = false
+      this.otherMobEnts.delete(id)
+    }
   }
 
   private faceToward(e: Entity, targetX: number, targetY: number): void {
@@ -1307,6 +1367,23 @@ export class WorldSceneController {
       this.tapMoveActive = false
       this.manualMode = false
       this.playerPath.pts = []
+      return
+    }
+    // Another enemy — switch to it AND commit, so one tap both picks the fight and
+    // starts walking to it. Nearest-first so overlapping bodies resolve to the front one.
+    let pick: { id: string; d: number } | null = null
+    for (const [id, rec] of this.otherMobEnts) {
+      if (!rec.e.active || !this.hitTestEntity(rec.e, clientX, clientY)) continue
+      const d = Math.hypot(rec.e.tx - this.player.tx, rec.e.ty - this.player.ty)
+      if (!pick || d < pick.d) pick = { id, d }
+    }
+    if (pick) {
+      this.targetLocked = true
+      this.engageSent = false
+      this.tapMoveActive = false
+      this.manualMode = false
+      this.playerPath.pts = []
+      this.onSelectTarget?.(pick.id)
       return
     }
     // A ground order is the player changing their mind — it releases the commitment.
@@ -1981,6 +2058,8 @@ export class WorldSceneController {
     this.retireAmbient()
     this.retirePropEntities()
     if (this.mob) { this.mob.active = false; this.mob = null }
+    for (const rec of this.otherMobEnts.values()) rec.e.active = false
+    this.otherMobEnts.clear()
     this.manualMode = false
     this.tapMoveActive = false
     this.input = { up: false, down: false, left: false, right: false }

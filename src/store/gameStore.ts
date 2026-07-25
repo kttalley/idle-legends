@@ -111,6 +111,8 @@ function defaultState(): GameState {
     gold: 0,
     skillCooldowns: {},
     currentZone: 'sunhollow_meadows',
+    mobs: [],
+    targetMobId: null,
     currentMob: null,
     persistedBoss: null,
     combatLog: [],
@@ -184,6 +186,9 @@ function rehydrateState(saved: GameState): GameState {
   saved.talentAllocs  = saved.talentAllocs  ?? {}
   saved.talentPoints  = saved.talentPoints  ?? saved.level
   saved.activeDoTs    = []
+  // The zone repopulates on load; saves predating the population have neither field.
+  saved.mobs          = []
+  saved.targetMobId   = null
   saved.activeBuffs   = []
   saved.procState     = defaultProcState()
   saved.castState     = null
@@ -296,6 +301,7 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
   const circuitMult = 1 + (state.zoneCircuit ?? 0) * 0.5
 
   return {
+    id: `mob_${++mobInstanceSeq}`,
     templateId: template.id,
     name: isBoss ? `[BOSS] ${template.name}` : isElite ? `★ ${template.name}` : template.name,
     currentHp: Math.round(template.hp * hpMult * circuitMult),
@@ -309,9 +315,38 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
     attackSpeedSeconds: template.attackSpeedSeconds * dmgMult,
     isElite,
     isBoss,
+    offset: spawnOffset(),
+    dots: [],
   }
 }
 
+/** A fresh spawn ring position: far enough to walk to, near enough to find. */
+function spawnOffset(): { dx: number; dy: number } {
+  const ang = Math.random() * Math.PI * 2
+  const dist = 9 + Math.random() * 7
+  return { dx: Math.cos(ang) * dist, dy: Math.sin(ang) * dist }
+}
+
+/** How many enemies populate a zone at once. The boss fights alone — a lair should not
+ *  be a crowd, and it keeps the climactic encounter reading as one. */
+const MOB_POPULATION = 4
+
+function isBossPresent(mobs: MobInstance[]): boolean {
+  return mobs.some(m => m.isBoss)
+}
+
+/** Nearest mob to the player, used when the player has expressed no preference. */
+function nearestMob(mobs: MobInstance[]): MobInstance | null {
+  let best: MobInstance | null = null
+  let bestD = Infinity
+  for (const m of mobs) {
+    const d = m.offset.dx * m.offset.dx + m.offset.dy * m.offset.dy
+    if (d < bestD) { bestD = d; best = m }
+  }
+  return best
+}
+
+let mobInstanceSeq = 0
 let playerAttackAccum = 0
 let mobAttackAccum    = 0
 let siphonLifeAccum   = 0
@@ -355,6 +390,7 @@ interface GameActions {
   claimQuestReward: (questId: string) => void
   dismissQuestReward: (questId: string) => void
   engageTarget: () => void
+  setTarget: (mobId: string) => void
 }
 
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
@@ -508,7 +544,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           : state.activeQuest
         resetCombatAccumulators()
         set({
-          currentZone: dest, currentMob: null, mobRespawnTimer: 0,
+          currentZone: dest, mobs: [], targetMobId: null, currentMob: null, mobRespawnTimer: 0,
           activeDoTs: [], gameMode: 'combat', travelTarget: null, travelProgress: 0,
           playerMapPos: { x: 32, y: 32 },
           zoneMaps: { ...state.zoneMaps, [dest]: destMap },
@@ -656,9 +692,27 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     const fx = compileTalentEffects(state.playerClass, talentAllocs)
 
+    // ── Resolve the engaged target out of the population ─────────────────────
+    // `mobs` is the source of truth; currentMob/mobMapOffset/activeDoTs are projections
+    // of whichever one is targeted, rebuilt here and written back at the end of the tick.
+    // Everything between those two points is the original single-target combat code,
+    // untouched — only spawning, selection and death know about the collection.
+    let mobs = state.mobs.map(m => ({ ...m, offset: { ...m.offset }, dots: m.dots.map(d => ({ ...d })) }))
+    let targetMobId = state.targetMobId
+    let target = mobs.find(m => m.id === targetMobId) ?? null
+    if (!target) {
+      // No valid choice standing — auto-play picks the nearest. The player's pick always
+      // wins while it lives; this only fills the vacuum.
+      target = nearestMob(mobs)
+      targetMobId = target?.id ?? null
+    }
+    currentMob = target
+    activeDoTs = target ? target.dots : []
+    const mobOffset = target ? target.offset : { dx: 0, dy: 0 }
+
     // Is the mob close enough to fight? (arrives from map edge over ~5s)
-    const rawMobDist = Math.sqrt(state.mobMapOffset.dx ** 2 + state.mobMapOffset.dy ** 2)
-    const mobEngaged = rawMobDist < 1.5
+    const rawMobDist = Math.sqrt(mobOffset.dx ** 2 + mobOffset.dy ** 2)
+    const mobEngaged = !!target && rawMobDist < 1.5
 
     // ── Tick down skill cooldowns ───────────────────────────────────────────
     for (const id of Object.keys(skillCooldowns)) {
@@ -709,34 +763,58 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       return
     }
 
-    // ── Mob respawn ─────────────────────────────────────────────────────────
-    if (!currentMob) {
+    // ── Keep the zone populated ─────────────────────────────────────────────
+    // Top the population up on the respawn timer rather than replacing a single slot.
+    // A waiting boss takes the field alone: it resumes with its HP preserved and the
+    // rest of the crowd clears out, so the climactic fight isn't a scrum.
+    // A boss already on the field blocks further spawns; a BANKED boss (persistedBoss,
+    // preserved when it killed the player) must still be allowed to retake the field,
+    // even at full population — gating on it would deadlock the zone with no mob and no
+    // spawn ever again.
+    if (!isBossPresent(mobs) && (persistedBoss || mobs.length < MOB_POPULATION)) {
       mobRespawnTimer = Math.max(0, mobRespawnTimer - deltaSeconds)
       if (mobRespawnTimer <= 0) {
-        // Resume a persisted boss (HP preserved from previous attempt) if available
-        currentMob = persistedBoss ?? spawnMob(currentZone, state)
+        const spawned = persistedBoss ?? spawnMob(currentZone, state)
         persistedBoss = null
-        if (currentMob) {
-          // Set mob approach offset (starts far, lerps to 0 in combat tick)
-          const mobSeed = hashStr(currentMob.templateId)
-          const angle = seededRandLocal(mobSeed, 0) * Math.PI * 2
-          const dist  = 10 + seededRandLocal(mobSeed, 1) * 5
-          set({ mobMapOffset: { dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist } })
-
-          // Apply Winterward absorb at combat start
+        if (spawned) {
+          if (spawned.isBoss) {
+            mobs = [spawned]            // the lair empties for the boss
+            targetMobId = spawned.id
+            // Re-project immediately: currentMob may still point at a regular mob this
+            // tick resolved before the boss cleared the field, and the write-back at the
+            // end would otherwise resurrect it alongside the boss.
+            currentMob = spawned
+            activeDoTs = spawned.dots
+            resetCombatAccumulators()
+          } else {
+            mobs.push(spawned)
+          }
           if (fx.iceBarrierAbsorb > 0 && procState.iceBarrierHp <= 0) {
             procState.iceBarrierHp = fx.iceBarrierAbsorb
           }
           newLogs.push(log(
             'mob_death',
-            `${currentMob.isBoss ? '⚠ BOSS: ' : currentMob.isElite ? '★ Elite: ' : ''}${currentMob.name} appears!`,
-            currentMob.isBoss ? '#ff8000' : currentMob.isElite ? '#a335ee' : '#cccccc'
+            `${spawned.isBoss ? '⚠ BOSS: ' : spawned.isElite ? '★ Elite: ' : ''}${spawned.name} appears!`,
+            spawned.isBoss ? '#ff8000' : spawned.isElite ? '#a335ee' : '#cccccc'
           ))
-          if (currentMob.isBoss) get().triggerThought('boss_spawn', currentMob.name)
-          resetCombatAccumulators()
+          if (spawned.isBoss) get().triggerThought('boss_spawn', spawned.name)
         }
+        mobRespawnTimer = MOB_RESPAWN_SECONDS
       }
-      set({ currentMob, persistedBoss, mobRespawnTimer, procState, skillCooldowns, castState,
+      // Re-resolve: the population may have just gained the mob we should be fighting.
+      if (!currentMob) {
+        target = mobs.find(m => m.id === targetMobId) ?? nearestMob(mobs)
+        targetMobId = target?.id ?? null
+        currentMob = target
+        activeDoTs = target ? target.dots : []
+        if (target) resetCombatAccumulators()
+      }
+    }
+
+    // Nothing to fight at all — hold here until the population refills.
+    if (!currentMob) {
+      set({ mobs, targetMobId, currentMob: null, mobMapOffset: { dx: 0, dy: 0 },
+            persistedBoss, mobRespawnTimer, procState, skillCooldowns, castState,
             combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX) })
       return
     }
@@ -959,6 +1037,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         procState.winterChillStacks = 0
         procState.mobFrozen = false
         procState.iceBarrierHp = 0
+        // Drop the corpse out of the population and release the player's commitment —
+        // "until the enemy is killed" ends here. The next tick auto-picks the nearest
+        // survivor unless the player names another.
+        mobs = mobs.filter(m => m.id !== currentMob!.id)
+        targetMobId = null
         currentMob = null
         activeDoTs  = []
         mobRespawnTimer = MOB_RESPAWN_SECONDS
@@ -1027,6 +1110,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             if (currentMob?.isBoss) {
               persistedBoss = currentMob
             }
+            // Dying scatters the encounter: the crowd disperses and the player starts the
+            // next one fresh, rather than respawning already surrounded.
+            mobs = []
+            targetMobId = null
             currentMob = null
             activeDoTs = []
             newLogs.push(log('player_death', `You have been slain! Respawning in ${RESPAWN_TIMER_SECONDS}s...`, '#ff4444'))
@@ -1060,20 +1147,34 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const driftY = Math.sin(driftAngle * 0.7) * 0.3 * deltaSeconds
     const playerMapPos = driftMapPos(state, driftX, driftY)
 
-    // ── Mob map approach lerp ─────────────────────────────────────────────────
-    let { mobMapOffset } = state
-    if (currentMob && (mobMapOffset.dx !== 0 || mobMapOffset.dy !== 0)) {
-      const speed = 2.5  // tiles per second
-      const { dx, dy } = mobMapOffset
-      const dist = Math.sqrt(dx * dx + dy * dy)
-      if (dist < 0.3) {
-        mobMapOffset = { dx: 0, dy: 0 }
-      } else {
-        const factor = Math.max(0, 1 - speed * deltaSeconds / dist)
-        mobMapOffset = { dx: dx * factor, dy: dy * factor }
+    // ── Mob movement ──────────────────────────────────────────────────────────
+    // Only the ENGAGED target closes; the rest hold station so the player has a standing
+    // choice of enemies rather than a queue that walks into them one at a time.
+    let mobMapOffset = { dx: 0, dy: 0 }
+    if (currentMob) {
+      const off = currentMob.offset
+      const dist = Math.sqrt(off.dx * off.dx + off.dy * off.dy)
+      if (dist !== 0) {
+        const speed = 2.5  // tiles per second
+        if (dist < 0.3) currentMob.offset = { dx: 0, dy: 0 }
+        else {
+          const factor = Math.max(0, 1 - speed * deltaSeconds / dist)
+          currentMob.offset = { dx: off.dx * factor, dy: off.dy * factor }
+        }
       }
-    } else if (!currentMob) {
-      mobMapOffset = { dx: 0, dy: 0 }
+      mobMapOffset = currentMob.offset
+    }
+
+    // ── Write the projections back into the population ────────────────────────
+    // currentMob/activeDoTs were handed to the (single-target) combat code above; fold
+    // the results back so `mobs` stays authoritative.
+    if (currentMob) {
+      currentMob.dots = activeDoTs
+      const i = mobs.findIndex(m => m.id === currentMob!.id)
+      // Update in place only. Absence means it was deliberately removed (slain, or a boss
+      // cleared the field), so re-adding it here would undo that.
+      if (i >= 0) { mobs[i] = currentMob; targetMobId = currentMob.id }
+      else { currentMob = null; targetMobId = null }
     }
 
     // Prune old floating numbers
@@ -1081,6 +1182,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const allFns = [...floatingNumbers.filter(f => now - f.createdAt < 1400), ...newFns]
 
     set({
+      mobs, targetMobId,
       stats, gold, xp, level, currentMob, persistedBoss, isAlive, respawnTimer, mobRespawnTimer,
       inventory, equipment, activeDoTs, activeBuffs, procState, castState, skillCooldowns,
       floatingNumbers: allFns,
@@ -1157,7 +1259,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const activeQuest = !s.bossesDefeated.includes(zoneId)
       ? makeZoneQuest(zoneId, s.playerFaction)
       : s.activeQuest
-    set({ currentZone: zoneId, currentMob: null, mobRespawnTimer: 0, activeDoTs: [], activeQuest })
+    set({ currentZone: zoneId, mobs: [], targetMobId: null, currentMob: null, mobRespawnTimer: 0, activeDoTs: [], activeQuest })
   },
 
   // Dev-only override: jump to ANY zone (unlock + generate its map if needed), so the
@@ -1169,7 +1271,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     resetCombatAccumulators()
     set({
       unlockedZones, zoneMaps, currentZone: zoneId,
-      gameMode: 'combat', currentTown: null, currentMob: null,
+      gameMode: 'combat', currentTown: null, mobs: [], targetMobId: null, currentMob: null,
       mobRespawnTimer: 0, activeDoTs: [], travelTarget: null, travelProgress: 0,
       playerMapPos: { x: 32, y: 32 },
     })
@@ -1303,8 +1405,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // Minimal kill handling — full path is in tick; just clear mob
       newLogs.push(log('mob_death', `${currentMob.name} dies to Umbral Bolt!`, '#ff4444'))
       const loot = rollLoot(currentMob, s.level, stats.goldFindBonus)
+      const slainId = currentMob.id
       set(prev => ({
-        currentMob: null, mobRespawnTimer: 3,
+        // Only the slain mob leaves — the rest of the crowd is still standing there.
+        mobs: prev.mobs.filter(m => m.id !== slainId),
+        targetMobId: null, currentMob: null, mobRespawnTimer: 3,
         activeDoTs: [], procState,
         gold: prev.gold + loot.gold,
         skillCooldowns,
@@ -1316,6 +1421,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     }
 
     set(prev => ({
+      // Fold the damage back into the population, else the next tick re-projects from
+      // `mobs` and the hit is silently undone.
+      mobs: currentMob ? prev.mobs.map(m => (m.id === currentMob!.id ? currentMob! : m)) : prev.mobs,
       currentMob,
       procState,
       skillCooldowns,
@@ -1378,7 +1486,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Clear the mob offset too: the travel tick returns before the approach lerp, so a
     // leftover engagement distance would sit stale for the whole journey.
     set({ gameMode: 'traveling', travelTarget: toZone, travelProgress: 0, travelDuration: dur,
-          currentMob: null, activeDoTs: [], activeBuffs: [], mobRespawnTimer: 0,
+          mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], activeBuffs: [], mobRespawnTimer: 0,
           mobMapOffset: { dx: 0, dy: 0 } })
     resetCombatAccumulators()
   },
@@ -1400,13 +1508,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const s = get()
     if (s.gameMode === 'traveling') return
     if (mode === 'gathering') {
-      set({ gameMode: 'gathering', gatheringTimer: 5, currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
+      set({ gameMode: 'gathering', gatheringTimer: 5, mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
       resetCombatAccumulators()
     } else if (mode === 'combat') {
       set({ gameMode: 'combat', mobRespawnTimer: 0 })
       resetCombatAccumulators()
     } else if (mode === 'crafting') {
-      set({ gameMode: 'crafting', currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
+      set({ gameMode: 'crafting', mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
       resetCombatAccumulators()
     }
   },
@@ -1428,7 +1536,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     set({
       gameMode: 'in_town',
       currentTown: townId,
-      currentMob: null,
+      mobs: [], targetMobId: null, currentMob: null,
       mobRespawnTimer: 0,
       activeDoTs: [],
     })
@@ -1476,11 +1584,34 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
    * the tick derives engagement from it, so combat starts through the normal path with
    * no special-cased "manual attack" branch.
    */
+  /**
+   * The player named the enemy they want. Their pick holds until it dies (the tick only
+   * auto-selects when `targetMobId` resolves to nothing), so auto-play can never pull
+   * them off a chosen fight. Switching mid-fight is allowed and simply re-projects:
+   * DoTs live on each mob, so the old target keeps its bleeds rather than donating them.
+   */
+  setTarget: (mobId) => {
+    const s = get()
+    const mob = s.mobs.find(m => m.id === mobId)
+    if (!mob || !s.isAlive || s.gameMode !== 'combat') return
+    if (s.targetMobId === mobId) return
+    set({ targetMobId: mobId, currentMob: mob, activeDoTs: mob.dots, mobMapOffset: mob.offset })
+    resetCombatAccumulators()
+  },
+
   engageTarget: () => {
     const s = get()
-    if (!s.currentMob || s.gameMode !== 'combat' || !s.isAlive) return
-    if (s.mobMapOffset.dx === 0 && s.mobMapOffset.dy === 0) return
-    set({ mobMapOffset: { dx: 0, dy: 0 } })
+    const mob = s.currentMob
+    if (!mob || s.gameMode !== 'combat' || !s.isAlive) return
+    if (mob.offset.dx === 0 && mob.offset.dy === 0) return
+    // Collapse the target's own approach, and fold it back into the population so the
+    // next tick's projection sees the closed gap.
+    const closed = { ...mob, offset: { dx: 0, dy: 0 } }
+    set({
+      mobs: s.mobs.map(m => (m.id === closed.id ? closed : m)),
+      currentMob: closed,
+      mobMapOffset: closed.offset,
+    })
   },
 
   dismissQuestReward: (questId) => {

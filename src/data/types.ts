@@ -227,6 +227,8 @@ export interface MobTemplate {
 }
 
 export interface MobInstance {
+  /** Unique per spawned instance — several mobs of the same template coexist. */
+  id: string
   templateId: MobId
   name: string
   currentHp: number
@@ -240,6 +242,12 @@ export interface MobInstance {
   attackSpeedSeconds: number
   isElite: boolean
   isBoss: boolean
+  /** This mob's own position relative to the player, in map tiles. The engaged target
+   *  closes to 0; the rest hold station until chosen. */
+  offset: { dx: number; dy: number }
+  /** Damage-over-time effects live ON the mob, so switching targets can't leak another
+   *  mob's bleeds onto the new one. `activeDoTs` mirrors the current target's list. */
+  dots: ActiveDoT[]
 }
 
 // ── Zones ─────────────────────────────────────────────────────────────────────
@@ -331,6 +339,17 @@ export interface GameState {
   gold: number
   skillCooldowns: Record<string, number>  // abilityId → seconds remaining
   currentZone: ZoneId
+  /** Every enemy present in the zone. The player picks which one to fight. */
+  mobs: MobInstance[]
+  /** The mob being fought. Null lets auto-play choose (nearest); set by the player to
+   *  commit to a specific enemy. */
+  targetMobId: string | null
+  /**
+   * PROJECTION of the targeted mob, not a second source of truth — the tick derives it
+   * from `mobs`/`targetMobId` each pass and writes changes back. It exists so the whole
+   * combat resolution, HUD and renderer keep reading a single engaged enemy exactly as
+   * before; only spawning, selection and death had to learn about the collection.
+   */
   currentMob: MobInstance | null
   persistedBoss: MobInstance | null
   combatLog: CombatLogEntry[]
