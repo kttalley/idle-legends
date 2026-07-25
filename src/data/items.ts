@@ -89,8 +89,13 @@ export function generateItem(
   slot: Slot,
   level: number,
   rarityBias: number = 0,
+  /** Skip the random roll and mint at this exact rarity. Crafting uses it so an item's
+   *  quality is *earned* by the material that went in, not gambled for. */
+  forceRarity?: Rarity,
+  /** Override the generated name (crafted goods carry their recipe's name). */
+  nameOverride?: string,
 ): Item {
-  const rarity = rollRarity(rarityBias)
+  const rarity = forceRarity ?? rollRarity(rarityBias)
   const mult   = RARITY_STAT_MULTIPLIER[rarity]
   const count  = RARITY_STAT_COUNT[rarity]
   const statPool = shuffle(SLOT_STATS[slot]).slice(0, count)
@@ -115,7 +120,7 @@ export function generateItem(
 
   const prefix = PREFIX[rarity][randInt(0, PREFIX[rarity].length - 1)]
   const base   = SLOT_NAMES[slot][randInt(0, SLOT_NAMES[slot].length - 1)]
-  const name   = `${prefix} ${base}`
+  const name   = nameOverride ?? `${prefix} ${base}`
 
   const vendorValue = Math.round(
     level * ({ common: 1, uncommon: 3, rare: 8, epic: 25, legendary: 100 }[rarity]) *

@@ -5,9 +5,18 @@ import type {
   Stats, ActiveDoT, ActiveBuff, CombatProcState,
   GameMode, RecipeId, MaterialId, WeatherType, TownId,
 } from '../data/types'
+import type { GatherSession, CraftResult, QualityTier } from '../data/types'
 import { TOWNS } from '../data/towns'
 import { RACE_DEFINITIONS } from '../data/races'
-import { ZONE_MATERIALS, RECIPES } from '../data/professions'
+import { ZONE_MATERIALS, RECIPES, isGearRecipe } from '../data/professions'
+import type { Recipe, CraftStatEffect } from '../data/professions'
+import {
+  GATHER_SECONDS, STRIKES_PER_HARVEST, STRIKE_LOCKOUT_SECONDS, MAX_PURITY_PER_UNIT,
+  QUALITY_LABEL, QUALITY_MULT, QUALITY_PALETTE, QUALITY_RARITY,
+  bandHalfWidthFor, consumeInputs, nodeRichness, qualityAtLeast, recipeQuality, rollSweep,
+  resolveStrike,
+} from '../engine/crafting'
+import { generateItem } from '../data/items'
 import { ZONE_ORDER } from '../data/zones'
 import { generateZoneMap } from '../engine/mapGen'
 import { ZONES } from '../data/zones'
@@ -149,10 +158,14 @@ function defaultState(): GameState {
     travelTarget: null,
     travelProgress: 0,
     travelDuration: 0,
-    gatheringTimer: 5,
+    gatheringTimer: GATHER_SECONDS,
     materials: {},
+    materialPurity: {},
+    gatherSession: null,
     activeRecipe: null,
     craftingTimer: 0,
+    craftQuality: null,
+    lastCraft: null,
     // World Map
     zoneMaps: {},
     // Per-run world entropy. 0 = the original fixed world (what every save before this
@@ -198,10 +211,16 @@ function rehydrateState(saved: GameState): GameState {
   saved.travelTarget  = null
   saved.travelProgress = 0
   saved.travelDuration = 0
-  saved.gatheringTimer = 5
+  saved.gatheringTimer = GATHER_SECONDS
   saved.materials     = saved.materials ?? {}
+  // Quality fields (added after this save was written). A pre-quality hero's stock simply
+  // reads as Coarse — purity 0 — which is exactly what it was worth before quality existed.
+  saved.materialPurity = saved.materialPurity ?? {}
+  saved.gatherSession  = null   // transient: the live strike meter
   saved.activeRecipe  = null
   saved.craftingTimer = 0
+  saved.craftQuality  = null
+  saved.lastCraft     = null
   // Generate maps for all unlocked zones
   saved.worldSeed = saved.worldSeed ?? 0   // pre-worldSeed saves keep their original world
   const zoneMaps: GameState['zoneMaps'] = {}
@@ -226,6 +245,13 @@ function rehydrateState(saved: GameState): GameState {
 function toSaveBlob(s: GameState): GameState {
   const blob = { ...s } as GameState;
   (blob.stats as any) = { ...s.stats, _savedHp: s.stats.currentHp }
+  // Stamp the write time so elapsed-offline is computable on load (calculateOfflineTime).
+  // It was only ever set at character creation, which made every offline window equal the
+  // hero's whole lifetime. Nothing consumes it yet — see the plan's out-of-scope note —
+  // but it must be honest before anything can.
+  blob.lastTickTimestamp = Date.now()
+  // The strike meter is a live UI object, never a saved one.
+  blob.gatherSession = null
   return blob
 }
 
@@ -275,6 +301,227 @@ function driftMapPos(state: GameState, dx: number, dy: number): { x: number; y: 
   const from = nearestWalkable(mask, state.playerMapPos.x, state.playerMapPos.y)
   const moved = moveWithCollision(mask, from.x, from.y, dx, dy)
   return { x: wrap(moved.x), y: wrap(moved.y) }
+}
+
+// ── Gathering: node lookup + the optional strike meter ────────────────────────
+const NODE_RANGE = 2.5
+
+/** The resource node the hero is standing at, if any. */
+function nodeAt(state: GameState, pos: { x: number; y: number }) {
+  const zMap = state.zoneMaps[state.currentZone]
+  if (!zMap) return null
+  for (const node of zMap.nodes) {
+    if (node.type !== 'ore' && node.type !== 'herb') continue
+    const ndx = Math.min(Math.abs(node.x - pos.x), 64 - Math.abs(node.x - pos.x))
+    const ndy = Math.min(Math.abs(node.y - pos.y), 64 - Math.abs(node.y - pos.y))
+    if (Math.sqrt(ndx * ndx + ndy * ndy) < NODE_RANGE) return node
+  }
+  return null
+}
+
+/**
+ * Open a session on a node. Everything here is presentation for a player who chooses to
+ * engage — the harvest timer, yield and material are decided entirely elsewhere, so a
+ * session that receives no input is indistinguishable from the pre-change behaviour.
+ */
+function openGatherSession(state: GameState, node: { x: number; y: number } | null): GatherSession {
+  const key = node ? `${node.x},${node.y}` : 'manual'
+  const richness = node ? nodeRichness(mapSeed(state), node.x, node.y) : 0
+  const seed = hashStr(`${state.currentZone}:${key}`) ^ mapSeed(state)
+  const sweep = rollSweep(seed, 0)
+  return {
+    nodeKey: key,
+    richness,
+    cursor: sweep.dir === 1 ? 0 : 1,
+    dir: sweep.dir,
+    speed: sweep.speed,
+    bandCenter: sweep.bandCenter,
+    bandHalfWidth: bandHalfWidthFor(richness),
+    streak: 0,
+    strikesLeft: STRIKES_PER_HARVEST,
+    lockout: 0,
+    purity: 0,
+    lastResult: null,
+    lastResultAt: 0,
+    harvests: 0,
+  }
+}
+
+/** Advance the sweep. Pure motion — never touches the harvest timer. */
+function advanceGatherSession(s: GatherSession, dt: number): GatherSession {
+  let cursor = s.cursor + s.dir * s.speed * dt
+  let dir = s.dir
+  // Reflect at the ends so the track reads as a swing, not a wrap-around jump.
+  while (cursor < 0 || cursor > 1) {
+    if (cursor < 0) { cursor = -cursor; dir = 1 }
+    else { cursor = 2 - cursor; dir = -1 }
+  }
+  return { ...s, cursor, dir, lockout: Math.max(0, s.lockout - dt) }
+}
+
+/** Re-roll the sweep for the next harvest, carrying the streak. */
+function rearmGatherSession(state: GameState, s: GatherSession): GatherSession {
+  const harvests = s.harvests + 1
+  const seed = hashStr(`${state.currentZone}:${s.nodeKey}`) ^ mapSeed(state)
+  const sweep = rollSweep(seed, harvests)
+  return {
+    ...s,
+    harvests,
+    speed: sweep.speed,
+    bandCenter: sweep.bandCenter,
+    strikesLeft: STRIKES_PER_HARVEST,
+    purity: 0,
+  }
+}
+
+// ── Crafting helpers ──────────────────────────────────────────────────────────
+function hasInputs(mats: Record<MaterialId, number>, r: Recipe): boolean {
+  for (const inp of r.inputs) if ((mats[inp.materialId] ?? 0) < inp.qty) return false
+  return true
+}
+
+/**
+ * What auto-craft picks when the hero walks away from a node.
+ *
+ * Legacy behaviour was "first satisfiable recipe in RECIPES order". That branch is
+ * preserved verbatim for consumables; the only addition is a preceding gear branch gated
+ * on Superior-or-better material quality — a tier that is arithmetically unreachable at
+ * purity 0. An idle player therefore takes the identical legacy path.
+ */
+function pickAutoRecipe(
+  playerClass: ClassType,
+  mats: Record<MaterialId, number>,
+  purity: Record<MaterialId, number>,
+): Recipe | null {
+  for (const r of RECIPES) {
+    if (r.classFor !== playerClass || !isGearRecipe(r) || !hasInputs(mats, r)) continue
+    if (qualityAtLeast(recipeQuality(mats, purity, r.inputs), 'superior')) return r
+  }
+  for (const r of RECIPES) {
+    if (r.classFor !== playerClass || isGearRecipe(r)) continue
+    if (hasInputs(mats, r)) return r
+  }
+  return null
+}
+
+function effectSummary(eff: CraftStatEffect, mult: number): string {
+  const dur = Math.round((eff.durationSeconds ?? 0) * mult)
+  if (eff.type === 'instant_heal') return `Heals ${Math.round(eff.value * mult)} HP`
+  if (eff.type === 'buff_armor')   return `+${Math.round(eff.value * mult)} Armor for ${dur}s`
+  if (eff.type === 'buff_crit')    return `+${(eff.value * mult * 100).toFixed(1)}% Crit for ${dur}s`
+  return `+${(eff.value * mult * 100).toFixed(1)}% Damage for ${dur}s`
+}
+
+function itemSummary(item: Item): string {
+  const parts: string[] = []
+  for (const [k, v] of Object.entries(item.statBonuses)) {
+    if (v == null) continue
+    const label = k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase())
+    parts.push(k === 'critChance' ? `+${(v * 100).toFixed(1)}% Crit` : `+${v} ${label}`)
+  }
+  return parts.join(' · ') || 'No bonuses'
+}
+
+/**
+ * Resolve a finished craft: consume inputs (count AND purity, proportionally), mint the
+ * output at the earned quality, and post the reveal card. Returns a state patch.
+ */
+function resolveCraft(state: GameState, recipe: Recipe, quality: QualityTier): Partial<GameState> {
+  const spent = consumeInputs(state.materials, state.materialPurity, recipe.inputs)
+  const mult = QUALITY_MULT[quality]
+  const rarity = QUALITY_RARITY[quality]
+  const qLabel = QUALITY_LABEL[quality]
+  const newLogs: CombatLogEntry[] = []
+
+  const base: Partial<GameState> = {
+    activeRecipe: null,
+    craftingTimer: 0,
+    craftQuality: null,
+    materials: spent.materials,
+    materialPurity: spent.purity,
+    gameMode: 'combat',   // return to wandering after craft completes
+  }
+
+  if (isGearRecipe(recipe) && recipe.gear) {
+    // Crafted gear is minted at the rarity the MATERIALS earned — no gamble. Rarity is a
+    // palette accent (heroWardrobe), so equipping this visibly recolours the hero.
+    const item = generateItem(
+      recipe.gear.slot, state.level, 0, rarity, `${qLabel} ${recipe.output.name}`,
+    )
+    const inventory = [...state.inventory]
+    const free = inventory.indexOf(null)
+    if (free >= 0) {
+      inventory[free] = item
+      newLogs.push(log('loot_item', `${recipe.output.icon} Crafted ${item.name}!`, rarityColor(rarity)))
+    } else {
+      newLogs.push(log('proc', `${recipe.output.icon} ${item.name} crafted — bags full!`, '#ff8844'))
+    }
+    return {
+      ...base,
+      inventory,
+      lastCraft: {
+        id: `craft_${Date.now()}`,
+        recipeId: recipe.id,
+        name: item.name,
+        icon: recipe.output.icon,
+        quality, rarity, kind: 'gear',
+        detail: itemSummary(item),
+        paletteId: QUALITY_PALETTE[quality],
+        item,
+        createdAt: Date.now(),
+      },
+      combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX),
+    }
+  }
+
+  // Consumable: quality scales BOTH the magnitude and the duration. coarse === 1.0, so an
+  // idle player's numbers are unchanged.
+  const eff = recipe.output.effect
+  let stats = state.stats
+  let activeBuffs = state.activeBuffs
+  let detail = ''
+  if (eff) {
+    detail = effectSummary(eff, mult)
+    if (eff.type === 'instant_heal') {
+      const healed = Math.round(eff.value * mult)
+      stats = { ...state.stats, currentHp: Math.min(state.stats.maxHp, state.stats.currentHp + healed) }
+      newLogs.push(log('proc', `${recipe.output.icon} ${qLabel} ${recipe.output.name} — healed ${healed} HP`, '#44ff88'))
+    } else {
+      const buffMap: Record<string, string> = {
+        buff_dmg_pct: 'next_hit_multiplier',
+        buff_armor:   'armor_buff',
+        buff_crit:    'crit_buff_pct',
+      }
+      activeBuffs = [...state.activeBuffs, {
+        id:                `craft_buff_${Date.now()}`,
+        label:             `${qLabel} ${recipe.output.name}`,
+        icon:              recipe.output.icon,
+        color:             rarityColor(rarity),
+        type:              buffMap[eff.type] as any,
+        value:             eff.value * mult,
+        durationRemaining: (eff.durationSeconds ?? 30) * mult,
+      }]
+      newLogs.push(log('proc', `${recipe.output.icon} Crafted ${qLabel} ${recipe.output.name}!`, rarityColor(rarity)))
+    }
+  }
+
+  return {
+    ...base,
+    stats,
+    activeBuffs,
+    lastCraft: {
+      id: `craft_${Date.now()}`,
+      recipeId: recipe.id,
+      name: `${qLabel} ${recipe.output.name}`,
+      icon: recipe.output.icon,
+      quality, rarity, kind: 'consumable',
+      detail,
+      paletteId: QUALITY_PALETTE[quality],
+      item: null,
+      createdAt: Date.now(),
+    },
+    combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX),
+  }
 }
 
 function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
@@ -384,6 +631,8 @@ interface GameActions {
   cycleZoom: () => void
   setMode: (mode: GameMode) => void
   startCrafting: (recipeId: RecipeId) => void
+  strikeNode: () => void
+  dismissCraftResult: () => void
   enterTown: (townId: TownId) => void
   leaveTown: () => void
   restInTown: () => void
@@ -557,53 +806,75 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     }
 
     // ── Gathering tick ───────────────────────────────────────────────────────
+    // The harvest half of this branch is byte-for-byte the old behaviour: same
+    // GATHER_SECONDS cadence, same +1 unit, same material. The additions are (a) a purity
+    // ledger fed only by the optional strike meter, and (b) a loop instead of a single
+    // decrement, so a large catch-up delta yields the harvests it earned instead of
+    // silently dropping the surplus.
     if (state.gameMode === 'gathering') {
-      const newTimer = state.gatheringTimer - deltaSeconds
       // World drift — slow wander so map scrolls past player
       const gatherDriftAngle = state.totalPlayTime * 0.08
       const gatherDriftX = Math.cos(gatherDriftAngle) * 0.5 * deltaSeconds
       const gatherDriftY = Math.sin(gatherDriftAngle * 0.7) * 0.3 * deltaSeconds
       const gatherMapPos = driftMapPos(state, gatherDriftX, gatherDriftY)
-      if (newTimer <= 0) {
-        const matId: MaterialId = ZONE_MATERIALS[state.currentZone][state.playerClass]
-        const newCount = (state.materials[matId] ?? 0) + 1
-        const updatedMats = { ...state.materials, [matId]: newCount }
 
-        // Check if still near a resource node → keep gathering; else return to combat
-        const zMap = state.zoneMaps[state.currentZone]
-        const stillNearNode = zMap?.nodes.some(node => {
-          if (node.type !== 'ore' && node.type !== 'herb') return false
-          const ndx = Math.min(Math.abs(node.x - gatherMapPos.x), 64 - Math.abs(node.x - gatherMapPos.x))
-          const ndy = Math.min(Math.abs(node.y - gatherMapPos.y), 64 - Math.abs(node.y - gatherMapPos.y))
-          return Math.sqrt(ndx * ndx + ndy * ndy) < 2.5
-        }) ?? false
+      const matId: MaterialId = ZONE_MATERIALS[state.currentZone][state.playerClass]
+      const standingNode = nodeAt(state, gatherMapPos)
 
-        let nextGatherMode: GameMode = stillNearNode ? 'gathering' : 'combat'
-        let autoRecipe: RecipeId | null = null
+      // Keep a session open on whatever node we're at. Opening one is free — it only
+      // matters if the player strikes.
+      let session = state.gatherSession
+      const wantKey = standingNode ? `${standingNode.x},${standingNode.y}` : 'manual'
+      if (!session || session.nodeKey !== wantKey) session = openGatherSession(state, standingNode)
+      session = advanceGatherSession(session, deltaSeconds)
 
-        // Auto-craft when leaving a resource node if materials are sufficient
-        if (!stillNearNode) {
-          for (const recipe of RECIPES) {
-            if (recipe.classFor !== state.playerClass) continue
-            let canCraft = true
-            for (const inp of recipe.inputs) {
-              if ((updatedMats[inp.materialId] ?? 0) < inp.qty) { canCraft = false; break }
-            }
-            if (canCraft) { autoRecipe = recipe.id; nextGatherMode = 'crafting'; break }
-          }
-        }
+      let timer = state.gatheringTimer - deltaSeconds
+      let mats = state.materials
+      let purity = state.materialPurity
+      let harvested = 0
 
-        set({
-          gatheringTimer: 5,
-          materials: updatedMats,
-          playerMapPos: gatherMapPos,
-          gameMode: nextGatherMode,
-          activeRecipe: autoRecipe,
-          craftingTimer: autoRecipe ? (RECIPES.find(r => r.id === autoRecipe)?.craftTime ?? 0) : 0,
-        })
-      } else {
-        set({ gatheringTimer: newTimer, playerMapPos: gatherMapPos })
+      // Bounded so a pathological delta can't spin. 64 harvests = >5 minutes of catch-up.
+      while (timer <= 0 && harvested < 64) {
+        mats = { ...mats, [matId]: (mats[matId] ?? 0) + 1 }
+        // Purity banked by this unit — 0 unless the player worked the meter.
+        const earned = Math.min(session.purity, MAX_PURITY_PER_UNIT)
+        if (earned > 0) purity = { ...purity, [matId]: (purity[matId] ?? 0) + earned }
+        session = rearmGatherSession(state, session)
+        timer += GATHER_SECONDS
+        harvested++
       }
+
+      if (harvested === 0) {
+        set({ gatheringTimer: timer, playerMapPos: gatherMapPos, gatherSession: session })
+        return
+      }
+
+      const stillNearNode = !!standingNode
+      let nextGatherMode: GameMode = stillNearNode ? 'gathering' : 'combat'
+      let autoRecipe: RecipeId | null = null
+      let autoQuality: QualityTier | null = null
+
+      // Auto-craft when leaving a resource node if materials are sufficient
+      if (!stillNearNode) {
+        const picked = pickAutoRecipe(state.playerClass, mats, purity)
+        if (picked) {
+          autoRecipe = picked.id
+          autoQuality = recipeQuality(mats, purity, picked.inputs)
+          nextGatherMode = 'crafting'
+        }
+      }
+
+      set({
+        gatheringTimer: timer,
+        materials: mats,
+        materialPurity: purity,
+        gatherSession: stillNearNode ? session : null,
+        playerMapPos: gatherMapPos,
+        gameMode: nextGatherMode,
+        activeRecipe: autoRecipe,
+        craftQuality: autoQuality,
+        craftingTimer: autoRecipe ? (RECIPES.find(r => r.id === autoRecipe)?.craftTime ?? 0) : 0,
+      })
       return
     }
 
@@ -613,46 +884,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if (newTimer <= 0) {
         const recipe = RECIPES.find(r => r.id === state.activeRecipe)
         if (recipe) {
-          // Consume inputs
-          const newMaterials = { ...state.materials }
-          for (const inp of recipe.inputs) {
-            newMaterials[inp.materialId] = Math.max(0, (newMaterials[inp.materialId] ?? 0) - inp.qty)
-          }
-          // Apply effect
-          const eff = recipe.output.effect
-          const newLogs: CombatLogEntry[] = []
-          let hpDelta = 0
-          let newBuffs = [...state.activeBuffs]
-          if (eff.type === 'instant_heal') {
-            hpDelta = eff.value
-            newLogs.push(log('proc', `${recipe.output.icon} ${recipe.output.name} — healed ${eff.value} HP`, '#44ff88'))
-          } else {
-            const buffMap: Record<string, string> = {
-              buff_dmg_pct: 'next_hit_multiplier',
-              buff_armor:   'armor_buff',
-              buff_crit:    'crit_buff_pct',
-            }
-            newBuffs.push({
-              id:                `craft_buff_${Date.now()}`,
-              label:             recipe.output.name,
-              icon:              recipe.output.icon,
-              color:             '#ffd700',
-              type:              buffMap[eff.type] as any,
-              value:             eff.value,
-              durationRemaining: eff.durationSeconds ?? 30,
-            })
-            newLogs.push(log('proc', `${recipe.output.icon} Crafted ${recipe.output.name}!`, '#ffd700'))
-          }
-          const stats = { ...state.stats,
-            currentHp: Math.min(state.stats.maxHp, state.stats.currentHp + hpDelta) }
-          set({
-            activeRecipe: null, craftingTimer: 0,
-            materials: newMaterials, activeBuffs: newBuffs, stats,
-            gameMode: 'combat',   // return to wandering after craft completes
-            combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX),
-          })
+          // The tier was locked when the craft started; re-derive only as a fallback for a
+          // craft that predates the field (an in-flight save from an older build).
+          const quality = state.craftQuality
+            ?? recipeQuality(state.materials, state.materialPurity, recipe.inputs)
+          set(resolveCraft(state, recipe, quality))
         } else {
-          set({ activeRecipe: null, craftingTimer: 0 })
+          set({ activeRecipe: null, craftingTimer: 0, craftQuality: null })
         }
       } else {
         set({ craftingTimer: newTimer })
@@ -1126,19 +1364,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     // ── Auto-gather: if drifting near a resource node with no active combat ──
     let nextGameMode: GameMode = state.gameMode as GameMode
+    let enteredNode: ReturnType<typeof nodeAt> = null
     if (nextGameMode === 'combat' && !currentMob) {
-      const zMap = state.zoneMaps[currentZone]
-      if (zMap) {
-        for (const node of zMap.nodes) {
-          if (node.type !== 'ore' && node.type !== 'herb') continue
-          const ndx = Math.min(Math.abs(node.x - state.playerMapPos.x), 64 - Math.abs(node.x - state.playerMapPos.x))
-          const ndy = Math.min(Math.abs(node.y - state.playerMapPos.y), 64 - Math.abs(node.y - state.playerMapPos.y))
-          if (Math.sqrt(ndx * ndx + ndy * ndy) < 2.5) {
-            nextGameMode = 'gathering'
-            break
-          }
-        }
-      }
+      enteredNode = nodeAt(state, state.playerMapPos)
+      if (enteredNode) nextGameMode = 'gathering'
     }
 
     // ── World drift (combat) — slow wander so map scrolls past player ────────
@@ -1192,7 +1421,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       mobMapOffset,
       playerMapPos,
       gameMode: nextGameMode,
-      gatheringTimer: nextGameMode === 'gathering' ? 5 : state.gatheringTimer,
+      gatheringTimer: nextGameMode === 'gathering' ? GATHER_SECONDS : state.gatheringTimer,
+      gatherSession: nextGameMode === 'gathering'
+        ? openGatherSession(state, enteredNode)
+        : state.gatherSession,
       activeQuest: state.activeQuest,
       completedQuestIds: state.completedQuestIds,
     })
@@ -1508,13 +1740,17 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const s = get()
     if (s.gameMode === 'traveling') return
     if (mode === 'gathering') {
-      set({ gameMode: 'gathering', gatheringTimer: 5, mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
+      set({
+        gameMode: 'gathering', gatheringTimer: GATHER_SECONDS,
+        gatherSession: openGatherSession(s, nodeAt(s, s.playerMapPos)),
+        mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], mobRespawnTimer: 0,
+      })
       resetCombatAccumulators()
     } else if (mode === 'combat') {
-      set({ gameMode: 'combat', mobRespawnTimer: 0 })
+      set({ gameMode: 'combat', gatherSession: null, mobRespawnTimer: 0 })
       resetCombatAccumulators()
     } else if (mode === 'crafting') {
-      set({ gameMode: 'crafting', mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
+      set({ gameMode: 'crafting', gatherSession: null, mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
       resetCombatAccumulators()
     }
   },
@@ -1523,11 +1759,49 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const s = get()
     const recipe = RECIPES.find(r => r.id === recipeId)
     if (!recipe || recipe.classFor !== s.playerClass) return
-    // Check materials
-    for (const inp of recipe.inputs) {
-      if ((s.materials[inp.materialId] ?? 0) < inp.qty) return
-    }
-    set({ activeRecipe: recipeId, craftingTimer: recipe.craftTime })
+    if (!hasInputs(s.materials, recipe)) return
+    // Lock the tier in now so the panel can promise what it will produce; the inputs are
+    // still consumed on completion, exactly as before.
+    set({
+      activeRecipe: recipeId,
+      craftingTimer: recipe.craftTime,
+      craftQuality: recipeQuality(s.materials, s.materialPurity, recipe.inputs),
+    })
+  },
+
+  /**
+   * The player struck the vein. This is the ONLY interactive surface of the whole system,
+   * and it can do exactly one thing: bank purity. It never touches `gatheringTimer`,
+   * `materials`, or the mode — so no amount of striking (or not striking) changes how
+   * fast or how much the hero gathers, only how good it is.
+   */
+  strikeNode: () => {
+    const s = get()
+    if (s.gameMode !== 'gathering') return
+    const session = s.gatherSession
+    if (!session) return
+    // Swallowed during miss-recovery: mashing costs the tap's opportunity rather than
+    // being merely unrewarded, which is what makes timing strictly better than spam.
+    if (session.lockout > 0 || session.strikesLeft <= 0) return
+
+    const out = resolveStrike(
+      session.cursor, session.bandCenter, session.bandHalfWidth, session.streak, session.richness,
+    )
+    set({
+      gatherSession: {
+        ...session,
+        streak: out.streak,
+        strikesLeft: session.strikesLeft - 1,
+        lockout: out.result === 'miss' ? STRIKE_LOCKOUT_SECONDS : 0,
+        purity: Math.min(MAX_PURITY_PER_UNIT, session.purity + out.purity),
+        lastResult: out.result,
+        lastResultAt: Date.now(),
+      },
+    })
+  },
+
+  dismissCraftResult: () => {
+    if (get().lastCraft) set({ lastCraft: null })
   },
 
   // ── Towns ─────────────────────────────────────────────────────────────────────

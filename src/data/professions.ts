@@ -1,4 +1,4 @@
-import type { ClassType, ZoneId, MaterialId, RecipeId } from './types'
+import type { ClassType, ZoneId, MaterialId, RecipeId, Slot } from './types'
 
 // ── Materials ─────────────────────────────────────────────────────────────────
 export interface Material {
@@ -118,13 +118,28 @@ export interface CraftStatEffect {
 }
 
 // ── Recipes ───────────────────────────────────────────────────────────────────
+/**
+ * Two shapes share one interface so the twenty existing consumable entries below did not
+ * have to be rewritten:
+ *   - `kind` absent / 'consumable' → `output.effect` applies a buff or heal (as before).
+ *   - `kind: 'gear'`               → `gear` describes an EQUIPPABLE item, minted at the
+ *                                    rarity the material quality earned. This is the loop
+ *                                    that lets a good gathering session change what the
+ *                                    hero visibly wears (rarity → palette accent).
+ */
 export interface Recipe {
   id: RecipeId
   name: string
   classFor: ClassType
+  kind?: 'consumable' | 'gear'
   inputs: { materialId: MaterialId; qty: number }[]
-  output: { name: string; icon: string; effect: CraftStatEffect }
+  output: { name: string; icon: string; effect?: CraftStatEffect }
+  gear?: { slot: Slot }
   craftTime: number   // seconds
+}
+
+export function isGearRecipe(r: Recipe): boolean {
+  return r.kind === 'gear' && !!r.gear
 }
 
 export const RECIPES: Recipe[] = [
@@ -294,6 +309,93 @@ export const RECIPES: Recipe[] = [
     inputs: [{ materialId: 'thick_leather', qty: 3 }, { materialId: 'heavy_leather', qty: 3 }],
     output: { name: "Deathstalker's Hood", icon: '🎭', effect: { type: 'buff_dmg_pct', value: 0.18, durationSeconds: 60 } },
     craftTime: 20,
+  },
+
+  // ── Gear recipes ─────────────────────────────────────────────────────────────
+  // Appended AFTER every consumable on purpose: auto-craft's legacy "first satisfiable
+  // recipe" scan is order-sensitive, and appending here leaves that scan's result
+  // unchanged for a player who never engages. Gear is reached by its own branch, which
+  // requires Superior-or-better material quality (unreachable at purity 0).
+  // They cost high-tier materials, so they are a goal rather than a default.
+  {
+    id: 'mithril_battleplate',
+    name: 'Mithril Battleplate',
+    classFor: 'warrior',
+    kind: 'gear',
+    inputs: [{ materialId: 'mithril_ore', qty: 6 }],
+    output: { name: 'Mithril Battleplate', icon: '🛡️' },
+    gear: { slot: 'chest' },
+    craftTime: 24,
+  },
+  {
+    id: 'thorium_greathelm',
+    name: 'Thorium Greathelm',
+    classFor: 'warrior',
+    kind: 'gear',
+    inputs: [{ materialId: 'thorium_ore', qty: 5 }, { materialId: 'mithril_ore', qty: 3 }],
+    output: { name: 'Thorium Greathelm', icon: '⛑️' },
+    gear: { slot: 'helm' },
+    craftTime: 28,
+  },
+  {
+    id: 'mageweave_mantle',
+    name: 'Mageweave Mantle',
+    classFor: 'mage',
+    kind: 'gear',
+    inputs: [{ materialId: 'mageweave_cloth', qty: 6 }],
+    output: { name: 'Mageweave Mantle', icon: '🧥' },
+    gear: { slot: 'chest' },
+    craftTime: 24,
+  },
+  {
+    id: 'runecloth_circlet',
+    name: 'Runecloth Circlet',
+    classFor: 'mage',
+    kind: 'gear',
+    inputs: [{ materialId: 'runecloth', qty: 5 }, { materialId: 'silk_cloth', qty: 3 }],
+    output: { name: 'Runecloth Circlet', icon: '👑' },
+    gear: { slot: 'helm' },
+    craftTime: 28,
+  },
+  {
+    id: 'kingsblood_signet',
+    name: 'Kingsblood Signet',
+    classFor: 'warlock',
+    kind: 'gear',
+    inputs: [{ materialId: 'kingsblood', qty: 6 }],
+    output: { name: 'Kingsblood Signet', icon: '💍' },
+    gear: { slot: 'trinket' },
+    craftTime: 24,
+  },
+  {
+    id: 'dreamfoil_shroud',
+    name: 'Dreamfoil Shroud',
+    classFor: 'warlock',
+    kind: 'gear',
+    inputs: [{ materialId: 'dreamfoil', qty: 5 }, { materialId: 'kingsblood', qty: 3 }],
+    output: { name: 'Dreamfoil Shroud', icon: '🌘' },
+    gear: { slot: 'chest' },
+    craftTime: 28,
+  },
+  {
+    id: 'shadowhide_vest',
+    name: 'Shadowhide Vest',
+    classFor: 'rogue',
+    kind: 'gear',
+    inputs: [{ materialId: 'heavy_leather', qty: 6 }],
+    output: { name: 'Shadowhide Vest', icon: '🦺' },
+    gear: { slot: 'chest' },
+    craftTime: 24,
+  },
+  {
+    id: 'stalker_treads',
+    name: 'Stalker Treads',
+    classFor: 'rogue',
+    kind: 'gear',
+    inputs: [{ materialId: 'thick_leather', qty: 5 }, { materialId: 'heavy_leather', qty: 3 }],
+    output: { name: 'Stalker Treads', icon: '👢' },
+    gear: { slot: 'boots' },
+    craftTime: 28,
   },
 ]
 
