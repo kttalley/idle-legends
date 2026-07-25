@@ -29,6 +29,9 @@ export type Slot = 'weapon' | 'helm' | 'chest' | 'legs' | 'boots' | 'trinket'
 export type GameMode = 'combat' | 'traveling' | 'gathering' | 'crafting' | 'in_town'
 export type MaterialId = string
 export type RecipeId = string
+/** Material / crafted-good quality. Maps 1:1 onto `Rarity` (and therefore onto a
+ *  `rarity/*` + `gear/t*` palette id) — see engine/crafting.ts. */
+export type QualityTier = 'coarse' | 'fine' | 'superior' | 'masterwork' | 'flawless'
 export type TownId = string
 export type TownServiceType = 'rest' | 'vendor' | 'repair'
 
@@ -375,8 +378,19 @@ export interface GameState {
   travelDuration: number      // total seconds
   gatheringTimer: number      // seconds until next harvest
   materials: Record<MaterialId, number>
+  /** Banked quality points, parallel to `materials`. purity/count = the stock's average
+   *  quality. Absent on pre-quality saves → `{}` → everything reads as Coarse, i.e. the
+   *  exact pre-change behaviour. */
+  materialPurity: Record<MaterialId, number>
+  /** Live strike meter for the node being worked. Transient — nulled on rehydrate. */
+  gatherSession: GatherSession | null
   activeRecipe: RecipeId | null
   craftingTimer: number
+  /** Quality locked in when the active craft started (materials are consumed on
+   *  completion, but the tier is decided up front so the UI can show it). */
+  craftQuality: QualityTier | null
+  /** The most recent craft's reveal card. Transient; auto-expires in the UI. */
+  lastCraft: CraftResult | null
   // ── World Map ───────────────────────────────────────────────────────────────
   zoneMaps: Partial<Record<ZoneId, ZoneMap>>
   /** Per-character world entropy; seeds terrain generation. 0 = the legacy fixed world. */
@@ -392,6 +406,51 @@ export interface GameState {
   // ── Zone Quests ─────────────────────────────────────────────────────────────
   activeQuest: ZoneQuest | null
   completedQuestIds: string[]
+}
+
+// ── Gathering: the optional strike-meter overlay ──────────────────────────────
+export type StrikeResult = 'perfect' | 'good' | 'miss'
+
+/**
+ * One node-working session. Purely additive over the untouched 5s harvest timer: if the
+ * player never strikes, every field stays at its opening value and the harvest lands
+ * exactly as it always did, at Coarse quality.
+ */
+export interface GatherSession {
+  /** `${x},${y}` of the node being worked, or 'manual' when the mode was forced. */
+  nodeKey: string
+  richness: 0 | 1 | 2
+  cursor: number          // 0–1 position along the track
+  dir: 1 | -1
+  speed: number           // track-lengths per second
+  bandCenter: number      // 0–1
+  bandHalfWidth: number   // 0–1
+  streak: number
+  strikesLeft: number
+  lockout: number         // seconds of miss-recovery remaining
+  purity: number          // banked so far for the harvest in progress
+  lastResult: StrikeResult | null
+  lastResultAt: number    // ms timestamp, drives the UI flash
+  /** Harvests completed in this session — used to vary the sweep so it never becomes a
+   *  metronome the player can tap blind. */
+  harvests: number
+}
+
+export interface CraftResult {
+  id: string
+  recipeId: RecipeId
+  name: string
+  icon: string
+  quality: QualityTier
+  rarity: Rarity
+  kind: 'consumable' | 'gear'
+  /** One-line summary of what it rolled ("+18% DMG for 60s", "+24 Stamina, +11 Armor"). */
+  detail: string
+  /** Palette id the quality resolves to — the same id the renderer would dress it in. */
+  paletteId: string
+  /** Set for gear crafts so the reveal can show the real item. */
+  item: Item | null
+  createdAt: number
 }
 
 export interface ZoneQuest {

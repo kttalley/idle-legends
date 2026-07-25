@@ -2,6 +2,8 @@ import React from 'react'
 import { MinimapRadar } from './MinimapRadar'
 import { UnitFrames } from './UnitFrames'
 import { ActionBar } from './ActionBar'
+import { StrikeMeter } from '../StrikeMeter'
+import { CraftResultToast } from '../CraftResultToast'
 
 // WoW/Diablo-style HUD shell: a click-through DOM overlay painted on top of the
 // dimetric world canvas (text/tooltips stay crisp; the canvas renders only the world).
@@ -16,6 +18,15 @@ export function HudOverlay() {
       </div>
       <div style={{ position: 'absolute', top: 8, right: 8 }}>
         <MinimapRadar />
+      </div>
+      {/* Craft reveal — under the minimap, out of the world's centre. Self-dismissing. */}
+      <div style={{ position: 'absolute', top: 8, right: 8, marginTop: 150, display: 'flex', justifyContent: 'flex-end' }}>
+        <CraftResultToast />
+      </div>
+      {/* Strike meter — floats just above the action bar, on the world rather than in a
+          separate screen. Renders nothing outside gathering mode. */}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 58, display: 'flex', justifyContent: 'center' }}>
+        <StrikeMeter />
       </div>
       {/* Bottom dock, flush to the canvas edge and full-bleed: the XP strip is the last
           row of the viewport (WoW-style) rather than a floating panel with world showing
