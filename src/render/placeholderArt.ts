@@ -7,7 +7,10 @@ import type { AnimationSet, IndexedSprite, TileAnimCycle } from './types'
 
 // ── Tiny pixel-painting helpers over a frame-major Uint8Array ────────────────
 
-class Painter {
+/** A 16×16 icon authored as ASCII rows in the docs/art-direction.md character key. */
+export type IconSketch = readonly string[]
+
+export class Painter {
   readonly data: Uint8Array
   constructor(
     readonly frameW: number,

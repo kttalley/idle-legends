@@ -3,6 +3,7 @@ import { useGameStore } from '../../store/gameStore'
 import { ZONE_MATERIALS, MATERIALS, CLASS_PROFESSIONS } from '../../data/professions'
 import { ZONES } from '../../data/zones'
 import { HealthBar } from '../ui/HealthBar'
+import { SpriteIcon } from '../ui/SpriteIcon'
 
 export function GatheringPanel() {
   const {
@@ -30,10 +31,10 @@ export function GatheringPanel() {
           {prof.gatheringName}
         </div>
         <div style={{ fontSize: '0.7rem', color: '#d4b896', marginTop: 1 }}>
-          {prof.gatherIcon} {prof.gatherVerb} — {zoneName}
+          <SpriteIcon emoji={prof.gatherIcon} size={16} /> {prof.gatherVerb} — {zoneName}
         </div>
         <div style={{ fontSize: '0.6rem', color: '#aaa', marginTop: 1 }}>
-          Harvesting {mat.icon} {mat.name}
+          Harvesting <SpriteIcon emoji={mat.icon} size={14} title={mat.name} /> {mat.name}
         </div>
       </div>
 
@@ -73,7 +74,7 @@ export function GatheringPanel() {
                   display: 'flex', alignItems: 'center', gap: 3,
                 }}
               >
-                <span>{m.icon}</span>
+                <SpriteIcon emoji={m.icon} size={14} title={m.name} />
                 <span>{m.name}</span>
                 <span style={{ color: qty > 0 ? '#ffd700' : '#444', fontWeight: 600 }}>×{qty}</span>
               </div>

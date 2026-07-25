@@ -1,11 +1,19 @@
 import React, { useState } from 'react'
 import { useGameStore, rarityColor } from '../../store/gameStore'
 import { TooltipWrapper, ItemTooltipContent } from '../ui/Tooltip'
+import { SpriteIcon } from '../ui/SpriteIcon'
 import type { Item, Slot } from '../../data/types'
 
 const SLOTS: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket']
 const SLOT_LABEL: Record<Slot, string> = {
   weapon: 'WPN', helm: 'HLM', chest: 'CHT', legs: 'LGS', boots: 'BTS', trinket: 'TRK',
+}
+
+/** Item level → gear-icon material tier. Rarity paints the accents (13–15); the tier
+ *  paints the material itself (5–12), so a level-40 common still looks better-made than a
+ *  level-2 one. Same four-tier ladder the unit rigs use. */
+function gearTier(level: number): string {
+  return level < 10 ? 't1' : level < 20 ? 't2' : level < 30 ? 't3' : 't4'
 }
 
 function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
@@ -28,10 +36,6 @@ function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '0.55rem',
-          color,
-          fontWeight: 700,
-          textAlign: 'center',
           padding: 1,
           background: `${color}15`,
           userSelect: 'none',
@@ -39,7 +43,7 @@ function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
         onClick={onClick}
         title={item.name}
       >
-        {item.slot.slice(0, 3).toUpperCase()}
+        <SpriteIcon gear={item.slot} rarity={item.rarity} tier={gearTier(item.level)} size={28} />
       </div>
     </TooltipWrapper>
   )
@@ -103,8 +107,17 @@ export function InventoryPanel() {
                   ) : (
                     <div
                       className="inventory-slot"
-                      style={{ width: 36, height: 36, border: '1px dashed #3a2c10' }}
-                    />
+                      style={{
+                        width: 36, height: 36, border: '1px dashed #3a2c10',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        opacity: 0.28,
+                      }}
+                      title={`Empty ${slot} slot`}
+                    >
+                      {/* Dimmed slot art on the neutral item palette — an empty socket that
+                          still tells you what belongs in it. */}
+                      <SpriteIcon gear={slot} paletteId="item/base" size={24} />
+                    </div>
                   )}
                   {item && (
                     <div style={{ fontSize: '0.65rem', color, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

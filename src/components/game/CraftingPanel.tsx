@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { RECIPES, MATERIALS, CLASS_PROFESSIONS } from '../../data/professions'
 import { HealthBar } from '../ui/HealthBar'
+import { SpriteIcon } from '../ui/SpriteIcon'
 import type { RecipeId } from '../../data/types'
 
 export function CraftingPanel() {
@@ -44,7 +45,7 @@ export function CraftingPanel() {
           {prof.craftingName}
         </div>
         <div style={{ fontSize: '0.65rem', color: '#d4b896', marginTop: 1 }}>
-          {prof.craftIcon} Choose a recipe
+          <SpriteIcon emoji={prof.craftIcon} size={16} /> Choose a recipe
         </div>
       </div>
 
@@ -71,7 +72,7 @@ export function CraftingPanel() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.65rem', color: isActive ? '#ffd700' : '#d4b896' }}>
-                  {r.output.icon} {r.name}
+                  <SpriteIcon emoji={r.output.icon} size={16} title={r.output.name} /> {r.name}
                 </span>
                 <span style={{ fontSize: '0.55rem', color: '#888' }}>{r.craftTime}s</span>
               </div>
@@ -86,7 +87,7 @@ export function CraftingPanel() {
                           key={inp.materialId}
                           style={{ marginRight: 6, color: have >= inp.qty ? '#88aa33' : '#ff4444' }}
                         >
-                          {m.icon} {m.name} {have}/{inp.qty}
+                          <SpriteIcon emoji={m.icon} size={13} title={m.name} /> {m.name} {have}/{inp.qty}
                         </span>
                       )
                     })}

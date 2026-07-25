@@ -78,6 +78,40 @@ for (const [tier, accents] of Object.entries(RARITY_ACCENTS)) {
   }
 }
 
+// ── Item icons: the gear-slot sheet on the unit slot contract ────────────────
+// `render/itemIcons.ts` draws the six equipment slots against 1–4 organic (leather, wood,
+// cord) · 5–8 armour material · 9–12 cloth trim · 13–15 metal, so the SAME six frames cover
+// every item in the game: material tier lives in 5–12, rarity in 13–15. Separate from
+// BASE_UNIT because icons sit on a dark UI panel at 18px and need the brighter, cooler
+// values a body sprite in a lit scene does not.
+const ITEM_BASE = paletteFromHex([
+  '',
+  '#3a2415', '#6b4526', '#9c6a3c', '#c9975a', // 1–4 organic: grip leather, haft, bone, cord
+  '#33404f', '#4e6070', '#748698', '#a9bccc', // 5–8 primary armour material
+  '#2b2b36', '#464655', '#67677a', '#9090a6', // 9–12 secondary: cloth trim, straps, lining
+  '#4a4a52', '#8a8a96', '#c8c8d4',            // 13–15 metal/accent — the rarity channel
+])
+reg('item/base', ITEM_BASE)
+
+// Material tiers, mirroring gear/t1..t4's hue story (leather → bronze → steel → arcane)
+// but held at icon values. t3 IS the base steel, so it overrides nothing.
+const ITEM_TIERS: Record<string, Partial<Record<number, string>>> = {
+  t1: { 5: '#3b2a1c', 6: '#5c4530', 7: '#836248', 8: '#b08a62', 9: '#2b2b36', 10: '#42424e', 11: '#5e5e6c', 12: '#82828f' },
+  t2: { 5: '#2f3a24', 6: '#4a5a34', 7: '#6e8248', 8: '#9cae62', 9: '#33291c', 10: '#54432c', 11: '#786040', 12: '#9c8054' },
+  t3: {},
+  t4: { 5: '#3a2440', 6: '#573a63', 7: '#7c5a8e', 8: '#a888bc', 9: '#2a1f34', 10: '#42324f', 11: '#5f4a70', 12: '#836a94' },
+}
+for (const [tier, mats] of Object.entries(ITEM_TIERS)) {
+  reg(`item/${tier}`, composePalette(ITEM_BASE, mats))
+}
+for (const [rarity, accents] of Object.entries(RARITY_ACCENTS)) {
+  reg(`item/${rarity}`, composePalette(ITEM_BASE, accents))
+  // Tier × rarity, e.g. 'item/t3+epic' — same composition rule as 'gear/t3+epic'.
+  for (const matTier of Object.keys(ITEM_TIERS)) {
+    reg(`item/${matTier}+${rarity}`, composePalette(REGISTRY.get(`item/${matTier}`)!, accents))
+  }
+}
+
 // ── Elite: shifted primary + hot accent over the base ────────────────────────
 reg('elite', composePalette(BASE_UNIT, {
   5: '#441c1c', 6: '#682a2a', 7: '#8c3c3c', 8: '#b45454',

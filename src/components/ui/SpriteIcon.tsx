@@ -1,44 +1,89 @@
 import React, { useEffect, useRef } from 'react'
 import { makeIconSheet, ICON, EMOJI_ICON, type IconKey } from '../../render/placeholderArt'
+import {
+  makeGearIconSheet, makeItemIconSheet, GEAR_ICON, ITEM_ICON, EMOJI_ITEM_ICON,
+  gearPaletteId, type GearIconKey, type ItemIconKey,
+} from '../../render/itemIcons'
 import { bakedSheet } from '../../render/palette'
 import { getPalette } from '../../render/palettes'
+import type { IndexedSprite } from '../../render/types'
 
-// Pixel UI icon (Phase 4). Renders a frame from the shared icon sheet, palette-tinted,
-// crisp-scaled to `size`. Resolves by explicit `icon` key or by mapping an `emoji` from
-// game data; if neither maps to a frame it falls back to rendering the emoji glyph, so
-// existing emoji-labelled content keeps working and adoption is incremental.
+// Pixel UI icon (Phase 4). Renders a frame from one of three shared indexed sheets,
+// palette-tinted, crisp-scaled to `size`:
+//   • base   (icons/base) — abilities, nav, schools; resolved by `icon` key or emoji.
+//   • gear   (icons/gear) — the six equipment slots; resolved by `gear`, tinted by `rarity`
+//                           (and optionally material `tier`) through the item palettes.
+//   • item   (icons/item) — materials, reagents and crafted goods; by `item` key or emoji.
+// If nothing resolves it falls back to rendering the emoji glyph, so existing emoji-labelled
+// content keeps working and adoption stays incremental.
 
-const SHEET = makeIconSheet() // one shared indexed sheet; bakes are cached per palette
+const BASE_SHEET = makeIconSheet()
+const GEAR_SHEET = makeGearIconSheet()
+const ITEM_SHEET = makeItemIconSheet()
 
 interface Props {
   icon?: IconKey
+  /** Equipment slot ('weapon' | 'helm' | …). Renders the gear sheet, tinted by `rarity`. */
+  gear?: GearIconKey
+  /** Material / crafted-good key ('ore' | 'potion' | …). */
+  item?: ItemIconKey
+  /** Rarity for a `gear` icon — drives the 13–15 accent channel. */
+  rarity?: string
+  /** Material tier ('t1'..'t4') for a `gear` icon — drives the 5–12 material channels. */
+  tier?: string
   emoji?: string
   size?: number
+  /** Explicit palette override; otherwise each sheet uses its own default. */
   paletteId?: string
   title?: string
 }
 
-export function SpriteIcon({ icon, emoji, size = 24, paletteId = 'icon/base', title }: Props) {
+interface Resolved {
+  sheet: IndexedSprite
+  frame: number
+  palette: string
+}
+
+function resolve({ icon, gear, item, rarity, tier, emoji }: Props): Resolved | null {
+  if (gear != null) {
+    return { sheet: GEAR_SHEET, frame: GEAR_ICON[gear], palette: gearPaletteId(rarity, tier) }
+  }
+  if (item != null) return { sheet: ITEM_SHEET, frame: ITEM_ICON[item], palette: 'icon/base' }
+  if (icon != null) return { sheet: BASE_SHEET, frame: ICON[icon], palette: 'icon/base' }
+  if (emoji == null) return null
   // Strip the emoji variation selector (U+FE0F) so e.g. '⛏️' matches the '⛏' map key.
-  const key = emoji?.replace(/️/g, '')
-  const iconKey: IconKey | undefined = icon ?? (key != null ? EMOJI_ICON[key] : undefined)
-  const frame = iconKey != null ? ICON[iconKey] : undefined
+  const key = emoji.replace(/️/g, '')
+  // Base sheet wins: everything it already claimed keeps rendering exactly as before, and
+  // the item map only fills the gaps (materials, reagents, crafted goods).
+  const baseKey = EMOJI_ICON[key]
+  if (baseKey != null) return { sheet: BASE_SHEET, frame: ICON[baseKey], palette: 'icon/base' }
+  const itemKey = EMOJI_ITEM_ICON[key]
+  if (itemKey != null) return { sheet: ITEM_SHEET, frame: ITEM_ICON[itemKey], palette: 'icon/base' }
+  return null
+}
+
+export function SpriteIcon(props: Props) {
+  const { emoji, size = 24, paletteId, title } = props
+  const hit = resolve(props)
+  const sheet = hit?.sheet
+  const frame = hit?.frame
+  const palette = paletteId ?? hit?.palette ?? 'icon/base'
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
-    if (frame == null) return
+    if (sheet == null || frame == null) return
     const c = ref.current
     if (!c) return
     const ctx = c.getContext('2d')!
     ctx.imageSmoothingEnabled = false
     ctx.clearRect(0, 0, size, size)
-    const sheet = bakedSheet(SHEET, paletteId, getPalette(paletteId))
-    const fw = SHEET.frameW
-    ctx.drawImage(sheet, frame * fw, 0, fw, fw, 0, 0, size, size)
-  }, [frame, paletteId, size])
+    const baked = bakedSheet(sheet, palette, getPalette(palette))
+    const fw = sheet.frameW
+    ctx.drawImage(baked, frame * fw, 0, fw, fw, 0, 0, size, size)
+  }, [sheet, frame, palette, size])
 
   // Fallback: no sprite for this emoji → render the glyph so nothing disappears.
-  if (frame == null) {
+  if (hit == null) {
     return (
       <span title={title} style={{ fontSize: size * 0.82, lineHeight: 1, display: 'inline-block' }}>
         {emoji}
@@ -52,7 +97,10 @@ export function SpriteIcon({ icon, emoji, size = 24, paletteId = 'icon/base', ti
       width={size}
       height={size}
       title={title}
-      style={{ width: size, height: size, imageRendering: 'pixelated', display: 'block' }}
+      style={{
+        width: size, height: size, imageRendering: 'pixelated',
+        display: 'inline-block', verticalAlign: 'middle', flexShrink: 0,
+      }}
     />
   )
 }
