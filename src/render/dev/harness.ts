@@ -257,7 +257,7 @@ async function main(): Promise<void> {
       return {
         canvas: out, originX: 520, planeOffsetY: 170,
         width: out.width, height: out.height,
-        heights: null, bw: 0,
+        heights: null, bw: 0, wrapTiles: 0,   // finite scaffold map, not a torus
         sheet: null, sheetCols: 0, sheetFrameW: 0, sheetFrameH: 0,
         anims: [], elapsed: 0,
       }

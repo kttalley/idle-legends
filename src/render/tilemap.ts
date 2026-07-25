@@ -49,6 +49,8 @@ export interface GroundBuffer {
   anims: GroundAnim[]
   /** Shared animation clock (seconds), advanced by Scene.render. */
   elapsed: number
+  /** Tile period of the world wrap, or 0 for a finite map. See TileMapData.wrapTiles. */
+  wrapTiles: number
 }
 
 /** Bilinear-interpolated elevation at fractional buffer-tile coords (0 if flat). */
@@ -224,5 +226,6 @@ export function bakeGround(
     sheet: anims.length ? sheet : null,
     sheetCols: cols, sheetFrameW: frameW, sheetFrameH: frameH,
     anims, elapsed: 0,
+    wrapTiles: map.wrapTiles ?? 0,
   }
 }

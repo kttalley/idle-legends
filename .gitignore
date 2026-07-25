@@ -53,3 +53,6 @@ local-data/
 logs/
 *.log
 local-assets/
+
+# Background-agent scratch worktrees — never part of the project history.
+.claude/worktrees/

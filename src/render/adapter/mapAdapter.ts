@@ -132,7 +132,9 @@ export function zoneMapToTileMap(zm: ZoneMap): TileMapData {
       if (artId !== undefined) props.push({ bx, by, artId })
     }
   }
-  return { w: PADDED_W, h: PADDED_W, tiles, heights, props }
+  // The zone wraps every MAP_SIZE tiles, so the renderer can tile this bake to fill any
+  // viewport rather than relying on PAD being wide enough — which it cannot be.
+  return { w: PADDED_W, h: PADDED_W, tiles, heights, props, wrapTiles: MAP_SIZE }
 }
 
 // ── Zone → biome palette id ───────────────────────────────────────────────────

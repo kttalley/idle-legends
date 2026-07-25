@@ -63,6 +63,10 @@ export interface TileMapData {
    *  from ZoneMap.props (game coords) so they wrap with the padded border. Stamped
    *  interleaved in bakeGround's painter loop. Optional → no clutter. */
   props?: { bx: number; by: number; artId: number }[]
+  /** Tile period of the world's wrap (the zone torus edge). Set → the ground repeats
+   *  every `wrapTiles` on both axes, so the renderer can tile it to fill the viewport
+   *  instead of running out of baked pixels. Omit for finite maps (the town). */
+  wrapTiles?: number
 }
 
 /**

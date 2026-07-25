@@ -62,6 +62,7 @@ const WALK_BOB_PX = 2
 const MOB_CLOSE_K = 5          // approach rate while closing (1/s)
 const MOB_ENGAGE_K = 14        // faster once engaged, so the fighting gap settles quickly
 const MOB_MIN_CLOSE = 1.2      // tiles/sec floor
+const BYSTANDER_SPEED = 3.4    // tiles/sec for an enemy walking in to take up station
 const MOB_SPAWN_FADE = 0.4     // seconds
 const MELEE_GAP_TILES = 2
 const RANGED_GAP_TILES = 5
@@ -386,6 +387,8 @@ export class WorldSceneController {
   // fade); these just stand in the world, depth-sorted and clickable, so the player has a
   // visible choice. World-anchored on spawn so they hold their ground as the hero moves.
   private otherMobEnts = new Map<string, { e: Entity; wx: number; wy: number }>()
+  // Bystanders still walking in from beyond the horizon → their station (wx,wy above).
+  private arriving = new Set<string>()
   /** Which mob `this.mob` currently represents. Identity, not sprite — see the handoff. */
   private mobId: string | null = null
   // Cached routes. Straight-line movement plus collide-and-slide wedges against any
@@ -455,6 +458,7 @@ export class WorldSceneController {
   // Footfall phase per walker (see WALK_CADENCE).
   private playerBob = { t: 0 }
   private mobBob = { t: 0 }
+  private bystanderBob = { t: 0 }
   // Does this mob charge the hero, or hold its ground and make the hero come to it?
   private mobAggressive = false
 
@@ -1256,21 +1260,64 @@ export class WorldSceneController {
             wx = PAD + WorldSceneController.wrapMod(w.x)
             wy = PAD + WorldSceneController.wrapMod(w.y)
           }
-          const e = this.scene.spawn(sprite, mobPaletteId(m), wx, wy)
+          // Enter from beyond the horizon and WALK to that station, rather than fading
+          // into existence in plain sight. The spawn ring (9–16 tiles) sits well inside
+          // a visible radius that reaches ~45 tiles on a large display, so materialising
+          // at the station is always on-screen — hence the "phasing in".
+          const bearing = Math.atan2(wy - this.player.ty, wx - this.player.tx)
+          const R = this.visibleTileRadius() + 6
+          const e = this.scene.spawn(
+            sprite, mobPaletteId(m),
+            this.player.tx + Math.cos(bearing) * R,
+            this.player.ty + Math.sin(bearing) * R,
+          )
           e.animator.set('idle')
           rec = { e, wx, wy }
           this.otherMobEnts.set(m.id, rec)
+          this.arriving.add(m.id)
         }
-        rec.e.tx = rec.wx
-        rec.e.ty = rec.wy
+        // Position is owned by advanceBystanders while walking in; pinned once arrived.
+        if (!this.arriving.has(m.id)) {
+          rec.e.tx = rec.wx
+          rec.e.ty = rec.wy
+          this.faceToward(rec.e, this.player.tx, this.player.ty)
+        }
         rec.e.paletteId = mobPaletteId(m)
-        this.faceToward(rec.e, this.player.tx, this.player.ty)
       }
     }
     for (const [id, rec] of this.otherMobEnts) {
       if (alive.has(id)) continue
       rec.e.active = false
       this.otherMobEnts.delete(id)
+      this.arriving.delete(id)
+    }
+  }
+
+  /** Walk newly-arrived bystanders in from off-screen to their station, then let them
+   *  hold it. Collided and routed like everything else that walks. */
+  private advanceBystanders(dt: number): void {
+    if (!this.arriving.size) return
+    for (const id of [...this.arriving]) {
+      const rec = this.otherMobEnts.get(id)
+      if (!rec || !rec.e.active) { this.arriving.delete(id); continue }
+      const dx = rec.wx - rec.e.tx, dy = rec.wy - rec.e.ty
+      const d = Math.hypot(dx, dy)
+      if (d < 0.3) {
+        rec.e.tx = rec.wx; rec.e.ty = rec.wy
+        this.arriving.delete(id)
+        continue
+      }
+      const step = Math.min(d, BYSTANDER_SPEED * dt)
+      const s = this.slide(rec.e.tx, rec.e.ty, dx / d * step, dy / d * step)
+      // Wedged against terrain — take the station here rather than grinding forever.
+      if (s.blocked && Math.hypot(s.x - rec.e.tx, s.y - rec.e.ty) < 1e-4) {
+        rec.wx = rec.e.tx; rec.wy = rec.e.ty
+        this.arriving.delete(id)
+        continue
+      }
+      rec.e.tx = s.x; rec.e.ty = s.y
+      this.faceToward(rec.e, rec.wx, rec.wy)
+      rec.e.z = this.walkBobZ(this.bystanderBob, true, dt)
     }
   }
 
@@ -1806,6 +1853,7 @@ export class WorldSceneController {
       // Pin tall-prop entities to the wrapped copy nearest the player before the sort
       // so they depth-correct against the player/mob as the player moves (Phase E).
       this.updatePropEntities()
+      this.advanceBystanders(realDt)
       // Guarded so a stray ambient error can never take down the whole scene render.
       try { this.updateAmbient(realDt) } catch (err) { console.error('[ambient] update failed:', err) }
     }
@@ -2135,6 +2183,7 @@ export class WorldSceneController {
         canvas: c, originX: c.width / 2 - HALF_W, planeOffsetY: c.height * 0.5 - HALF_H,
         width: c.width, height: c.height, heights: null, bw: 0,
         sheet: null, sheetCols: 0, sheetFrameW: 0, sheetFrameH: 0, anims: [], elapsed: 0,
+        wrapTiles: 0,   // town is a finite hand-authored map, not a torus — never tiled
       }
       return this.townGround
     } catch (e) {

@@ -6,7 +6,7 @@
 import { Animator } from './animation'
 import { bakedSheet } from './palette'
 import { getPalette } from './palettes'
-import { feetX, feetY, type GroundBuffer } from './tilemap'
+import { feetX, feetY, HALF_W, HALF_H, type GroundBuffer } from './tilemap'
 import type { IndexedSprite } from './types'
 
 export interface Camera {
@@ -107,13 +107,36 @@ export class Scene {
     //    mid-frame, so guard it. In-bounds pixels map 1:1 exactly as before; the
     //    letterbox stays the cleared void.
     ctx.clearRect(0, 0, cam.w, cam.h)
-    let sx = cam.x, sy = cam.y, sw = cam.w, sh = cam.h
-    let dx = 0, dy = 0
-    if (sx < 0) { dx = -sx; sw += sx; sx = 0 }
-    if (sy < 0) { dy = -sy; sh += sy; sy = 0 }
-    if (sx + sw > ground.width) sw = ground.width - sx
-    if (sy + sh > ground.height) sh = ground.height - sy
-    if (sw > 0 && sh > 0) ctx.drawImage(ground.canvas, sx, sy, sw, sh, dx, dy, sw, sh)
+    // Blit the buffer as though its top-left sat at screen offset (ox, oy), clipping the
+    // source to what the buffer actually holds. An out-of-bounds drawImage source throws
+    // IndexSizeError on WebKit/iOS (Blink silently clips), which — thrown from the frame
+    // loop — would blank the scene until reload, so the clamp is load-bearing.
+    const blit = (ox: number, oy: number) => {
+      let sx = cam.x - ox, sy = cam.y - oy, sw = cam.w, sh = cam.h
+      let dx = 0, dy = 0
+      if (sx < 0) { dx = -sx; sw += sx; sx = 0 }
+      if (sy < 0) { dy = -sy; sh += sy; sy = 0 }
+      if (sx + sw > ground.width) sw = ground.width - sx
+      if (sy + sh > ground.height) sh = ground.height - sy
+      if (sw > 0 && sh > 0) ctx.drawImage(ground.canvas, sx, sy, sw, sh, dx, dy, sw, sh)
+    }
+
+    if (ground.wrapTiles > 0) {
+      // The zone is a torus, so the baked ground REPEATS every `wrapTiles` on both tile
+      // axes. Painting the neighbouring lattice copies fills the viewport at any zoom,
+      // which padding alone cannot: the visible radius reaches ~45 tiles on a large
+      // display against a 64-tile world, so no practical border is ever wide enough.
+      // Overlaps land on identical pixels (the copies are exactly one world apart), so
+      // the seams are invisible and the extra draws are clipped to the camera.
+      const P = ground.wrapTiles
+      const ux = P * HALF_W, uy = P * HALF_H     // +P tiles along tx
+      const vx = -P * HALF_W, vy = P * HALF_H    // +P tiles along ty
+      for (let p = -1; p <= 1; p++) {
+        for (let q = -1; q <= 1; q++) blit(p * ux + q * vx, p * uy + q * vy)
+      }
+    } else {
+      blit(0, 0)   // finite map (town): one copy, letterboxed as before
+    }
 
     // 1b. Animated ground cells (Phase B): reblit just the water (etc.) cells' current
     // frames over the static blit. One shared clock advances all cells in sync (the
