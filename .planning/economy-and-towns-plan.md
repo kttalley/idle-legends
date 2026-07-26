@@ -1,9 +1,98 @@
 # Plan — The Economy: Gold, Inventory, Towns & Merchants
 
-**Status:** draft plan — awaiting approval.
+**Status: T1 and T2 BUILT (2026-07-25). T3 open, T4 blocked on a false premise, T5 open.**
 **Written as a cold-start brief:** a fresh session can execute this without prior conversation.
 
 Supersedes and expands **Track T** in `.planning/world-systems-plan.md`.
+
+---
+
+## 0. What was built, and what measuring it changed
+
+A headless harness landed first (`src/sim/econSim.ts`, run via `node tools/sim/run.mjs`).
+It drives the real store with a seeded `Math.random`, samples the gold curve, asserts
+invariants every tick, and can sweep N seeds. **Every number below came out of it.**
+Everything §1 claimed was confirmed; several things this plan assumed were not.
+
+| | Status |
+|---|---|
+| **T1 — bag space, stop destroying loot** | **Done.** Overflow salvages at `SALVAGE_RATE` (0.20) instead of deleting; purchasable bag slots (20 base + up to 20 at 200g × 1.25ⁿ) at the town outfitter; hostile towns charge `HOSTILE_TOWN_MARKUP` rather than refusing. |
+| **T2 — merchant contract** | **Done.** 1,500g retainer, bills 25% of what it moves. Sells drops below a player-set rarity **and** no better than anything already owned for that slot, so it can never eat an upgrade. Lapses (harmlessly) if unpaid. |
+| **`repair`** | **Dropped** from `TownServiceType` — owner decision, §4.1. |
+| **T3 — vendor stock** | Open. Price it against §0.2, not against the early curve. |
+| **T4 — trainer respec** | **Blocked — see §0.3.** Its premise is false. |
+| **T5 — town NPCs** | Open. |
+
+### 0.1 Two soft-locks found on the way (both fixed)
+
+Neither was an economy bug; both ended unattended runs, which is the same disease.
+
+1. **`getWalkMask` cached by zone id** while `mapSeed()` had started folding in
+   `worldSeed` and `zoneCircuit` — so a second character, or any prestige circuit, ran
+   against the *first* terrain's collision. A hero standing where the stale mask said
+   "wall" could not move. **15% of seeded 8-hour runs soft-locked.** Now keyed on the
+   ZoneMap object (WeakMap), which cannot go stale by construction.
+2. **The gathering drift steered by a stopped clock** — its angle is `totalPlayTime *
+   0.08`, and only the combat branch ever advanced `totalPlayTime`. Constant vector, so
+   one blocked heading was permanent rather than momentary. Fixed, plus `driftMapPos`
+   now fans a blocked step through eight directions (the mask is single-component by
+   construction, so the fan cannot come up empty).
+
+0/40 soft-locks after, in both idle and advancing regimes.
+
+### 0.2 The gold curve — measure before pricing anything (§4.3, now answered)
+
+Gold/min is **not** flat; it spans roughly **500×** across the level range:
+
+| level | zone | gold/min |
+|---|---|---|
+| 8–19 | sunhollow / dustwind | 13 → 27 |
+| 25–33 | grimshade / thornvale | ~6 → 145 |
+| 45–60 | ashfire / bloodfields | 200 → 430 |
+| 75–89 | ironcrag / warsong | ~450 |
+
+An equipping player who buys everything ends 20 simulated hours with **~248,000 gold and
+nothing left to spend it on** — every bag slot bought by hour 12. So:
+
+- **T1/T2 pricing is right for the early game and irrelevant late.** That is fine; they
+  are early-game upgrades you outgrow the cost of.
+- **The late-game sink does not exist yet, and contract upkeep will never be it** — the
+  factor's throughput is only ~14% of late income, so no rate on it moves the needle.
+  T3/T4 must be priced against **hundreds of gold per minute**, not against the 13/min
+  that §1 measured at level 6.
+
+### 0.3 T4's premise is false — do not build it as written
+
+T4 says respec "makes the talent trees explorable instead of a one-way commitment."
+They are already explorable: `resetTalents` is free, unlimited, and available anywhere,
+and right-click deallocates a single point for nothing. **Charging for respec would not
+add a sink; it would delete a free feature to sell it back** — the same anti-pattern that
+got `repair` dropped, and a direct violation of PLAN.md Track M's "never engineer pain to
+sell relief."
+
+If the trainer should exist, it needs something *additive* to sell. Talent **loadouts**
+(save/swap builds, already listed as QoL in PLAN.md Track M) are the obvious candidate:
+a real sink, purely additive, and idle-friendly since a build can be swapped per zone.
+**Owner call — not taken here.**
+
+### 0.4 The biggest remaining hole: nothing ever equips itself
+
+**There is no auto-equip anywhere in this codebase.** Gear reaches the hero only when a
+player clicks an item in the bag. So a hero nobody touches fights **naked forever**, and
+the measurements are stark:
+
+- Idle hero, never equipped: stalls at **level ~20**, then enters the next legal zone and
+  takes 0 kills in 11 simulated hours while dying repeatedly. The run is over.
+- Same seed, equipping strict upgrades: **level 89 across 10 zones** in 20 hours.
+
+This is why the pure-idle gold numbers plateau, and it caps what T1/T2 can be worth — the
+contract's whole upgrade-guard exists to work around gear that never gets worn. For a game
+whose premise is progress while unattended, this is arguably a larger hole than the bag
+was, and it is upstream of the rest of this track. **Not built — it changes combat balance
+and is an owner call.** Recommended as the next thing after T3.
+
+*(Also worth knowing: an idle hero never changes zone either — `selectZone` is a click —
+so the pure-idle player simply farms zone 1 forever at ~13–27 g/min. Stable, but static.)*
 
 ---
 
@@ -99,19 +188,24 @@ rather than leaving towns a menu list.
 
 ---
 
-## 4. Decisions needed before building
+## 4. Decisions — RESOLVED
 
-1. **Drop `repair`?** There is no durability system, so the service is meaningless today.
-   Recommend **removing it from `TownServiceType`** rather than building durability, which
-   is an anti-idle chore that adds upkeep clicking. If you want the gold sink, T1–T4 are
-   better sinks.
-2. **Should the merchant contract have upkeep** (a recurring drain, keeps gold scarce
-   long-term) or be a one-off purchase (simpler, but gold re-inflates once bought)?
-   Recommend upkeep, because an idle game needs a *continuous* sink to stay meaningful at
-   hour 50.
-3. **Gold curve.** 14/min at level 6 is the only datapoint; nobody has checked how it scales
-   with zone tier or the prestige circuit multiplier. Price anything before measuring this
-   and it will be wrong within an hour of play.
+1. ~~**Drop `repair`?**~~ **Dropped** (owner decision). No durability system existed behind
+   it and durability is an anti-idle chore.
+2. ~~**Should the merchant contract have upkeep?**~~ **Yes, upkeep** (owner decision) — but
+   measuring it changed the *shape*. A flat fee was net-negative for the first three hours
+   after purchase and 2% of income by hour 20; no flat number works across a 500× curve.
+   It bills a **25% cut of what the factor moves**, floor 1g. Still a recurring bill that
+   can lapse, but it can never be a losing deal. Note §0.2: upkeep is **not** the
+   late-game sink and cannot be made into one.
+3. ~~**Gold curve.**~~ **Measured — see §0.2.** It spans ~500×. The 14/min datapoint was
+   level 6; late zones run ~450/min.
+
+### Still open for the owner
+
+4. **Auto-equip (§0.4)** — the largest remaining hole in the idle loop. Recommended next.
+5. **What the trainer sells (§0.3)** — respec is already free, so T4 needs a different
+   product (loadouts?) or should be dropped.
 
 ---
 
@@ -124,7 +218,18 @@ rather than leaving towns a menu list.
   merchant contract should make them *better* off, which is the point.
 - **`vendorValue` is already on every `Item`** and surfaced in the tooltip, so pricing has a
   foundation.
-- The economy is one of the few systems with **no test harness yet**. The pattern used
-  elsewhere this session — drive the real store headlessly under an esbuild bundle with a
-  `localStorage` shim, and assert invariants over tens of thousands of ticks — works well
-  here and is worth setting up early. Measure gold in/out per hour before pricing anything.
+- ~~The economy has **no test harness**~~ — it has one now: `src/sim/econSim.ts` +
+  `tools/sim/run.mjs`. Use it before changing any number.
+
+  ```
+  node tools/sim/run.mjs --minutes 480 --sample 60            # idle baseline
+  node tools/sim/run.mjs --minutes 1200 --advance --equip \
+                         --buyslots --contract --seed 1       # the works
+  node tools/sim/run.mjs --minutes 300 --assert --sweep 10    # invariants, every tick
+  node tools/sim/run.mjs --minutes 480 --sweep 40 --advance   # soft-lock sweep
+  ```
+
+  Flags: `--advance` (change zone when legal), `--equip` (wear strict upgrades — **off is
+  the true idle baseline**, see §0.4), `--sell`, `--buyslots`, `--contract`, `--seed N`
+  (reproducible), `--sweep N`, `--assert`. `--seed` matters: both soft-locks in §0.1 were
+  intermittent and would not have been findable without it.
