@@ -350,6 +350,8 @@ export interface GameSettings {
   volume: number
 }
 
+import type { OfflineRates, OfflineReport } from '../engine/offline'
+
 // ── Full Game State ───────────────────────────────────────────────────────────
 export interface GameState {
   initialized: boolean
@@ -415,6 +417,11 @@ export interface GameState {
   totalZoneKills: Record<ZoneId, number>
   bossesDefeated: ZoneId[]
   lastTickTimestamp: number
+  /** Decaying window of what combat actually produced, used to project time away.
+   *  See engine/offline.ts — this is what makes offline parity measured, not modelled. */
+  offlineRates: OfflineRates
+  /** The last "while you were away" report, held until the player dismisses it. */
+  lastOffline: OfflineReport | null
   totalPlayTime: number
   settings: GameSettings
   // ── Map / Travel / Professions ──────────────────────────────────────────────

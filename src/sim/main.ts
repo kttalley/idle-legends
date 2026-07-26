@@ -2,7 +2,8 @@
 // `node tools/sim/run.mjs [--minutes N] [--advance] [--sell] [--step S] [--class C]`.
 
 import {
-  runScenario, runSweep, runInvariants, runSaveMigration, formatReport, formatSweep,
+  runScenario, runSweep, runInvariants, runSaveMigration, runOfflineParity,
+  formatReport, formatSweep, formatParity, MEAN_TOLERANCE,
   type ScenarioOpts, type Violation,
 } from './econSim'
 import type { ClassType } from '../data/types'
@@ -37,7 +38,13 @@ const opts: ScenarioOpts = {
 
 const sweepCount = process.argv.includes('--sweep') ? argNum('--sweep', 20) : 0
 
-if (process.argv.includes('--assert')) {
+if (process.argv.includes('--parity')) {
+  const seeds = Array.from({ length: sweepCount || 8 }, (_, i) => i + 1)
+  const tolerance = argNum('--tolerance', 0.35)
+  const results = seeds.map(seed =>
+    runOfflineParity(opts.minutes, seed, opts.stepSeconds, argNum('--warmup', 30)))
+  process.stdout.write(formatParity(results, opts.minutes, tolerance) + '\n')
+} else if (process.argv.includes('--assert')) {
   // Every scenario shape, across N seeds, checked every tick.
   const seeds = Array.from({ length: sweepCount || 10 }, (_, i) => i + 1)
   const shapes: { name: string; o: Partial<ScenarioOpts> }[] = [
@@ -63,6 +70,17 @@ if (process.argv.includes('--assert')) {
       }
     }
   }
+  // Offline parity is part of the standard check: it is the one claim that would be
+  // invisible in normal play until players noticed idling paid worse than watching.
+  const parity = seeds.map(seed => runOfflineParity(60, seed, opts.stepSeconds))
+  const meanErr = parity.reduce((a, r) => a + r.goldError, 0) / parity.length
+  if (Math.abs(meanErr) <= MEAN_TOLERANCE) {
+    process.stdout.write(`  ok    offline parity — mean gold error ${(meanErr * 100).toFixed(1)}% over ${seeds.length} seeds\n`)
+  } else {
+    failed++
+    process.stdout.write(`  FAIL  offline parity — mean gold error ${(meanErr * 100).toFixed(1)}%, outside ±${Math.round(MEAN_TOLERANCE * 100)}%\n`)
+  }
+
   const migration = runSaveMigration()
   if (migration.length === 0) {
     process.stdout.write('  ok    save migration — round-trip, legacy blob, over-long array\n')

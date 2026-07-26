@@ -47,10 +47,11 @@ import {
   MERCHANT_CONTRACT_COST, MERCHANT_UPKEEP_RATE, MERCHANT_UPKEEP_MIN, MERCHANT_UPKEEP_SECONDS,
 } from '../data/constants'
 import { isTownHostileToPlayer } from '../engine/zoneProgression'
-import { rollLoot } from '../engine/loot'
+import { rollLoot, placeDrop, salvageValue } from '../engine/loot'
 import { generateNames, generateThought, generateFactionNamesFallback, generatePlayerNameFallback } from '../engine/nameGen'
 import type { ThoughtEvent } from '../engine/nameGen'
 import { slotStorage, summarize, newSlotId } from './saveSlots'
+import { emptyRates, accrueRates, projectOfflineProgress } from '../engine/offline'
 
 // The slot currently loaded into the store — the target of every autosave. Null
 // while at the character-select menu. Kept out of GameState so it isn't serialized
@@ -125,68 +126,12 @@ export function townPrice(base: number, townId: TownId | null, faction: FactionT
   return base
 }
 
-/**
- * What a drop is worth when there is nowhere to put it.
- *
- * This exists so that overflow is a bad outcome instead of an invisible one. The previous
- * behaviour logged `Bag full! Lost: {item}` and dropped the item on the floor of the
- * universe — measured at 96% of every drop across an 8-hour idle run, roughly five times
- * more value than the game paid out in gold over the same window. Never zero, so a
- * legendary is never worth literally nothing; never full, so capacity stays worth buying.
- */
-export function salvageValue(item: Item): number {
-  return Math.max(1, Math.round(item.vendorValue * SALVAGE_RATE))
-}
 
 // ── The merchant contract ─────────────────────────────────────────────────────
+// The drop ladder itself lives in engine/loot.ts so the offline projection runs the
+// identical code; re-exported here because the UI reaches for it through the store.
+export { rarityRank, contractSells, contractWouldSell, salvageValue } from '../engine/loot'
 
-export function rarityRank(r: Rarity): number {
-  return RARITY_ORDER.indexOf(r as typeof RARITY_ORDER[number])
-}
-
-/**
- * Would the factor take this drop?
- *
- * Strictly-below, so the threshold names the cheapest thing you want to KEEP. `common`
- * therefore sells nothing — an off switch that doesn't require cancelling the contract.
- * A lapsed contract always answers no, which is what makes "lapsed" mean "as if you never
- * bought it" rather than "broken".
- */
-export function contractSells(c: MerchantContract | null, rarity: Rarity): boolean {
-  if (!c || c.lapsed) return false
-  return rarityRank(rarity) < rarityRank(c.threshold)
-}
-
-/**
- * Would the factor sell THIS drop, given everything the hero already owns for its slot?
- *
- * The rarity threshold alone is not a sufficient guard. There is no auto-equip in this
- * game, so gear only reaches the hero by sitting in the bag until the player picks it up
- * — which means a retainer who sells a drop before it lands can cost real power, not just
- * gold. The rule: **sell only what is no better than something the hero already has for
- * that slot**, counting both the worn piece and anything carried. So the factor can never
- * dispose of an upgrade, whatever its rarity — the plan's "never eats a legendary"
- * instinct, generalised to "never eats anything that mattered".
- *
- * Comparing against the BAG as well as the worn piece is what makes this work for the
- * player it is meant for. An earlier version only checked the equipped slot, and since a
- * hero nobody touches never equips anything, every slot stayed empty and the factor sold
- * nothing at all — the arrangement was inert for exactly the idle player who should get
- * the most from it, while still drawing its floor charge. Now an untouched hero keeps the
- * best of each slot and the rest is sold at full price.
- */
-export function contractWouldSell(
-  s: Pick<GameState, 'merchantContract' | 'equipment' | 'inventory'>, item: Item,
-): boolean {
-  if (!contractSells(s.merchantContract, item.rarity)) return false
-  const power = itemPower(item)
-  const equipped = s.equipment[item.slot]
-  if (equipped && itemPower(equipped) >= power) return true
-  for (const held of s.inventory) {
-    if (held && held.slot === item.slot && itemPower(held) >= power) return true
-  }
-  return false
-}
 
 /** What the factor bills this period: their cut of what they moved, never below the floor. */
 export function contractUpkeep(c: MerchantContract): number {
@@ -300,6 +245,8 @@ function defaultState(): GameState {
     bossesDefeated: [],
     zoneCircuit: 0,
     lastTickTimestamp: Date.now(),
+    offlineRates: emptyRates(),
+    lastOffline: null,
     totalPlayTime: 0,
     settings: {
       tickRateMs: 1000,
@@ -364,6 +311,8 @@ function rehydrateState(saved: GameState): GameState {
   // A save written before auto-equip existed opts IN: it is a strict improvement for the
   // hero it most affects, and leaving it off would preserve the very bug it fixes.
   saved.settings = { ...saved.settings, autoEquip: saved.settings?.autoEquip ?? true }
+  saved.offlineRates      = saved.offlineRates ?? emptyRates()
+  saved.lastOffline       = null   // set by the load path if there is time to grant
   saved.totalAutoSold     = saved.totalAutoSold ?? 0
   saved.totalUpkeepPaid   = saved.totalUpkeepPaid ?? 0
   // A contract survives a reload, but never in the lapsed state: gold may well have
@@ -834,6 +783,7 @@ interface GameActions {
   sellAllCommon: () => void
   buyBagSlot: () => void
   setAutoEquip: (on: boolean) => void
+  dismissOfflineReport: () => void
   buyMerchantContract: () => void
   setMerchantThreshold: (threshold: Rarity) => void
   cancelMerchantContract: () => void
@@ -922,7 +872,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       const saved = rehydrateState(slot.state)
       resetCombatAccumulators()
       activeSlotId = id
-      set(saved)
+      // Grant time away BEFORE the state goes live, so the player never sees the
+      // pre-offline numbers flash and then jump. `lastTickTimestamp` is stamped by
+      // toSaveBlob at write time, which is what makes the elapsed window honest.
+      const offline = projectOfflineProgress(saved, Date.now())
+      set(offline ? { ...saved, ...offline.patch, lastOffline: offline.report } : saved)
       get().saveGame()   // refreshes lastPlayedAt
       return true
     } catch {
@@ -1168,6 +1122,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // from `gold` so the overflow leak stays visible in the save rather than blending
     // into kill income.
     let salvaged = 0
+    // Combat output this tick, folded into the decaying rate window at the end. This is
+    // what offline progress replays, so it has to be measured rather than assumed.
+    let killsThisTick = 0
+    let xpThisTick = 0
+    // ONLY the gold mobs drop. Proceeds from selling or scrapping loot are deliberately
+    // excluded: the offline projection re-rolls those drops and runs them through the real
+    // ladder, so folding them into the rate as well would pay for the same items twice.
+    let killGoldThisTick = 0
     // Gold the merchant contract earned this tick, tracked separately so the retainer
     // can be judged against its own upkeep rather than on vibes.
     let autoSold = 0
@@ -1428,6 +1390,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         const deadMob = currentMob!
         const loot = rollLoot(deadMob, level, stats.goldFindBonus)
         gold += loot.gold
+        killGoldThisTick += loot.gold
 
         newLogs.push(log('mob_death', `${deadMob.name} dies!`, '#ff4444'))
         newLogs.push(log('loot_gold',  `+${loot.gold} gold`,   '#ffd700'))
@@ -1442,6 +1405,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         }
 
         xp += deadMob.xpReward
+        killsThisTick++
+        xpThisTick += deadMob.xpReward
         while (xp >= xpForLevel(level)) {
           xp -= xpForLevel(level)
           level++
@@ -1515,47 +1480,35 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         // hero and what's being disposed of is the OLD piece. The displaced item then
         // takes the bag pressure instead of the good one.
         if (loot.item) {
-          let pending: Item | null = loot.item
-
-          if (state.settings.autoEquip !== false &&
-              isGearUpgrade(pending, state.playerClass, level, equipment, talentAllocs, racialPassive)) {
-            const displaced = equipment[pending.slot]
-            equipment = { ...equipment, [pending.slot]: pending }
+          // One ladder — wear, sell, bag, salvage — shared verbatim with the offline
+          // projection (engine/loot.ts). Two copies of "what happens to a drop" would
+          // drift, and offline progress matching online is the entire promise.
+          const placed = placeDrop(loot.item, equipment, inventory, {
+            playerClass: state.playerClass, level, talentAllocs, racialPassive,
+            autoEquip: state.settings.autoEquip !== false,
+            contract: state.merchantContract,
+          })
+          if (placed.equipment !== equipment) {
+            equipment = placed.equipment
             const rescored = compileStats(state.playerClass, level, equipment, talentAllocs, racialPassive)
             // Recompiling resets currentHp to full; carry the hero's real HP across, and
             // let a stamina gain raise the ceiling without healing them for free.
             rescored.currentHp = Math.min(rescored.maxHp, stats.currentHp)
             stats = rescored
-            newLogs.push(log('loot_item', `Equipped ${pending.name}`, rarityColor(pending.rarity)))
-            pending = displaced
+            newLogs.push(log('loot_item', `Equipped ${loot.item.name}`, rarityColor(loot.item.rarity)))
           }
-
-          if (pending) {
-            if (contractWouldSell({ merchantContract: state.merchantContract, equipment, inventory }, pending)) {
-              // The factor takes it at FULL price before it ever reaches the bag. That is
-              // the contract's whole value: not just better than the 20% salvage, but the
-              // reason the bag stops filling with junk in the first place, which is what
-              // keeps an unattended run collecting the drops that actually matter.
-              gold += pending.vendorValue
-              autoSold += pending.vendorValue
-              newLogs.push(log('loot_item',
-                `Factor bought ${pending.name} — ${pending.vendorValue}g`, '#88ccaa'))
-            } else {
-              const empty = inventory.findIndex(s => s === null)
-              if (empty >= 0) {
-                inventory[empty] = pending
-                newLogs.push(log('loot_item', `Looted: ${pending.name}`, rarityColor(pending.rarity)))
-              } else {
-                // No room: sell it at the wayside rather than delete it. This branch used to
-                // destroy the drop outright, which is how an unattended run quietly stopped
-                // paying out after twenty minutes.
-                const recovered = salvageValue(pending)
-                gold += recovered
-                salvaged += recovered
-                newLogs.push(log('loot_item',
-                  `Bag full — salvaged ${pending.name} for ${recovered}g`, '#c8a100'))
-              }
-            }
+          inventory = placed.inventory
+          gold += placed.sold + placed.salvaged
+          autoSold += placed.sold
+          salvaged += placed.salvaged
+          if (placed.sold > 0 && placed.disposed) {
+            newLogs.push(log('loot_item',
+              `Factor bought ${placed.disposed.name} — ${placed.sold}g`, '#88ccaa'))
+          } else if (placed.salvaged > 0 && placed.disposed) {
+            newLogs.push(log('loot_item',
+              `Bag full — salvaged ${placed.disposed.name} for ${placed.salvaged}g`, '#c8a100'))
+          } else if (placed.outcome === 'bagged') {
+            newLogs.push(log('loot_item', `Looted: ${loot.item.name}`, rarityColor(loot.item.rarity)))
           }
         }
 
@@ -1705,6 +1658,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       floatingNumbers: allFns,
       totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones, currentZone,
       totalPlayTime: state.totalPlayTime + deltaSeconds,
+      offlineRates: accrueRates(
+        state.offlineRates, deltaSeconds, killGoldThisTick, xpThisTick, killsThisTick,
+      ),
       totalSalvaged: state.totalSalvaged + salvaged,
       totalAutoSold: state.totalAutoSold + autoSold,
       // Bank what the factor moved this tick against their next bill.
@@ -1801,6 +1757,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       ].slice(0, LOG_MAX),
     })
   },
+
+  dismissOfflineReport: () => { if (get().lastOffline) set({ lastOffline: null }) },
 
   /** Player's call on whether drops are worn automatically. Persisted with the save. */
   setAutoEquip: (on) => {

@@ -5,6 +5,17 @@ export const RESPAWN_TIMER_SECONDS = 3    // player death respawn delay
 export const MOB_RESPAWN_SECONDS = 1.5    // mob respawn after kill
 export const OFFLINE_CAP_HOURS = 8        // max offline progress
 
+// Offline progress is projected from the hero's own measured combat rate — see
+// engine/offline.ts. Parity is exactly 1.0: being away pays what being present paid.
+/** Absences shorter than this are ignored, so a reload isn't a reward. */
+export const OFFLINE_MIN_SECONDS = 60
+/** Time constant τ of the decaying rate record. Short enough to track the hero the
+ *  player actually left behind — a long τ keeps stale low-level play weighted in and
+ *  systematically under-pays anyone mid-progression. */
+export const OFFLINE_RATE_WINDOW_SECONDS = 600
+/** Below this much measured combat there is nothing honest to extrapolate from. */
+export const OFFLINE_MIN_MEASURED_SECONDS = 120
+
 // ── XP Curve ────────────────────────────────────────────────────────────────
 // xpForLevel(n) = BASE * n^EXPONENT
 export const XP_BASE = 75

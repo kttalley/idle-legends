@@ -10,6 +10,7 @@ import { ZoneSelector } from './components/game/ZoneSelector'
 import { CombatLog } from './components/game/CombatLog'
 import { GoldDisplay } from './components/ui/GoldDisplay'
 import { QuestToast } from './components/game/QuestToast'
+import { OfflineReportToast } from './components/game/OfflineReportToast'
 import { slotStorage } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
 import { ZONES, ZONE_ORDER } from './data/zones'
@@ -73,6 +74,7 @@ export default function App() {
   return (
     <div className="app-root">
       <QuestToast />
+      <OfflineReportToast />
 
       {/* ── Top bar ── */}
       <div className="rp-panel flex items-center justify-between px-3 py-1.5" style={{ flexShrink: 0 }}>

@@ -14,10 +14,11 @@
 
 import { useGameStore } from '../store/gameStore'
 import { INVENTORY_SLOTS, RARITY_WEIGHTS, BAG_SLOTS_MAX_PURCHASED } from '../data/constants'
-import type { ClassType, RaceType, TownId, ZoneId } from '../data/types'
+import type { ClassType, GameState, RaceType, TownId, ZoneId } from '../data/types'
 import { ZONE_ORDER } from '../data/zones'
 import { canEnterZone, townForZone } from '../engine/zoneProgression'
 import { slotStorage } from '../store/saveSlots'
+import { projectOfflineProgress } from '../engine/offline'
 import { itemPower } from '../data/items'
 
 // ── Expected value of a destroyed drop ────────────────────────────────────────
@@ -503,6 +504,109 @@ export function runSaveMigration(): Violation[] {
   }
 
   return out
+}
+
+// ── Offline parity ────────────────────────────────────────────────────────────
+//
+// The claim offline progress makes is exact: being away pays what being present paid.
+// That is checkable rather than arguable — play online for a window, measure what it
+// produced, then ask the projection what the SAME window is worth and compare.
+//
+// A tolerance is unavoidable and it is not a fudge: the online run is one noisy sample of
+// a random process (crit rolls, drop rolls, elite spawns, deaths), while the projection
+// returns that process's mean. They should agree in expectation, not to the gold.
+
+/** How far the MEAN error may sit from zero before it stops being noise. */
+export const MEAN_TOLERANCE = 0.10
+
+export interface ParityResult {
+  seed: number
+  onlineGold: number
+  offlineGold: number
+  onlineKills: number
+  offlineKills: number
+  /** Signed relative error of the offline grant against the online run. */
+  goldError: number
+  killError: number
+}
+
+export function runOfflineParity(
+  minutes: number, seed: number, stepSeconds = 0.25, warmupMinutes = 30,
+): ParityResult {
+  if (typeof __setSeed === 'function') __setSeed(seed)
+  const store = useGameStore
+  store.getState().initGame('warrior', 'human')
+
+  // Warm the rate record up on a stretch of real play. A LONG warmup settles the hero's
+  // level, which is the control for whether any residual error is progression or bias.
+  const warmupTicks = Math.round((warmupMinutes * 60) / stepSeconds)
+  for (let t = 0; t < warmupTicks; t++) store.getState().tick(stepSeconds)
+
+  // Snapshot, then play the measured window ONLINE.
+  const before = store.getState()
+  const snapshot = JSON.parse(JSON.stringify({
+    gold: before.gold, kills: totalKills(before), rates: before.offlineRates,
+  }))
+  const windowTicks = Math.round((minutes * 60) / stepSeconds)
+  for (let t = 0; t < windowTicks; t++) store.getState().tick(stepSeconds)
+  const after = store.getState()
+  const onlineGold = after.gold - snapshot.gold
+  const onlineKills = totalKills(after) - snapshot.kills
+
+  // Now ask the projection what that same window was worth, from the same starting rates.
+  // `lastTickTimestamp` is back-dated by exactly the window so the elapsed time matches.
+  const probe: GameState = {
+    ...JSON.parse(JSON.stringify(before)),
+    offlineRates: snapshot.rates,
+    lastTickTimestamp: Date.now() - minutes * 60 * 1000,
+  }
+  const outcome = projectOfflineProgress(probe, Date.now())
+  const offlineGold = outcome ? outcome.report.gold : 0
+  const offlineKills = outcome ? outcome.report.kills : 0
+
+  return {
+    seed, onlineGold, offlineGold, onlineKills, offlineKills,
+    goldError: onlineGold > 0 ? (offlineGold - onlineGold) / onlineGold : 0,
+    killError: onlineKills > 0 ? (offlineKills - onlineKills) / onlineKills : 0,
+  }
+}
+
+function totalKills(s: GameState): number {
+  return Object.values(s.totalZoneKills).reduce((a, b) => a + (b ?? 0), 0)
+}
+
+export function formatParity(rs: ParityResult[], minutes: number, tolerance: number): string {
+  const out: string[] = []
+  out.push(`offline parity: ${minutes}-minute window, ${rs.length} seeds, tolerance ±${Math.round(tolerance * 100)}%`)
+  out.push('')
+  out.push([pad('seed', 6), pad('online g', 10), pad('offline g', 10), pad('gold err', 10),
+            pad('online k', 9), pad('offline k', 10), pad('kill err', 9)].join(' '))
+  out.push('-'.repeat(70))
+  let failed = 0
+  for (const r of rs) {
+    const bad = Math.abs(r.goldError) > tolerance
+    if (bad) failed++
+    out.push([pad(r.seed, 6), pad(r.onlineGold, 10), pad(r.offlineGold, 10),
+              pad(`${(r.goldError * 100).toFixed(1)}%${bad ? ' !' : ''}`, 10),
+              pad(r.onlineKills, 9), pad(r.offlineKills, 10),
+              pad(`${(r.killError * 100).toFixed(1)}%`, 9)].join(' '))
+  }
+  const meanGold = rs.reduce((a, r) => a + r.goldError, 0) / rs.length
+  const meanKill = rs.reduce((a, r) => a + r.killError, 0) / rs.length
+  out.push('')
+  // The claim is about the MEAN, not any one run. A single online window is one sample of
+  // a noisy process — crit rolls, drop rolls, elite spawns, deaths — while the projection
+  // returns that process's expectation. Per-seed spread of ±25% is the process, not a bug;
+  // a mean that keeps landing on one side is the bug, because it means a systematic
+  // discount or bonus, and parity 1.0 forbids both.
+  out.push(`per-seed spread is sampling noise; the parity claim is about the mean.`)
+  out.push(`mean gold error ${(meanGold * 100).toFixed(1)}%   mean kill error ${(meanKill * 100).toFixed(1)}%`)
+  out.push(`${failed}/${rs.length} individual seeds outside ±${Math.round(tolerance * 100)}%`)
+  const biased = Math.abs(meanGold) > MEAN_TOLERANCE
+  out.push(biased
+    ? `FAIL — mean is outside ±${Math.round(MEAN_TOLERANCE * 100)}%, which is bias rather than noise`
+    : `ok — no systematic discount or bonus (mean within ±${Math.round(MEAN_TOLERANCE * 100)}%)`)
+  return out.join('\n')
 }
 
 // ── Stall detection ───────────────────────────────────────────────────────────
