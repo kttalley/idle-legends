@@ -13,7 +13,9 @@
 // §4.3 makes measuring the gold curve a precondition for pricing anything.
 
 import { useGameStore } from '../store/gameStore'
-import { INVENTORY_SLOTS, RARITY_WEIGHTS, BAG_SLOTS_MAX_PURCHASED } from '../data/constants'
+import {
+  INVENTORY_SLOTS, RARITY_WEIGHTS, BAG_SLOTS_MAX_PURCHASED, ZONE_STUCK_SECONDS,
+} from '../data/constants'
 import type { ClassType, GameState, RaceType, TownId, ZoneId } from '../data/types'
 import { ZONE_ORDER } from '../data/zones'
 import { canEnterZone, townForZone } from '../engine/zoneProgression'
@@ -406,6 +408,20 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
       fail(t, 'unbilled sales are never negative', `${s.merchantContract.soldSinceBill}`)
     }
 
+    // ── The anti-brick property ───────────────────────────────────────────────
+    // The failure this whole track exists to prevent: a hero parked somewhere they cannot
+    // make progress, forever, with nobody watching. Retreat is supposed to make that
+    // unreachable, so assert the outcome rather than the mechanism — if the hero has stood
+    // in one zone for well past the stuck threshold with nothing to show for it, the
+    // rescue did not happen, whatever the reason.
+    if (s.settings.autoAdvanceZones &&
+        s.zoneWatch.zone === s.currentZone &&
+        s.zoneWatch.kills === 0 &&
+        s.zoneWatch.seconds > ZONE_STUCK_SECONDS * 3) {
+      fail(t, 'a hero is never stranded in an unkillable zone',
+        `${s.currentZone}: ${Math.round(s.zoneWatch.seconds)}s with 0 kills (level ${s.level})`)
+    }
+
     if (t % ticksPerSample === 0) {
       if (o.sellCommons) store.getState().sellAllCommon()
       if (o.buyBagSlots || o.buyContract) {
@@ -508,13 +524,23 @@ export function runSaveMigration(): Violation[] {
 
 // ── Offline parity ────────────────────────────────────────────────────────────
 //
-// The claim offline progress makes is exact: being away pays what being present paid.
-// That is checkable rather than arguable — play online for a window, measure what it
-// produced, then ask the projection what the SAME window is worth and compare.
+// The claim, stated precisely, is two-sided in one direction only:
 //
-// A tolerance is unavoidable and it is not a fudge: the online run is one noisy sample of
-// a random process (crit rolls, drop rolls, elite spawns, deaths), while the projection
-// returns that process's mean. They should agree in expectation, not to the gold.
+//   1. Being away NEVER pays better than being present. This is the one that matters —
+//      if idling out-earned playing, closing the tab would be the optimal strategy, which
+//      is a far worse failure than paying a little light.
+//   2. When nothing is changing, being away pays the SAME. A hero at a settled level in a
+//      settled zone should come back to what they would have earned watching.
+//
+// It deliberately does NOT claim to match a hero mid-progression. The projection replays a
+// measured rate; a hero who levels up and moves to a richer zone during the window
+// compounds in a way no fixed rate can follow, and chasing that would mean rebuilding the
+// combat model inside the projection. Measured, auto-advance alone opens a ~40% gap — all
+// of it in the player's disfavour, which is the safe direction.
+//
+// A tolerance is unavoidable and is not a fudge: the online run is one noisy sample of a
+// random process (crit rolls, drop rolls, elite spawns, deaths), while the projection
+// returns that process's mean. They agree in expectation, not to the gold.
 
 /** How far the MEAN error may sit from zero before it stops being noise. */
 export const MEAN_TOLERANCE = 0.10
@@ -531,11 +557,17 @@ export interface ParityResult {
 }
 
 export function runOfflineParity(
-  minutes: number, seed: number, stepSeconds = 0.25, warmupMinutes = 30,
+  minutes: number, seed: number, stepSeconds = 0.25, warmupMinutes = 30, settled = false,
 ): ParityResult {
   if (typeof __setSeed === 'function') __setSeed(seed)
   const store = useGameStore
   store.getState().initGame('warrior', 'human')
+  if (settled) {
+    // Hold the hero still so the comparison isolates rate-replay fidelity from
+    // progression. This is the condition under which exact parity is actually claimed.
+    const st = store.getState()
+    useGameStore.setState({ settings: { ...st.settings, autoAdvanceZones: false } })
+  }
 
   // Warm the rate record up on a stretch of real play. A LONG warmup settles the hero's
   // level, which is the control for whether any residual error is progression or bias.

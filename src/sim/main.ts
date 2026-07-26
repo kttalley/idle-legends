@@ -42,7 +42,8 @@ if (process.argv.includes('--parity')) {
   const seeds = Array.from({ length: sweepCount || 8 }, (_, i) => i + 1)
   const tolerance = argNum('--tolerance', 0.35)
   const results = seeds.map(seed =>
-    runOfflineParity(opts.minutes, seed, opts.stepSeconds, argNum('--warmup', 30)))
+    runOfflineParity(opts.minutes, seed, opts.stepSeconds, argNum('--warmup', 30),
+      process.argv.includes('--settled')))
   process.stdout.write(formatParity(results, opts.minutes, tolerance) + '\n')
 } else if (process.argv.includes('--assert')) {
   // Every scenario shape, across N seeds, checked every tick.
@@ -72,13 +73,24 @@ if (process.argv.includes('--parity')) {
   }
   // Offline parity is part of the standard check: it is the one claim that would be
   // invisible in normal play until players noticed idling paid worse than watching.
-  const parity = seeds.map(seed => runOfflineParity(60, seed, opts.stepSeconds))
-  const meanErr = parity.reduce((a, r) => a + r.goldError, 0) / parity.length
-  if (Math.abs(meanErr) <= MEAN_TOLERANCE) {
-    process.stdout.write(`  ok    offline parity — mean gold error ${(meanErr * 100).toFixed(1)}% over ${seeds.length} seeds\n`)
+  // (a) Settled hero: exact parity is claimed and checked two-sided.
+  const settled = seeds.map(seed => runOfflineParity(60, seed, opts.stepSeconds, 120, true))
+  const settledErr = settled.reduce((a, r) => a + r.goldError, 0) / settled.length
+  if (Math.abs(settledErr) <= MEAN_TOLERANCE) {
+    process.stdout.write(`  ok    offline parity, settled hero — mean ${(settledErr * 100).toFixed(1)}%\n`)
   } else {
     failed++
-    process.stdout.write(`  FAIL  offline parity — mean gold error ${(meanErr * 100).toFixed(1)}%, outside ±${Math.round(MEAN_TOLERANCE * 100)}%\n`)
+    process.stdout.write(`  FAIL  offline parity, settled hero — mean ${(settledErr * 100).toFixed(1)}%, outside ±${Math.round(MEAN_TOLERANCE * 100)}%\n`)
+  }
+  // (b) Progressing hero: only the dangerous direction is forbidden. Idling must never
+  //     out-earn playing, or closing the tab becomes the optimal strategy.
+  const moving = seeds.map(seed => runOfflineParity(60, seed, opts.stepSeconds, 30, false))
+  const movingErr = moving.reduce((a, r) => a + r.goldError, 0) / moving.length
+  if (movingErr <= MEAN_TOLERANCE) {
+    process.stdout.write(`  ok    offline never out-earns online — mean ${(movingErr * 100).toFixed(1)}% while progressing\n`)
+  } else {
+    failed++
+    process.stdout.write(`  FAIL  offline OUT-EARNS online by ${(movingErr * 100).toFixed(1)}% — idling would beat playing\n`)
   }
 
   const migration = runSaveMigration()

@@ -87,6 +87,14 @@ export const ITEM_DROP_CHANCE = 0.25         // 25% chance per kill
 export const ELITE_SPAWN_CHANCE = 0.05       // 5% chance mob is elite
 export const GOLD_DROP_VARIANCE = 0.4        // ±40% on gold drops
 
+// ── Unattended zone progression ───────────────────────────────────────────────
+// An idle hero never changed zone, because `selectZone` is a click — so an untouched
+// character farmed zone 1 forever. Auto-advance fixes that, and the retreat rule is what
+// makes it safe: measured before it existed, a hero who moved into a zone they could not
+// handle took ZERO kills in eleven simulated hours and never recovered.
+/** Field time with no kill at all before the hero judges a zone beyond them and falls back. */
+export const ZONE_STUCK_SECONDS = 300
+
 // ── Zone unlock kill threshold ────────────────────────────────────────────────
 export const ZONE_UNLOCK_KILLS = 50          // kills needed to unlock boss
 export const BOSS_HP_MULTIPLIER = 10

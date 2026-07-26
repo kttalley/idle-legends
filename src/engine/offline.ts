@@ -63,9 +63,19 @@ export interface GatherProjection {
 // re-simulation needs sub-second ticks, because combat resolves at most one swing per
 // tick, which is ~115,000 ticks for an 8-hour window and far too slow on a phone.
 //
-// PARITY IS EXACTLY 1.0. Offline pays what online paid, no discount and no bonus. That is
-// the house rule taken literally: there is then no dominant strategy, nothing to tune, and
-// no reason to leave a tab burning. It is also directly assertable — see the harness.
+// The parity promise, stated precisely, because measuring it forced the wording:
+//
+//   • Offline NEVER pays better than online. This is the one that matters — if idling
+//     out-earned playing, closing the tab would be the optimal strategy, and that is a far
+//     worse failure than paying a little light. Asserted in the harness.
+//   • When nothing is changing, offline pays the SAME. A settled hero comes back to what
+//     watching would have given them (measured within a few percent).
+//
+// It does NOT claim to match a hero mid-progression, and cannot: the projection replays a
+// measured rate, while a hero who levels and moves to a richer zone compounds in a way no
+// fixed rate follows. Auto-advance alone opens a ~40% gap — entirely in the safe
+// direction. Closing it would mean rebuilding the combat model in here, which is exactly
+// the duplication this design avoids.
 
 /**
  * An exponentially-weighted record of what combat actually produced, updated live and

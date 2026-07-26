@@ -41,7 +41,7 @@ import {
   INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
   ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE,
   BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
-  AUTOSAVE_INTERVAL_MS,
+  AUTOSAVE_INTERVAL_MS, ZONE_STUCK_SECONDS,
   BAG_SLOTS_MAX_PURCHASED, BAG_SLOT_BASE_COST, BAG_SLOT_COST_GROWTH,
   SALVAGE_RATE, HOSTILE_TOWN_MARKUP, RARITY_ORDER,
   MERCHANT_CONTRACT_COST, MERCHANT_UPKEEP_RATE, MERCHANT_UPKEEP_MIN, MERCHANT_UPKEEP_SECONDS,
@@ -97,6 +97,47 @@ function readZoomPref(): number {
 }
 function writeZoomPref(n: number): void {
   try { localStorage.setItem(ZOOM_KEY, String(n)) } catch { /* private mode / no storage */ }
+}
+
+// ── Unattended zone progression ───────────────────────────────────────────────
+/**
+ * Decide whether an unattended hero should move on, or fall back.
+ *
+ * Advance is the easy half: take the next zone the moment it is legal. Retreat is what
+ * makes advancing safe, and it deliberately measures THROUGHPUT rather than deaths. Death
+ * costs nothing here — no gold penalty, three-second respawn — so dying a lot is not the
+ * failure state. Taking no kills is. Before this existed a hero who wandered into a zone
+ * the game had already unlocked for them landed zero kills in eleven simulated hours,
+ * dying on repeat, with nothing in the log to say the run was over.
+ *
+ * Thrash between the two is prevented structurally rather than by a cooldown: a zone the
+ * hero was driven out of records the level it beat them at, and auto-advance refuses to
+ * return until they have passed it. Every retreat raises the bar; only levelling lowers
+ * it. So the pair cannot oscillate, whatever combat tuning lands later.
+ */
+export function decideZoneMove(
+  s: Pick<GameState,
+    'currentZone' | 'level' | 'bossesDefeated' | 'zoneWatch' | 'zoneBlockedAtLevel' | 'settings'>,
+): { to: ZoneId; retreat: boolean } | null {
+  if (!s.settings?.autoAdvanceZones) return null
+
+  const idx = ZONE_ORDER.indexOf(s.currentZone)
+
+  // Retreat: long enough in this zone with nothing at all to show for it.
+  if (s.zoneWatch.zone === s.currentZone &&
+      s.zoneWatch.seconds >= ZONE_STUCK_SECONDS &&
+      s.zoneWatch.kills === 0 &&
+      idx > 0) {
+    return { to: ZONE_ORDER[idx - 1] as ZoneId, retreat: true }
+  }
+
+  // Advance: the next zone is legal, and is not one that has already beaten us at this level.
+  const next = ZONE_ORDER[idx + 1] as ZoneId | undefined
+  if (!next) return null
+  if (!canEnterZone(next, s.level, s.bossesDefeated)) return null
+  const blockedAt = s.zoneBlockedAtLevel[next]
+  if (blockedAt !== undefined && s.level <= blockedAt) return null
+  return { to: next, retreat: false }
 }
 
 // ── Bag capacity & the price of it ────────────────────────────────────────────
@@ -247,6 +288,8 @@ function defaultState(): GameState {
     lastTickTimestamp: Date.now(),
     offlineRates: emptyRates(),
     lastOffline: null,
+    zoneWatch: { zone: 'sunhollow_meadows', seconds: 0, kills: 0 },
+    zoneBlockedAtLevel: {},
     totalPlayTime: 0,
     settings: {
       tickRateMs: 1000,
@@ -254,6 +297,7 @@ function defaultState(): GameState {
       showDamageNumbers: true,
       autoSellCommon: false,
       autoEquip: true,
+      autoAdvanceZones: true,
       volume: 0.5,
     },
     // Map / Travel / Professions
@@ -310,7 +354,13 @@ function rehydrateState(saved: GameState): GameState {
   saved.totalSalvaged     = saved.totalSalvaged ?? 0
   // A save written before auto-equip existed opts IN: it is a strict improvement for the
   // hero it most affects, and leaving it off would preserve the very bug it fixes.
-  saved.settings = { ...saved.settings, autoEquip: saved.settings?.autoEquip ?? true }
+  saved.settings = {
+    ...saved.settings,
+    autoEquip: saved.settings?.autoEquip ?? true,
+    autoAdvanceZones: saved.settings?.autoAdvanceZones ?? true,
+  }
+  saved.zoneWatch = { zone: saved.currentZone, seconds: 0, kills: 0 }
+  saved.zoneBlockedAtLevel = saved.zoneBlockedAtLevel ?? {}
   saved.offlineRates      = saved.offlineRates ?? emptyRates()
   saved.lastOffline       = null   // set by the load path if there is time to grant
   saved.totalAutoSold     = saved.totalAutoSold ?? 0
@@ -783,6 +833,7 @@ interface GameActions {
   sellAllCommon: () => void
   buyBagSlot: () => void
   setAutoEquip: (on: boolean) => void
+  setAutoAdvanceZones: (on: boolean) => void
   dismissOfflineReport: () => void
   buyMerchantContract: () => void
   setMerchantThreshold: (threshold: Rarity) => void
@@ -1661,6 +1712,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       offlineRates: accrueRates(
         state.offlineRates, deltaSeconds, killGoldThisTick, xpThisTick, killsThisTick,
       ),
+      // Evidence for the retreat rule. Reset whenever the hero changes zone, so it always
+      // describes the ground they are standing on.
+      zoneWatch: state.zoneWatch.zone === currentZone
+        ? { zone: currentZone, seconds: state.zoneWatch.seconds + deltaSeconds,
+            kills: state.zoneWatch.kills + killsThisTick }
+        : { zone: currentZone, seconds: deltaSeconds, kills: killsThisTick },
       totalSalvaged: state.totalSalvaged + salvaged,
       totalAutoSold: state.totalAutoSold + autoSold,
       // Bank what the factor moved this tick against their next bill.
@@ -1682,6 +1739,34 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // A channel completed this tick → resolve its effects now (own get()/set(),
     // reads the just-committed state; reuses the instant-cast path + cooldown).
     if (castCompletedId) get().finishCast(castCompletedId)
+
+    // ── Move on, or fall back ────────────────────────────────────────────────
+    // Runs against the JUST-COMMITTED state so it sees this tick's zoneWatch, and only
+    // between fights, so it never yanks the hero off an enemy mid-swing.
+    const committed = get()
+    if (committed.gameMode === 'combat' && committed.isAlive && !committed.currentMob) {
+      const move = decideZoneMove(committed)
+      if (move) {
+        if (move.retreat) {
+          set({
+            // Remember the level this zone beat us at — auto-advance will not bring the
+            // hero back until they have out-levelled the defeat.
+            zoneBlockedAtLevel: {
+              ...committed.zoneBlockedAtLevel, [committed.currentZone]: committed.level,
+            },
+            combatLog: [
+              log('zone_change',
+                `Nothing here falls to you. Falling back to ${ZONES[move.to].name}.`, '#ff8844'),
+              ...committed.combatLog,
+            ].slice(0, LOG_MAX),
+          })
+        }
+        // Walk there, using the same journey a player's click would take — travel time
+        // and all — rather than teleporting. `canEnterZone` gates on a MINIMUM level and
+        // the prerequisite boss, so a retreat to already-cleared ground always passes.
+        get().beginTravel(move.to)
+      }
+    }
   },
 
   // ── Equipment ────────────────────────────────────────────────────────────────
@@ -1759,6 +1844,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   },
 
   dismissOfflineReport: () => { if (get().lastOffline) set({ lastOffline: null }) },
+
+  /** Player's call on whether the hero roams the world unsupervised. */
+  setAutoAdvanceZones: (on) => {
+    const s = get()
+    if ((s.settings.autoAdvanceZones !== false) === on) return
+    set({ settings: { ...s.settings, autoAdvanceZones: on } })
+  },
 
   /** Player's call on whether drops are worn automatically. Persisted with the save. */
   setAutoEquip: (on) => {

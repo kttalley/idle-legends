@@ -52,7 +52,7 @@ function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
 export function InventoryPanel() {
   const {
     inventory, equipment, equipItem, unequipItem, sellItem, sellAllCommon,
-    settings, setAutoEquip,
+    settings, setAutoEquip, setAutoAdvanceZones,
   } = useGameStore()
   const [activeTab, setActiveTab] = useState<'inventory' | 'equipment'>('equipment')
   const used = inventory.filter(Boolean).length
@@ -104,6 +104,22 @@ export function InventoryPanel() {
                 style={{ accentColor: '#c8a100', width: 11, height: 11 }}
               />
               Auto-equip upgrades
+            </label>
+            <label
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8,
+                fontSize: '0.6rem', color: settings.autoAdvanceZones ? '#88ccaa' : '#9d9d9d',
+                cursor: 'pointer', userSelect: 'none',
+              }}
+              title="Move on when the next zone opens, and fall back from one that proves too hard."
+            >
+              <input
+                type="checkbox"
+                checked={settings.autoAdvanceZones !== false}
+                onChange={e => setAutoAdvanceZones(e.target.checked)}
+                style={{ accentColor: '#c8a100', width: 11, height: 11 }}
+              />
+              Roam onward when ready
             </label>
             {SLOTS.map(slot => {
               const item = equipment[slot]

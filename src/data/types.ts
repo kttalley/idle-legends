@@ -347,6 +347,9 @@ export interface GameSettings {
    * and then took zero kills in eleven simulated hours.
    */
   autoEquip: boolean
+  /** Move on when the next zone opens, and fall back from one that proves too hard.
+   *  Without it an untouched hero farms the starting zone forever. */
+  autoAdvanceZones: boolean
   volume: number
 }
 
@@ -422,6 +425,16 @@ export interface GameState {
   offlineRates: OfflineRates
   /** The last "while you were away" report, held until the player dismisses it. */
   lastOffline: OfflineReport | null
+  /** Field time and kills since arriving in the current zone — the evidence the retreat
+   *  rule acts on. Transient; not worth persisting across a reload. */
+  zoneWatch: { zone: ZoneId; seconds: number; kills: number }
+  /**
+   * Zones the hero has been driven out of, and the level they were when it happened.
+   * Auto-advance refuses to re-enter until they have out-levelled that failure, which is
+   * what stops advance and retreat from thrashing against each other: every retreat
+   * raises the bar, and only levelling can lower it again.
+   */
+  zoneBlockedAtLevel: Partial<Record<ZoneId, number>>
   totalPlayTime: number
   settings: GameSettings
   // ── Map / Travel / Professions ──────────────────────────────────────────────
