@@ -157,6 +157,10 @@ with `rehydrateState` defaults, same pattern as the quest system).
 
 ## Track T — A town that actually works
 
+> **Superseded by `.planning/economy-and-towns-plan.md`**, which measures the economy
+> (gold has zero sinks; the 20-slot bag silently destroys loot after ~30 min) and
+> re-frames this track around buying better idling rather than adding a shop.
+
 ### Problem
 
 `TownServiceType = 'rest' | 'vendor' | 'repair'`. Only **rest** is implemented. `TownView.tsx`

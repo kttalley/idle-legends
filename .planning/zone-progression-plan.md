@@ -1,6 +1,8 @@
 # Plan: Zone Progression & Quest Framework
 
-**Status:** draft plan — awaiting approval.
+**Status:** SHIPPED (commits 028ea7e, 02cb03b). The Venture Onward dead-button bug this
+plan's §5 introduced was fixed later in 13d6a01; see that commit for the boss-vs-level
+pacing problem it exposed, which is still open.
 
 ## Goal
 
