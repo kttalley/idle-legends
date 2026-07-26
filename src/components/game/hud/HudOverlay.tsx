@@ -1,9 +1,13 @@
 import React from 'react'
+import { useGameStore } from '../../../store/gameStore'
 import { MinimapRadar } from './MinimapRadar'
 import { UnitFrames } from './UnitFrames'
 import { ActionBar } from './ActionBar'
-import { StrikeMeter } from '../StrikeMeter'
 import { CraftResultToast } from '../CraftResultToast'
+import { TravelOverlay } from '../TravelOverlay'
+import { GatheringPanel } from '../GatheringPanel'
+import { CraftingPanel } from '../CraftingPanel'
+import { TownView } from '../TownView'
 
 // WoW/Diablo-style HUD shell: a click-through DOM overlay painted on top of the
 // dimetric world canvas (text/tooltips stay crisp; the canvas renders only the world).
@@ -14,6 +18,12 @@ import { CraftResultToast } from '../CraftResultToast'
 // few pixels when a column is folded away or on mobile, so the HUD reclaims the space.
 // Each panel re-enables pointer-events for its own interactive bits.
 export function HudOverlay() {
+  const gameMode = useGameStore(s => s.gameMode)
+  const currentTown = useGameStore(s => s.currentTown)
+  const showTown = gameMode === 'in_town' && !!currentTown
+  const showPanel = gameMode === 'traveling' || gameMode === 'gathering'
+    || gameMode === 'crafting' || showTown
+
   return (
     <div className="hud-layer">
       <div className="hud-tl"><UnitFrames /></div>
@@ -22,11 +32,20 @@ export function HudOverlay() {
       <div className="hud-tr" style={{ marginTop: 150, display: 'flex', justifyContent: 'flex-end' }}>
         <CraftResultToast />
       </div>
-      {/* Strike meter — floats just above the action bar, on the world rather than in a
-          separate screen. Renders nothing outside gathering mode. */}
-      <div className="hud-strike"><StrikeMeter /></div>
-      {/* Bottom dock. Inset by the rails so it never slides under a glass column. */}
-      <div className="hud-bottom"><ActionBar /></div>
+      {/* Bottom stack: mode panel above the action bar, in ONE flow. Positioning them
+          independently meant guessing the bar's height, which changes with the mode —
+          the panel sat on top of it and the XP strip. */}
+      <div className="hud-bottom">
+        {showPanel && (
+          <div className="app-modepanel rp-glass">
+            {gameMode === 'traveling' && <TravelOverlay />}
+            {gameMode === 'gathering' && <GatheringPanel />}
+            {gameMode === 'crafting'  && <CraftingPanel />}
+            {showTown && <TownView />}
+          </div>
+        )}
+        <ActionBar />
+      </div>
     </div>
   )
 }

@@ -9,7 +9,10 @@ import { TalentTree } from './TalentTree'
 type Tab = 'stats' | 'talents'
 
 export function CharacterPanel() {
-  const { stats, level, xp, playerClass, gold, talentPoints, playerName, nameGenStatus } = useGameStore()
+  const {
+    stats, level, xp, playerClass, gold, talentPoints, playerName, nameGenStatus,
+    returnToMenu,
+  } = useGameStore()
   const classDef = CLASS_DEFINITIONS[playerClass]
   const xpNeeded = xpForLevel(level)
   const [tab, setTab] = useState<Tab>('stats')
@@ -28,7 +31,19 @@ export function CharacterPanel() {
             <div style={{ fontSize: '0.5rem', color: '#666' }}>Naming…</div>
           )}
         </div>
-        <GoldDisplay gold={gold} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <GoldDisplay gold={gold} />
+          {/* Was in a floating top bar that spanned the screen for the sake of two
+              controls. Gold already lived here; switching hero belongs with the hero. */}
+          <button
+            className="rp-button"
+            onClick={returnToMenu}
+            title="Save and return to character select"
+            style={{ fontSize: '0.55rem', padding: '2px 7px' }}
+          >
+            Heroes
+          </button>
+        </div>
       </div>
 
       {/* Tab bar */}

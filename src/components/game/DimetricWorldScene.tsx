@@ -32,6 +32,7 @@ export function DimetricWorldScene() {
     // intent, the store owns the state change.
     controller.onEngageTarget = () => useGameStore.getState().engageTarget()
     controller.onSelectTarget = (id: string) => useGameStore.getState().setTarget(id)
+    controller.onTownNpcChanged = id => useGameStore.getState().setActiveTownNpc(id)
 
     controller.init().then(() => {
       if (disposed) return

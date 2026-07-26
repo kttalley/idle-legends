@@ -53,6 +53,7 @@ import type { ThoughtEvent } from '../engine/nameGen'
 import { slotStorage, summarize, newSlotId } from './saveSlots'
 import { emptyRates, accrueRates, projectOfflineProgress } from '../engine/offline'
 import { compileUpgrades, upgradeCost, UPGRADE_BY_ID, type UpgradeId } from '../data/upgrades'
+import type { TownServiceKind } from '../data/townNpcs'
 
 // The slot currently loaded into the store — the target of every autosave. Null
 // while at the character-select menu. Kept out of GameState so it isn't serialized
@@ -263,6 +264,7 @@ function defaultState(): GameState {
     totalSalvaged: 0,
     skillCooldowns: {},
     currentZone: 'sunhollow_meadows',
+    activeTownNpc: null,
     mobs: [],
     targetMobId: null,
     currentMob: null,
@@ -416,6 +418,7 @@ function rehydrateState(saved: GameState): GameState {
   saved.weatherState  = { type: 'clear', timer: 45, cloudOffset: 0, rainPhase: 0 }
   saved.mobMapOffset       = { dx: 0, dy: 0 }
   saved.currentTown        = null
+  saved.activeTownNpc      = null
   saved.generatedTownNames = saved.generatedTownNames ?? {}
   saved.zoomLevel          = readZoomPref()  // global UI pref, not per-slot
   // Zone quest fields (added after this save was written)
@@ -837,6 +840,7 @@ interface GameActions {
   buyBagSlot: () => void
   setAutoEquip: (on: boolean) => void
   setAutoAdvanceZones: (on: boolean) => void
+  setActiveTownNpc: (id: TownServiceKind | null) => void
   buyUpgrade: (id: UpgradeId) => void
   dismissOfflineReport: () => void
   buyMerchantContract: () => void
@@ -1875,6 +1879,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     })
   },
 
+  /** Reported by the world scene as the hero walks around town. */
+  setActiveTownNpc: (id) => {
+    if (get().activeTownNpc !== id) set({ activeTownNpc: id })
+  },
+
   /** Player's call on whether the hero roams the world unsupervised. */
   setAutoAdvanceZones: (on) => {
     const s = get()
@@ -1955,7 +1964,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     resetCombatAccumulators()
     set({
       unlockedZones, zoneMaps, currentZone: zoneId,
-      gameMode: 'combat', currentTown: null, mobs: [], targetMobId: null, currentMob: null,
+      gameMode: 'combat', currentTown: null, activeTownNpc: null, mobs: [], targetMobId: null, currentMob: null,
       mobRespawnTimer: 0, activeDoTs: [], travelTarget: null, travelProgress: 0,
       playerMapPos: { x: 32, y: 32 },
     })

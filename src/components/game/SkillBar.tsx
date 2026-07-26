@@ -11,11 +11,15 @@ interface SlotProps {
   remaining: number
   onActivate: () => void
   onInspect: () => void
+  compact?: boolean
 }
 
-function SkillSlot({ ability, remaining, onActivate, onInspect }: SlotProps) {
+function SkillSlot({ ability, remaining, onActivate, onInspect, compact }: SlotProps) {
   const pct = remaining > 0 ? remaining / ability.cooldownSeconds : 0
   const onCd = remaining > 0
+  // 64px slots plus four mode toggles overflowed a 390px viewport, which is why the bar
+  // was pressed against both edges. 56 still clears the touch minimum comfortably.
+  const size = compact ? 56 : 64
 
   // Abilities are the one place tap CANNOT open an inspector: firing them is a combat
   // action and has to stay a single instant press. So the description — which used to
@@ -32,8 +36,8 @@ function SkillSlot({ ability, remaining, onActivate, onInspect }: SlotProps) {
       disabled={onCd}
       style={{
         position: 'relative',
-        width: 64,
-        height: 64,
+        width: size,
+        height: size,
         background: onCd
           ? 'linear-gradient(180deg, #1a1508, #0d0b05)'
           : 'linear-gradient(180deg, #3a2c10, #1f1a08)',
@@ -76,16 +80,16 @@ function SkillSlot({ ability, remaining, onActivate, onInspect }: SlotProps) {
 
       {/* Icon — pixel sprite (falls back to the emoji glyph if unmapped) */}
       <span style={{ zIndex: 1, opacity: onCd ? 0.5 : 1 }}>
-        <SpriteIcon emoji={ability.icon} size={26} />
+        <SpriteIcon emoji={ability.icon} size={compact ? 22 : 26} />
       </span>
 
       {/* Name (truncated) */}
       <span style={{
-        fontSize: '0.5rem',
+        fontSize: compact ? '0.45rem' : '0.5rem',
         color: onCd ? '#666' : '#d4b896',
         textAlign: 'center',
         lineHeight: 1.1,
-        maxWidth: 56,
+        maxWidth: size - 8,
         overflow: 'hidden',
         whiteSpace: 'nowrap',
         textOverflow: 'ellipsis',
@@ -115,7 +119,8 @@ function SkillSlot({ ability, remaining, onActivate, onInspect }: SlotProps) {
   )
 }
 
-export function SkillBar({ embedded = false }: { embedded?: boolean } = {}) {
+export function SkillBar({ embedded = false, compact = false }:
+  { embedded?: boolean; compact?: boolean } = {}) {
   const { playerClass, skillCooldowns, activateAbility, currentMob, isAlive } = useGameStore()
   const abilities = getClassAbilities(playerClass)
   const [inspected, setInspected] = useState<ActiveAbilityDef | null>(null)
@@ -165,7 +170,7 @@ export function SkillBar({ embedded = false }: { embedded?: boolean } = {}) {
   // the ActionBar owns the panel. Standalone: the legacy fixed bottom strip.
   if (embedded) {
     return (
-      <div className="flex items-center justify-center gap-2">
+      <div className="flex items-center justify-center" style={{ gap: compact ? 5 : 8 }}>
         {abilities.map(ability => (
           <SkillSlot
             key={ability.id}
@@ -173,6 +178,7 @@ export function SkillBar({ embedded = false }: { embedded?: boolean } = {}) {
             remaining={skillCooldowns[ability.id] ?? 0}
             onActivate={() => isAlive && activateAbility(ability.id)}
             onInspect={() => setInspected(ability)}
+            compact={compact}
           />
         ))}
         {sheet}

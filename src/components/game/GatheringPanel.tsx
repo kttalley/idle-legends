@@ -4,6 +4,7 @@ import { ZONE_MATERIALS, MATERIALS, CLASS_PROFESSIONS } from '../../data/profess
 import { ZONES } from '../../data/zones'
 import { HealthBar } from '../ui/HealthBar'
 import { SpriteIcon } from '../ui/SpriteIcon'
+import { StrikeMeter } from './StrikeMeter'
 import {
   GATHER_SECONDS, QUALITY_LABEL, QUALITY_RARITY, RICHNESS_COLOR, RICHNESS_LABEL,
   stockPurity, stockQuality,
@@ -36,7 +37,12 @@ export function GatheringPanel() {
   const idle = projectGathering(60)
 
   return (
-    <div className="flex flex-col gap-2 flex-1" style={{ padding: '10px 8px' }}>
+    <div className="flex flex-col gap-2" style={{ padding: '8px 10px' }}>
+      {/* The minigame first, and inside the panel rather than floating beneath it.
+          As separate layers the panel simply covered the meter — the one thing in
+          gathering mode the player is actually meant to be looking at. */}
+      <div className="flex justify-center"><StrikeMeter /></div>
+
       {/* Header */}
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>

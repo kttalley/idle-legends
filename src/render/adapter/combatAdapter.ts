@@ -19,6 +19,7 @@ import { composePalette } from '../palette'
 import { heroPaletteId } from './heroWardrobe'
 import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
 import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } from '../../engine/walkability'
+import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } from '../../data/townNpcs'
 import { Animator } from '../animation'
 import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId } from './fftaRoster'
 import type { Facing, IndexedSprite } from '../types'
@@ -250,6 +251,8 @@ const TOWN_WALK_RADIUS = 6.5    // raw tiles the player may roam from town centr
 const TOWN_CROWD = 12           // idle heroes milling in the square
 
 interface TownFolk { e: Entity; hx: number; hy: number; tx: number; ty: number; t: number; name: string; faction: FactionType }
+/** A service NPC: a body at a fixed anchor whose menu opens when the hero reaches it. */
+interface TownNpcEnt { def: TownNpcDef; e: Entity }
 
 // ── FFTA scaffold cache ────────────────────────────────────────────────────────
 // Race/class and monster sprite selection lives in fftaRoster.ts.  This cache holds
@@ -329,6 +332,11 @@ export class WorldSceneController {
   private townGround: GroundBuffer | null = null
   private townCrowd: TownFolk[] = []
   private townBuildings: { label: string; tx: number; ty: number }[] = []
+  private townNpcs: TownNpcEnt[] = []
+  /** Which NPC the hero is currently close enough to talk to; null when nobody. */
+  private nearNpc: TownServiceKind | null = null
+  /** Fired when that changes, so the store can open/close the right panel. */
+  onTownNpcChanged: ((id: TownServiceKind | null) => void) | null = null
 
   // Weather + ambience: synced from game state; phases advanced on real time in render.
   private weatherType: WeatherType = 'clear'
@@ -1492,6 +1500,24 @@ export class WorldSceneController {
   moveTo(clientX: number, clientY: number): void {
     const g = this.ground
     if (!g || this.playerDead) return
+    // In town, tapping a service NPC walks the hero to them — the tap is "go see this
+    // person", not "stand exactly on their tile". Stops just short so the two bodies do
+    // not overlap and the arrival still lands inside NPC_TALK_RADIUS.
+    if (this.townMode) {
+      for (const n of this.townNpcs) {
+        if (!this.hitTestEntity(n.e, clientX, clientY)) continue
+        const dx = this.player.tx - n.e.tx, dy = this.player.ty - n.e.ty
+        const d = Math.hypot(dx, dy) || 1
+        const stand = NPC_TALK_RADIUS * 0.62
+        this.tapTx = n.e.tx + (dx / d) * stand
+        this.tapTy = n.e.ty + (dy / d) * stand
+        this.tapMoveActive = true
+        this.tapFlashT = 0.42
+        this.manualMode = false
+        this.playerPath.pts = []
+        return
+      }
+    }
     // Tapping the enemy commits to IT, rather than walking to the patch of ground it
     // happens to be standing on. Checked first so the target is never harder to click
     // than the dirt beneath it.
@@ -1849,6 +1875,7 @@ export class WorldSceneController {
     // Advance the population: the roaming open-world crowd, or the idle town crowd.
     if (this.townMode) {
       try { this.updateTownCrowd(realDt) } catch (err) { console.error('[town] crowd update failed:', err) }
+      try { this.updateNearestNpc() } catch (err) { console.error('[town] npc proximity failed:', err) }
     } else {
       // Pin tall-prop entities to the wrapped copy nearest the player before the sort
       // so they depth-correct against the player/mob as the player moves (Phase E).
@@ -2210,17 +2237,51 @@ export class WorldSceneController {
     this.player.z = 0
     this.player.animator.set('idle')
     this.spawnTownCrowd()
-    this.townBuildings = [
-      { label: '⚒ Blacksmith', tx: -4, ty: -2.5 },
-      { label: '☠ Witch-Doctor', tx: 3.5, ty: -3 },
-      { label: '🍺 Tavern', tx: -3, ty: 3.5 },
-      { label: '📦 Stash', tx: 4, ty: 2.5 },
-    ]
+    this.spawnTownNpcs()
+    this.townBuildings = []
+  }
+
+  /**
+   * Give every town service a body standing at its anchor. These replace the bare
+   * building labels: the services used to live in one panel over the scene, and now the
+   * scene IS the menu — you walk to the person whose business you want.
+   */
+  private spawnTownNpcs(): void {
+    if (!this.rigs) return
+    for (const def of TOWN_NPCS) {
+      const spriteId = heroSpriteId(def.race, def.cls, def.name)
+      const sprite = this.spriteCache[spriteId] ?? this.rigs.player
+      const e = this.scene.spawn(
+        sprite, heroPaletteId(def.cls, def.race, def.faction, 'rare'), def.tx, def.ty,
+      )
+      e.shadow = true
+      e.animator.set('idle')
+      // Face roughly inward, so the square reads as populated rather than as a car park.
+      e.animator.face(def.tx > 0 ? 'sw' : 'se')
+      this.townNpcs.push({ def, e })
+    }
+  }
+
+  /** Nearest NPC inside talking distance, or null. Reported only when it changes. */
+  private updateNearestNpc(): void {
+    let found: TownServiceKind | null = null
+    let best = NPC_TALK_RADIUS
+    for (const n of this.townNpcs) {
+      const d = Math.hypot(n.e.tx - this.player.tx, n.e.ty - this.player.ty)
+      if (d <= best) { best = d; found = n.def.id }
+    }
+    if (found !== this.nearNpc) {
+      this.nearNpc = found
+      this.onTownNpcChanged?.(found)
+    }
   }
 
   private leaveTownScene(): void {
     for (const a of this.townCrowd) a.e.active = false
     this.townCrowd = []
+    for (const n of this.townNpcs) n.e.active = false
+    this.townNpcs = []
+    if (this.nearNpc !== null) { this.nearNpc = null; this.onTownNpcChanged?.(null) }
     this.townBuildings = []
     this.townMode = false
     this.zone = null // force a clean zone rebake (repositions player, respawns crowd/props)
@@ -2284,6 +2345,26 @@ export class WorldSceneController {
       ctx.strokeText(b.label, sx, sy)
       ctx.fillStyle = '#ffe08a'
       ctx.fillText(b.label, sx, sy)
+    }
+    // Service NPCs: role above the head, lit up once the hero is close enough to talk.
+    for (const n of this.townNpcs) {
+      const sx = Math.round(n.e.screenX - this.cam.x)
+      const sy = Math.round(n.e.screenY - this.cam.y - n.e.sprite.frameH - 4)
+      if (sx < -70 || sx > this.cam.w + 70) continue
+      const near = this.nearNpc === n.def.id
+      ctx.font = `700 ${near ? 11 : 10}px system-ui, -apple-system, "Segoe UI", sans-serif`
+      ctx.lineWidth = 3.5
+      ctx.strokeStyle = 'rgba(0,0,0,0.95)'
+      ctx.strokeText(n.def.role, sx, sy)
+      ctx.fillStyle = near ? '#ffe08a' : '#c8a864'
+      ctx.fillText(n.def.role, sx, sy)
+      if (near) {
+        ctx.font = '600 8px system-ui, -apple-system, "Segoe UI", sans-serif'
+        ctx.lineWidth = 3
+        ctx.strokeText(n.def.name, sx, sy + 10)
+        ctx.fillStyle = '#d4b896'
+        ctx.fillText(n.def.name, sx, sy + 10)
+      }
     }
     ctx.font = '600 8px system-ui, -apple-system, "Segoe UI", sans-serif'
     ctx.lineWidth = 3

@@ -83,7 +83,12 @@ body {
 .app-root {
   position: fixed;
   inset: 0;
-  overflow: hidden;
+  /* `clip`, not `hidden`. The closed drawers park themselves off the bottom edge with a
+     transform, which extends the scrollable area — and `overflow: hidden` still scrolls
+     PROGRAMMATICALLY, so focusing a control inside one scrolled the whole shell by 34px
+     and lifted the dock off the bottom of the screen, leaving the log peeking underneath
+     it. `clip` forbids scrolling outright, which is what was meant all along. */
+  overflow: clip;
 }
 
 .app-world {
@@ -93,19 +98,6 @@ body {
 }
 
 /* Floating chrome ------------------------------------------------------------ */
-.app-topbar {
-  position: absolute;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 5px 14px;
-  pointer-events: auto;
-}
-
 .app-sidebar-left,
 .app-sidebar-right {
   position: absolute;
@@ -163,17 +155,14 @@ body {
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
 }
 
-/* Mode panels (town / gathering / crafting) float centre-bottom over the world
-   instead of stacking under a boxed viewport. */
+/* Mode panels (travel / gathering / crafting / town) sit in the bottom stack, directly
+   above the action bar, so the world keeps everything above them. */
 .app-modepanel {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 74px;
-  z-index: 28;
+  pointer-events: auto;
   width: min(560px, calc(100vw - 24px));
-  max-height: 52vh;
+  max-height: 46vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: #4a3818 transparent;
 }
@@ -187,14 +176,6 @@ body {
    Same world layer, same glass; the side columns become sheets that come up over
    it from the edges, and a tab bar replaces the collapse tabs. */
 @media (max-width: 899px) {
-  .app-topbar {
-    top: 6px;
-    left: 6px;
-    right: 6px;
-    transform: none;
-    justify-content: space-between;
-    gap: 8px;
-  }
 
   .app-sidebar-left,
   .app-sidebar-right {
@@ -230,9 +211,8 @@ body {
   .app-log.panel-open { transform: translateY(0); }
 
   .app-modepanel {
-    bottom: calc(var(--dock-h) + var(--safe-b) + 8px);
     width: calc(100vw - 12px);
-    max-height: 46vh;
+    max-height: 40vh;
   }
 
   .app-backdrop {
@@ -283,24 +263,25 @@ body {
 /* Text sits on a moving, high-contrast world. A tight shadow keeps every glass
    panel readable over a bright meadow as well as a dark cavern, which no single
    background alpha can do on its own. */
-.rp-glass, .app-modepanel, .app-topbar { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+.rp-glass, .app-modepanel { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
 
 /* ── HUD rails ─────────────────────────────────────────────────────────────── */
 .hud-layer { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
 .hud-tl { position: absolute; top: 8px; left: var(--rail-l); transition: left 0.28s cubic-bezier(0.4,0,0.2,1); }
 .hud-tr { position: absolute; top: 8px; right: var(--rail-r); transition: right 0.28s cubic-bezier(0.4,0,0.2,1); }
 .hud-bottom { position: absolute; left: var(--rail-l); right: var(--rail-r); bottom: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
   transition: left 0.28s cubic-bezier(0.4,0,0.2,1), right 0.28s cubic-bezier(0.4,0,0.2,1); }
-.hud-strike { position: absolute; left: var(--rail-l); right: var(--rail-r); bottom: 64px;
-  display: flex; justify-content: center; }
 @media (max-width: 899px) {
   /* No persistent rails on mobile — the drawers are transient, so the HUD gets
      the full width and tucks above the dock. */
   .app-root { --rail-l: 6px; --rail-r: 6px; }
-  .hud-tl { top: 44px; }
-  .hud-tr { top: 44px; }
+  /* Nothing above them any more — the HUD starts at the top of the screen. */
+  .hud-tl { top: 8px; }
+  .hud-tr { top: 8px; }
   .hud-bottom { bottom: calc(var(--dock-h) + var(--safe-b)); }
-  .hud-strike { bottom: calc(var(--dock-h) + var(--safe-b) + 64px); }
+  /* Breathing room under the action bar so it is not welded to the XP strip. */
+  .hud-bottom { padding-bottom: 4px; }
 }
 
 /* ── Panels nested inside glass ──────────────────────────────────────────────
@@ -398,6 +379,15 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .sheet, .sheet-scrim { animation: none; }
   .app-sidebar-left, .app-sidebar-right, .app-log, .hud-tl, .hud-tr, .hud-bottom { transition: none; }
+}
+
+/* Gold chip on the bag button — replaces the old full-width top bar. */
+.app-dock-gold {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: #ffd700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.9);
 }
 
 /* ── Dock buttons ─────────────────────────────────────────────────────────────── */

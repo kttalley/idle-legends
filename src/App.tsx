@@ -8,7 +8,6 @@ import { CharacterPanel } from './components/game/CharacterPanel'
 import { InventoryPanel } from './components/game/InventoryPanel'
 import { ZoneSelector } from './components/game/ZoneSelector'
 import { CombatLog } from './components/game/CombatLog'
-import { GoldDisplay } from './components/ui/GoldDisplay'
 import { QuestToast } from './components/game/QuestToast'
 import { OfflineReportToast } from './components/game/OfflineReportToast'
 import { slotStorage } from './store/saveSlots'
@@ -18,13 +17,19 @@ import { SpriteIcon } from './components/ui/SpriteIcon'
 
 const SHOW_DEV_JUMP = new URLSearchParams(window.location.search).has('dev')
 
+/** Compact gold for the dock chip — 1.2K / 46.7K / 3.4M. */
+function formatGold(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`
+  return String(n)
+}
+
 type MobilePanel = 'left' | 'right' | 'log' | null
 
 export default function App() {
   const initialized  = useGameStore(s => s.initialized)
   const initGame     = useGameStore(s => s.initGame)
   const loadSlot     = useGameStore(s => s.loadSlot)
-  const returnToMenu = useGameStore(s => s.returnToMenu)
   const gold         = useGameStore(s => s.gold)
   const currentZone  = useGameStore(s => s.currentZone)
   const devJumpZone  = useGameStore(s => s.devJumpZone)
@@ -95,44 +100,24 @@ export default function App() {
       <QuestToast />
       <OfflineReportToast />
 
-      {/* ── Floating top bar ── */}
-      <div className="app-topbar rp-glass">
-        <div style={{
-          fontFamily: 'Cinzel Decorative, Cinzel, serif',
-          color: '#ffd700',
-          fontSize: '0.85rem',
-          textShadow: '0 0 8px rgba(200,161,0,0.4)',
-          letterSpacing: '0.08em',
-          whiteSpace: 'nowrap',
-        }}>
-          Idle Legends
-        </div>
-        <GoldDisplay gold={gold} />
-        <div className="flex items-center gap-2">
-          {SHOW_DEV_JUMP && (
-            <select
-              value={currentZone}
-              onChange={e => devJumpZone(e.target.value as typeof currentZone)}
-              title="DEV: jump to biome"
-              className="rp-button"
-              style={{ fontSize: '0.55rem', padding: '2px 4px', maxWidth: 120 }}
-            >
-              {ZONE_ORDER.map(z => (
-                <option key={z} value={z}>{ZONES[z]?.name ?? z}</option>
-              ))}
-            </select>
-          )}
-          <button className="rp-button" style={{ fontSize: '0.6rem' }} onClick={returnToMenu}>
-            Menu
-          </button>
-        </div>
-      </div>
-
       {/* ── Left: zones + character ── */}
       <div className={leftClass}>
         <button className="app-drawer-close" onClick={close} aria-label="Close">✕</button>
         <ZoneSelector />
         <CharacterPanel />
+        {SHOW_DEV_JUMP && (
+          <select
+            value={currentZone}
+            onChange={e => devJumpZone(e.target.value as typeof currentZone)}
+            title="DEV: jump to biome"
+            className="rp-button"
+            style={{ fontSize: '0.55rem', padding: '2px 4px' }}
+          >
+            {ZONE_ORDER.map(z => (
+              <option key={z} value={z}>{ZONES[z]?.name ?? z}</option>
+            ))}
+          </select>
+        )}
       </div>
       <button
         className="app-collapse-tab left rp-glass"
@@ -183,7 +168,9 @@ export default function App() {
           onClick={() => toggle('right')}
         >
           <span className="app-dock-btn-icon"><SpriteIcon ui="bag" size={18} /></span>
-          <span>Bag</span>
+          {/* Gold rides the bag rather than occupying a bar across the top of the world:
+              it belongs with the things you spend it on, and costs no vertical space. */}
+          <span className="app-dock-gold">{formatGold(gold)}</span>
         </button>
       </div>
 

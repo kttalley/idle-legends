@@ -256,21 +256,6 @@ export function CombatView() {
       )}
       {DIMETRIC_ENABLED && !HUD_SHELL_ENABLED && gameMode === 'combat' && <SkillBar />}
 
-      {/* ── Traveling overlay ── */}
-      {gameMode === 'traveling' && <TravelOverlay />}
-
-      {/* ── Mode panels ──────────────────────────────────────────────────────
-             Gathering, crafting and town used to stack BELOW the viewport inside
-             this box, which is what pushed the world into a letterbox. They now
-             float over it as glass sheets, docked above the action bar on desktop
-             and above the tab bar on mobile. */}
-      {(gameMode === 'gathering' || gameMode === 'crafting' || (gameMode === 'in_town' && currentTown)) && (
-        <div className="app-modepanel rp-glass">
-          {gameMode === 'gathering' && <GatheringPanel />}
-          {gameMode === 'crafting'  && <CraftingPanel />}
-          {gameMode === 'in_town' && currentTown && <TownView />}
-        </div>
-      )}
 
       {/* ── Combat arena (legacy path only) ── */}
       {!DIMETRIC_ENABLED && gameMode === 'combat' && (

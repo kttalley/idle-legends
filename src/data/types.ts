@@ -355,6 +355,7 @@ export interface GameSettings {
 
 import type { OfflineRates, OfflineReport } from '../engine/offline'
 import type { UpgradeId } from './upgrades'
+import type { TownServiceKind } from './townNpcs'
 
 // ── Full Game State ───────────────────────────────────────────────────────────
 export interface GameState {
@@ -397,6 +398,9 @@ export interface GameState {
   totalSalvaged: number
   skillCooldowns: Record<string, number>  // abilityId → seconds remaining
   currentZone: ZoneId
+  /** The town NPC the hero is currently standing with, if any. Set by the world scene
+   *  from proximity — town services belong to people you walk up to, not to a menu. */
+  activeTownNpc: TownServiceKind | null
   /** Every enemy present in the zone. The player picks which one to fight. */
   mobs: MobInstance[]
   /** The mob being fought. Null lets auto-play choose (nearest); set by the player to

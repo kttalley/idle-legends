@@ -20,7 +20,7 @@ export function TravelOverlay() {
   const goingRight = toIdx > fromIdx
 
   return (
-    <div className="flex flex-col items-center justify-center gap-2 flex-1" style={{ padding: '8px 12px' }}>
+    <div className="flex flex-col items-center justify-center gap-2" style={{ padding: '10px 12px' }}>
       {/* Heading */}
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '0.55rem', color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>

@@ -7,18 +7,26 @@ import {
 } from '../../data/constants'
 import type { Rarity } from '../../data/types'
 import { UPGRADES, upgradeCost } from '../../data/upgrades'
+import { TOWN_NPC_BY_ID } from '../../data/townNpcs'
 import { SpriteIcon } from '../ui/SpriteIcon'
+
+/**
+ * Town, as a conversation rather than a control panel.
+ *
+ * This used to render every service at once — rest, bags, the factor, four standing
+ * upgrades — in one tall sheet that sat permanently over the town scene. Two problems:
+ * the hub the renderer draws was never visible, and the panel was a wall of controls with
+ * no sense of place.
+ *
+ * Now each service belongs to somebody standing somewhere (data/townNpcs.ts). Walking up
+ * to them opens their business and nothing else; walking away closes it. When the hero is
+ * not standing with anyone this is a single line telling them so, and the town is on show.
+ */
 
 const FACTION_COLOR: Record<string, string> = {
   alliance: '#6699ff',
   horde:    '#ff4444',
   neutral:  '#ddaa44',
-}
-
-const TYPE_LABEL: Record<string, string> = {
-  friendly: 'Friendly',
-  neutral:  'Neutral',
-  hostile:  'Hostile',
 }
 
 const TYPE_COLOR: Record<string, string> = {
@@ -27,9 +35,26 @@ const TYPE_COLOR: Record<string, string> = {
   hostile:  '#ff4444',
 }
 
+/** Shared frame: who you are talking to, what they said, then their business. */
+function NpcPanel({ id, children }: { id: keyof typeof TOWN_NPC_BY_ID; children: React.ReactNode }) {
+  const npc = TOWN_NPC_BY_ID[id]
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#ffd700' }}>{npc.role}</span>
+        <span style={{ fontSize: '0.58rem', color: '#d4b896', fontStyle: 'italic' }}>{npc.name}</span>
+      </div>
+      <div style={{ fontSize: '0.55rem', color: '#9d9d9d', fontStyle: 'italic' }}>
+        “{npc.greeting}”
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export function TownView() {
   const {
-    currentTown, generatedTownNames, restInTown, leaveTown, playerFaction,
+    currentTown, generatedTownNames, restInTown, leaveTown, playerFaction, activeTownNpc,
     gold, bagSlotsPurchased, buyBagSlot,
     merchantContract, buyMerchantContract, setMerchantThreshold, cancelMerchantContract,
     totalAutoSold, totalUpkeepPaid, upgradeRanks, buyUpgrade,
@@ -40,11 +65,11 @@ export function TownView() {
   const town = TOWNS[currentTown]
   if (!town) return null
 
-  const displayName = generatedTownNames[currentTown] ?? town.name
-  const factionColor = FACTION_COLOR[town.faction] ?? '#d4b896'
-  const typeLabel = TYPE_LABEL[town.type] ?? town.type
-  const typeColor = TYPE_COLOR[town.type] ?? '#888'
+  const displayName    = generatedTownNames[currentTown] ?? town.name
+  const factionColor   = FACTION_COLOR[town.faction] ?? '#d4b896'
+  const typeColor      = TYPE_COLOR[town.type] ?? '#888'
   const hostileToPlayer = isTownHostileToPlayer(currentTown, playerFaction)
+  const trades         = town.services.includes('vendor')
 
   function handleRest() {
     if (hostileToPlayer) return
@@ -53,159 +78,134 @@ export function TownView() {
     setTimeout(() => setRestFeedback(false), 2000)
   }
 
-  // The outfitter sells bag slots — capacity, not goods. Hostile towns still trade;
-  // they just charge for the privilege (they deny rest, not commerce).
-  const slotsBought = bagSlotsPurchased ?? 0
-  const capacity    = bagCapacity({ bagSlotsPurchased: slotsBought })
-  const bagMaxed    = slotsBought >= BAG_SLOTS_MAX_PURCHASED
-  const slotCost    = townPrice(bagSlotCost(slotsBought), currentTown, playerFaction)
-  const canAfford   = gold >= slotCost
-
-  // The factor: a standing arrangement rather than a purchase, so the panel shows what
-  // it has earned against what it has cost — the player should be able to judge it.
+  const slotsBought  = bagSlotsPurchased ?? 0
+  const capacity     = bagCapacity({ bagSlotsPurchased: slotsBought })
+  const bagMaxed     = slotsBought >= BAG_SLOTS_MAX_PURCHASED
+  const slotCost     = townPrice(bagSlotCost(slotsBought), currentTown, playerFaction)
   const contractCost = townPrice(MERCHANT_CONTRACT_COST, currentTown, playerFaction)
   const contractNet  = totalAutoSold - totalUpkeepPaid
   const upkeepPct    = Math.round(MERCHANT_UPKEEP_RATE * 100)
 
   return (
-    <div
-      style={{
-        padding: '10px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 6,
-        flexShrink: 0,
-      }}
-    >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: factionColor }}>
-          {displayName}
+    <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+      {/* Where you are — one compact line, not a header block. */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: factionColor }}>{displayName}</span>
+        <span style={{ fontSize: '0.5rem', color: typeColor }}>
+          {town.type}{town.type === 'hostile' && <> <SpriteIcon ui="warn" size={10} /></>}
         </span>
-        <span
-          style={{
-            fontSize: '0.5rem',
-            color: typeColor,
-            border: `1px solid ${typeColor}`,
-            borderRadius: 3,
-            padding: '0 4px',
-            lineHeight: '1.4',
-          }}
+        <button
+          className="rp-button"
+          onClick={leaveTown}
+          style={{ fontSize: '0.55rem', padding: '2px 8px', marginLeft: 'auto' }}
         >
-          {typeLabel}{town.type === 'hostile' && <> <SpriteIcon ui="warn" size={11} /></>}
-        </span>
+          Leave
+        </button>
       </div>
 
-      {/* Description */}
-      <div style={{ fontSize: '0.55rem', color: '#9d9d9d', fontStyle: 'italic' }}>
-        {town.description}
-      </div>
-
-      {hostileToPlayer && (
-        <div style={{ fontSize: '0.55rem', color: '#ff6666' }}>
-          The locals recognize you as an enemy of {town.faction === 'horde' ? 'the Ashmarch' : 'the Concord'}. Rest is denied here.
+      {/* ── Nobody nearby: the town is the interface ─────────────────────────── */}
+      {!activeTownNpc && (
+        <div style={{ fontSize: '0.58rem', color: '#9d9d9d' }}>
+          Walk up to someone to do business.
+          <span style={{ color: '#7a6a4a', fontStyle: 'italic' }}>
+            {' '}Tap a name in the square to go to them.
+          </span>
         </div>
       )}
 
-      {/* Services */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-        {town.services.includes('rest') && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <button
-              className="rp-button"
-              onClick={handleRest}
-              disabled={hostileToPlayer}
-              style={{ fontSize: '0.55rem', padding: '2px 8px' }}
-            >
-              Rest & Recover
-            </button>
-            {restFeedback && (
-              <span style={{ fontSize: '0.5rem', color: '#44ff88' }}>
-                Full HP restored
-              </span>
-            )}
-          </div>
-        )}
-        {town.services.includes('vendor') && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      {/* ── Innkeeper ─────────────────────────────────────────────────────────── */}
+      {activeTownNpc === 'rest' && (
+        <NpcPanel id="rest">
+          {hostileToPlayer ? (
+            <div style={{ fontSize: '0.55rem', color: '#ff6666' }}>
+              They know whose colours you wear. No bed here.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button className="rp-button" onClick={handleRest} style={{ fontSize: '0.6rem' }}>
+                Rest & Recover
+              </button>
+              {restFeedback && (
+                <span style={{ fontSize: '0.55rem', color: '#44ff88' }}>Full HP restored</span>
+              )}
+            </div>
+          )}
+        </NpcPanel>
+      )}
+
+      {/* ── Outfitter: bag slots ──────────────────────────────────────────────── */}
+      {activeTownNpc === 'outfitter' && trades && (
+        <NpcPanel id="outfitter">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <button
               className="rp-button"
               onClick={buyBagSlot}
-              disabled={bagMaxed || !canAfford}
-              title={
-                bagMaxed ? 'The outfitter has nothing larger.'
-                : !canAfford ? `Need ${slotCost}g`
-                : `One more slot, to ${capacity + 1}`
-              }
-              style={{ fontSize: '0.55rem', padding: '2px 8px', opacity: bagMaxed || !canAfford ? 0.5 : 1 }}
+              disabled={bagMaxed || gold < slotCost}
+              title={bagMaxed ? 'Nothing larger in stock.' : gold < slotCost ? `Need ${slotCost}g` : undefined}
+              style={{ fontSize: '0.6rem', opacity: bagMaxed || gold < slotCost ? 0.5 : 1 }}
             >
-              {bagMaxed ? 'Bag maxed' : `Buy bag slot — ${slotCost}g`}
+              {bagMaxed ? 'Bag maxed' : `Buy a slot — ${slotCost.toLocaleString()}g`}
             </button>
-            <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>
-              {capacity} slots
-              {!bagMaxed && ` (${BAG_SLOTS_MAX_PURCHASED - slotsBought} more available)`}
+            <span style={{ fontSize: '0.55rem', color: '#9d9d9d' }}>
+              {capacity} slots{!bagMaxed && ` · ${BAG_SLOTS_MAX_PURCHASED - slotsBought} more available`}
             </span>
           </div>
-        )}
-      </div>
-
-      {town.services.includes('vendor') && (
-        <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic' }}>
-          {hostileToPlayer
-            ? 'They will take your gold. They will not pretend to like you — prices are marked up.'
-            : 'A bigger bag means longer in the field before drops start going for scrap.'}
-        </div>
+          <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic' }}>
+            {hostileToPlayer
+              ? 'They will take your gold without pretending to like you — prices are marked up.'
+              : 'A bigger bag means longer in the field before drops start going for scrap.'}
+          </div>
+        </NpcPanel>
       )}
 
-      {/* ── The factor ──────────────────────────────────────────────────────── */}
-      {town.services.includes('vendor') && (
-        <div style={{ borderTop: '1px solid #3a2c10', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {/* ── Factor: the merchant contract ─────────────────────────────────────── */}
+      {activeTownNpc === 'factor' && trades && (
+        <NpcPanel id="factor">
           {!merchantContract ? (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <button
                   className="rp-button"
                   onClick={buyMerchantContract}
                   disabled={gold < contractCost}
-                  title={gold < contractCost ? `Need ${contractCost}g` : 'They buy your junk in the field, at full price'}
-                  style={{ fontSize: '0.55rem', padding: '2px 8px', opacity: gold < contractCost ? 0.5 : 1 }}
+                  title={gold < contractCost ? `Need ${contractCost}g` : undefined}
+                  style={{ fontSize: '0.6rem', opacity: gold < contractCost ? 0.5 : 1 }}
                 >
-                  Retain a factor — {contractCost}g
+                  Retain — {contractCost.toLocaleString()}g
                 </button>
-                <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>
+                <span style={{ fontSize: '0.55rem', color: '#9d9d9d' }}>
                   then {upkeepPct}% of what they move
                 </span>
               </div>
               <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic' }}>
                 They buy every drop below your chosen rarity the moment it falls, at full
-                price — so it never fills a bag slot and never goes for scrap. They keep
-                their {upkeepPct}% cut, never an upgrade, and never more than they earned.
-                Works hardest while you are away.
+                price — never an upgrade, never more than they earned. Works hardest while
+                you are away.
               </div>
             </>
           ) : (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.55rem', color: merchantContract.lapsed ? '#ff8844' : '#88ccaa' }}>
-                  Factor {merchantContract.lapsed ? 'idle — upkeep unpaid' : 'on retainer'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.58rem', color: merchantContract.lapsed ? '#ff8844' : '#88ccaa' }}>
+                  {merchantContract.lapsed ? 'Idle — upkeep unpaid' : 'On retainer'}
                 </span>
-                <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>
-                  earned {totalAutoSold}g · upkeep {totalUpkeepPaid}g ·{' '}
+                <span style={{ fontSize: '0.52rem', color: '#9d9d9d' }}>
+                  earned {totalAutoSold.toLocaleString()}g · upkeep {totalUpkeepPaid.toLocaleString()}g ·{' '}
                   <span style={{ color: contractNet >= 0 ? '#44ff88' : '#ff6666' }}>
-                    net {contractNet >= 0 ? '+' : ''}{contractNet}g
+                    net {contractNet >= 0 ? '+' : ''}{contractNet.toLocaleString()}g
                   </span>
                 </span>
                 <button
                   className="rp-button"
                   onClick={cancelMerchantContract}
-                  style={{ fontSize: '0.5rem', padding: '1px 6px' }}
+                  style={{ fontSize: '0.52rem', padding: '2px 7px' }}
                   title="End the arrangement. No refund, but no more upkeep."
                 >
                   Release
                 </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>Sells below:</span>
+                <span style={{ fontSize: '0.52rem', color: '#9d9d9d' }}>Sells below:</span>
                 {(RARITY_ORDER as readonly Rarity[]).map(r => {
                   const active = merchantContract.threshold === r
                   return (
@@ -215,7 +215,7 @@ export function TownView() {
                       onClick={() => setMerchantThreshold(r)}
                       title={r === 'common' ? 'Sell nothing — the arrangement idles' : `Keep ${r} and better`}
                       style={{
-                        fontSize: '0.5rem', padding: '1px 5px', textTransform: 'capitalize',
+                        fontSize: '0.52rem', padding: '2px 6px', textTransform: 'capitalize',
                         color: rarityColor(r),
                         borderColor: active ? rarityColor(r) : undefined,
                         background: active ? `${rarityColor(r)}22` : undefined,
@@ -226,41 +226,33 @@ export function TownView() {
                   )
                 })}
               </div>
-              <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic' }}>
-                {merchantContract.threshold === 'common'
-                  ? 'Set to keep everything, so they are selling nothing — and still drawing upkeep.'
-                  : `Keeping ${merchantContract.threshold} and better; anything below is sold where it falls.`}
-              </div>
             </>
           )}
-        </div>
+        </NpcPanel>
       )}
 
-      {/* ── Standing upgrades: the sink that never runs out ──────────────────── */}
-      {town.services.includes('vendor') && (
-        <div style={{ borderTop: '1px solid #3a2c10', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ fontSize: '0.55rem', color: '#d4b896', fontWeight: 700 }}>
-            Standing arrangements
-          </div>
+      {/* ── Quartermaster: standing upgrades ──────────────────────────────────── */}
+      {activeTownNpc === 'quartermaster' && trades && (
+        <NpcPanel id="quartermaster">
           {UPGRADES.map(u => {
-            const rank = upgradeRanks[u.id] ?? 0
-            const cost = townPrice(upgradeCost(rank), currentTown, playerFaction)
+            const rank   = upgradeRanks[u.id] ?? 0
+            const cost   = townPrice(upgradeCost(rank), currentTown, playerFaction)
             const afford = gold >= cost
             return (
-              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                 <button
                   className="rp-button"
                   onClick={() => buyUpgrade(u.id)}
                   disabled={!afford}
                   title={afford ? u.flavour : `Need ${cost.toLocaleString()}g`}
                   style={{
-                    fontSize: '0.55rem', padding: '2px 8px', opacity: afford ? 1 : 0.5,
-                    minWidth: 132, textAlign: 'left',
+                    fontSize: '0.55rem', minWidth: 128, textAlign: 'left',
+                    opacity: afford ? 1 : 0.5,
                     color: rarityColor(u.tint),
                     borderColor: rank > 0 ? rarityColor(u.tint) : undefined,
                   }}
                 >
-                  {u.name} {rank > 0 && <span style={{ opacity: 0.8 }}>·{rank}</span>}
+                  {u.name}{rank > 0 && <span style={{ opacity: 0.8 }}> ·{rank}</span>}
                 </button>
                 <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>
                   {u.description} — {cost.toLocaleString()}g
@@ -269,22 +261,10 @@ export function TownView() {
             )
           })}
           <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic' }}>
-            Every rank costs more than the last, and there is no final rank. Gold you are
-            not spending is gold doing nothing.
+            Every rank costs more than the last, and there is no final rank.
           </div>
-        </div>
+        </NpcPanel>
       )}
-
-      {/* Leave */}
-      <div>
-        <button
-          className="rp-button"
-          onClick={leaveTown}
-          style={{ fontSize: '0.55rem', padding: '2px 8px' }}
-        >
-          Leave Town
-        </button>
-      </div>
     </div>
   )
 }

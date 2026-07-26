@@ -18,8 +18,8 @@ import type { GameMode } from '../../../data/types'
 // bar, comfortably past the point where a thumb starts missing.
 const MODE_BTN = (active: boolean, disabled: boolean, touch: boolean): React.CSSProperties => ({
   fontSize: 15,
-  width: touch ? 40 : 30,
-  height: touch ? 40 : 30,
+  width: touch ? 36 : 30,
+  height: touch ? 36 : 30,
   touchAction: 'manipulation',
   borderRadius: 5,
   border: `1px solid ${active ? '#c8a864' : '#45403a'}`,
@@ -54,18 +54,21 @@ export function ActionBar() {
       gap: 4,
       width: '100%',
     }}>
-      {/* Main action bar panel */}
+      {/* Main action bar panel. On touch it shrinks and keeps a margin so it stops
+          running into both screen edges — four mode toggles plus three 64px ability
+          slots simply did not fit a 390px viewport. */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: touch ? 5 : 8,
         background: 'rgba(8,8,14,0.6)',
         border: '1px solid #3a3630',
-        borderRadius: 8,
-        padding: 6,
+        borderRadius: 10,
+        padding: touch ? '5px 7px' : 6,
+        maxWidth: 'calc(100vw - 16px)',
       }}>
         {/* Mode / town toggles */}
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: touch ? 3 : 4 }}>
           {(['combat', 'gathering', 'crafting'] as const).map(m => (
             <button
               key={m}
@@ -97,7 +100,7 @@ export function ActionBar() {
         {gameMode === 'combat' && (
           <>
             <div style={{ width: 1, alignSelf: 'stretch', background: '#3a3630' }} />
-            <SkillBar embedded />
+            <SkillBar embedded compact={touch} />
           </>
         )}
       </div>
