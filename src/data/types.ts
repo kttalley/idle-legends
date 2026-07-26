@@ -354,6 +354,7 @@ export interface GameSettings {
 }
 
 import type { OfflineRates, OfflineReport } from '../engine/offline'
+import type { UpgradeId } from './upgrades'
 
 // ── Full Game State ───────────────────────────────────────────────────────────
 export interface GameState {
@@ -388,6 +389,9 @@ export interface GameState {
    *  net worth checkable rather than a matter of opinion. */
   totalUpkeepPaid: number
   gold: number
+  /** Ranks bought in each standing upgrade — the endless gold sink. Ranks are the only
+   *  persisted truth; their effects are compiled on use (see data/upgrades.ts). */
+  upgradeRanks: Partial<Record<UpgradeId, number>>
   /** Cumulative value recovered from drops there was no room to carry. Kept so the
    *  economy can be audited — a silent loss is what this replaced. */
   totalSalvaged: number

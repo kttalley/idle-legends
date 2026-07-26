@@ -19,6 +19,7 @@ import {
 import type { ClassType, GameState, RaceType, TownId, ZoneId } from '../data/types'
 import { ZONE_ORDER } from '../data/zones'
 import { canEnterZone, townForZone } from '../engine/zoneProgression'
+import { UPGRADES, upgradeCost } from '../data/upgrades'
 import { slotStorage } from '../store/saveSlots'
 import { projectOfflineProgress } from '../engine/offline'
 import { itemPower } from '../data/items'
@@ -61,6 +62,8 @@ export interface Sample {
   salvagedGold: number
   /** Bag slots bought with gold. */
   bagSlotsBought: number
+  /** Total ranks across every standing upgrade. */
+  upgradeRanks: number
   /** Gold the merchant contract earned, and what it cost to keep. */
   autoSold: number
   upkeepPaid: number
@@ -113,6 +116,9 @@ export interface ScenarioOpts {
    * only way to check that its upkeep is smaller than what it earns.
    */
   buyContract?: boolean
+  /** Buy every standing upgrade the hero can afford, cheapest rank first. The test of
+   *  whether the endless sink actually absorbs an income curve that spans ~500×. */
+  buyUpgrades?: boolean
   /**
    * Equip strict upgrades out of the BAG at each sample — a player who clicks.
    *
@@ -128,6 +134,9 @@ export interface ScenarioOpts {
    * exists. Regression guard, not a play style.
    */
   disableAutoEquip?: boolean
+  /** Hold the hero in the starting zone (which HAS a town), isolating the sink from the
+   *  fact that six of twelve zones have no town to shop in at all. */
+  disableAutoAdvance?: boolean
   /** Seed for the harness's `Math.random` swap — makes a run reproducible. */
   seed?: number | null
 }
@@ -193,8 +202,10 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     sellCommons: false,
     buyBagSlots: false,
     buyContract: false,
+    buyUpgrades: false,
     autoEquip: false,
     disableAutoEquip: false,
+    disableAutoAdvance: false,
     seed: null,
     ...opts,
   }
@@ -203,9 +214,13 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
 
   const store = useGameStore
   store.getState().initGame(o.playerClass, o.playerRace)
-  if (o.disableAutoEquip) {
+  if (o.disableAutoEquip || o.disableAutoAdvance) {
     const st = store.getState()
-    useGameStore.setState({ settings: { ...st.settings, autoEquip: false } })
+    useGameStore.setState({ settings: {
+      ...st.settings,
+      autoEquip: o.disableAutoEquip ? false : st.settings.autoEquip,
+      autoAdvanceZones: o.disableAutoAdvance ? false : st.settings.autoAdvanceZones,
+    } })
   }
 
   const readNewLogs = makeLogReader()
@@ -256,12 +271,24 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
       if (o.autoEquip) equipUpgrades(store)
       if (o.sellCommons) store.getState().sellAllCommon()
 
-      if (o.buyBagSlots || o.buyContract) {
+      if (o.buyBagSlots || o.buyContract || o.buyUpgrades) {
         const townId = townForZone(store.getState().currentZone)
         if (townId) {
           const resume = store.getState().gameMode
           store.getState().enterTown(townId as TownId)
           if (o.buyContract) store.getState().buyMerchantContract()
+          if (o.buyUpgrades) {
+            // Keep buying the cheapest affordable rank until nothing is affordable —
+            // the greediest possible spender, i.e. the hardest test of the sink.
+            for (let n = 0; n < 400; n++) {
+              const st = store.getState()
+              const best = UPGRADES
+                .map(u => ({ id: u.id, cost: upgradeCost(st.upgradeRanks[u.id] ?? 0) }))
+                .sort((a, b) => a.cost - b.cost)[0]
+              if (!best || st.gold < best.cost) break
+              store.getState().buyUpgrade(best.id)
+            }
+          }
           // Buy while affordable. buyBagSlot is a no-op at the ceiling or short on
           // gold, so the loop needs its own bound to stay honest about termination.
           if (o.buyBagSlots) {
@@ -292,6 +319,7 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
         autoSold: after.totalAutoSold,
         upkeepPaid: after.totalUpkeepPaid,
         contract: !after.merchantContract ? 'none' : after.merchantContract.lapsed ? 'lapsed' : 'active',
+        upgradeRanks: Object.values(after.upgradeRanks).reduce((a: number, b) => a + (b ?? 0), 0),
         mode: after.gameMode,
         alive: after.isAlive,
         hpPct: after.stats.maxHp > 0 ? after.stats.currentHp / after.stats.maxHp : 0,
@@ -335,8 +363,8 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
   const o: Required<ScenarioOpts> = {
     playerClass: 'warrior', playerRace: 'human', stepSeconds: 0.25,
     sampleEveryMinutes: 5, advanceZones: false, sellCommons: false,
-    buyBagSlots: false, buyContract: false, autoEquip: false,
-    disableAutoEquip: false, seed: null, ...opts,
+    buyBagSlots: false, buyContract: false, buyUpgrades: false, autoEquip: false,
+    disableAutoEquip: false, disableAutoAdvance: false, seed: null, ...opts,
   }
   if (typeof __setSeed === 'function') __setSeed(o.seed)
 
@@ -736,7 +764,7 @@ export function formatReport(r: ScenarioResult): string {
   out.push('')
   out.push(
     [pad('min', 6), pad('lvl', 4), pad('zone', 20, true), pad('gold', 9), pad('g/min', 8),
-     pad('bag', 7), pad('loot', 6), pad('ovf', 6), pad('ovfVal', 8), pad('salv$', 8), pad('+slot', 6), pad('factor', 7), pad('sold$', 8), pad('upkeep', 7),
+     pad('bag', 7), pad('loot', 6), pad('ovf', 6), pad('ovfVal', 8), pad('salv$', 8), pad('+slot', 6), pad('factor', 7), pad('sold$', 8), pad('upkeep', 7), pad('ranks', 6),
      pad('mode', 10, true), pad('hp%', 5), pad('mobs', 5), pad('dist', 6), pad('kills', 6),
      pad('pos', 14)].join(' '),
   )
@@ -751,7 +779,7 @@ export function formatReport(r: ScenarioResult): string {
        pad(s.gold, 9), pad(rate.toFixed(1), 8), pad(`${s.bagUsed}/${s.bagSize}`, 7),
        pad(s.itemsLooted, 6), pad(s.itemsLost, 6), pad(Math.round(s.lostValueEst), 8),
        pad(s.salvagedGold, 8), pad(s.bagSlotsBought, 6),
-       pad(s.contract, 7), pad(s.autoSold, 8), pad(s.upkeepPaid, 7),
+       pad(s.contract, 7), pad(s.autoSold, 8), pad(s.upkeepPaid, 7), pad(s.upgradeRanks, 6),
        pad(s.alive ? s.mode : 'DEAD', 10, true), pad((s.hpPct * 100).toFixed(0), 5),
        pad(s.mobCount, 5), pad(s.targetDist === null ? '-' : s.targetDist.toFixed(1), 6),
        pad(s.zoneKills, 6), pad(`${s.pos.x.toFixed(2)},${s.pos.y.toFixed(2)}`, 14)].join(' '),

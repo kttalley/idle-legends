@@ -14,15 +14,20 @@ export interface LootResult {
 
 const ALL_SLOTS: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket']
 
-export function rollLoot(mob: MobInstance, level: number, goldFindBonus: number): LootResult {
+export function rollLoot(
+  mob: MobInstance, level: number, goldFindBonus: number,
+  /** Standing-upgrade bonuses. Defaulted so callers that predate them are unchanged. */
+  fx: { goldFind?: number; dropChance?: number } = {},
+): LootResult {
   // Gold
   const base = mob.goldMin + Math.random() * (mob.goldMax - mob.goldMin)
   const variance = 1 + (Math.random() * 2 - 1) * GOLD_DROP_VARIANCE
-  const gold = Math.max(1, Math.round(base * variance * goldFindBonus))
+  const gold = Math.max(1, Math.round(base * variance * goldFindBonus * (fx.goldFind ?? 1)))
 
   // Item
   let item: Item | null = null
-  const dropChance = mob.isElite ? ITEM_DROP_CHANCE * 2 : mob.isBoss ? 1.0 : ITEM_DROP_CHANCE
+  const baseChance = ITEM_DROP_CHANCE + (fx.dropChance ?? 0)
+  const dropChance = mob.isElite ? baseChance * 2 : mob.isBoss ? 1.0 : baseChance
   if (Math.random() < dropChance) {
     const rarityBias = mob.isBoss ? 3 : mob.isElite ? 1.5 : 0
     const slot = ALL_SLOTS[Math.floor(Math.random() * ALL_SLOTS.length)]
@@ -41,9 +46,11 @@ export function rarityRank(r: Rarity): number {
   return RARITY_ORDER.indexOf(r as typeof RARITY_ORDER[number])
 }
 
-/** Value recovered when a drop cannot be carried. Never zero, never full price. */
-export function salvageValue(item: Item): number {
-  return Math.max(1, Math.round(item.vendorValue * SALVAGE_RATE))
+/** Value recovered when a drop cannot be carried. Never zero, never full price.
+ *  `bonus` is Scrapper's Lot; capped below 1 so scrapping can never beat selling. */
+export function salvageValue(item: Item, bonus = 0): number {
+  const rate = Math.min(0.9, SALVAGE_RATE + bonus)
+  return Math.max(1, Math.round(item.vendorValue * rate))
 }
 
 /**
@@ -88,6 +95,8 @@ export interface DropContext {
   racialPassive: StatBonuses
   autoEquip: boolean
   contract: MerchantContract | null
+  /** Scrapper's Lot bonus, added to SALVAGE_RATE. */
+  salvageBonus?: number
 }
 
 export type DropOutcome = 'equipped' | 'sold' | 'bagged' | 'salvaged'
@@ -150,7 +159,7 @@ export function placeDrop(
 
   return {
     equipment: eq, inventory: inv,
-    sold: 0, salvaged: salvageValue(pending),
+    sold: 0, salvaged: salvageValue(pending, ctx.salvageBonus ?? 0),
     outcome: outcome === 'equipped' ? outcome : 'salvaged',
     disposed: pending,
   }

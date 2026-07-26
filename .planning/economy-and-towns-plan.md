@@ -1,6 +1,7 @@
 # Plan — The Economy: Gold, Inventory, Towns & Merchants
 
-**Status: T1 and T2 BUILT (2026-07-25). T3 open, T4 blocked on a false premise, T5 open.**
+**Status: T1, T2 and the four idle-loop holes BUILT (2026-07-25). T3 open, T4 blocked, T5 open.**
+**BLOCKER FOUND: half the zones have no town — see §0.5.**
 **Written as a cold-start brief:** a fresh session can execute this without prior conversation.
 
 Supersedes and expands **Track T** in `.planning/world-systems-plan.md`.
@@ -22,6 +23,47 @@ Everything §1 claimed was confirmed; several things this plan assumed were not.
 | **T3 — vendor stock** | Open. Price it against §0.2, not against the early curve. |
 | **T4 — trainer respec** | **Blocked — see §0.3.** Its premise is false. |
 | **T5 — town NPCs** | Open. |
+
+### 0.05 The four game-breaking holes — all now closed
+
+Found by the harness while building T1/T2, and addressed after the owner said go:
+
+| | Before | After |
+|---|---|---|
+| **Nothing auto-equipped.** A hero nobody touched fought naked forever. | stalls at level 19; 0 kills in 11h after entering an unlocked zone | level 25 in 8h idle; 4.5× gold; 10× fewer deaths |
+| **No offline progress at all.** `calculateOfflineTime` had zero callers; the 8h cap was decorative. | closing the tab paid nothing | rate-replay projection; 6h away returns a level-20 hero in full auto-equipped gear |
+| **Nothing auto-advanced zones.** `selectZone` is a click. | farms zone 1 forever | walks the whole world; level 202 and a full prestige circuit in 8h idle |
+| **No late-game sink.** | ~248k gold unspent by hour 20 | geometric upgrade ladder; a greedy spender ends 8h on 1,269g |
+
+Design notes worth keeping:
+- **Order is the safety property.** The drop ladder is wear → sell → bag → salvage, so an
+  upgrade can never be sold whatever the merchant threshold says.
+- **Retreat measures throughput, not deaths.** Death is free here; taking no kills is the
+  real failure. A zone that beats the hero records the level it did so at, so advance and
+  retreat cannot thrash.
+- **Offline parity is one-sided.** Settled hero: same within ±10%. Progressing hero:
+  offline pays ~40% LESS, deliberately — if idling out-earned playing, closing the tab
+  would be optimal, a far worse failure than paying light.
+- **Geometric cost + linear benefit** is why the upgrade ladder needs no re-pricing across
+  a 500× income curve, and why even "+gold find" cannot run away.
+
+### 0.5 BLOCKER — six of twelve zones have no town
+
+`thornvale_jungle`, `ashfire_peaks`, `the_bloodfields`, `venom_hollows`,
+`cinderfall_wastes` and `the_maw_eternal` have no entry in `data/towns.ts`. **The entire
+economy is unreachable from them** — no bag slots, no merchant contract, no standing
+upgrades, no rest.
+
+This barely mattered before, because an idle hero never left zone 1. Now that auto-advance
+ships, the hero spends most of their life in the late zones — where the gold actually
+piles up — and cannot spend any of it. Measured: a roaming hero finished 8 hours holding
+604,837g having bought 6 upgrade ranks, while the same hero held in a town zone drained to
+1,269g having bought everything.
+
+Fixing it is data, not code (`TOWNS` entries + `linkedZone`), but the names are world-bible
+territory — see `docs/art-direction.md` — so it is left for the owner. Note the runtime
+already overwrites static town names via `generatedTownNames`, so the committed strings are
+fallbacks rather than canon.
 
 ### 0.1 Two soft-locks found on the way (both fixed)
 

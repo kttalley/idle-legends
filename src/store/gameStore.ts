@@ -52,6 +52,7 @@ import { generateNames, generateThought, generateFactionNamesFallback, generateP
 import type { ThoughtEvent } from '../engine/nameGen'
 import { slotStorage, summarize, newSlotId } from './saveSlots'
 import { emptyRates, accrueRates, projectOfflineProgress } from '../engine/offline'
+import { compileUpgrades, upgradeCost, UPGRADE_BY_ID, type UpgradeId } from '../data/upgrades'
 
 // The slot currently loaded into the store — the target of every autosave. Null
 // while at the character-select menu. Kept out of GameState so it isn't serialized
@@ -255,6 +256,7 @@ function defaultState(): GameState {
     inventory: Array(INVENTORY_SLOTS).fill(null),
     bagSlotsPurchased: 0,
     merchantContract: null,
+    upgradeRanks: {},
     totalAutoSold: 0,
     totalUpkeepPaid: 0,
     gold: 0,
@@ -361,6 +363,7 @@ function rehydrateState(saved: GameState): GameState {
   }
   saved.zoneWatch = { zone: saved.currentZone, seconds: 0, kills: 0 }
   saved.zoneBlockedAtLevel = saved.zoneBlockedAtLevel ?? {}
+  saved.upgradeRanks      = saved.upgradeRanks ?? {}
   saved.offlineRates      = saved.offlineRates ?? emptyRates()
   saved.lastOffline       = null   // set by the load path if there is time to grant
   saved.totalAutoSold     = saved.totalAutoSold ?? 0
@@ -834,6 +837,7 @@ interface GameActions {
   buyBagSlot: () => void
   setAutoEquip: (on: boolean) => void
   setAutoAdvanceZones: (on: boolean) => void
+  buyUpgrade: (id: UpgradeId) => void
   dismissOfflineReport: () => void
   buyMerchantContract: () => void
   setMerchantThreshold: (threshold: Rarity) => void
@@ -1188,6 +1192,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const fx = compileTalentEffects(state.playerClass, talentAllocs)
     // Hoisted: both the level-up recompile and the auto-equip recompile need it.
     const racialPassive = RACE_DEFINITIONS[state.playerRace]?.racialPassive ?? {}
+    const upg = compileUpgrades(state.upgradeRanks)
 
     // ── Resolve the engaged target out of the population ─────────────────────
     // `mobs` is the source of truth; currentMob/mobMapOffset/activeDoTs are projections
@@ -1439,7 +1444,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // ── Mob dies ────────────────────────────────────────────────────────────
       if (currentMob!.currentHp <= 0) {
         const deadMob = currentMob!
-        const loot = rollLoot(deadMob, level, stats.goldFindBonus)
+        const loot = rollLoot(deadMob, level, stats.goldFindBonus, upg)
         gold += loot.gold
         killGoldThisTick += loot.gold
 
@@ -1537,7 +1542,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           const placed = placeDrop(loot.item, equipment, inventory, {
             playerClass: state.playerClass, level, talentAllocs, racialPassive,
             autoEquip: state.settings.autoEquip !== false,
-            contract: state.merchantContract,
+            contract: state.merchantContract, salvageBonus: upg.salvageRate,
           })
           if (placed.equipment !== equipment) {
             equipment = placed.equipment
@@ -1844,6 +1849,31 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   },
 
   dismissOfflineReport: () => { if (get().lastOffline) set({ lastOffline: null }) },
+
+  /**
+   * Buy one more rank of a standing upgrade — the sink that never runs out.
+   *
+   * Available in town like the rest of the economy's purchases. Costs grow geometrically
+   * while the benefit stays linear, so this absorbs a gold curve that spans ~500× without
+   * any price ever needing to be revisited, and can never run away with itself.
+   */
+  buyUpgrade: (id) => {
+    const s = get()
+    if (s.gameMode !== 'in_town') return
+    const def = UPGRADE_BY_ID[id]
+    if (!def) return
+    const rank = s.upgradeRanks[id] ?? 0
+    const cost = townPrice(upgradeCost(rank), s.currentTown, s.playerFaction)
+    if (s.gold < cost) return
+    set({
+      gold: s.gold - cost,
+      upgradeRanks: { ...s.upgradeRanks, [id]: rank + 1 },
+      combatLog: [
+        log('proc', `${def.name} ${rank + 1} — ${cost}g. ${def.description}.`, '#c8a100'),
+        ...s.combatLog,
+      ].slice(0, LOG_MAX),
+    })
+  },
 
   /** Player's call on whether the hero roams the world unsupervised. */
   setAutoAdvanceZones: (on) => {

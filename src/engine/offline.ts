@@ -9,6 +9,7 @@ import { placeDrop } from './loot'
 import { compileStats } from './combat'
 import { xpForLevel } from './progression'
 import { RACE_DEFINITIONS } from '../data/races'
+import { compileUpgrades } from './../data/upgrades'
 
 export interface OfflineSummary {
   secondsElapsed: number
@@ -16,10 +17,10 @@ export interface OfflineSummary {
   cappedAt: number | null  // if capped, the cap in seconds
 }
 
-export function calculateOfflineTime(lastTimestamp: number): OfflineSummary {
+export function calculateOfflineTime(lastTimestamp: number, extraHours = 0): OfflineSummary {
   const now = Date.now()
   const rawMs = now - lastTimestamp
-  const capMs = OFFLINE_CAP_HOURS * 60 * 60 * 1000
+  const capMs = (OFFLINE_CAP_HOURS + extraHours) * 60 * 60 * 1000
 
   const effectiveMs = Math.min(rawMs, capMs)
   const secondsElapsed = Math.floor(effectiveMs / 1000)
@@ -157,7 +158,8 @@ export function projectOfflineProgress(state: GameState, now: number): OfflineOu
   const rates = state.offlineRates
   if (!rates || rates.seconds < OFFLINE_MIN_MEASURED_SECONDS) return null
 
-  const elapsed = calculateOfflineTime(state.lastTickTimestamp ?? now)
+  const fx = compileUpgrades(state.upgradeRanks)
+  const elapsed = calculateOfflineTime(state.lastTickTimestamp ?? now, fx.offlineHours)
   if (elapsed.secondsElapsed < OFFLINE_MIN_SECONDS) return null
 
   const secs = elapsed.secondsElapsed
@@ -191,14 +193,14 @@ export function projectOfflineProgress(state: GameState, now: number): OfflineOu
   let salvagedGold = 0
   let equipped = 0, sold = 0, bagged = 0, scrapped = 0
 
-  const drops = Math.round(kills * ITEM_DROP_CHANCE)
+  const drops = Math.round(kills * (ITEM_DROP_CHANCE + fx.dropChance))
   for (let i = 0; i < drops; i++) {
     const slot = ALL_SLOTS[Math.floor(Math.random() * ALL_SLOTS.length)]
     const item = generateItem(slot, level, 0)
     const placed = placeDrop(item, equipment, inventory, {
       playerClass: state.playerClass, level, talentAllocs: state.talentAllocs,
       racialPassive, autoEquip: state.settings?.autoEquip !== false,
-      contract: state.merchantContract,
+      contract: state.merchantContract, salvageBonus: fx.salvageRate,
     })
     equipment = placed.equipment
     soldGold += placed.sold
@@ -226,7 +228,7 @@ export function projectOfflineProgress(state: GameState, now: number): OfflineOu
     },
     report: {
       secondsElapsed: secs,
-      cappedAtHours: elapsed.cappedAt === null ? null : OFFLINE_CAP_HOURS,
+      cappedAtHours: elapsed.cappedAt === null ? null : OFFLINE_CAP_HOURS + fx.offlineHours,
       kills, gold: totalGold, xp: gainedXp,
       levelsGained: level - startLevel,
       itemsEquipped: equipped, itemsSold: sold, itemsBagged: bagged, itemsSalvaged: scrapped,

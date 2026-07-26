@@ -6,6 +6,7 @@ import {
   BAG_SLOTS_MAX_PURCHASED, MERCHANT_CONTRACT_COST, MERCHANT_UPKEEP_RATE, RARITY_ORDER,
 } from '../../data/constants'
 import type { Rarity } from '../../data/types'
+import { UPGRADES, upgradeCost } from '../../data/upgrades'
 import { SpriteIcon } from '../ui/SpriteIcon'
 
 const FACTION_COLOR: Record<string, string> = {
@@ -31,7 +32,7 @@ export function TownView() {
     currentTown, generatedTownNames, restInTown, leaveTown, playerFaction,
     gold, bagSlotsPurchased, buyBagSlot,
     merchantContract, buyMerchantContract, setMerchantThreshold, cancelMerchantContract,
-    totalAutoSold, totalUpkeepPaid,
+    totalAutoSold, totalUpkeepPaid, upgradeRanks, buyUpgrade,
   } = useGameStore()
   const [restFeedback, setRestFeedback] = useState(false)
 
@@ -234,6 +235,45 @@ export function TownView() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ── Standing upgrades: the sink that never runs out ──────────────────── */}
+      {town.services.includes('vendor') && (
+        <div style={{ borderTop: '1px solid #3a2c10', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ fontSize: '0.55rem', color: '#d4b896', fontWeight: 700 }}>
+            Standing arrangements
+          </div>
+          {UPGRADES.map(u => {
+            const rank = upgradeRanks[u.id] ?? 0
+            const cost = townPrice(upgradeCost(rank), currentTown, playerFaction)
+            const afford = gold >= cost
+            return (
+              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <button
+                  className="rp-button"
+                  onClick={() => buyUpgrade(u.id)}
+                  disabled={!afford}
+                  title={afford ? u.flavour : `Need ${cost.toLocaleString()}g`}
+                  style={{
+                    fontSize: '0.55rem', padding: '2px 8px', opacity: afford ? 1 : 0.5,
+                    minWidth: 132, textAlign: 'left',
+                    color: rarityColor(u.tint),
+                    borderColor: rank > 0 ? rarityColor(u.tint) : undefined,
+                  }}
+                >
+                  {u.name} {rank > 0 && <span style={{ opacity: 0.8 }}>·{rank}</span>}
+                </button>
+                <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>
+                  {u.description} — {cost.toLocaleString()}g
+                </span>
+              </div>
+            )
+          })}
+          <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic' }}>
+            Every rank costs more than the last, and there is no final rank. Gold you are
+            not spending is gold doing nothing.
+          </div>
         </div>
       )}
 

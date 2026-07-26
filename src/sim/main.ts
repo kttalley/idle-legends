@@ -31,8 +31,10 @@ const opts: ScenarioOpts = {
   sellCommons: process.argv.includes('--sell'),
   buyBagSlots: process.argv.includes('--buyslots'),
   buyContract: process.argv.includes('--contract'),
+  buyUpgrades: process.argv.includes('--upgrades'),
   autoEquip: process.argv.includes('--equip'),
   disableAutoEquip: process.argv.includes('--noautoequip'),
+  disableAutoAdvance: process.argv.includes('--noroam'),
   seed: process.argv.includes('--seed') ? argNum('--seed', 1) : null,
 }
 
@@ -56,6 +58,7 @@ if (process.argv.includes('--parity')) {
     { name: 'contract',            o: { buyContract: true } },
     { name: 'contract+equip+all',  o: { advanceZones: true, buyBagSlots: true, buyContract: true, autoEquip: true } },
     { name: 'no-auto-equip',       o: { disableAutoEquip: true } },
+    { name: 'buys-everything',     o: { buyBagSlots: true, buyContract: true, buyUpgrades: true, disableAutoAdvance: true } },
   ]
   let failed = 0
   for (const shape of shapes) {
