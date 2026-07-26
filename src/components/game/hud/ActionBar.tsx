@@ -3,6 +3,7 @@ import { useGameStore } from '../../../store/gameStore'
 import { SkillBar } from '../SkillBar'
 import { SpriteIcon } from '../../ui/SpriteIcon'
 import { HealthBar } from '../../ui/HealthBar'
+import { useCoarsePointer } from '../../ui/useLongPress'
 import { CLASS_PROFESSIONS } from '../../../data/professions'
 import { ZONE_TOWN } from '../../../data/towns'
 import { xpForLevel } from '../../../engine/progression'
@@ -13,10 +14,13 @@ import type { GameMode } from '../../../data/types'
 // the dimetric world. Pointer-events are on so its buttons are tappable through the
 // otherwise click-through HUD overlay.
 
-const MODE_BTN = (active: boolean, disabled: boolean): React.CSSProperties => ({
+// 30px was a mouse-sized target. Coarse pointers get 40 — still compact enough for the
+// bar, comfortably past the point where a thumb starts missing.
+const MODE_BTN = (active: boolean, disabled: boolean, touch: boolean): React.CSSProperties => ({
   fontSize: 15,
-  width: 30,
-  height: 30,
+  width: touch ? 40 : 30,
+  height: touch ? 40 : 30,
+  touchAction: 'manipulation',
   borderRadius: 5,
   border: `1px solid ${active ? '#c8a864' : '#45403a'}`,
   background: active ? '#2a1e00' : 'linear-gradient(180deg, #201d26, #14121a)',
@@ -38,6 +42,7 @@ export function ActionBar() {
   const townId = ZONE_TOWN[currentZone]
   const xpNeeded = xpForLevel(level)
 
+  const touch = useCoarsePointer()
   const isActive = (m: GameMode) => gameMode === m && !mobApproaching
 
   return (
@@ -67,7 +72,9 @@ export function ActionBar() {
               onClick={() => !isTraveling && setMode(m)}
               disabled={isTraveling}
               title={`${m[0].toUpperCase()}${m.slice(1)}`}
-              style={MODE_BTN(isActive(m), isTraveling)}
+              aria-label={`${m[0].toUpperCase()}${m.slice(1)} mode`}
+              aria-pressed={isActive(m)}
+              style={MODE_BTN(isActive(m), isTraveling, touch)}
             >
               <SpriteIcon emoji={m === 'combat' ? '⚔' : m === 'gathering' ? prof.gatherIcon : prof.craftIcon} size={18} />
             </button>
@@ -77,7 +84,9 @@ export function ActionBar() {
               onClick={() => !isTraveling && enterTown(townId)}
               disabled={isTraveling}
               title="Visit town"
-              style={MODE_BTN(gameMode === 'in_town', isTraveling)}
+              aria-label="Visit town"
+              aria-pressed={gameMode === 'in_town'}
+              style={MODE_BTN(gameMode === 'in_town', isTraveling, touch)}
             >
               <SpriteIcon emoji="🏠" size={18} />
             </button>

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
  * Press-and-hold as a SECONDARY action, with tap left free for the primary one.
@@ -74,4 +74,30 @@ export function useLongPress(
     /** True while the most recent gesture was a hold — callers suppress their own click. */
     didLongPress: () => fired.current,
   }
+}
+
+/**
+ * Does this device point with a finger rather than a cursor?
+ *
+ * `hover: none` is the load-bearing half of the test. A device can report a fine pointer
+ * (a stylus, some 2-in-1s) and still have nowhere to put a tooltip, and it is hover — not
+ * precision — that the affordance swap depends on.
+ *
+ * Subscribed rather than sampled once: a hybrid can gain or lose a mouse mid-session, and
+ * reading this at module scope in one place and at mount in another produced two answers
+ * for the same device. One reactive source, used for both behaviour and geometry.
+ */
+export function useCoarsePointer(): boolean {
+  const query = '(pointer: coarse), (hover: none)'
+  const [coarse, setCoarse] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(query).matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const onChange = () => setCoarse(mq.matches)
+    mq.addEventListener('change', onChange)
+    onChange()
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return coarse
 }

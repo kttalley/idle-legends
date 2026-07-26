@@ -336,6 +336,14 @@ body {
 @media (pointer: coarse) {
   .rp-button { min-height: 34px; padding: 6px 12px; }
   .app-dock-btn { min-height: 44px; }
+  /* 36px squares are a miss-prone target for a fingertip; the bag grid is five
+     columns wide either way, so the extra size costs no layout. */
+  .inventory-slot { min-width: 44px; min-height: 44px; }
+  /* Kill the 300ms tap delay and iOS's long-press callout on game surfaces. */
+  .inventory-slot, .app-dock-btn, .rp-button, .sheet-action {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+  }
 }
 
 /* ── Detail sheet ────────────────────────────────────────────────────────────

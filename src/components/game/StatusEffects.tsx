@@ -36,6 +36,15 @@ interface Props {
   buffs?: ActiveBuff[]
 }
 
+/**
+ * Buff / debuff chips.
+ *
+ * The name used to live only in a `title`, so on a phone these read as an emoji next to a
+ * number — you could see that something was ticking but not what. The fix is to show the
+ * label rather than to add a gesture: information a player needs at a glance should not be
+ * behind an interaction at all, on any device. Short labels ("Rend", "Poison") and the
+ * existing wrap make room for it, and `title` stays for the fuller hover on desktop.
+ */
 export function StatusEffects({ dots = [], buffs = [] }: Props) {
   const chips: StatusChip[] = [
     ...buildDotChips(dots),
@@ -68,6 +77,11 @@ export function StatusEffects({ dots = [], buffs = [] }: Props) {
           }}
         >
           <span style={{ fontSize: '0.75rem', lineHeight: 1 }}>{chip.icon}</span>
+          <span style={{
+            maxWidth: 62, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {chip.label}
+          </span>
           <span style={{ color: '#ccc' }}>{chip.sub}</span>
         </div>
       ))}

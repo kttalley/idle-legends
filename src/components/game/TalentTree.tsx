@@ -4,28 +4,33 @@ import { CLASS_DEFINITIONS } from '../../data/classes'
 import type { TalentNodeDef } from '../../data/types'
 import { SpriteIcon } from '../ui/SpriteIcon'
 import { DetailSheet } from '../ui/DetailSheet'
+import { useCoarsePointer } from '../ui/useLongPress'
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 // Sidebar is 220px; 4 cols × 48 + 8 padding = 200px, fits with room to spare
-const CELL_W  = 48   // px per column
-const CELL_H  = 66   // px per row
-const NODE_W  = 40   // node box width
-const NODE_H  = 54   // node box height
+// Node geometry, sized up on touch so a fingertip clears the 44px minimum. Derived from
+// the same reactive source as the behaviour swap below — reading the media query at module
+// scope here and at mount there gave two different answers for one device.
+const GEOM = {
+  fine:   { CELL_W: 48, CELL_H: 66, NODE_W: 40, NODE_H: 54 },
+  coarse: { CELL_W: 54, CELL_H: 72, NODE_W: 46, NODE_H: 60 },
+}
 const PAD     = 4    // grid padding
 
+type Geom = typeof GEOM['fine']
+
 // Node center in SVG/absolute space
-function nodeCenter(t: TalentNodeDef) {
+function nodeCenter(t: TalentNodeDef, g: Geom) {
   return {
-    x: PAD + (t.col - 1) * CELL_W + CELL_W / 2,
-    y: PAD + (t.row - 1) * CELL_H + CELL_H / 2,
+    x: PAD + (t.col - 1) * g.CELL_W + g.CELL_W / 2,
+    y: PAD + (t.row - 1) * g.CELL_H + g.CELL_H / 2,
   }
 }
 
 // Node top-left for absolute positioning
-function nodeOrigin(t: TalentNodeDef) {
-  const cx = PAD + (t.col - 1) * CELL_W + CELL_W / 2
-  const cy = PAD + (t.row - 1) * CELL_H + CELL_H / 2
-  return { x: cx - NODE_W / 2, y: cy - NODE_H / 2 }
+function nodeOrigin(t: TalentNodeDef, g: Geom) {
+  const c = nodeCenter(t, g)
+  return { x: c.x - g.NODE_W / 2, y: c.y - g.NODE_H / 2 }
 }
 
 // ── Tooltip ───────────────────────────────────────────────────────────────────
@@ -49,11 +54,10 @@ export function TalentTree() {
   const [inspected, setInspected] = useState<TalentNodeDef | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   // A touch device has no hover and no second button, so the tree switches from
-  // "click to act" to "tap to inspect, then act". Matched once rather than per render.
-  const coarsePointer = useMemo(
-    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
-    [],
-  )
+  // "click to act" to "tap to inspect, then act", and its nodes grow to fingertip size.
+  const coarsePointer = useCoarsePointer()
+  const geom = GEOM[coarsePointer ? 'coarse' : 'fine']
+  const { CELL_W, CELL_H, NODE_W, NODE_H } = geom
 
   const maxRow = talents.reduce((m, t) => Math.max(m, t.row), 0)
   const maxCol = talents.reduce((m, t) => Math.max(m, t.col), 0)
@@ -161,8 +165,8 @@ export function TalentTree() {
           style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }}
         >
           {connections.map(({ from, to }) => {
-            const f = nodeCenter(from)
-            const t2 = nodeCenter(to)
+            const f = nodeCenter(from, geom)
+            const t2 = nodeCenter(to, geom)
             const parentRank = talentAllocs[from.id] ?? 0
             const parentNode = talents.find(n => n.id === from.id)!
             const isActive = parentRank >= parentNode.maxRanks
@@ -184,7 +188,7 @@ export function TalentTree() {
           const rank   = talentAllocs[t.id] ?? 0
           const state  = nodeState(t)
           const colors = STATE_COLORS[state]
-          const origin = nodeOrigin(t)
+          const origin = nodeOrigin(t, geom)
 
           return (
             <button
