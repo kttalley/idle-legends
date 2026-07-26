@@ -7,33 +7,26 @@ import { CraftResultToast } from '../CraftResultToast'
 
 // WoW/Diablo-style HUD shell: a click-through DOM overlay painted on top of the
 // dimetric world canvas (text/tooltips stay crisp; the canvas renders only the world).
-// Positioned absolute inset:0 within the scene wrapper, so on mobile it docks above the
-// FAB bar automatically (the app-root reserves that space). Each panel re-enables
-// pointer-events for its own interactive bits.
+//
+// Now that the world is full-bleed and the side panels float ON it, the HUD insets by
+// `--rail-l` / `--rail-r` (index.css) rather than hugging the viewport edges — otherwise
+// the unit frames and minimap sit underneath the glass columns. Those vars collapse to a
+// few pixels when a column is folded away or on mobile, so the HUD reclaims the space.
+// Each panel re-enables pointer-events for its own interactive bits.
 export function HudOverlay() {
   return (
-    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20 }}>
-      <div style={{ position: 'absolute', top: 8, left: 8 }}>
-        <UnitFrames />
-      </div>
-      <div style={{ position: 'absolute', top: 8, right: 8 }}>
-        <MinimapRadar />
-      </div>
+    <div className="hud-layer">
+      <div className="hud-tl"><UnitFrames /></div>
+      <div className="hud-tr"><MinimapRadar /></div>
       {/* Craft reveal — under the minimap, out of the world's centre. Self-dismissing. */}
-      <div style={{ position: 'absolute', top: 8, right: 8, marginTop: 150, display: 'flex', justifyContent: 'flex-end' }}>
+      <div className="hud-tr" style={{ marginTop: 150, display: 'flex', justifyContent: 'flex-end' }}>
         <CraftResultToast />
       </div>
       {/* Strike meter — floats just above the action bar, on the world rather than in a
           separate screen. Renders nothing outside gathering mode. */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 58, display: 'flex', justifyContent: 'center' }}>
-        <StrikeMeter />
-      </div>
-      {/* Bottom dock, flush to the canvas edge and full-bleed: the XP strip is the last
-          row of the viewport (WoW-style) rather than a floating panel with world showing
-          under it, so the action bar eats the least world possible. */}
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-        <ActionBar />
-      </div>
+      <div className="hud-strike"><StrikeMeter /></div>
+      {/* Bottom dock. Inset by the rails so it never slides under a glass column. */}
+      <div className="hud-bottom"><ActionBar /></div>
     </div>
   )
 }

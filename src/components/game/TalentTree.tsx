@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useMemo } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { CLASS_DEFINITIONS } from '../../data/classes'
 import type { TalentNodeDef } from '../../data/types'
 import { SpriteIcon } from '../ui/SpriteIcon'
+import { DetailSheet } from '../ui/DetailSheet'
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 // Sidebar is 220px; 4 cols × 48 + 8 padding = 200px, fits with room to spare
@@ -45,7 +46,14 @@ export function TalentTree() {
   const classDef   = CLASS_DEFINITIONS[playerClass]
   const talents    = classDef.talents
   const [tooltip, setTooltip] = useState<Tooltip | null>(null)
+  const [inspected, setInspected] = useState<TalentNodeDef | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  // A touch device has no hover and no second button, so the tree switches from
+  // "click to act" to "tap to inspect, then act". Matched once rather than per render.
+  const coarsePointer = useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches,
+    [],
+  )
 
   const maxRow = talents.reduce((m, t) => Math.max(m, t.row), 0)
   const maxCol = talents.reduce((m, t) => Math.max(m, t.col), 0)
@@ -88,13 +96,14 @@ export function TalentTree() {
     locked:    { border: '#2a2010', bg: '#0d0b05', icon: '#333',    rank: '#333' },
   }
 
+  // Desktop keeps its fast path: left-click learns, right-click unlearns. Touch gets
+  // the same two actions as labelled buttons in the sheet, because a right-click has no
+  // finger equivalent and a talent tree is not somewhere to hide a gesture.
   function handleNodeClick(e: React.MouseEvent, t: TalentNodeDef) {
     e.preventDefault()
-    if (e.button === 2) {
-      deallocateTalent(t.id)
-    } else {
-      allocateTalent(t.id)
-    }
+    if (e.button === 2) deallocateTalent(t.id)
+    else if (e.button === 0 && !coarsePointer) allocateTalent(t.id)
+    else if (e.button === 0) setInspected(t)
   }
 
   function handleMouseEnter(e: React.MouseEvent, t: TalentNodeDef) {
@@ -133,9 +142,9 @@ export function TalentTree() {
         </button>
       </div>
 
-      {/* Hint */}
+      {/* Hint — states whichever grammar this device actually has. */}
       <div style={{ fontSize: '0.55rem', color: '#555', marginBottom: 4, textAlign: 'center' }}>
-        Left-click to allocate · Right-click to remove
+        {coarsePointer ? 'Tap a talent to learn or unlearn it' : 'Left-click to learn · Right-click to unlearn'}
       </div>
 
       {/* Grid container — scrollable, height-bounded */}
@@ -282,6 +291,51 @@ export function TalentTree() {
         )}
       </div>
       </div>
+
+      <DetailSheet
+        open={!!inspected}
+        onClose={() => setInspected(null)}
+        title={inspected && (
+          <span>
+            <SpriteIcon talentId={inspected.id} emoji={inspected.icon} size={16} /> {inspected.name}
+          </span>
+        )}
+        actions={inspected ? (() => {
+          const rank = talentAllocs[inspected.id] ?? 0
+          const state = nodeState(inspected)
+          return [
+            {
+              label: 'Learn',
+              tone: 'primary' as const,
+              onClick: () => allocateTalent(inspected.id),
+              disabled: state === 'locked' || state === 'maxed' || talentPoints <= 0,
+              hint: state === 'locked' ? 'Prerequisites not met'
+                : state === 'maxed' ? 'Already at maximum rank'
+                : talentPoints <= 0 ? 'No unspent points' : undefined,
+            },
+            {
+              label: 'Unlearn',
+              onClick: () => deallocateTalent(inspected.id),
+              disabled: rank <= 0,
+              hint: rank <= 0 ? 'Nothing invested here' : undefined,
+            },
+          ]
+        })() : undefined}
+      >
+        {inspected && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div>{inspected.description.replace('{n}', String(
+              inspected.effects.find(e => e.type === 'stat')?.valuePerRank
+              ?? inspected.effects[0]?.valuePerRank ?? '?'
+            ))}</div>
+            <div style={{ color: '#9d9d9d', fontSize: '0.65rem' }}>
+              Rank {talentAllocs[inspected.id] ?? 0} / {inspected.maxRanks}
+              {inspected.requiresPoints > 0 && <> · Requires {inspected.requiresPoints} pts spent</>}
+              {' · '}{talentPoints} unspent
+            </div>
+          </div>
+        )}
+      </DetailSheet>
     </div>
   )
 }

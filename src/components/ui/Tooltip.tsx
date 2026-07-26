@@ -6,6 +6,9 @@ import { rarityColor } from '../../store/gameStore'
 interface ItemTooltipProps {
   item: Item
   equippedItem?: Item | null  // for stat comparison
+  /** Suppress the name row when the surrounding surface already shows it (the detail
+   *  sheet puts it in the title), so the item isn't announced twice. */
+  hideName?: boolean
 }
 
 function statLabel(key: string): string {
@@ -30,14 +33,16 @@ function formatStat(key: string, val: number): string {
   return val > 0 ? `+${val}` : String(val)
 }
 
-export function ItemTooltipContent({ item, equippedItem }: ItemTooltipProps) {
+export function ItemTooltipContent({ item, equippedItem, hideName }: ItemTooltipProps) {
   const color = rarityColor(item.rarity)
 
   return (
     <div className="rp-tooltip" style={{ fontSize: '0.7rem' }}>
-      <div style={{ color, fontWeight: 700, fontSize: '0.8rem', marginBottom: 4 }}>
-        {item.name}
-      </div>
+      {!hideName && (
+        <div style={{ color, fontWeight: 700, fontSize: '0.8rem', marginBottom: 4 }}>
+          {item.name}
+        </div>
+      )}
       <div style={{ color: '#aaa', marginBottom: 2 }}>
         {item.slot.charAt(0).toUpperCase() + item.slot.slice(1)} • Level {item.level}
       </div>

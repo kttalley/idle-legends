@@ -69,10 +69,8 @@ export function TownView() {
 
   return (
     <div
-      className="rp-panel"
       style={{
-        margin: '4px 6px',
-        padding: '8px 10px',
+        padding: '10px 12px',
         display: 'flex',
         flexDirection: 'column',
         gap: 6,

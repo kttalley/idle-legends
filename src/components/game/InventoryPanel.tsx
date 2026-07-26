@@ -1,8 +1,15 @@
 import React, { useState } from 'react'
 import { useGameStore, rarityColor } from '../../store/gameStore'
 import { TooltipWrapper, ItemTooltipContent } from '../ui/Tooltip'
+import { DetailSheet, type SheetAction } from '../ui/DetailSheet'
 import { SpriteIcon } from '../ui/SpriteIcon'
 import type { Item, Slot } from '../../data/types'
+
+/** What the sheet is currently describing: a bag index, or an equipped slot. */
+type Inspecting =
+  | { kind: 'bag'; index: number }
+  | { kind: 'equipped'; slot: Slot }
+  | null
 
 const SLOTS: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket']
 const SLOT_LABEL: Record<Slot, string> = {
@@ -23,6 +30,8 @@ function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
   isEquipped?: boolean
 }) {
   const color = rarityColor(item.rarity)
+  // Hover still gives a mouse user the instant read; the tap target underneath opens
+  // the sheet, which is the only path a touch device has to the same information.
   return (
     <TooltipWrapper content={<ItemTooltipContent item={item} equippedItem={equippedItem} />}>
       <div
@@ -39,6 +48,7 @@ function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
           padding: 1,
           background: `${color}15`,
           userSelect: 'none',
+          touchAction: 'manipulation',
         }}
         onClick={onClick}
         title={item.name}
@@ -55,8 +65,43 @@ export function InventoryPanel() {
     settings, setAutoEquip, setAutoAdvanceZones,
   } = useGameStore()
   const [activeTab, setActiveTab] = useState<'inventory' | 'equipment'>('equipment')
+  const [inspecting, setInspecting] = useState<Inspecting>(null)
   const used = inventory.filter(Boolean).length
   const full = used >= inventory.length
+
+  // Resolve whatever the sheet is pointed at into an item plus the actions that make
+  // sense for it. Equipping and selling are BUTTONS now — the panel used to advertise
+  // "Right-click to sell" with no handler behind it anywhere, so that instruction was
+  // never true on any device.
+  const inspected: { item: Item; compare: Item | null; actions: SheetAction[] } | null = (() => {
+    if (!inspecting) return null
+    if (inspecting.kind === 'bag') {
+      const item = inventory[inspecting.index]
+      if (!item) return null
+      return {
+        item,
+        compare: equipment[item.slot],
+        actions: [
+          { label: 'Equip', tone: 'primary', onClick: () => equipItem(inspecting.index) },
+          { label: `Sell — ${item.vendorValue}g`, tone: 'danger', onClick: () => sellItem(inspecting.index) },
+        ],
+      }
+    }
+    const item = equipment[inspecting.slot]
+    if (!item) return null
+    return {
+      item,
+      compare: null,
+      actions: [
+        {
+          label: 'Unequip',
+          onClick: () => unequipItem(inspecting.slot),
+          disabled: full,
+          hint: full ? 'No room in your bag' : undefined,
+        },
+      ],
+    }
+  })()
 
   return (
     <div className="rp-panel flex flex-col h-full">
@@ -85,7 +130,7 @@ export function InventoryPanel() {
         {activeTab === 'equipment' && (
           <div>
             <div style={{ fontSize: '0.65rem', color: '#9d9d9d', marginBottom: 6 }}>
-              Click an equipped item to unequip it.
+              Tap a piece to inspect it.
             </div>
             {/* Auto-equip is what makes an unattended hero get stronger at all, so it is
                 surfaced here rather than buried — but it stays the player's call. */}
@@ -140,7 +185,7 @@ export function InventoryPanel() {
                     <ItemBox
                       item={item}
                       isEquipped
-                      onClick={() => unequipItem(slot)}
+                      onClick={() => setInspecting({ kind: 'equipped', slot })}
                       equippedItem={null}
                     />
                   ) : (
@@ -194,7 +239,7 @@ export function InventoryPanel() {
                     key={i}
                     item={item}
                     equippedItem={equipment[item.slot]}
-                    onClick={() => equipItem(i)}
+                    onClick={() => setInspecting({ kind: 'bag', index: i })}
                   />
                 ) : (
                   <div
@@ -207,12 +252,25 @@ export function InventoryPanel() {
             </div>
             {inventory.some(Boolean) && (
               <div style={{ fontSize: '0.6rem', color: '#666', marginTop: 6 }}>
-                Click item to equip. Right-click to sell.
+                Tap an item to equip or sell it.
               </div>
             )}
           </div>
         )}
       </div>
+
+      <DetailSheet
+        open={!!inspected}
+        onClose={() => setInspecting(null)}
+        title={inspected && (
+          <span style={{ color: rarityColor(inspected.item.rarity) }}>{inspected.item.name}</span>
+        )}
+        actions={inspected?.actions}
+      >
+        {inspected && (
+          <ItemTooltipContent item={inspected.item} equippedItem={inspected.compare} hideName />
+        )}
+      </DetailSheet>
     </div>
   )
 }

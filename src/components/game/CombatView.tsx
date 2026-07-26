@@ -142,15 +142,17 @@ export function CombatView() {
   })()
 
   return (
+    /* The world is the page. This was an `rp-panel` box sitting in a three-column
+       grid; it is now the full-bleed layer everything else floats on, so the scene
+       fills the viewport on both desktop and mobile and the panels overlay it. */
     <div
       ref={combatContainerRef}
-      className="rp-panel flex flex-col"
+      className="flex flex-col"
       style={{
         background: `linear-gradient(180deg, ${zone?.bgColor ?? '#1a1510'}cc 0%, #1a1510 100%)`,
-        position: 'relative',
+        position: 'absolute',
+        inset: 0,
         overflow: 'hidden',
-        flex: 1,
-        minHeight: 0,
       }}
     >
       {!DIMETRIC_ENABLED && (
@@ -257,14 +259,18 @@ export function CombatView() {
       {/* ── Traveling overlay ── */}
       {gameMode === 'traveling' && <TravelOverlay />}
 
-      {/* ── Gathering panel ── */}
-      {gameMode === 'gathering' && <GatheringPanel />}
-
-      {/* ── Crafting panel ── */}
-      {gameMode === 'crafting' && <CraftingPanel />}
-
-      {/* ── Town panel ── */}
-      {gameMode === 'in_town' && currentTown && <TownView />}
+      {/* ── Mode panels ──────────────────────────────────────────────────────
+             Gathering, crafting and town used to stack BELOW the viewport inside
+             this box, which is what pushed the world into a letterbox. They now
+             float over it as glass sheets, docked above the action bar on desktop
+             and above the tab bar on mobile. */}
+      {(gameMode === 'gathering' || gameMode === 'crafting' || (gameMode === 'in_town' && currentTown)) && (
+        <div className="app-modepanel rp-glass">
+          {gameMode === 'gathering' && <GatheringPanel />}
+          {gameMode === 'crafting'  && <CraftingPanel />}
+          {gameMode === 'in_town' && currentTown && <TownView />}
+        </div>
+      )}
 
       {/* ── Combat arena (legacy path only) ── */}
       {!DIMETRIC_ENABLED && gameMode === 'combat' && (

@@ -1,23 +1,34 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { getClassAbilities } from '../../data/abilities'
 import { SpriteIcon } from '../ui/SpriteIcon'
+import { DetailSheet } from '../ui/DetailSheet'
+import { useLongPress } from '../ui/useLongPress'
 import type { ActiveAbilityDef } from '../../data/types'
 
 interface SlotProps {
   ability: ActiveAbilityDef
   remaining: number
   onActivate: () => void
+  onInspect: () => void
 }
 
-function SkillSlot({ ability, remaining, onActivate }: SlotProps) {
+function SkillSlot({ ability, remaining, onActivate, onInspect }: SlotProps) {
   const pct = remaining > 0 ? remaining / ability.cooldownSeconds : 0
   const onCd = remaining > 0
 
+  // Abilities are the one place tap CANNOT open an inspector: firing them is a combat
+  // action and has to stay a single instant press. So the description — which used to
+  // live only in a `title` attribute, i.e. nowhere at all on a phone — moves to
+  // press-and-hold. The corner dot is there so the gesture is discoverable rather than
+  // folklore.
+  const press = useLongPress(onInspect, () => { if (!onCd) onActivate() })
+
   return (
     <button
-      title={`${ability.name}\n${ability.description}\nCooldown: ${ability.cooldownSeconds}s`}
-      onClick={onActivate}
+      title={`${ability.name}\n${ability.description}\nCooldown: ${ability.cooldownSeconds}s — hold to inspect`}
+      {...press}
+      aria-label={`${ability.name}. Hold to inspect.`}
       disabled={onCd}
       style={{
         position: 'relative',
@@ -37,8 +48,15 @@ function SkillSlot({ ability, remaining, onActivate }: SlotProps) {
         padding: 4,
         transition: 'border-color 0.15s',
         overflow: 'hidden',
+        touchAction: 'manipulation',
+        WebkitTouchCallout: 'none',
       }}
     >
+      {/* Hold hint — small enough to ignore, present enough to invite the gesture. */}
+      <span style={{
+        position: 'absolute', top: 3, right: 4, width: 3, height: 3, borderRadius: 2,
+        background: onCd ? '#4a4030' : '#c8a864', opacity: 0.8, zIndex: 2,
+      }} />
       {/* Conic-gradient cooldown sweep overlay */}
       {onCd && (
         <div
@@ -100,6 +118,33 @@ function SkillSlot({ ability, remaining, onActivate }: SlotProps) {
 export function SkillBar({ embedded = false }: { embedded?: boolean } = {}) {
   const { playerClass, skillCooldowns, activateAbility, currentMob, isAlive } = useGameStore()
   const abilities = getClassAbilities(playerClass)
+  const [inspected, setInspected] = useState<ActiveAbilityDef | null>(null)
+
+  const sheet = (
+    <DetailSheet
+      open={!!inspected}
+      onClose={() => setInspected(null)}
+      title={inspected?.name}
+      actions={inspected ? [{
+        label: 'Use',
+        tone: 'primary',
+        onClick: () => activateAbility(inspected.id),
+        disabled: !isAlive || (skillCooldowns[inspected.id] ?? 0) > 0,
+        hint: (skillCooldowns[inspected.id] ?? 0) > 0 ? 'Still on cooldown' : undefined,
+      }] : undefined}
+    >
+      {inspected && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <SpriteIcon emoji={inspected.icon} size={28} />
+            <span style={{ color: '#9d9d9d' }}>Cooldown {inspected.cooldownSeconds}s
+              {inspected.castTimeSeconds ? ` · ${inspected.castTimeSeconds}s cast` : ''}</span>
+          </div>
+          <div>{inspected.description}</div>
+        </div>
+      )}
+    </DetailSheet>
+  )
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -127,8 +172,10 @@ export function SkillBar({ embedded = false }: { embedded?: boolean } = {}) {
             ability={ability}
             remaining={skillCooldowns[ability.id] ?? 0}
             onActivate={() => isAlive && activateAbility(ability.id)}
+            onInspect={() => setInspected(ability)}
           />
         ))}
+        {sheet}
       </div>
     )
   }
@@ -159,8 +206,10 @@ export function SkillBar({ embedded = false }: { embedded?: boolean } = {}) {
           ability={ability}
           remaining={skillCooldowns[ability.id] ?? 0}
           onActivate={() => isAlive && activateAbility(ability.id)}
+          onInspect={() => setInspected(ability)}
         />
       ))}
+      {sheet}
     </div>
   )
 }
