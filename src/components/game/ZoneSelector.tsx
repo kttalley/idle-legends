@@ -3,6 +3,7 @@ import { useGameStore } from '../../store/gameStore'
 import { ZONES, ZONE_ORDER } from '../../data/zones'
 import { getZoneProgression, getPrerequisiteZone } from '../../engine/zoneProgression'
 import type { ZoneId } from '../../data/types'
+import { SpriteIcon } from '../ui/SpriteIcon'
 
 export function ZoneSelector() {
   const {
@@ -66,7 +67,7 @@ export function ZoneSelector() {
             >
               <div className="flex justify-between items-center">
                 <span style={{ fontSize: '0.7rem', fontWeight: active ? 700 : 400, color: active ? '#ffd700' : isDestination ? '#ff8800' : '#d4b896' }}>
-                  {active ? '▶ ' : isDestination ? '✈ ' : ''}{zoneName}
+                  {active ? '▶ ' : ''}{isDestination && <SpriteIcon ui="travel" size={11} />}{isDestination ? ' ' : ''}{zoneName}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   {!active && canEnter && !isTraveling && dist > 0 && (
@@ -80,9 +81,9 @@ export function ZoneSelector() {
               {unlocked && (
                 <div className="flex justify-between mt-0.5" style={{ fontSize: '0.6rem', color: '#666' }}>
                   <span>{kills} kills</span>
-                  {bossDown && <span style={{ color: '#ffd700' }}>★ Boss slain</span>}
+                  {bossDown && <span style={{ color: '#ffd700' }}><SpriteIcon emoji="★" size={11} /> Boss slain</span>}
                   {!bossDown && kills >= zone.unlockKills && (
-                    <span style={{ color: '#ff8000' }}>⚠ Boss ready!</span>
+                    <span style={{ color: '#ff8000' }}><SpriteIcon ui="warn" size={11} /> Boss ready!</span>
                   )}
                   {!bossDown && kills < zone.unlockKills && (
                     <span>{zone.unlockKills - kills} to boss</span>
@@ -91,7 +92,7 @@ export function ZoneSelector() {
               )}
               {!canEnter && lockReason && (
                 <div style={{ fontSize: '0.6rem', color: '#aa6644', marginTop: 2 }}>
-                  🔒 {lockReason}
+                  <SpriteIcon ui="lock" size={11} /> {lockReason}
                 </div>
               )}
             </button>

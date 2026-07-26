@@ -6,6 +6,7 @@ import { generatePlayerNameFallback } from '../../engine/nameGen'
 import { useGameStore } from '../../store/gameStore'
 import { HeroPreview } from './HeroPreview'
 import type { ClassType, RaceType, FactionType } from '../../data/types'
+import { SpriteIcon } from '../ui/SpriteIcon'
 
 interface CharacterCreateProps {
   onCreate: (cls: ClassType, race: RaceType, opts: { name: string; faction: FactionType }) => void
@@ -117,8 +118,8 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
             {name || 'Unnamed'}
           </div>
         )}
-        <button className="rp-button" style={{ fontSize: '0.9rem', padding: '6px 10px' }} title="Reroll name" onClick={reroll}>🎲</button>
-        <button className="rp-button" style={{ fontSize: '0.75rem', padding: '6px 10px' }} title="Edit name" onClick={() => setEditing(true)}>✎</button>
+        <button className="rp-button" style={{ fontSize: '0.9rem', padding: '6px 10px' }} title="Reroll name" onClick={reroll}><SpriteIcon ui="dice" size={16} /></button>
+        <button className="rp-button" style={{ fontSize: '0.75rem', padding: '6px 10px' }} title="Edit name" onClick={() => setEditing(true)}><SpriteIcon ui="quill" size={14} /></button>
       </div>
 
       {/* ── Class ── */}

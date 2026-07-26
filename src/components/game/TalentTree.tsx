@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { CLASS_DEFINITIONS } from '../../data/classes'
 import type { TalentNodeDef } from '../../data/types'
+import { SpriteIcon } from '../ui/SpriteIcon'
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 // Sidebar is 220px; 4 cols × 48 + 8 padding = 200px, fits with room to spare
@@ -206,8 +207,13 @@ export function TalentTree() {
               }}
             >
               {/* Icon */}
-              <span style={{ fontSize: '1.3rem', lineHeight: 1, color: colors.icon }}>
-                {t.icon}
+              <span style={{
+                lineHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                // Rank state reads through as opacity: a locked node dims rather than
+                // recolouring, so the archetype silhouette stays legible at 20px.
+                opacity: state === 'locked' ? 0.35 : state === 'available' ? 0.7 : 1,
+              }}>
+                <SpriteIcon talentId={t.id} emoji={t.icon} size={20} title={t.name} />
               </span>
 
               {/* Name */}
@@ -256,7 +262,8 @@ export function TalentTree() {
             }}
           >
             <div style={{ color: '#ffd700', fontWeight: 700, fontSize: '0.65rem', marginBottom: 2 }}>
-              {tooltip.node.icon} {tooltip.node.name}
+              <SpriteIcon talentId={tooltip.node.id} emoji={tooltip.node.icon} size={14} />{' '}
+              {tooltip.node.name}
             </div>
             <div style={{ color: '#9d9d9d', fontSize: '0.58rem', lineHeight: 1.4, marginBottom: 4 }}>
               {tooltip.node.description.replace('{n}', String(

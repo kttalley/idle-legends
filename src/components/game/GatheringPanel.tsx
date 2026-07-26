@@ -120,7 +120,7 @@ export function GatheringPanel() {
           onClick={() => setMode('combat')}
           style={{ fontSize: '0.6rem', flex: 1 }}
         >
-          ⚔ Fight
+          <SpriteIcon emoji="⚔" size={13} /> Fight
         </button>
         <button
           className="rp-button"
@@ -128,7 +128,7 @@ export function GatheringPanel() {
           disabled={!hasMaterials}
           style={{ fontSize: '0.6rem', flex: 1, opacity: hasMaterials ? 1 : 0.4 }}
         >
-          🔨 Craft
+          <SpriteIcon emoji="🔨" size={13} /> Craft
         </button>
       </div>
     </div>

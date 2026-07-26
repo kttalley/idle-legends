@@ -13,6 +13,7 @@ import { QuestToast } from './components/game/QuestToast'
 import { slotStorage } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
 import { ZONES, ZONE_ORDER } from './data/zones'
+import { SpriteIcon } from './components/ui/SpriteIcon'
 
 const SHOW_DEV_JUMP = new URLSearchParams(window.location.search).has('dev')
 
@@ -137,15 +138,15 @@ export default function App() {
       {/* ── Mobile FABs ── */}
       <div className="app-fabs">
         <button className={`app-fab${activePanel === 'left' ? ' fab-active' : ''}`} onClick={() => toggle('left')}>
-          <span className="app-fab-icon">⚔</span>
+          <span className="app-fab-icon"><SpriteIcon emoji="⚔" size={18} /></span>
           <span>Character</span>
         </button>
         <button className={`app-fab${activePanel === 'log' ? ' fab-active' : ''}`} onClick={() => toggle('log')}>
-          <span className="app-fab-icon">📜</span>
+          <span className="app-fab-icon"><SpriteIcon emoji="📜" size={18} /></span>
           <span>Log</span>
         </button>
         <button className={`app-fab${activePanel === 'right' ? ' fab-active' : ''}`} onClick={() => toggle('right')}>
-          <span className="app-fab-icon">🎒</span>
+          <span className="app-fab-icon"><SpriteIcon ui="bag" size={18} /></span>
           <span>Inv</span>
         </button>
       </div>

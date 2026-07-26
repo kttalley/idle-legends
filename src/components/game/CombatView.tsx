@@ -20,6 +20,7 @@ import { CombatParticles } from './CombatParticles'
 import type { CombatParticlesHandle } from './CombatParticles'
 import { ZONE_TOWN } from '../../data/towns'
 import { TOWNS } from '../../data/towns'
+import { SpriteIcon } from '../ui/SpriteIcon'
 
 // Phase 2: the unified dimetric world scene replaces the ASCII strip + combat
 // arena. Flip to false to fall back to the original presentation path.
@@ -132,11 +133,11 @@ export function CombatView() {
   // Auto-mode status label
   const autoStatus = (() => {
     if (isTraveling) return null
-    if (mobApproaching) return { label: `${currentMob!.isBoss ? '⚠' : '↘'} ${currentMob!.name} approaching…`, color: currentMob!.isBoss ? '#ff8000' : '#ff6666' }
+    if (mobApproaching) return { label: `${currentMob!.name} approaching…`, color: currentMob!.isBoss ? '#ff8000' : '#ff6666' }
     if (gameMode === 'gathering') return { label: `${prof.gatherIcon} Gathering…`, color: '#88cc88' }
     if (gameMode === 'crafting') return { label: `${prof.craftIcon} Crafting…`, color: '#ffd700' }
-    if (gameMode === 'in_town' && currentTown) return { label: `🏠 In Town`, color: '#ddaa44' }
-    if (gameMode === 'combat' && currentMob) return { label: `⚔ Fighting ${currentMob.name}`, color: '#88aaff' }
+    if (gameMode === 'in_town' && currentTown) return { label: `In Town`, color: '#ddaa44' }
+    if (gameMode === 'combat' && currentMob) return { label: `Fighting ${currentMob.name}`, color: '#88aaff' }
     return null
   })()
 
@@ -213,9 +214,10 @@ export function CombatView() {
                 transition: 'all 0.15s',
               }}
             >
-              {m === 'combat'    ? '⚔'                : null}
-              {m === 'gathering' ? prof.gatherIcon     : null}
-              {m === 'crafting'  ? prof.craftIcon      : null}
+              <SpriteIcon
+                emoji={m === 'combat' ? '⚔' : m === 'gathering' ? prof.gatherIcon : prof.craftIcon}
+                size={12}
+              />
             </button>
           ))}
           {ZONE_TOWN[currentZone] && (
@@ -235,7 +237,7 @@ export function CombatView() {
                 transition: 'all 0.15s',
               }}
             >
-              🏠
+              <SpriteIcon emoji="🏠" size={12} />
             </button>
           )}
         </div>
@@ -314,7 +316,7 @@ export function CombatView() {
 
               {!isAlive && (
                 <div className="text-center" style={{ fontSize: '0.6rem', color: '#ff4444' }}>
-                  💀 {Math.ceil(respawnTimer)}s
+                  <SpriteIcon emoji="💀" size={11} /> {Math.ceil(respawnTimer)}s
                   <br />
                   <button className="rp-button mt-1" onClick={respawnNow} style={{ fontSize: '0.55rem' }}>
                     Respawn
@@ -326,7 +328,9 @@ export function CombatView() {
             {/* Combat gap — approach indicator only (particles handle the rest) */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 60, flexShrink: 0 }}>
               <span style={{ color: mobApproaching ? '#ff6644' : '#333', fontSize: mobApproaching ? '0.65rem' : '0.9rem', fontWeight: 700, transition: 'all 0.3s' }}>
-                {mobApproaching ? `↘ ${Math.round(mobDist)}` : '⚔'}
+                {mobApproaching
+                  ? <>{Math.round(mobDist)}</>
+                  : <SpriteIcon emoji="⚔" size={11} />}
               </span>
             </div>
 
@@ -348,7 +352,7 @@ export function CombatView() {
                     <div className="flex flex-col items-center gap-0.5">
                       {procState.mobFrozen && (
                         <div style={{ fontSize: '0.5rem', color: '#6af' }}>
-                          🥶 {procState.mobFrozenTimer.toFixed(1)}s
+                          <SpriteIcon emoji="❄" size={10} /> {procState.mobFrozenTimer.toFixed(1)}s
                         </div>
                       )}
                       <StatusEffects dots={activeDoTs} />

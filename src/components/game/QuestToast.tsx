@@ -2,6 +2,7 @@ import React from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { ZONES } from '../../data/zones'
 import { canEnterZone } from '../../engine/zoneProgression'
+import { SpriteIcon } from '../ui/SpriteIcon'
 
 export function QuestToast() {
   const activeQuest = useGameStore(s => s.activeQuest)
@@ -43,7 +44,7 @@ export function QuestToast() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <span style={{ fontSize: '1.1rem' }}>🏆</span>
+          <SpriteIcon ui="trophy" size={17} />
           <span
             style={{
               fontSize: '0.55rem',

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { TOWNS } from '../../data/towns'
 import { isTownHostileToPlayer } from '../../engine/zoneProgression'
+import { SpriteIcon } from '../ui/SpriteIcon'
 
 const FACTION_COLOR: Record<string, string> = {
   alliance: '#6699ff',
@@ -69,7 +70,7 @@ export function TownView() {
             lineHeight: '1.4',
           }}
         >
-          {typeLabel}{town.type === 'hostile' ? ' ⚠' : ''}
+          {typeLabel}{town.type === 'hostile' && <> <SpriteIcon ui="warn" size={11} /></>}
         </span>
       </div>
 

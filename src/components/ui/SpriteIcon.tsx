@@ -4,6 +4,10 @@ import {
   makeGearIconSheet, makeItemIconSheet, GEAR_ICON, ITEM_ICON, EMOJI_ITEM_ICON,
   gearPaletteId, type GearIconKey, type ItemIconKey,
 } from '../../render/itemIcons'
+import {
+  makeTalentIconSheet, TALENT_ICON, TALENT_ICON_BY_ID, type TalentIconKey,
+} from '../../render/talentIcons'
+import { makeUiIconSheet, UI_ICON, EMOJI_UI_ICON, type UiIconKey } from '../../render/uiIcons'
 import { bakedSheet } from '../../render/palette'
 import { getPalette } from '../../render/palettes'
 import type { IndexedSprite } from '../../render/types'
@@ -14,12 +18,16 @@ import type { IndexedSprite } from '../../render/types'
 //   • gear   (icons/gear) — the six equipment slots; resolved by `gear`, tinted by `rarity`
 //                           (and optionally material `tier`) through the item palettes.
 //   • item   (icons/item) — materials, reagents and crafted goods; by `item` key or emoji.
+//   • talent (icons/talent) — talent-tree nodes, resolved from the talent's own id.
+//   • ui     (icons/ui)     — shell chrome (lock, map, coin, trophy, warn, …).
 // If nothing resolves it falls back to rendering the emoji glyph, so existing emoji-labelled
 // content keeps working and adoption stays incremental.
 
 const BASE_SHEET = makeIconSheet()
 const GEAR_SHEET = makeGearIconSheet()
 const ITEM_SHEET = makeItemIconSheet()
+const TALENT_SHEET = makeTalentIconSheet()
+const UI_SHEET = makeUiIconSheet()
 
 interface Props {
   icon?: IconKey
@@ -27,6 +35,11 @@ interface Props {
   gear?: GearIconKey
   /** Material / crafted-good key ('ore' | 'potion' | …). */
   item?: ItemIconKey
+  /** Talent archetype, or `talentId` to look one up from the id map. */
+  talent?: TalentIconKey
+  talentId?: string
+  /** Shell chrome key ('lock' | 'coin' | …). */
+  ui?: UiIconKey
   /** Rarity for a `gear` icon — drives the 13–15 accent channel. */
   rarity?: string
   /** Material tier ('t1'..'t4') for a `gear` icon — drives the 5–12 material channels. */
@@ -44,11 +57,14 @@ interface Resolved {
   palette: string
 }
 
-function resolve({ icon, gear, item, rarity, tier, emoji }: Props): Resolved | null {
+function resolve({ icon, gear, item, talent, talentId, ui, rarity, tier, emoji }: Props): Resolved | null {
   if (gear != null) {
     return { sheet: GEAR_SHEET, frame: GEAR_ICON[gear], palette: gearPaletteId(rarity, tier) }
   }
   if (item != null) return { sheet: ITEM_SHEET, frame: ITEM_ICON[item], palette: 'icon/base' }
+  if (ui != null) return { sheet: UI_SHEET, frame: UI_ICON[ui], palette: 'icon/base' }
+  const talentKey = talent ?? (talentId != null ? TALENT_ICON_BY_ID[talentId] : undefined)
+  if (talentKey != null) return { sheet: TALENT_SHEET, frame: TALENT_ICON[talentKey], palette: 'icon/base' }
   if (icon != null) return { sheet: BASE_SHEET, frame: ICON[icon], palette: 'icon/base' }
   if (emoji == null) return null
   // Strip the emoji variation selector (U+FE0F) so e.g. '⛏️' matches the '⛏' map key.
@@ -59,6 +75,8 @@ function resolve({ icon, gear, item, rarity, tier, emoji }: Props): Resolved | n
   if (baseKey != null) return { sheet: BASE_SHEET, frame: ICON[baseKey], palette: 'icon/base' }
   const itemKey = EMOJI_ITEM_ICON[key]
   if (itemKey != null) return { sheet: ITEM_SHEET, frame: ITEM_ICON[itemKey], palette: 'icon/base' }
+  const uiKey = EMOJI_UI_ICON[key]
+  if (uiKey != null) return { sheet: UI_SHEET, frame: UI_ICON[uiKey], palette: 'icon/base' }
   return null
 }
 

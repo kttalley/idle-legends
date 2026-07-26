@@ -1,4 +1,5 @@
 import React from 'react'
+import { SpriteIcon } from './SpriteIcon'
 
 function formatGold(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -13,7 +14,7 @@ interface GoldDisplayProps {
 export function GoldDisplay({ gold }: GoldDisplayProps) {
   return (
     <div className="flex items-center gap-1 text-sm">
-      <span style={{ fontSize: 16 }}>🪙</span>
+      <SpriteIcon ui="coin" size={16} title="Gold" />
       <span style={{ color: '#ffd700', fontWeight: 700, textShadow: '0 1px 2px rgba(0,0,0,0.9)' }}>
         {formatGold(gold)}
       </span>

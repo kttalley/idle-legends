@@ -5,6 +5,7 @@ import { StatusEffects } from '../StatusEffects'
 import { CLASS_DEFINITIONS } from '../../../data/classes'
 import { xpForLevel } from '../../../engine/progression'
 import type { CastState } from '../../../data/types'
+import { SpriteIcon } from '../../ui/SpriteIcon'
 
 // Compact, background-less unit read-outs (mobile-friendly). Just bars + text + status
 // icons floating over the world — no card panel. The HP/XP bar tracks provide their own
@@ -72,7 +73,7 @@ export function UnitFrames() {
         {activeBuffs.length > 0 && <div style={{ display: 'flex', justifyContent: 'flex-start' }}><StatusEffects buffs={activeBuffs} /></div>}
         {!isAlive && (
           <div style={{ fontSize: 10, color: '#ff6a5a', display: 'flex', alignItems: 'center', gap: 6, textShadow: TEXT_SHADOW }}>
-            💀 {Math.ceil(respawnTimer)}s
+            <SpriteIcon emoji="💀" size={11} /> {Math.ceil(respawnTimer)}s
             <button onClick={respawnNow} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, border: '1px solid #6a2c24', background: 'rgba(42,18,16,0.9)', color: '#ffb0a0', cursor: 'pointer' }}>
               Respawn
             </button>
@@ -88,7 +89,9 @@ export function UnitFrames() {
             color: currentMob.isBoss ? '#ff9a3c' : currentMob.isElite ? '#c78af0' : '#e0b0a0',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            {currentMob.isBoss ? '☠ ' : currentMob.isElite ? '★ ' : ''}{currentMob.name}
+            {currentMob.isBoss && <><SpriteIcon emoji="☠" size={11} /> </>}
+            {!currentMob.isBoss && currentMob.isElite && <><SpriteIcon emoji="★" size={11} /> </>}
+            {currentMob.name}
           </div>
           {mobApproaching ? (
             <div style={{ fontSize: 9, color: '#c89a6a', textShadow: TEXT_SHADOW }}>↘ approaching… ~{Math.round(mobDist / 2.5)}s</div>
@@ -96,7 +99,7 @@ export function UnitFrames() {
             <HealthBar current={Math.max(0, currentMob.currentHp)} max={currentMob.maxHp} type="mob-hp" height={9} />
           )}
           {procState.mobFrozen && (
-            <div style={{ fontSize: 9, color: '#6ab0ff', textShadow: TEXT_SHADOW }}>🥶 {procState.mobFrozenTimer.toFixed(1)}s</div>
+            <div style={{ fontSize: 9, color: '#6ab0ff', textShadow: TEXT_SHADOW }}><SpriteIcon emoji="❄" size={10} /> {procState.mobFrozenTimer.toFixed(1)}s</div>
           )}
           {activeDoTs.length > 0 && <div style={{ display: 'flex', justifyContent: 'flex-start' }}><StatusEffects dots={activeDoTs} /></div>}
         </div>

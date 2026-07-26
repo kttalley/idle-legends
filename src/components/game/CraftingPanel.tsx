@@ -174,7 +174,7 @@ export function CraftingPanel() {
           disabled={isCrafting}
           style={{ fontSize: '0.6rem', flex: 1, opacity: isCrafting ? 0.4 : 1 }}
         >
-          ⛏ Gather
+          <SpriteIcon emoji="⛏" size={13} /> Gather
         </button>
         <button
           className="rp-button"
@@ -182,7 +182,7 @@ export function CraftingPanel() {
           disabled={isCrafting}
           style={{ fontSize: '0.6rem', flex: 1, opacity: isCrafting ? 0.4 : 1 }}
         >
-          ⚔ Fight
+          <SpriteIcon emoji="⚔" size={13} /> Fight
         </button>
         {selected && !isCrafting && (
           <button
@@ -195,7 +195,7 @@ export function CraftingPanel() {
               opacity: canCraft(selected) ? 1 : 0.4,
             }}
           >
-            🔨 Craft{selectedRecipe && canCraft(selectedRecipe.id)
+            <SpriteIcon emoji="🔨" size={13} /> Craft{selectedRecipe && canCraft(selectedRecipe.id)
               ? ` ${QUALITY_LABEL[qualityOf(selectedRecipe)]}`
               : '!'}
           </button>

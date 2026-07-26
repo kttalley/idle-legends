@@ -3,6 +3,7 @@ import { useGameStore } from '../../../store/gameStore'
 import { ZONES } from '../../../data/zones'
 import { ZoneSelector } from '../ZoneSelector'
 import type { ZoneMap, TileType } from '../../../data/types'
+import { SpriteIcon } from '../../ui/SpriteIcon'
 
 // Top-right circular radar: the current zone's 64×64 ZoneMap baked to an offscreen
 // canvas (cached per zone), player-centered so the player sits at the disc center with
@@ -144,7 +145,7 @@ export function MinimapRadar() {
             color: '#ffd700', fontSize: 12, cursor: 'pointer', lineHeight: '20px', padding: 0,
           }}
         >
-          🗺
+          <SpriteIcon ui="map" size={15} title="Zone map" />
         </button>
         {/* Zoom cycle button, opposite the map (bottom-left): Wide → Medium → Close → Wide */}
         <button
@@ -157,7 +158,7 @@ export function MinimapRadar() {
             color: '#ffd700', fontSize: 12, cursor: 'pointer', lineHeight: '20px', padding: 0,
           }}
         >
-          🔍
+          <SpriteIcon ui="zoom" size={15} title="Zoom" />
           {/* current step indicator (1–3) */}
           <span style={{
             position: 'absolute', right: -3, top: -3,
