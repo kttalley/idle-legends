@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
-import { useGameStore } from '../../store/gameStore'
+import { useGameStore, bagCapacity, bagSlotCost, townPrice } from '../../store/gameStore'
 import { TOWNS } from '../../data/towns'
 import { isTownHostileToPlayer } from '../../engine/zoneProgression'
+import { BAG_SLOTS_MAX_PURCHASED, INVENTORY_SLOTS } from '../../data/constants'
 import { SpriteIcon } from '../ui/SpriteIcon'
 
 const FACTION_COLOR: Record<string, string> = {
@@ -23,7 +24,10 @@ const TYPE_COLOR: Record<string, string> = {
 }
 
 export function TownView() {
-  const { currentTown, generatedTownNames, restInTown, leaveTown, playerFaction } = useGameStore()
+  const {
+    currentTown, generatedTownNames, restInTown, leaveTown, playerFaction,
+    gold, bagSlotsPurchased, buyBagSlot,
+  } = useGameStore()
   const [restFeedback, setRestFeedback] = useState(false)
 
   if (!currentTown) return null
@@ -42,6 +46,14 @@ export function TownView() {
     setRestFeedback(true)
     setTimeout(() => setRestFeedback(false), 2000)
   }
+
+  // The outfitter sells bag slots — capacity, not goods. Hostile towns still trade;
+  // they just charge for the privilege (they deny rest, not commerce).
+  const slotsBought = bagSlotsPurchased ?? 0
+  const capacity    = bagCapacity({ bagSlotsPurchased: slotsBought })
+  const bagMaxed    = slotsBought >= BAG_SLOTS_MAX_PURCHASED
+  const slotCost    = townPrice(bagSlotCost(slotsBought), currentTown, playerFaction)
+  const canAfford   = gold >= slotCost
 
   return (
     <div
@@ -105,16 +117,44 @@ export function TownView() {
           </div>
         )}
         {town.services.includes('vendor') && (
-          <span style={{ fontSize: '0.55rem', color: '#888' }}>
-            Vendor: coming soon
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              className="rp-button"
+              onClick={buyBagSlot}
+              disabled={bagMaxed || !canAfford}
+              title={
+                bagMaxed ? 'The outfitter has nothing larger.'
+                : !canAfford ? `Need ${slotCost}g`
+                : `One more slot, to ${capacity + 1}`
+              }
+              style={{ fontSize: '0.55rem', padding: '2px 8px', opacity: bagMaxed || !canAfford ? 0.5 : 1 }}
+            >
+              {bagMaxed ? 'Bag maxed' : `Buy bag slot — ${slotCost}g`}
+            </button>
+            <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>
+              {capacity} slots
+              {!bagMaxed && ` (${BAG_SLOTS_MAX_PURCHASED - slotsBought} more available)`}
+            </span>
+          </div>
         )}
+        {/* `repair` is still a declared service with no durability system behind it.
+            Whether to build durability or drop the service is an owner call — see
+            .planning/economy-and-towns-plan.md §4.1 — so it keeps saying so honestly
+            rather than being quietly deleted here. */}
         {town.services.includes('repair') && (
           <span style={{ fontSize: '0.55rem', color: '#888' }}>
             Repair: coming soon
           </span>
         )}
       </div>
+
+      {town.services.includes('vendor') && (
+        <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic' }}>
+          {hostileToPlayer
+            ? 'They will take your gold. They will not pretend to like you — prices are marked up.'
+            : 'A bigger bag means longer in the field before drops start going for scrap.'}
+        </div>
+      )}
 
       {/* Leave */}
       <div>

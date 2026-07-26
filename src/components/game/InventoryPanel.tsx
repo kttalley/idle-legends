@@ -52,6 +52,8 @@ function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
 export function InventoryPanel() {
   const { inventory, equipment, equipItem, unequipItem, sellItem, sellAllCommon } = useGameStore()
   const [activeTab, setActiveTab] = useState<'inventory' | 'equipment'>('equipment')
+  const used = inventory.filter(Boolean).length
+  const full = used >= inventory.length
 
   return (
     <div className="rp-panel flex flex-col h-full">
@@ -133,13 +135,21 @@ export function InventoryPanel() {
         {activeTab === 'inventory' && (
           <div>
             <div className="flex justify-between items-center mb-2" style={{ fontSize: '0.65rem' }}>
-              <span style={{ color: '#9d9d9d' }}>
-                {inventory.filter(Boolean).length} / {inventory.length} slots
+              <span style={{ color: full ? '#c8a100' : '#9d9d9d' }}>
+                {used} / {inventory.length} slots
               </span>
               <button className="rp-button" style={{ fontSize: '0.6rem' }} onClick={sellAllCommon}>
                 Sell Common
               </button>
             </div>
+            {/* A full bag no longer eats drops, but it does sell them cheap — say so
+                here rather than only in the combat log, which scrolls. */}
+            {full && (
+              <div style={{ fontSize: '0.55rem', color: '#c8a100', marginBottom: 6 }}>
+                Bag full — new drops are being salvaged for a fraction of their worth.
+                Buy slots from a town outfitter.
+              </div>
+            )}
             <div className="grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: 3 }}>
               {inventory.map((item, i) => (
                 item ? (

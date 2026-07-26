@@ -339,7 +339,13 @@ export interface GameState {
   talentPoints: number
   equipment: Record<Slot, Item | null>
   inventory: (Item | null)[]
+  /** Bag slots bought with gold, on top of INVENTORY_SLOTS. `inventory.length` is the
+   *  live capacity and is kept equal to base + this; the counter persists it. */
+  bagSlotsPurchased: number
   gold: number
+  /** Cumulative value recovered from drops there was no room to carry. Kept so the
+   *  economy can be audited — a silent loss is what this replaced. */
+  totalSalvaged: number
   skillCooldowns: Record<string, number>  // abilityId → seconds remaining
   currentZone: ZoneId
   /** Every enemy present in the zone. The player picks which one to fight. */

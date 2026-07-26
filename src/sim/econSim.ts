@@ -13,10 +13,11 @@
 // §4.3 makes measuring the gold curve a precondition for pricing anything.
 
 import { useGameStore } from '../store/gameStore'
-import { INVENTORY_SLOTS, RARITY_WEIGHTS } from '../data/constants'
-import type { ClassType, RaceType, ZoneId } from '../data/types'
+import { INVENTORY_SLOTS, RARITY_WEIGHTS, BAG_SLOTS_MAX_PURCHASED } from '../data/constants'
+import type { ClassType, RaceType, TownId, ZoneId } from '../data/types'
 import { ZONE_ORDER } from '../data/zones'
-import { canEnterZone } from '../engine/zoneProgression'
+import { canEnterZone, townForZone } from '../engine/zoneProgression'
+import { slotStorage } from '../store/saveSlots'
 
 // ── Expected value of a destroyed drop ────────────────────────────────────────
 // The bag-full branch logs a name, not a price, so a lost item's worth has to be
@@ -46,9 +47,16 @@ export interface Sample {
   bagSize: number
   /** Cumulative counts since the run started. */
   itemsLooted: number
+  /** Drops that overflowed the bag. Destroyed outright before the salvage change;
+   *  sold at SALVAGE_RATE after it. */
   itemsLost: number
-  /** Cumulative modelled vendor value of everything the bag-full branch ate. */
+  /** Cumulative modelled vendor value of everything that overflowed — what the old
+   *  bag-full branch destroyed, and the yardstick salvage income is judged against. */
   lostValueEst: number
+  /** Gold actually recovered from overflow (`totalSalvaged`), 0 before the change. */
+  salvagedGold: number
+  /** Bag slots bought with gold. */
+  bagSlotsBought: number
   deaths: number
   // ── Liveness probe ──────────────────────────────────────────────────────────
   // A stalled run reads identically to a slow one in the gold column alone, so
@@ -84,6 +92,13 @@ export interface ScenarioOpts {
   advanceZones?: boolean
   /** Sell every common on every sample, i.e. the closest thing to a sink today. */
   sellCommons?: boolean
+  /**
+   * Emulate a player who spends: at each sample, duck into the linked town and buy
+   * every bag slot currently affordable, then leave. The point of the scenario is to
+   * check that gold's first sink is reachable on the measured income curve — if the
+   * ladder outruns the faucet, the sink is decorative.
+   */
+  buyBagSlots?: boolean
   /** Seed for the harness's `Math.random` swap — makes a run reproducible. */
   seed?: number | null
 }
@@ -123,6 +138,7 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     sampleEveryMinutes: 5,
     advanceZones: false,
     sellCommons: false,
+    buyBagSlots: false,
     seed: null,
     ...opts,
   }
@@ -150,10 +166,9 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
 
     for (const msg of readNewLogs(s.combatLog)) {
       if (msg.startsWith('Looted:')) itemsLooted++
-      else if (msg.startsWith('Bag full!')) {
-        itemsLost++
-        lostValueEst += s.level * EXPECTED_VALUE_MULT
-      } else if (msg.includes('bags full')) {
+      // Overflow, under either regime: the old destroy branch and the salvage that
+      // replaced it, so a before/after comparison counts the same events.
+      else if (msg.startsWith('Bag full') || msg.includes('bags full') || msg.includes('no room, salvaged')) {
         itemsLost++
         lostValueEst += s.level * EXPECTED_VALUE_MULT
       } else if (msg.includes('You have died') || msg.includes('has slain you')) deaths++
@@ -178,6 +193,23 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
       }
       if (o.sellCommons) store.getState().sellAllCommon()
 
+      if (o.buyBagSlots) {
+        const townId = townForZone(store.getState().currentZone)
+        if (townId) {
+          const resume = store.getState().gameMode
+          store.getState().enterTown(townId as TownId)
+          // Buy while affordable. buyBagSlot is a no-op at the ceiling or short on
+          // gold, so the loop needs its own bound to stay honest about termination.
+          for (let n = 0; n < BAG_SLOTS_MAX_PURCHASED; n++) {
+            const before = store.getState().bagSlotsPurchased
+            store.getState().buyBagSlot()
+            if (store.getState().bagSlotsPurchased === before) break
+          }
+          store.getState().leaveTown()
+          if (resume === 'gathering' || resume === 'crafting') store.getState().setMode(resume)
+        }
+      }
+
       const after = store.getState()
       const tgt = after.currentMob
       samples.push({
@@ -189,6 +221,8 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
         bagUsed: after.inventory.filter(Boolean).length,
         bagSize: after.inventory.length,
         itemsLooted, itemsLost, lostValueEst, deaths,
+        salvagedGold: after.totalSalvaged,
+        bagSlotsBought: after.bagSlotsPurchased,
         mode: after.gameMode,
         alive: after.isAlive,
         hpPct: after.stats.maxHp > 0 ? after.stats.currentHp / after.stats.maxHp : 0,
@@ -207,6 +241,180 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     firstFullAtMinute,
     wallMs: Date.now() - started,
   }
+}
+
+// ── Invariants ────────────────────────────────────────────────────────────────
+// Checked every tick, not every sample: the properties below are the ones the T1
+// work claims, and a claim that is only spot-checked at 5-minute boundaries is not
+// checked at all. Run with `--assert`.
+
+export interface Violation {
+  tick: number
+  minute: number
+  rule: string
+  detail: string
+}
+
+const DESTROY_PATTERNS = [
+  // The exact strings the old code logged when it deleted a drop. If either can still
+  // appear, loot is still being destroyed somewhere.
+  'Bag full! Lost:',
+  'crafted — bags full!',
+]
+
+export function runInvariants(opts: ScenarioOpts): Violation[] {
+  const o: Required<ScenarioOpts> = {
+    playerClass: 'warrior', playerRace: 'human', stepSeconds: 0.25,
+    sampleEveryMinutes: 5, advanceZones: false, sellCommons: false,
+    buyBagSlots: false, seed: null, ...opts,
+  }
+  if (typeof __setSeed === 'function') __setSeed(o.seed)
+
+  const store = useGameStore
+  store.getState().initGame(o.playerClass, o.playerRace)
+
+  const readNewLogs = makeLogReader()
+  const violations: Violation[] = []
+  const totalTicks = Math.round((o.minutes * 60) / o.stepSeconds)
+  const ticksPerSample = Math.round((o.sampleEveryMinutes * 60) / o.stepSeconds)
+  let prevSalvaged = 0
+  let prevSlots = 0
+
+  const fail = (t: number, rule: string, detail: string) => {
+    // One report per rule keeps a systemic break from burying the others.
+    if (violations.some(v => v.rule === rule)) return
+    violations.push({ tick: t, minute: (t * o.stepSeconds) / 60, rule, detail })
+  }
+
+  for (let t = 1; t <= totalTicks; t++) {
+    store.getState().tick(o.stepSeconds)
+    const s = store.getState()
+
+    for (const msg of readNewLogs(s.combatLog)) {
+      for (const pattern of DESTROY_PATTERNS) {
+        if (msg.includes(pattern)) fail(t, 'loot is never destroyed', `log said: "${msg}"`)
+      }
+    }
+
+    if (s.gold < 0) fail(t, 'gold never goes negative', `gold=${s.gold}`)
+    if (s.totalSalvaged < prevSalvaged) {
+      fail(t, 'salvage ledger only grows', `${prevSalvaged} → ${s.totalSalvaged}`)
+    }
+    prevSalvaged = s.totalSalvaged
+
+    // Capacity is stored twice — as the array length and as the purchase counter — so
+    // they have to agree or the bag silently gains or loses room.
+    const expected = INVENTORY_SLOTS + s.bagSlotsPurchased
+    if (s.inventory.length !== expected) {
+      fail(t, 'bag length matches slots bought',
+        `length=${s.inventory.length} expected=${expected} (bought ${s.bagSlotsPurchased})`)
+    }
+    if (s.bagSlotsPurchased > BAG_SLOTS_MAX_PURCHASED) {
+      fail(t, 'purchased slots respect the ceiling', `bought ${s.bagSlotsPurchased}`)
+    }
+    if (s.bagSlotsPurchased < prevSlots) {
+      fail(t, 'bought slots are never lost', `${prevSlots} → ${s.bagSlotsPurchased}`)
+    }
+    prevSlots = s.bagSlotsPurchased
+
+    if (t % ticksPerSample === 0) {
+      if (o.sellCommons) store.getState().sellAllCommon()
+      if (o.buyBagSlots) {
+        const townId = townForZone(store.getState().currentZone)
+        if (townId) {
+          store.getState().enterTown(townId as TownId)
+          for (let n = 0; n < BAG_SLOTS_MAX_PURCHASED; n++) {
+            const before = store.getState().bagSlotsPurchased
+            store.getState().buyBagSlot()
+            if (store.getState().bagSlotsPurchased === before) break
+          }
+          store.getState().leaveTown()
+        }
+      }
+    }
+  }
+  return violations
+}
+
+// ── Save migration ────────────────────────────────────────────────────────────
+// Bag capacity is now stored in two places that must agree: the inventory array's
+// length and the `bagSlotsPurchased` counter. Every save written before this change
+// has the array and not the counter, so `rehydrateState` has to reconcile them — and
+// getting that wrong either shrinks a paid-for bag or deletes the items in it. This
+// drives the real save path (slotStorage → loadSlot) rather than trusting the reader.
+
+export function runSaveMigration(): Violation[] {
+  const out: Violation[] = []
+  const store = useGameStore
+  const fail = (rule: string, detail: string) => out.push({ tick: 0, minute: 0, rule, detail })
+
+  if (typeof __setSeed === 'function') __setSeed(99)
+  store.getState().initGame('warrior', 'human')
+
+  // Play a while so there is loot to preserve, then buy capacity.
+  for (let i = 0; i < 4 * 60 * 20; i++) store.getState().tick(0.25)
+  const townId = townForZone(store.getState().currentZone)
+  if (townId) {
+    store.getState().enterTown(townId as TownId)
+    for (let n = 0; n < 3; n++) store.getState().buyBagSlot()
+    store.getState().leaveTown()
+  }
+  const bought = store.getState().bagSlotsPurchased
+  if (bought === 0) fail('setup bought slots', 'no slots affordable — test proves nothing')
+
+  store.getState().saveGame()
+  const slotId = slotStorage.list()[0]?.id
+  if (!slotId) { fail('save produced a slot', 'slotStorage.list() empty'); return out }
+
+  // (1) Round-trip: a current save must come back byte-identical in capacity terms.
+  const expectedCapacity = INVENTORY_SLOTS + bought
+  const expectedItems = store.getState().inventory.filter(Boolean).length
+  store.getState().loadSlot(slotId)
+  if (store.getState().bagSlotsPurchased !== bought) {
+    fail('round-trip keeps bought slots', `${bought} → ${store.getState().bagSlotsPurchased}`)
+  }
+  if (store.getState().inventory.length !== expectedCapacity) {
+    fail('round-trip keeps capacity', `${expectedCapacity} → ${store.getState().inventory.length}`)
+  }
+  if (store.getState().inventory.filter(Boolean).length !== expectedItems) {
+    fail('round-trip keeps items', `${expectedItems} → ${store.getState().inventory.filter(Boolean).length}`)
+  }
+
+  // (2) Legacy save: strip the fields this change introduced, exactly as a blob written
+  // by the previous build would look, and confirm it loads as the 20-slot bag it was.
+  const slot = slotStorage.load(slotId)!
+  const legacy = JSON.parse(JSON.stringify(slot)) as typeof slot
+  delete (legacy.state as Partial<typeof legacy.state>).bagSlotsPurchased
+  delete (legacy.state as Partial<typeof legacy.state>).totalSalvaged
+  legacy.state.inventory = legacy.state.inventory.slice(0, INVENTORY_SLOTS)
+  const legacyItems = legacy.state.inventory.filter(Boolean).length
+  slotStorage.save(legacy)
+  store.getState().loadSlot(slotId)
+  const after = store.getState()
+  if (after.bagSlotsPurchased !== 0) fail('legacy save has no bought slots', `got ${after.bagSlotsPurchased}`)
+  if (after.totalSalvaged !== 0) fail('legacy save starts an empty ledger', `got ${after.totalSalvaged}`)
+  if (after.inventory.length !== INVENTORY_SLOTS) {
+    fail('legacy save keeps its 20 slots', `got ${after.inventory.length}`)
+  }
+  if (after.inventory.filter(Boolean).length !== legacyItems) {
+    fail('legacy save keeps its items', `${legacyItems} → ${after.inventory.filter(Boolean).length}`)
+  }
+
+  // (3) Over-long array (a save that somehow holds more items than it paid for): items
+  // must survive, because deleting a player's loot to satisfy a counter is the worse bug.
+  const over = JSON.parse(JSON.stringify(slotStorage.load(slotId)!)) as typeof slot
+  ;(over.state as { bagSlotsPurchased: number }).bagSlotsPurchased = 0
+  const filler = store.getState().inventory.filter(Boolean).slice(0, 3)
+  over.state.inventory = [...over.state.inventory, ...filler]
+  const overItems = over.state.inventory.filter(Boolean).length
+  slotStorage.save(over)
+  store.getState().loadSlot(slotId)
+  if (store.getState().inventory.filter(Boolean).length !== overItems) {
+    fail('over-long save keeps every item',
+      `${overItems} → ${store.getState().inventory.filter(Boolean).length}`)
+  }
+
+  return out
 }
 
 // ── Stall detection ───────────────────────────────────────────────────────────
@@ -304,11 +512,11 @@ export function formatReport(r: ScenarioResult): string {
   out.push('')
   out.push(
     [pad('min', 6), pad('lvl', 4), pad('zone', 20, true), pad('gold', 9), pad('g/min', 8),
-     pad('bag', 7), pad('loot', 6), pad('lost', 6), pad('lostVal', 9),
+     pad('bag', 7), pad('loot', 6), pad('ovf', 6), pad('ovfVal', 8), pad('salv$', 8), pad('+slot', 6),
      pad('mode', 10, true), pad('hp%', 5), pad('mobs', 5), pad('dist', 6), pad('kills', 6),
      pad('pos', 14)].join(' '),
   )
-  out.push('-'.repeat(133))
+  out.push('-'.repeat(146))
 
   let prevGold = 0
   let prevMin = 0
@@ -317,7 +525,8 @@ export function formatReport(r: ScenarioResult): string {
     out.push(
       [pad(s.minute.toFixed(0), 6), pad(s.level, 4), pad(s.zone, 20, true),
        pad(s.gold, 9), pad(rate.toFixed(1), 8), pad(`${s.bagUsed}/${s.bagSize}`, 7),
-       pad(s.itemsLooted, 6), pad(s.itemsLost, 6), pad(Math.round(s.lostValueEst), 9),
+       pad(s.itemsLooted, 6), pad(s.itemsLost, 6), pad(Math.round(s.lostValueEst), 8),
+       pad(s.salvagedGold, 8), pad(s.bagSlotsBought, 6),
        pad(s.alive ? s.mode : 'DEAD', 10, true), pad((s.hpPct * 100).toFixed(0), 5),
        pad(s.mobCount, 5), pad(s.targetDist === null ? '-' : s.targetDist.toFixed(1), 6),
        pad(s.zoneKills, 6), pad(`${s.pos.x.toFixed(2)},${s.pos.y.toFixed(2)}`, 14)].join(' '),
@@ -331,12 +540,13 @@ export function formatReport(r: ScenarioResult): string {
   out.push(`bag first full at: ${r.firstFullAtMinute === null ? 'never' : `${r.firstFullAtMinute.toFixed(1)} min`}` +
            `  (capacity ${INVENTORY_SLOTS})`)
   out.push(`gold earned:       ${f.gold}  (${(f.gold / f.minute).toFixed(1)}/min average)`)
-  out.push(`items looted:      ${f.itemsLooted}`)
-  out.push(`items DESTROYED:   ${f.itemsLost}  (~${Math.round(f.lostValueEst)}g of modelled vendor value)`)
-  if (f.itemsLooted + f.itemsLost > 0) {
-    const pct = (100 * f.itemsLost) / (f.itemsLooted + f.itemsLost)
-    out.push(`loot loss rate:    ${pct.toFixed(1)}% of all drops`)
-  }
+  out.push(`items kept:        ${f.itemsLooted}`)
+  out.push(`items overflowed:  ${f.itemsLost}  (~${Math.round(f.lostValueEst)}g of modelled vendor value)`)
+  out.push(`salvage recovered: ${f.salvagedGold}g` +
+           (f.lostValueEst > 0 ? `  (${(100 * f.salvagedGold / f.lostValueEst).toFixed(0)}% of it — the rest is what capacity buys)` : ''))
+  out.push(`value DESTROYED:   ${Math.round(f.lostValueEst) - f.salvagedGold}g modelled` +
+           (f.salvagedGold > 0 ? ' — none of it silently' : ''))
+  out.push(`bag slots bought:  ${f.bagSlotsBought}  (capacity ${f.bagSize})`)
   out.push(`deaths:            ${f.deaths}`)
   return out.join('\n')
 }

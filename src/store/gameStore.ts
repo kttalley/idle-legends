@@ -42,7 +42,10 @@ import {
   ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE,
   BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
   AUTOSAVE_INTERVAL_MS,
+  BAG_SLOTS_MAX_PURCHASED, BAG_SLOT_BASE_COST, BAG_SLOT_COST_GROWTH,
+  SALVAGE_RATE, HOSTILE_TOWN_MARKUP,
 } from '../data/constants'
+import { isTownHostileToPlayer } from '../engine/zoneProgression'
 import { rollLoot } from '../engine/loot'
 import { generateNames, generateThought, generateFactionNamesFallback, generatePlayerNameFallback } from '../engine/nameGen'
 import type { ThoughtEvent } from '../engine/nameGen'
@@ -94,6 +97,46 @@ function writeZoomPref(n: number): void {
   try { localStorage.setItem(ZOOM_KEY, String(n)) } catch { /* private mode / no storage */ }
 }
 
+// ── Bag capacity & the price of it ────────────────────────────────────────────
+
+/** Live bag capacity. `inventory.length` is kept equal to this. */
+export function bagCapacity(s: Pick<GameState, 'bagSlotsPurchased'>): number {
+  return INVENTORY_SLOTS + Math.min(BAG_SLOTS_MAX_PURCHASED, s.bagSlotsPurchased ?? 0)
+}
+
+/**
+ * Price of the next bag slot, given how many are already bought.
+ *
+ * Geometric, and sized against the harness rather than guessed. Measured idle income
+ * after salvage is ~27 gold/min, so the first slot (200g) lands about ten minutes into a
+ * first session, and a full 8-hour idle window (~13,200g) buys the first twelve — leaving
+ * the last eight as a genuinely long arc instead of an afternoon. Verified end to end:
+ * `--buyslots` finishes an 8-hour run with 12 slots bought and gold spent down to near
+ * zero, which is what a working sink looks like.
+ */
+export function bagSlotCost(purchased: number): number {
+  return Math.round(BAG_SLOT_BASE_COST * Math.pow(BAG_SLOT_COST_GROWTH, purchased))
+}
+
+/** What a town actually charges — hostile ones trade, at a price. */
+export function townPrice(base: number, townId: TownId | null, faction: FactionType): number {
+  if (townId && isTownHostileToPlayer(townId, faction)) return Math.round(base * HOSTILE_TOWN_MARKUP)
+  return base
+}
+
+/**
+ * What a drop is worth when there is nowhere to put it.
+ *
+ * This exists so that overflow is a bad outcome instead of an invisible one. The previous
+ * behaviour logged `Bag full! Lost: {item}` and dropped the item on the floor of the
+ * universe — measured at 96% of every drop across an 8-hour idle run, roughly five times
+ * more value than the game paid out in gold over the same window. Never zero, so a
+ * legendary is never worth literally nothing; never full, so capacity stays worth buying.
+ */
+export function salvageValue(item: Item): number {
+  return Math.max(1, Math.round(item.vendorValue * SALVAGE_RATE))
+}
+
 // ── Default State ─────────────────────────────────────────────────────────────
 function defaultState(): GameState {
   return {
@@ -117,7 +160,9 @@ function defaultState(): GameState {
     talentPoints: 1,  // start with 1 point at level 1
     equipment: { weapon: null, helm: null, chest: null, legs: null, boots: null, trinket: null },
     inventory: Array(INVENTORY_SLOTS).fill(null),
+    bagSlotsPurchased: 0,
     gold: 0,
+    totalSalvaged: 0,
     skillCooldowns: {},
     currentZone: 'sunhollow_meadows',
     mobs: [],
@@ -198,6 +243,20 @@ function rehydrateState(saved: GameState): GameState {
   saved.stats.currentHp = Math.min(saved.stats.maxHp, (saved.stats as any)._savedHp ?? saved.stats.maxHp)
   saved.talentAllocs  = saved.talentAllocs  ?? {}
   saved.talentPoints  = saved.talentPoints  ?? saved.level
+  // Bag capacity. A save written before slots were purchasable has neither field, and
+  // reads as the 20 it always had. The array is the live capacity, so reconcile it with
+  // the counter rather than trusting either alone: grow to fit purchased slots, and if a
+  // save somehow carries a longer array than it paid for, keep any items it holds instead
+  // of truncating them away.
+  saved.bagSlotsPurchased = Math.min(BAG_SLOTS_MAX_PURCHASED, saved.bagSlotsPurchased ?? 0)
+  saved.totalSalvaged     = saved.totalSalvaged ?? 0
+  saved.inventory         = saved.inventory ?? []
+  const capacity = Math.max(bagCapacity(saved), saved.inventory.filter(Boolean).length)
+  while (saved.inventory.length < capacity) saved.inventory.push(null)
+  if (saved.inventory.length > capacity) {
+    const kept = saved.inventory.filter(Boolean).slice(0, capacity)
+    saved.inventory = [...kept, ...Array(capacity - kept.length).fill(null)]
+  }
   saved.activeDoTs    = []
   // The zone repopulates on load; saves predating the population have neither field.
   saved.mobs          = []
@@ -469,22 +528,34 @@ function resolveCraft(state: GameState, recipe: Recipe, quality: QualityTier): P
     )
     const inventory = [...state.inventory]
     const free = inventory.indexOf(null)
+    let salvaged = 0
     if (free >= 0) {
       inventory[free] = item
       newLogs.push(log('loot_item', `${recipe.output.icon} Crafted ${item.name}!`, rarityColor(rarity)))
     } else {
-      newLogs.push(log('proc', `${recipe.output.icon} ${item.name} crafted — bags full!`, '#ff8844'))
+      // Same rule as combat loot: a craft with nowhere to go is sold off, not voided.
+      // Harsh for something the player earned the materials for — which is the point,
+      // it should push them toward buying capacity, not toward losing the item.
+      salvaged = salvageValue(item)
+      newLogs.push(log('proc',
+        `${recipe.output.icon} ${item.name} — no room, salvaged for ${salvaged}g`, '#c8a100'))
     }
     return {
       ...base,
       inventory,
+      gold: state.gold + salvaged,
+      totalSalvaged: state.totalSalvaged + salvaged,
       lastCraft: {
         id: `craft_${Date.now()}`,
         recipeId: recipe.id,
         name: item.name,
         icon: recipe.output.icon,
         quality, rarity, kind: 'gear',
-        detail: itemSummary(item),
+        // The reveal must not show off gear the hero doesn't actually have — if it
+        // overflowed, the card says where it went.
+        detail: salvaged > 0
+          ? `${itemSummary(item)} — no room, salvaged for ${salvaged}g`
+          : itemSummary(item),
         paletteId: QUALITY_PALETTE[quality],
         item,
         createdAt: Date.now(),
@@ -635,6 +706,7 @@ interface GameActions {
   unequipItem: (slot: Slot) => void
   sellItem: (inventoryIndex: number) => void
   sellAllCommon: () => void
+  buyBagSlot: () => void
   selectZone: (zoneId: ZoneId) => void
   devJumpZone: (zoneId: ZoneId) => void
   allocateTalent: (talentId: string) => void
@@ -956,6 +1028,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     bossesDefeated  = [...bossesDefeated]
     unlockedZones   = [...unlockedZones]
     skillCooldowns  = { ...skillCooldowns }
+
+    // Gold recovered this tick from drops the bag had no room for — tracked separately
+    // from `gold` so the overflow leak stays visible in the save rather than blending
+    // into kill income.
+    let salvaged = 0
 
     const fx = compileTalentEffects(state.playerClass, talentAllocs)
 
@@ -1296,7 +1373,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             inventory[empty] = loot.item
             newLogs.push(log('loot_item', `Looted: ${loot.item.name}`, rarityColor(loot.item.rarity)))
           } else {
-            newLogs.push(log('loot_item', `Bag full! Lost: ${loot.item.name}`, '#ff6666'))
+            // No room: sell it at the wayside rather than delete it. This branch used to
+            // destroy the drop outright, which is how an unattended run quietly stopped
+            // paying out after twenty minutes.
+            const recovered = salvageValue(loot.item)
+            gold += recovered
+            salvaged += recovered
+            newLogs.push(log('loot_item',
+              `Bag full — salvaged ${loot.item.name} for ${recovered}g`, '#c8a100'))
           }
         }
 
@@ -1446,6 +1530,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       floatingNumbers: allFns,
       totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones, currentZone,
       totalPlayTime: state.totalPlayTime + deltaSeconds,
+      totalSalvaged: state.totalSalvaged + salvaged,
       combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX),
       mobMapOffset,
       playerMapPos,
@@ -1510,6 +1595,31 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       return item
     })
     set({ inventory, gold: s.gold + gained })
+  },
+
+  /**
+   * Buy one more bag slot from the town outfitter — the game's first gold sink.
+   *
+   * Deliberately a purchase of *capacity*, not of an item: it is worth the same to a
+   * player who never opens a menu again, because the thing it improves is the unattended
+   * loop. That is the test every sink in this economy has to pass.
+   */
+  buyBagSlot: () => {
+    const s = get()
+    if (s.gameMode !== 'in_town') return
+    if (s.bagSlotsPurchased >= BAG_SLOTS_MAX_PURCHASED) return
+    const cost = townPrice(bagSlotCost(s.bagSlotsPurchased), s.currentTown, s.playerFaction)
+    if (s.gold < cost) return
+    const purchased = s.bagSlotsPurchased + 1
+    set({
+      gold: s.gold - cost,
+      bagSlotsPurchased: purchased,
+      inventory: [...s.inventory, null],
+      combatLog: [
+        log('proc', `Bought a bag slot for ${cost}g — ${INVENTORY_SLOTS + purchased} slots.`, '#c8a100'),
+        ...s.combatLog,
+      ].slice(0, LOG_MAX),
+    })
   },
 
   // ── Zone ─────────────────────────────────────────────────────────────────────
