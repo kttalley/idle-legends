@@ -292,14 +292,33 @@ export function mapSeed(s: Pick<GameState, 'worldSeed' | 'zoneCircuit'>): number
  * that is already blocked — the zone spawn (32,32) sits on a blocked tile in two zones,
  * and old saves can hold such a position — because a blocked start would otherwise refuse
  * every step and strand the drift forever.
+ *
+ * Wedge escape: collide-and-slide alone stops dead in a concave corner, where BOTH axes
+ * are blocked. That is survivable in combat, where the drift angle rotates with the clock
+ * and eventually points somewhere open — but it was fatal while gathering, whose angle was
+ * frozen (see the gathering branch), so a wedged hero harvested one node forever and the
+ * idle run ended silently. Rather than rely on the angle moving, fan the same step through
+ * the eight compass directions and take the first that lands. `buildWalkMask` seals every
+ * pocket below MIN_REGION and keeps the mask single-component, so a walkable tile always
+ * has a walkable neighbour: the fan cannot come up empty. Structurally unstuckable rather
+ * than tuned to be unlikely.
  */
 function driftMapPos(state: GameState, dx: number, dy: number): { x: number; y: number } {
   const wrap = (v: number) => ((v % 64) + 64) % 64
   const zm = state.zoneMaps[state.currentZone]
   if (!zm) return { x: wrap(state.playerMapPos.x + dx), y: wrap(state.playerMapPos.y + dy) }
-  const mask = getWalkMask(state.currentZone, zm)
+  const mask = getWalkMask(zm)
   const from = nearestWalkable(mask, state.playerMapPos.x, state.playerMapPos.y)
-  const moved = moveWithCollision(mask, from.x, from.y, dx, dy)
+  let moved = moveWithCollision(mask, from.x, from.y, dx, dy)
+  if (moved.blocked && moved.x === from.x && moved.y === from.y) {
+    const mag = Math.hypot(dx, dy)
+    const base = Math.atan2(dy, dx)
+    for (let i = 1; i < 8; i++) {
+      const a = base + (i * Math.PI) / 4
+      const t = moveWithCollision(mask, from.x, from.y, Math.cos(a) * mag, Math.sin(a) * mag)
+      if (t.x !== from.x || t.y !== from.y) { moved = t; break }
+    }
+  }
   return { x: wrap(moved.x), y: wrap(moved.y) }
 }
 
@@ -812,7 +831,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // decrement, so a large catch-up delta yields the harvests it earned instead of
     // silently dropping the surplus.
     if (state.gameMode === 'gathering') {
-      // World drift — slow wander so map scrolls past player
+      // World drift — slow wander so map scrolls past player.
+      // The angle is driven by `totalPlayTime`, which this branch used to leave frozen:
+      // only the combat branch advanced it, and every other branch returns before that.
+      // A frozen clock means a CONSTANT drift vector, so a hero whose one direction was
+      // blocked pushed into the same wall every tick for the rest of the run. Advancing
+      // it here (below) restores the intended slow curve; `driftMapPos` handles the
+      // corner case where even a rotating heading is momentarily wedged.
       const gatherDriftAngle = state.totalPlayTime * 0.08
       const gatherDriftX = Math.cos(gatherDriftAngle) * 0.5 * deltaSeconds
       const gatherDriftY = Math.sin(gatherDriftAngle * 0.7) * 0.3 * deltaSeconds
@@ -845,7 +870,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
 
       if (harvested === 0) {
-        set({ gatheringTimer: timer, playerMapPos: gatherMapPos, gatherSession: session })
+        set({
+          gatheringTimer: timer, playerMapPos: gatherMapPos, gatherSession: session,
+          totalPlayTime: state.totalPlayTime + deltaSeconds,
+        })
         return
       }
 
@@ -870,6 +898,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         materialPurity: purity,
         gatherSession: stillNearNode ? session : null,
         playerMapPos: gatherMapPos,
+        totalPlayTime: state.totalPlayTime + deltaSeconds,
         gameMode: nextGatherMode,
         activeRecipe: autoRecipe,
         craftQuality: autoQuality,

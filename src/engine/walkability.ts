@@ -118,13 +118,29 @@ export function buildWalkMask(zm: ZoneMap): Uint8Array {
   return mask
 }
 
-// One mask per zone; zone maps are generated deterministically and never mutated, so a
-// plain cache keyed by zone id is safe for the process lifetime.
-const maskCache = new Map<ZoneId, Uint8Array>()
+/**
+ * One mask per zone MAP, keyed on the map object itself.
+ *
+ * This used to be a `Map` keyed by zone id, on the premise that a zone id names one fixed
+ * terrain. That stopped being true: `mapSeed()` folds in the character's `worldSeed` and
+ * the prestige `zoneCircuit`, so 'sunhollow_meadows' is different ground for every hero
+ * and again on every lap of the world. A zone-id key therefore served the FIRST terrain
+ * ever built to every later one — collision that disagrees with the map you can see.
+ *
+ * That is not cosmetic. `gameStore`'s world drift refuses to enter blocked ground, so a
+ * hero standing where the stale mask says "wall" cannot move, and a pinned hero inside a
+ * resource node never leaves `gathering` — the run soft-locks with nobody watching. It
+ * reproduced in 15% of seeded 8-hour runs in `src/sim/econSim.ts` before this change.
+ *
+ * Keying on the ZoneMap object is correct by construction: a regenerated map is a new
+ * object and can only miss. WeakMap so dropped maps (`zoneMaps: {}` on circuit rollover)
+ * take their masks with them.
+ */
+const maskCache = new WeakMap<ZoneMap, Uint8Array>()
 
-export function getWalkMask(zoneId: ZoneId, zm: ZoneMap): Uint8Array {
-  let m = maskCache.get(zoneId)
-  if (!m) { m = buildWalkMask(zm); maskCache.set(zoneId, m) }
+export function getWalkMask(zm: ZoneMap): Uint8Array {
+  let m = maskCache.get(zm)
+  if (!m) { m = buildWalkMask(zm); maskCache.set(zm, m) }
   return m
 }
 

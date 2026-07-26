@@ -1013,7 +1013,7 @@ export class WorldSceneController {
         )
         this.zone = state.currentZone
         this.lastNodes = zm.nodes
-        this.walkMask = getWalkMask(state.currentZone, zm)
+        this.walkMask = getWalkMask(zm)
         // Land on walkable ground: the zone spawn (32,32) is itself blocked in
         // grimshade_forest and venom_hollows, and an old save can hold a position that
         // is now inside water.
