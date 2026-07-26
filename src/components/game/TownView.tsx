@@ -137,15 +137,6 @@ export function TownView() {
             </span>
           </div>
         )}
-        {/* `repair` is still a declared service with no durability system behind it.
-            Whether to build durability or drop the service is an owner call — see
-            .planning/economy-and-towns-plan.md §4.1 — so it keeps saying so honestly
-            rather than being quietly deleted here. */}
-        {town.services.includes('repair') && (
-          <span style={{ fontSize: '0.55rem', color: '#888' }}>
-            Repair: coming soon
-          </span>
-        )}
       </div>
 
       {town.services.includes('vendor') && (

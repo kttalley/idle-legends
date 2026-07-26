@@ -33,7 +33,11 @@ export type RecipeId = string
  *  `rarity/*` + `gear/t*` palette id) — see engine/crafting.ts. */
 export type QualityTier = 'coarse' | 'fine' | 'superior' | 'masterwork' | 'flawless'
 export type TownId = string
-export type TownServiceType = 'rest' | 'vendor' | 'repair'
+// `repair` was declared here for the whole life of the project with no durability field
+// anywhere behind it — a service that could never do anything. Dropped by owner decision
+// rather than built out: durability is upkeep clicking, which is the opposite of what an
+// idle game is for. See .planning/economy-and-towns-plan.md §4.1.
+export type TownServiceType = 'rest' | 'vendor'
 
 export interface TownConfig {
   id: TownId
