@@ -44,6 +44,33 @@ export const SALVAGE_RATE = 0.20
 /** Hostile towns trade at a markup rather than refusing — smugglers beat closed doors. */
 export const HOSTILE_TOWN_MARKUP = 1.5
 
+// ── The merchant contract ─────────────────────────────────────────────────────
+// A standing arrangement, not an item: a factor who takes junk drops off your hands at
+// FULL vendor price the moment they land, so they never reach the bag and never fall to
+// salvage. The keystone sink — see .planning/economy-and-towns-plan.md §T2. It is worth
+// buying for every play style precisely because it works hardest when nobody is watching.
+export const MERCHANT_CONTRACT_COST = 1500
+
+/**
+ * Upkeep, billed every MERCHANT_UPKEEP_SECONDS of field time (never while parked in town).
+ *
+ * The bill is the factor's CUT of what they moved for you since the last one, with a
+ * token floor so it is never literally free. It started as a flat 5g/min and the harness
+ * showed that was wrong at both ends: net-negative for the first ~3 hours after a player
+ * could afford the contract (the factor moves ~3.5 g/min at the level where 1,500g is
+ * reachable), and then 2% of income by hour 20, where gold runs at ~450/min. A flat fee
+ * cannot be right at both ends of a curve that spans 500×.
+ *
+ * A cut is right at every point on that curve by construction, and it can never make the
+ * arrangement a losing deal — you always keep (1 - rate) of what it earns you.
+ */
+export const MERCHANT_UPKEEP_RATE = 0.25
+export const MERCHANT_UPKEEP_MIN = 1
+export const MERCHANT_UPKEEP_SECONDS = 60
+
+/** Rarity ordering, low to high. The single source of truth for "is X rarer than Y". */
+export const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const
+
 // ── Loot ─────────────────────────────────────────────────────────────────────
 export const ITEM_DROP_CHANCE = 0.25         // 25% chance per kill
 export const ELITE_SPAWN_CHANCE = 0.05       // 5% chance mob is elite

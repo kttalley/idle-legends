@@ -29,6 +29,19 @@ const RARITY_STAT_COUNT: Record<Rarity, number> = {
   legendary: 5,
 }
 
+/**
+ * Rough power ranking, used for "is this an upgrade" decisions.
+ *
+ * Deliberately derived from the same two inputs `generateItem` rolls stats from — item
+ * level sets the stat base and rarity sets both the multiplier and how many stats roll —
+ * so it is monotonic in exactly the things that make an item better. `vendorValue` would
+ * almost work, but it carries a ±20% random factor and would make the same comparison
+ * come out differently for identical items.
+ */
+export function itemPower(item: Item): number {
+  return item.level * RARITY_STAT_MULTIPLIER[item.rarity] * RARITY_STAT_COUNT[item.rarity]
+}
+
 // ── Procedural item name parts ────────────────────────────────────────────────
 const PREFIX: Record<Rarity, string[]> = {
   common:    ['Worn', 'Scavenged', 'Crude', 'Battered'],

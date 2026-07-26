@@ -29,6 +29,8 @@ const opts: ScenarioOpts = {
   advanceZones: process.argv.includes('--advance'),
   sellCommons: process.argv.includes('--sell'),
   buyBagSlots: process.argv.includes('--buyslots'),
+  buyContract: process.argv.includes('--contract'),
+  autoEquip: process.argv.includes('--equip'),
   seed: process.argv.includes('--seed') ? argNum('--seed', 1) : null,
 }
 
@@ -42,6 +44,8 @@ if (process.argv.includes('--assert')) {
     { name: 'idle+sell',           o: { sellCommons: true } },
     { name: 'idle+buy',            o: { buyBagSlots: true } },
     { name: 'advancing+sell+buy',  o: { advanceZones: true, sellCommons: true, buyBagSlots: true } },
+    { name: 'contract',            o: { buyContract: true } },
+    { name: 'contract+equip+all',  o: { advanceZones: true, buyBagSlots: true, buyContract: true, autoEquip: true } },
   ]
   let failed = 0
   for (const shape of shapes) {

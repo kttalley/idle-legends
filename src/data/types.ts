@@ -219,6 +219,28 @@ export interface Item {
   spriteKey?: string
 }
 
+// ── The merchant contract ─────────────────────────────────────────────────────
+/**
+ * A retainer who buys your junk at full price the moment it drops, so it never occupies
+ * a bag slot and never falls to salvage. Bought once, then billed for field time.
+ */
+export interface MerchantContract {
+  /** Drops STRICTLY BELOW this rarity are sold on sight. `common` sells nothing, which
+   *  is how the player switches the arrangement off without cancelling it. */
+  threshold: Rarity
+  /** Seconds of field time until the next upkeep charge. */
+  upkeepTimer: number
+  /** Gross gold the factor has taken in since the last bill — the base their cut is
+   *  worked out from, reset every time they are paid. */
+  soldSinceBill: number
+  /**
+   * Upkeep went unpaid. A lapsed contract does NOTHING — drops fall back to the bag and
+   * to salvage exactly as if it were never bought — and it costs nothing while lapsed,
+   * so it can never drive a hero's gold down. It resumes on its own once gold recovers.
+   */
+  lapsed: boolean
+}
+
 // ── Mobs ─────────────────────────────────────────────────────────────────────
 export interface MobTemplate {
   id: MobId
@@ -346,6 +368,13 @@ export interface GameState {
   /** Bag slots bought with gold, on top of INVENTORY_SLOTS. `inventory.length` is the
    *  live capacity and is kept equal to base + this; the counter persists it. */
   bagSlotsPurchased: number
+  /** The standing arrangement with a town factor, or null if none is held. */
+  merchantContract: MerchantContract | null
+  /** Cumulative gold the contract has earned, for auditing it against its upkeep. */
+  totalAutoSold: number
+  /** Cumulative upkeep paid. Together with totalAutoSold this makes the contract's
+   *  net worth checkable rather than a matter of opinion. */
+  totalUpkeepPaid: number
   gold: number
   /** Cumulative value recovered from drops there was no room to carry. Kept so the
    *  economy can be audited — a silent loss is what this replaced. */

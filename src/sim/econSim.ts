@@ -18,6 +18,7 @@ import type { ClassType, RaceType, TownId, ZoneId } from '../data/types'
 import { ZONE_ORDER } from '../data/zones'
 import { canEnterZone, townForZone } from '../engine/zoneProgression'
 import { slotStorage } from '../store/saveSlots'
+import { itemPower } from '../data/items'
 
 // ── Expected value of a destroyed drop ────────────────────────────────────────
 // The bag-full branch logs a name, not a price, so a lost item's worth has to be
@@ -57,6 +58,10 @@ export interface Sample {
   salvagedGold: number
   /** Bag slots bought with gold. */
   bagSlotsBought: number
+  /** Gold the merchant contract earned, and what it cost to keep. */
+  autoSold: number
+  upkeepPaid: number
+  contract: 'none' | 'active' | 'lapsed'
   deaths: number
   // ── Liveness probe ──────────────────────────────────────────────────────────
   // A stalled run reads identically to a slow one in the gold column alone, so
@@ -99,6 +104,23 @@ export interface ScenarioOpts {
    * ladder outruns the faucet, the sink is decorative.
    */
   buyBagSlots?: boolean
+  /**
+   * Emulate a player who engages a factor as soon as they can afford one, and then
+   * leaves it running. The scenario the merchant contract exists to serve — and the
+   * only way to check that its upkeep is smaller than what it earns.
+   */
+  buyContract?: boolean
+  /**
+   * Equip any strict upgrade out of the bag.
+   *
+   * There is NO auto-equip in this game, so a hero nobody touches fights naked forever.
+   * That is the true idle baseline and it is measured by leaving this off — but it also
+   * walls hard the moment such a hero enters a zone scaled for geared characters, which
+   * makes the economy past that point unobservable. Turning this on models the least
+   * engaged player who still picks things up, and is required to see the gold curve at
+   * higher tiers at all.
+   */
+  autoEquip?: boolean
   /** Seed for the harness's `Math.random` swap — makes a run reproducible. */
   seed?: number | null
 }
@@ -114,6 +136,30 @@ export interface ScenarioResult {
   firstFullAtMinute: number | null
   /** Wall-clock milliseconds the simulation took. */
   wallMs: number
+}
+
+/**
+ * Equip every strict upgrade sitting in the bag, lowest slot first.
+ *
+ * Repeats until nothing changes, because `equipItem` swaps the old piece back into the
+ * bag and that displaced item can itself be an upgrade for another slot later in the
+ * pass. Bounded so a comparison that ever reports "both better" cannot spin.
+ */
+function equipUpgrades(store: typeof useGameStore): void {
+  for (let pass = 0; pass < 8; pass++) {
+    const s = store.getState()
+    let acted = false
+    for (let i = 0; i < s.inventory.length; i++) {
+      const item = s.inventory[i]
+      if (!item) continue
+      const worn = s.equipment[item.slot]
+      if (worn && itemPower(item) <= itemPower(worn)) continue
+      store.getState().equipItem(i)
+      acted = true
+      break
+    }
+    if (!acted) return
+  }
 }
 
 /** Log ids already accounted for, so each combat-log line is counted once. */
@@ -139,6 +185,8 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     advanceZones: false,
     sellCommons: false,
     buyBagSlots: false,
+    buyContract: false,
+    autoEquip: false,
     seed: null,
     ...opts,
   }
@@ -171,7 +219,9 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
       else if (msg.startsWith('Bag full') || msg.includes('bags full') || msg.includes('no room, salvaged')) {
         itemsLost++
         lostValueEst += s.level * EXPECTED_VALUE_MULT
-      } else if (msg.includes('You have died') || msg.includes('has slain you')) deaths++
+      // The real log line is "You have been slain! Respawning in Ns..." — an earlier
+      // guess at this string silently reported 0 deaths for every run.
+      } else if (msg.includes('You have been slain')) deaths++
     }
 
     if (firstFullAtMinute === null && s.inventory.every(Boolean)) {
@@ -191,19 +241,23 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
           store.getState().selectZone(next)
         }
       }
+      if (o.autoEquip) equipUpgrades(store)
       if (o.sellCommons) store.getState().sellAllCommon()
 
-      if (o.buyBagSlots) {
+      if (o.buyBagSlots || o.buyContract) {
         const townId = townForZone(store.getState().currentZone)
         if (townId) {
           const resume = store.getState().gameMode
           store.getState().enterTown(townId as TownId)
+          if (o.buyContract) store.getState().buyMerchantContract()
           // Buy while affordable. buyBagSlot is a no-op at the ceiling or short on
           // gold, so the loop needs its own bound to stay honest about termination.
-          for (let n = 0; n < BAG_SLOTS_MAX_PURCHASED; n++) {
-            const before = store.getState().bagSlotsPurchased
-            store.getState().buyBagSlot()
-            if (store.getState().bagSlotsPurchased === before) break
+          if (o.buyBagSlots) {
+            for (let n = 0; n < BAG_SLOTS_MAX_PURCHASED; n++) {
+              const before = store.getState().bagSlotsPurchased
+              store.getState().buyBagSlot()
+              if (store.getState().bagSlotsPurchased === before) break
+            }
           }
           store.getState().leaveTown()
           if (resume === 'gathering' || resume === 'crafting') store.getState().setMode(resume)
@@ -223,6 +277,9 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
         itemsLooted, itemsLost, lostValueEst, deaths,
         salvagedGold: after.totalSalvaged,
         bagSlotsBought: after.bagSlotsPurchased,
+        autoSold: after.totalAutoSold,
+        upkeepPaid: after.totalUpkeepPaid,
+        contract: !after.merchantContract ? 'none' : after.merchantContract.lapsed ? 'lapsed' : 'active',
         mode: after.gameMode,
         alive: after.isAlive,
         hpPct: after.stats.maxHp > 0 ? after.stats.currentHp / after.stats.maxHp : 0,
@@ -266,7 +323,7 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
   const o: Required<ScenarioOpts> = {
     playerClass: 'warrior', playerRace: 'human', stepSeconds: 0.25,
     sampleEveryMinutes: 5, advanceZones: false, sellCommons: false,
-    buyBagSlots: false, seed: null, ...opts,
+    buyBagSlots: false, buyContract: false, autoEquip: false, seed: null, ...opts,
   }
   if (typeof __setSeed === 'function') __setSeed(o.seed)
 
@@ -279,6 +336,8 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
   const ticksPerSample = Math.round((o.sampleEveryMinutes * 60) / o.stepSeconds)
   let prevSalvaged = 0
   let prevSlots = 0
+  let prevUpkeep = 0
+  let prevAutoSold = 0
 
   const fail = (t: number, rule: string, detail: string) => {
     // One report per rule keeps a systemic break from burying the others.
@@ -317,9 +376,28 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
     }
     prevSlots = s.bagSlotsPurchased
 
+    // ── The merchant contract's promises ──────────────────────────────────────
+    if (s.totalUpkeepPaid < prevUpkeep) {
+      fail(t, 'upkeep ledger only grows', `${prevUpkeep} → ${s.totalUpkeepPaid}`)
+    }
+    prevUpkeep = s.totalUpkeepPaid
+    if (s.totalAutoSold < prevAutoSold) {
+      fail(t, 'factor earnings only grow', `${prevAutoSold} → ${s.totalAutoSold}`)
+    }
+    prevAutoSold = s.totalAutoSold
+    // The whole point of billing a cut rather than a flat fee: the arrangement can never
+    // be a losing deal. Slack of MERCHANT_UPKEEP_MIN per bill covers the floor charge.
+    if (s.totalAutoSold > 0 && s.totalUpkeepPaid > s.totalAutoSold) {
+      fail(t, 'the factor never costs more than it earns',
+        `earned ${s.totalAutoSold}, upkeep ${s.totalUpkeepPaid}`)
+    }
+    if (s.merchantContract && s.merchantContract.soldSinceBill < 0) {
+      fail(t, 'unbilled sales are never negative', `${s.merchantContract.soldSinceBill}`)
+    }
+
     if (t % ticksPerSample === 0) {
       if (o.sellCommons) store.getState().sellAllCommon()
-      if (o.buyBagSlots) {
+      if (o.buyBagSlots || o.buyContract) {
         const townId = townForZone(store.getState().currentZone)
         if (townId) {
           store.getState().enterTown(townId as TownId)
@@ -512,11 +590,11 @@ export function formatReport(r: ScenarioResult): string {
   out.push('')
   out.push(
     [pad('min', 6), pad('lvl', 4), pad('zone', 20, true), pad('gold', 9), pad('g/min', 8),
-     pad('bag', 7), pad('loot', 6), pad('ovf', 6), pad('ovfVal', 8), pad('salv$', 8), pad('+slot', 6),
+     pad('bag', 7), pad('loot', 6), pad('ovf', 6), pad('ovfVal', 8), pad('salv$', 8), pad('+slot', 6), pad('factor', 7), pad('sold$', 8), pad('upkeep', 7),
      pad('mode', 10, true), pad('hp%', 5), pad('mobs', 5), pad('dist', 6), pad('kills', 6),
      pad('pos', 14)].join(' '),
   )
-  out.push('-'.repeat(146))
+  out.push('-'.repeat(170))
 
   let prevGold = 0
   let prevMin = 0
@@ -527,6 +605,7 @@ export function formatReport(r: ScenarioResult): string {
        pad(s.gold, 9), pad(rate.toFixed(1), 8), pad(`${s.bagUsed}/${s.bagSize}`, 7),
        pad(s.itemsLooted, 6), pad(s.itemsLost, 6), pad(Math.round(s.lostValueEst), 8),
        pad(s.salvagedGold, 8), pad(s.bagSlotsBought, 6),
+       pad(s.contract, 7), pad(s.autoSold, 8), pad(s.upkeepPaid, 7),
        pad(s.alive ? s.mode : 'DEAD', 10, true), pad((s.hpPct * 100).toFixed(0), 5),
        pad(s.mobCount, 5), pad(s.targetDist === null ? '-' : s.targetDist.toFixed(1), 6),
        pad(s.zoneKills, 6), pad(`${s.pos.x.toFixed(2)},${s.pos.y.toFixed(2)}`, 14)].join(' '),
@@ -547,6 +626,10 @@ export function formatReport(r: ScenarioResult): string {
   out.push(`value DESTROYED:   ${Math.round(f.lostValueEst) - f.salvagedGold}g modelled` +
            (f.salvagedGold > 0 ? ' — none of it silently' : ''))
   out.push(`bag slots bought:  ${f.bagSlotsBought}  (capacity ${f.bagSize})`)
+  if (f.contract !== 'none' || f.autoSold > 0) {
+    out.push(`merchant contract: ${f.contract} — earned ${f.autoSold}g, upkeep ${f.upkeepPaid}g, ` +
+             `NET ${f.autoSold - f.upkeepPaid >= 0 ? '+' : ''}${f.autoSold - f.upkeepPaid}g`)
+  }
   out.push(`deaths:            ${f.deaths}`)
   return out.join('\n')
 }

@@ -3,7 +3,7 @@ import type {
   GameState, ClassType, RaceType, FactionType, ZoneId, Item, Slot,
   MobInstance, CombatLogEntry, FloatingNumber,
   Stats, ActiveDoT, ActiveBuff, CombatProcState,
-  GameMode, RecipeId, MaterialId, WeatherType, TownId,
+  GameMode, RecipeId, MaterialId, WeatherType, TownId, Rarity, MerchantContract,
 } from '../data/types'
 import type { GatherSession, CraftResult, QualityTier } from '../data/types'
 import { TOWNS } from '../data/towns'
@@ -16,7 +16,7 @@ import {
   bandHalfWidthFor, consumeInputs, nodeRichness, qualityAtLeast, recipeQuality, rollSweep,
   resolveStrike,
 } from '../engine/crafting'
-import { generateItem } from '../data/items'
+import { generateItem, itemPower } from '../data/items'
 import { ZONE_ORDER } from '../data/zones'
 import { generateZoneMap } from '../engine/mapGen'
 import { ZONES } from '../data/zones'
@@ -43,7 +43,8 @@ import {
   BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
   AUTOSAVE_INTERVAL_MS,
   BAG_SLOTS_MAX_PURCHASED, BAG_SLOT_BASE_COST, BAG_SLOT_COST_GROWTH,
-  SALVAGE_RATE, HOSTILE_TOWN_MARKUP,
+  SALVAGE_RATE, HOSTILE_TOWN_MARKUP, RARITY_ORDER,
+  MERCHANT_CONTRACT_COST, MERCHANT_UPKEEP_RATE, MERCHANT_UPKEEP_MIN, MERCHANT_UPKEEP_SECONDS,
 } from '../data/constants'
 import { isTownHostileToPlayer } from '../engine/zoneProgression'
 import { rollLoot } from '../engine/loot'
@@ -137,6 +138,112 @@ export function salvageValue(item: Item): number {
   return Math.max(1, Math.round(item.vendorValue * SALVAGE_RATE))
 }
 
+// ── The merchant contract ─────────────────────────────────────────────────────
+
+export function rarityRank(r: Rarity): number {
+  return RARITY_ORDER.indexOf(r as typeof RARITY_ORDER[number])
+}
+
+/**
+ * Would the factor take this drop?
+ *
+ * Strictly-below, so the threshold names the cheapest thing you want to KEEP. `common`
+ * therefore sells nothing — an off switch that doesn't require cancelling the contract.
+ * A lapsed contract always answers no, which is what makes "lapsed" mean "as if you never
+ * bought it" rather than "broken".
+ */
+export function contractSells(c: MerchantContract | null, rarity: Rarity): boolean {
+  if (!c || c.lapsed) return false
+  return rarityRank(rarity) < rarityRank(c.threshold)
+}
+
+/**
+ * Would the factor sell THIS drop, given everything the hero already owns for its slot?
+ *
+ * The rarity threshold alone is not a sufficient guard. There is no auto-equip in this
+ * game, so gear only reaches the hero by sitting in the bag until the player picks it up
+ * — which means a retainer who sells a drop before it lands can cost real power, not just
+ * gold. The rule: **sell only what is no better than something the hero already has for
+ * that slot**, counting both the worn piece and anything carried. So the factor can never
+ * dispose of an upgrade, whatever its rarity — the plan's "never eats a legendary"
+ * instinct, generalised to "never eats anything that mattered".
+ *
+ * Comparing against the BAG as well as the worn piece is what makes this work for the
+ * player it is meant for. An earlier version only checked the equipped slot, and since a
+ * hero nobody touches never equips anything, every slot stayed empty and the factor sold
+ * nothing at all — the arrangement was inert for exactly the idle player who should get
+ * the most from it, while still drawing its floor charge. Now an untouched hero keeps the
+ * best of each slot and the rest is sold at full price.
+ */
+export function contractWouldSell(
+  s: Pick<GameState, 'merchantContract' | 'equipment' | 'inventory'>, item: Item,
+): boolean {
+  if (!contractSells(s.merchantContract, item.rarity)) return false
+  const power = itemPower(item)
+  const equipped = s.equipment[item.slot]
+  if (equipped && itemPower(equipped) >= power) return true
+  for (const held of s.inventory) {
+    if (held && held.slot === item.slot && itemPower(held) >= power) return true
+  }
+  return false
+}
+
+/** What the factor bills this period: their cut of what they moved, never below the floor. */
+export function contractUpkeep(c: MerchantContract): number {
+  return Math.max(MERCHANT_UPKEEP_MIN, Math.round(c.soldSinceBill * MERCHANT_UPKEEP_RATE))
+}
+
+/**
+ * Advance the retainer's billing clock and return the state patch, or null for no change.
+ *
+ * Pure, and applied at the very TOP of the tick — before it snapshots state — because the
+ * tick reads `gold` into a local and writes it back at the end, so any `set()` issued
+ * alongside would be silently overwritten by that stale copy. The same trap the weather
+ * block avoids only by touching a field nothing else writes.
+ *
+ * Field time is what's billed. Standing in town isn't, because you aren't earning there
+ * either, and draining a browsing player's gold would be a mean surprise. Nothing to
+ * exploit: not being in the field is not being paid.
+ *
+ * The charge can never take gold negative and never accrues as debt. If the hero can't
+ * cover it the contract LAPSES — which costs nothing and does nothing, so the player
+ * falls back to exactly the behaviour they had before buying it — and it un-lapses on
+ * its own the moment gold covers a bill. That is what makes it safe to leave running
+ * unattended, which is the only way an idle player would ever use it.
+ */
+export function merchantUpkeepPatch(s: GameState, deltaSeconds: number): Partial<GameState> | null {
+  const c = s.merchantContract
+  if (!c || s.gameMode === 'in_town') return null
+
+  const timer = c.upkeepTimer - deltaSeconds
+  if (timer > 0) return { merchantContract: { ...c, upkeepTimer: timer } }
+
+  // Carry the remainder so a long catch-up delta doesn't lose or double-bill time.
+  const nextTimer = MERCHANT_UPKEEP_SECONDS + (timer % MERCHANT_UPKEEP_SECONDS)
+  const due = contractUpkeep(c)
+
+  if (s.gold >= due) {
+    return {
+      gold: s.gold - due,
+      totalUpkeepPaid: s.totalUpkeepPaid + due,
+      merchantContract: { ...c, upkeepTimer: nextTimer, lapsed: false, soldSinceBill: 0 },
+      ...(c.lapsed
+        ? { combatLog: [log('proc', 'Your factor is back on retainer.', '#88ccaa'), ...s.combatLog].slice(0, LOG_MAX) }
+        : {}),
+    }
+  }
+  if (!c.lapsed) {
+    return {
+      merchantContract: { ...c, upkeepTimer: nextTimer, lapsed: true, soldSinceBill: 0 },
+      combatLog: [
+        log('proc', `Your factor stopped working — ${due}g upkeep unpaid.`, '#ff8844'),
+        ...s.combatLog,
+      ].slice(0, LOG_MAX),
+    }
+  }
+  return { merchantContract: { ...c, upkeepTimer: nextTimer, soldSinceBill: 0 } }
+}
+
 // ── Default State ─────────────────────────────────────────────────────────────
 function defaultState(): GameState {
   return {
@@ -161,6 +268,9 @@ function defaultState(): GameState {
     equipment: { weapon: null, helm: null, chest: null, legs: null, boots: null, trinket: null },
     inventory: Array(INVENTORY_SLOTS).fill(null),
     bagSlotsPurchased: 0,
+    merchantContract: null,
+    totalAutoSold: 0,
+    totalUpkeepPaid: 0,
     gold: 0,
     totalSalvaged: 0,
     skillCooldowns: {},
@@ -250,6 +360,15 @@ function rehydrateState(saved: GameState): GameState {
   // of truncating them away.
   saved.bagSlotsPurchased = Math.min(BAG_SLOTS_MAX_PURCHASED, saved.bagSlotsPurchased ?? 0)
   saved.totalSalvaged     = saved.totalSalvaged ?? 0
+  saved.totalAutoSold     = saved.totalAutoSold ?? 0
+  saved.totalUpkeepPaid   = saved.totalUpkeepPaid ?? 0
+  // A contract survives a reload, but never in the lapsed state: gold may well have
+  // recovered while the save sat on disk, and a retainer that stays sulking after a
+  // reload for no reason the player can see is just a bug with a story.
+  saved.merchantContract  = saved.merchantContract
+    ? { ...saved.merchantContract, lapsed: false, upkeepTimer: MERCHANT_UPKEEP_SECONDS,
+        soldSinceBill: saved.merchantContract.soldSinceBill ?? 0 }
+    : null
   saved.inventory         = saved.inventory ?? []
   const capacity = Math.max(bagCapacity(saved), saved.inventory.filter(Boolean).length)
   while (saved.inventory.length < capacity) saved.inventory.push(null)
@@ -545,6 +664,9 @@ function resolveCraft(state: GameState, recipe: Recipe, quality: QualityTier): P
       inventory,
       gold: state.gold + salvaged,
       totalSalvaged: state.totalSalvaged + salvaged,
+      // Note: the merchant contract deliberately does NOT cover crafted goods. It buys
+      // drops the hero didn't choose; selling something they gathered the materials for
+      // and queued at the forge would be the retainer overstepping.
       lastCraft: {
         id: `craft_${Date.now()}`,
         recipeId: recipe.id,
@@ -707,6 +829,9 @@ interface GameActions {
   sellItem: (inventoryIndex: number) => void
   sellAllCommon: () => void
   buyBagSlot: () => void
+  buyMerchantContract: () => void
+  setMerchantThreshold: (threshold: Rarity) => void
+  cancelMerchantContract: () => void
   selectZone: (zoneId: ZoneId) => void
   devJumpZone: (zoneId: ZoneId) => void
   allocateTalent: (talentId: string) => void
@@ -835,8 +960,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
   // ── Main Tick ────────────────────────────────────────────────────────────────
   tick: (deltaSeconds) => {
+    if (!get().initialized) return
+    // Settle the retainer's bill before anything snapshots state — see the note on
+    // merchantUpkeepPatch for why this cannot live alongside the other tick branches.
+    const upkeep = merchantUpkeepPatch(get(), deltaSeconds)
+    if (upkeep) set(upkeep)
+
     const state = get()
-    if (!state.initialized) return
 
     // ── Weather tick (always runs) ────────────────────────────────────────────
     {
@@ -1033,6 +1163,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // from `gold` so the overflow leak stays visible in the save rather than blending
     // into kill income.
     let salvaged = 0
+    // Gold the merchant contract earned this tick, tracked separately so the retainer
+    // can be judged against its own upkeep rather than on vibes.
+    let autoSold = 0
 
     const fx = compileTalentEffects(state.playerClass, talentAllocs)
 
@@ -1367,7 +1500,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           state.activeQuest = activeQuest
         }
 
-        if (loot.item) {
+        if (loot.item && contractWouldSell({ merchantContract: state.merchantContract, equipment, inventory }, loot.item)) {
+          // The factor takes it at FULL price before it ever reaches the bag. That is
+          // the contract's whole value: not just better than the 20% salvage, but the
+          // reason the bag stops filling with junk in the first place, which is what
+          // keeps an unattended run collecting the drops that actually matter.
+          gold += loot.item.vendorValue
+          autoSold += loot.item.vendorValue
+          newLogs.push(log('loot_item',
+            `Factor bought ${loot.item.name} — ${loot.item.vendorValue}g`, '#88ccaa'))
+        } else if (loot.item) {
           const empty = inventory.findIndex(s => s === null)
           if (empty >= 0) {
             inventory[empty] = loot.item
@@ -1531,6 +1673,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones, currentZone,
       totalPlayTime: state.totalPlayTime + deltaSeconds,
       totalSalvaged: state.totalSalvaged + salvaged,
+      totalAutoSold: state.totalAutoSold + autoSold,
+      // Bank what the factor moved this tick against their next bill.
+      merchantContract: state.merchantContract && autoSold > 0
+        ? { ...state.merchantContract, soldSinceBill: state.merchantContract.soldSinceBill + autoSold }
+        : state.merchantContract,
       combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX),
       mobMapOffset,
       playerMapPos,
@@ -1619,6 +1766,52 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         log('proc', `Bought a bag slot for ${cost}g — ${INVENTORY_SLOTS + purchased} slots.`, '#c8a100'),
         ...s.combatLog,
       ].slice(0, LOG_MAX),
+    })
+  },
+
+  /**
+   * Engage a factor. The keystone sink: it costs gold up front and gold to keep, and what
+   * it buys is a better unattended run — junk converted at full price instead of clogging
+   * the bag until everything after it salvages at 20%.
+   *
+   * Opens at `rare`, i.e. sell commons and uncommons, keep rare and up. That is the
+   * setting that helps most while being impossible to regret.
+   */
+  buyMerchantContract: () => {
+    const s = get()
+    if (s.gameMode !== 'in_town') return
+    if (s.merchantContract) return
+    const cost = townPrice(MERCHANT_CONTRACT_COST, s.currentTown, s.playerFaction)
+    if (s.gold < cost) return
+    set({
+      gold: s.gold - cost,
+      merchantContract: {
+        threshold: 'rare', upkeepTimer: MERCHANT_UPKEEP_SECONDS, lapsed: false, soldSinceBill: 0,
+      },
+      combatLog: [
+        log('proc', `A factor takes your retainer — ${cost}g, then ${Math.round(MERCHANT_UPKEEP_RATE * 100)}% of what they move.`, '#88ccaa'),
+        ...s.combatLog,
+      ].slice(0, LOG_MAX),
+    })
+  },
+
+  /** Retune what the factor is allowed to sell. Free, and available outside town —
+   *  it is a standing instruction, not a renegotiation. `common` sells nothing. */
+  setMerchantThreshold: (threshold) => {
+    const s = get()
+    if (!s.merchantContract) return
+    if (s.merchantContract.threshold === threshold) return
+    set({ merchantContract: { ...s.merchantContract, threshold } })
+  },
+
+  /** Dismiss the factor, so upkeep can never trap a player who no longer wants it.
+   *  No refund — but nothing is lost either, since the bag reverts to T1 behaviour. */
+  cancelMerchantContract: () => {
+    const s = get()
+    if (!s.merchantContract) return
+    set({
+      merchantContract: null,
+      combatLog: [log('proc', 'You release your factor from retainer.', '#9d9d9d'), ...s.combatLog].slice(0, LOG_MAX),
     })
   },
 

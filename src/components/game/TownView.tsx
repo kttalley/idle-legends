@@ -1,8 +1,11 @@
 import React, { useState } from 'react'
-import { useGameStore, bagCapacity, bagSlotCost, townPrice } from '../../store/gameStore'
+import { useGameStore, bagCapacity, bagSlotCost, townPrice, rarityColor } from '../../store/gameStore'
 import { TOWNS } from '../../data/towns'
 import { isTownHostileToPlayer } from '../../engine/zoneProgression'
-import { BAG_SLOTS_MAX_PURCHASED, INVENTORY_SLOTS } from '../../data/constants'
+import {
+  BAG_SLOTS_MAX_PURCHASED, MERCHANT_CONTRACT_COST, MERCHANT_UPKEEP_RATE, RARITY_ORDER,
+} from '../../data/constants'
+import type { Rarity } from '../../data/types'
 import { SpriteIcon } from '../ui/SpriteIcon'
 
 const FACTION_COLOR: Record<string, string> = {
@@ -27,6 +30,8 @@ export function TownView() {
   const {
     currentTown, generatedTownNames, restInTown, leaveTown, playerFaction,
     gold, bagSlotsPurchased, buyBagSlot,
+    merchantContract, buyMerchantContract, setMerchantThreshold, cancelMerchantContract,
+    totalAutoSold, totalUpkeepPaid,
   } = useGameStore()
   const [restFeedback, setRestFeedback] = useState(false)
 
@@ -54,6 +59,12 @@ export function TownView() {
   const bagMaxed    = slotsBought >= BAG_SLOTS_MAX_PURCHASED
   const slotCost    = townPrice(bagSlotCost(slotsBought), currentTown, playerFaction)
   const canAfford   = gold >= slotCost
+
+  // The factor: a standing arrangement rather than a purchase, so the panel shows what
+  // it has earned against what it has cost — the player should be able to judge it.
+  const contractCost = townPrice(MERCHANT_CONTRACT_COST, currentTown, playerFaction)
+  const contractNet  = totalAutoSold - totalUpkeepPaid
+  const upkeepPct    = Math.round(MERCHANT_UPKEEP_RATE * 100)
 
   return (
     <div
@@ -144,6 +155,85 @@ export function TownView() {
           {hostileToPlayer
             ? 'They will take your gold. They will not pretend to like you — prices are marked up.'
             : 'A bigger bag means longer in the field before drops start going for scrap.'}
+        </div>
+      )}
+
+      {/* ── The factor ──────────────────────────────────────────────────────── */}
+      {town.services.includes('vendor') && (
+        <div style={{ borderTop: '1px solid #3a2c10', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {!merchantContract ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  className="rp-button"
+                  onClick={buyMerchantContract}
+                  disabled={gold < contractCost}
+                  title={gold < contractCost ? `Need ${contractCost}g` : 'They buy your junk in the field, at full price'}
+                  style={{ fontSize: '0.55rem', padding: '2px 8px', opacity: gold < contractCost ? 0.5 : 1 }}
+                >
+                  Retain a factor — {contractCost}g
+                </button>
+                <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>
+                  then {upkeepPct}% of what they move
+                </span>
+              </div>
+              <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic' }}>
+                They buy every drop below your chosen rarity the moment it falls, at full
+                price — so it never fills a bag slot and never goes for scrap. They keep
+                their {upkeepPct}% cut, never an upgrade, and never more than they earned.
+                Works hardest while you are away.
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.55rem', color: merchantContract.lapsed ? '#ff8844' : '#88ccaa' }}>
+                  Factor {merchantContract.lapsed ? 'idle — upkeep unpaid' : 'on retainer'}
+                </span>
+                <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>
+                  earned {totalAutoSold}g · upkeep {totalUpkeepPaid}g ·{' '}
+                  <span style={{ color: contractNet >= 0 ? '#44ff88' : '#ff6666' }}>
+                    net {contractNet >= 0 ? '+' : ''}{contractNet}g
+                  </span>
+                </span>
+                <button
+                  className="rp-button"
+                  onClick={cancelMerchantContract}
+                  style={{ fontSize: '0.5rem', padding: '1px 6px' }}
+                  title="End the arrangement. No refund, but no more upkeep."
+                >
+                  Release
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>Sells below:</span>
+                {(RARITY_ORDER as readonly Rarity[]).map(r => {
+                  const active = merchantContract.threshold === r
+                  return (
+                    <button
+                      key={r}
+                      className="rp-button"
+                      onClick={() => setMerchantThreshold(r)}
+                      title={r === 'common' ? 'Sell nothing — the arrangement idles' : `Keep ${r} and better`}
+                      style={{
+                        fontSize: '0.5rem', padding: '1px 5px', textTransform: 'capitalize',
+                        color: rarityColor(r),
+                        borderColor: active ? rarityColor(r) : undefined,
+                        background: active ? `${rarityColor(r)}22` : undefined,
+                      }}
+                    >
+                      {r}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic' }}>
+                {merchantContract.threshold === 'common'
+                  ? 'Set to keep everything, so they are selling nothing — and still drawing upkeep.'
+                  : `Keeping ${merchantContract.threshold} and better; anything below is sold where it falls.`}
+              </div>
+            </>
+          )}
         </div>
       )}
 
