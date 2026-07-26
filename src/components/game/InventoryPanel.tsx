@@ -50,7 +50,10 @@ function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
 }
 
 export function InventoryPanel() {
-  const { inventory, equipment, equipItem, unequipItem, sellItem, sellAllCommon } = useGameStore()
+  const {
+    inventory, equipment, equipItem, unequipItem, sellItem, sellAllCommon,
+    settings, setAutoEquip,
+  } = useGameStore()
   const [activeTab, setActiveTab] = useState<'inventory' | 'equipment'>('equipment')
   const used = inventory.filter(Boolean).length
   const full = used >= inventory.length
@@ -84,6 +87,24 @@ export function InventoryPanel() {
             <div style={{ fontSize: '0.65rem', color: '#9d9d9d', marginBottom: 6 }}>
               Click an equipped item to unequip it.
             </div>
+            {/* Auto-equip is what makes an unattended hero get stronger at all, so it is
+                surfaced here rather than buried — but it stays the player's call. */}
+            <label
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8,
+                fontSize: '0.6rem', color: settings.autoEquip ? '#88ccaa' : '#9d9d9d',
+                cursor: 'pointer', userSelect: 'none',
+              }}
+              title="Wear a drop the moment it beats what you have in that slot. The piece it replaces goes to your bag."
+            >
+              <input
+                type="checkbox"
+                checked={settings.autoEquip !== false}
+                onChange={e => setAutoEquip(e.target.checked)}
+                style={{ accentColor: '#c8a100', width: 11, height: 11 }}
+              />
+              Auto-equip upgrades
+            </label>
             {SLOTS.map(slot => {
               const item = equipment[slot]
               const color = item ? rarityColor(item.rarity) : '#3a2c10'

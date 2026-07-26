@@ -180,6 +180,60 @@ export function compileStats(
   }
 }
 
+// ── Gear scoring ──────────────────────────────────────────────────────────────
+/**
+ * How good a whole equipment set is for THIS class, as one number.
+ *
+ * Effective DPS × effective HP — the usual combat-power product. Both halves are read
+ * out of the real combat math rather than modelled a second time, which is what keeps it
+ * honest as the formulas change:
+ *
+ *  • **Sustained DPS is exactly `weaponDps`.** `resolvePlayerAttack` deals
+ *    `weaponDps × attackSpeedSeconds` once every `attackSpeedSeconds`, so attack speed
+ *    cancels out of the rate entirely — it changes hit granularity, not throughput.
+ *    Lifted here by the expected crit multiplier.
+ *  • **Armor is a multiplier on survivability.** `resolveMobAttack` reduces incoming
+ *    damage by `armor / (armor + 100)`, so effective HP is `maxHp × (armor + 100) / 100`.
+ *
+ * Class-awareness comes for free: `compileStats` folds the class's own primary stat into
+ * `weaponDps` (`+ primaryStat × 0.1`), so a strength trinket simply scores nothing on a
+ * mage. That is the whole reason auto-equip cannot reuse `itemPower` from data/items.ts —
+ * that one ranks by level and rarity alone, which is right for "would a merchant buy
+ * this" and quite wrong for "should this hero wear it".
+ */
+export function gearScore(
+  playerClass: ClassType,
+  level: number,
+  equipment: Record<Slot, Item | null>,
+  talentAllocs: Record<string, number>,
+  racialPassive: StatBonuses = {},
+): number {
+  const s = compileStats(playerClass, level, equipment, talentAllocs, racialPassive)
+  const dps = s.weaponDps * (1 + s.critChance * (CRIT_MULTIPLIER - 1))
+  const ehp = s.maxHp * (s.armor + 100) / 100
+  return dps * ehp
+}
+
+/**
+ * Would wearing `item` make this hero strictly better off? Compares whole compiled sets,
+ * so a piece that trades armour for damage is judged on the net effect rather than on
+ * whichever stat happens to be listed first.
+ */
+export function isGearUpgrade(
+  item: Item,
+  playerClass: ClassType,
+  level: number,
+  equipment: Record<Slot, Item | null>,
+  talentAllocs: Record<string, number>,
+  racialPassive: StatBonuses = {},
+): boolean {
+  const current = gearScore(playerClass, level, equipment, talentAllocs, racialPassive)
+  const swapped = gearScore(
+    playerClass, level, { ...equipment, [item.slot]: item }, talentAllocs, racialPassive,
+  )
+  return swapped > current
+}
+
 // ── Attack Resolution ─────────────────────────────────────────────────────────
 export interface AttackResult {
   damage: number

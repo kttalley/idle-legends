@@ -340,6 +340,13 @@ export interface GameSettings {
   combatTickSeconds: number
   showDamageNumbers: boolean
   autoSellCommon: boolean
+  /**
+   * Wear a strict upgrade the moment it drops. ON by default, and it has to be: there is
+   * no other path from a drop to the hero's body, so a character nobody clicks on fights
+   * naked forever. Measured before this existed — an untouched hero stalled at level ~20
+   * and then took zero kills in eleven simulated hours.
+   */
+  autoEquip: boolean
   volume: number
 }
 

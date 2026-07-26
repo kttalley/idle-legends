@@ -25,7 +25,7 @@ import { ACTIVE_ABILITIES, getClassAbilities } from '../data/abilities'
 import {
   compileStats, compileTalentEffects,
   resolvePlayerAttack, resolveMobAttack,
-  makeShadowBoltHit, makeAbilityBuff,
+  makeShadowBoltHit, makeAbilityBuff, isGearUpgrade,
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
 import {
@@ -306,6 +306,7 @@ function defaultState(): GameState {
       combatTickSeconds: 2,
       showDamageNumbers: true,
       autoSellCommon: false,
+      autoEquip: true,
       volume: 0.5,
     },
     // Map / Travel / Professions
@@ -360,6 +361,9 @@ function rehydrateState(saved: GameState): GameState {
   // of truncating them away.
   saved.bagSlotsPurchased = Math.min(BAG_SLOTS_MAX_PURCHASED, saved.bagSlotsPurchased ?? 0)
   saved.totalSalvaged     = saved.totalSalvaged ?? 0
+  // A save written before auto-equip existed opts IN: it is a strict improvement for the
+  // hero it most affects, and leaving it off would preserve the very bug it fixes.
+  saved.settings = { ...saved.settings, autoEquip: saved.settings?.autoEquip ?? true }
   saved.totalAutoSold     = saved.totalAutoSold ?? 0
   saved.totalUpkeepPaid   = saved.totalUpkeepPaid ?? 0
   // A contract survives a reload, but never in the lapsed state: gold may well have
@@ -829,6 +833,7 @@ interface GameActions {
   sellItem: (inventoryIndex: number) => void
   sellAllCommon: () => void
   buyBagSlot: () => void
+  setAutoEquip: (on: boolean) => void
   buyMerchantContract: () => void
   setMerchantThreshold: (threshold: Rarity) => void
   cancelMerchantContract: () => void
@@ -1168,6 +1173,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     let autoSold = 0
 
     const fx = compileTalentEffects(state.playerClass, talentAllocs)
+    // Hoisted: both the level-up recompile and the auto-equip recompile need it.
+    const racialPassive = RACE_DEFINITIONS[state.playerRace]?.racialPassive ?? {}
 
     // ── Resolve the engaged target out of the population ─────────────────────
     // `mobs` is the source of truth; currentMob/mobMapOffset/activeDoTs are projections
@@ -1438,7 +1445,6 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         while (xp >= xpForLevel(level)) {
           xp -= xpForLevel(level)
           level++
-          const racialPassive = RACE_DEFINITIONS[state.playerRace]?.racialPassive ?? {}
           const newStats = compileStats(state.playerClass, level, equipment, talentAllocs, racialPassive)
           stats = { ...newStats, currentHp: Math.min(newStats.maxHp, stats.currentHp + 20) }
           newLogs.push(log('level_up', `★ Level Up! Now level ${level}!`, '#ffd700'))
@@ -1500,29 +1506,56 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           state.activeQuest = activeQuest
         }
 
-        if (loot.item && contractWouldSell({ merchantContract: state.merchantContract, equipment, inventory }, loot.item)) {
-          // The factor takes it at FULL price before it ever reaches the bag. That is
-          // the contract's whole value: not just better than the 20% salvage, but the
-          // reason the bag stops filling with junk in the first place, which is what
-          // keeps an unattended run collecting the drops that actually matter.
-          gold += loot.item.vendorValue
-          autoSold += loot.item.vendorValue
-          newLogs.push(log('loot_item',
-            `Factor bought ${loot.item.name} — ${loot.item.vendorValue}g`, '#88ccaa'))
-        } else if (loot.item) {
-          const empty = inventory.findIndex(s => s === null)
-          if (empty >= 0) {
-            inventory[empty] = loot.item
-            newLogs.push(log('loot_item', `Looted: ${loot.item.name}`, rarityColor(loot.item.rarity)))
-          } else {
-            // No room: sell it at the wayside rather than delete it. This branch used to
-            // destroy the drop outright, which is how an unattended run quietly stopped
-            // paying out after twenty minutes.
-            const recovered = salvageValue(loot.item)
-            gold += recovered
-            salvaged += recovered
-            newLogs.push(log('loot_item',
-              `Bag full — salvaged ${loot.item.name} for ${recovered}g`, '#c8a100'))
+        // ── Where the drop goes ───────────────────────────────────────────────
+        // One ladder, in this order: WEAR it, then sell it, then bag it, then salvage it.
+        //
+        // Equipping first is not a preference, it is the safety property. It means an
+        // upgrade can never be sold or scrapped no matter how the merchant threshold is
+        // set, because by the time anything else looks at the drop it is already on the
+        // hero and what's being disposed of is the OLD piece. The displaced item then
+        // takes the bag pressure instead of the good one.
+        if (loot.item) {
+          let pending: Item | null = loot.item
+
+          if (state.settings.autoEquip !== false &&
+              isGearUpgrade(pending, state.playerClass, level, equipment, talentAllocs, racialPassive)) {
+            const displaced = equipment[pending.slot]
+            equipment = { ...equipment, [pending.slot]: pending }
+            const rescored = compileStats(state.playerClass, level, equipment, talentAllocs, racialPassive)
+            // Recompiling resets currentHp to full; carry the hero's real HP across, and
+            // let a stamina gain raise the ceiling without healing them for free.
+            rescored.currentHp = Math.min(rescored.maxHp, stats.currentHp)
+            stats = rescored
+            newLogs.push(log('loot_item', `Equipped ${pending.name}`, rarityColor(pending.rarity)))
+            pending = displaced
+          }
+
+          if (pending) {
+            if (contractWouldSell({ merchantContract: state.merchantContract, equipment, inventory }, pending)) {
+              // The factor takes it at FULL price before it ever reaches the bag. That is
+              // the contract's whole value: not just better than the 20% salvage, but the
+              // reason the bag stops filling with junk in the first place, which is what
+              // keeps an unattended run collecting the drops that actually matter.
+              gold += pending.vendorValue
+              autoSold += pending.vendorValue
+              newLogs.push(log('loot_item',
+                `Factor bought ${pending.name} — ${pending.vendorValue}g`, '#88ccaa'))
+            } else {
+              const empty = inventory.findIndex(s => s === null)
+              if (empty >= 0) {
+                inventory[empty] = pending
+                newLogs.push(log('loot_item', `Looted: ${pending.name}`, rarityColor(pending.rarity)))
+              } else {
+                // No room: sell it at the wayside rather than delete it. This branch used to
+                // destroy the drop outright, which is how an unattended run quietly stopped
+                // paying out after twenty minutes.
+                const recovered = salvageValue(pending)
+                gold += recovered
+                salvaged += recovered
+                newLogs.push(log('loot_item',
+                  `Bag full — salvaged ${pending.name} for ${recovered}g`, '#c8a100'))
+              }
+            }
           }
         }
 
@@ -1767,6 +1800,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         ...s.combatLog,
       ].slice(0, LOG_MAX),
     })
+  },
+
+  /** Player's call on whether drops are worn automatically. Persisted with the save. */
+  setAutoEquip: (on) => {
+    const s = get()
+    if ((s.settings.autoEquip !== false) === on) return
+    set({ settings: { ...s.settings, autoEquip: on } })
   },
 
   /**

@@ -111,16 +111,20 @@ export interface ScenarioOpts {
    */
   buyContract?: boolean
   /**
-   * Equip any strict upgrade out of the bag.
+   * Equip strict upgrades out of the BAG at each sample — a player who clicks.
    *
-   * There is NO auto-equip in this game, so a hero nobody touches fights naked forever.
-   * That is the true idle baseline and it is measured by leaving this off — but it also
-   * walls hard the moment such a hero enters a zone scaled for geared characters, which
-   * makes the economy past that point unobservable. Turning this on models the least
-   * engaged player who still picks things up, and is required to see the gold curve at
-   * higher tiers at all.
+   * Distinct from the game's own auto-equip (`settings.autoEquip`, on by default), which
+   * only ever sees a drop as it lands. This mops up anything that reached the bag before
+   * it became an upgrade, so it models an engaged player on top of the automatic floor.
    */
   autoEquip?: boolean
+  /**
+   * Turn the game's `settings.autoEquip` OFF, reproducing the pre-auto-equip behaviour.
+   * Kept so the counterfactual stays measurable: with it, an untouched hero stalls at
+   * level ~20 and then takes zero kills for hours, which is the whole reason the feature
+   * exists. Regression guard, not a play style.
+   */
+  disableAutoEquip?: boolean
   /** Seed for the harness's `Math.random` swap — makes a run reproducible. */
   seed?: number | null
 }
@@ -187,6 +191,7 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     buyBagSlots: false,
     buyContract: false,
     autoEquip: false,
+    disableAutoEquip: false,
     seed: null,
     ...opts,
   }
@@ -195,6 +200,10 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
 
   const store = useGameStore
   store.getState().initGame(o.playerClass, o.playerRace)
+  if (o.disableAutoEquip) {
+    const st = store.getState()
+    useGameStore.setState({ settings: { ...st.settings, autoEquip: false } })
+  }
 
   const readNewLogs = makeLogReader()
   const samples: Sample[] = []
@@ -323,7 +332,8 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
   const o: Required<ScenarioOpts> = {
     playerClass: 'warrior', playerRace: 'human', stepSeconds: 0.25,
     sampleEveryMinutes: 5, advanceZones: false, sellCommons: false,
-    buyBagSlots: false, buyContract: false, autoEquip: false, seed: null, ...opts,
+    buyBagSlots: false, buyContract: false, autoEquip: false,
+    disableAutoEquip: false, seed: null, ...opts,
   }
   if (typeof __setSeed === 'function') __setSeed(o.seed)
 
