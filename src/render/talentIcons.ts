@@ -6,8 +6,12 @@
 // archetype icons keyed by what a talent DOES (bleed, freeze, drain, crit, …) rather than
 // one bespoke drawing per node — a tree is read by silhouette at a glance, and two dozen
 // legible shapes reused across every tree beats a hundred mushy ones. The set grows only
-// when a new tree would otherwise have to reuse a shape next to itself. The mapping below is arranged so
-// no two neighbouring nodes in a tree share an icon.
+// when a new tree would otherwise have to reuse a shape next to itself.
+//
+// The id map at the bottom is DERIVED, not hand-written: each node takes the archetype
+// matching its primary mechanic, then any two horizontal neighbours that collided are
+// nudged apart. 240 nodes across twelve trees is past the point where a hand-kept table
+// stays correct.
 //
 // Ships on the `icon/base` palette, the same UI contract the ability/nav icons use:
 //   1–4 steel/bone/white · 5–8 warm (blood, flame, gold) · 9–12 cool (frost, mana)
@@ -232,51 +236,110 @@ export function makeTalentIconSheet(id = 'icons/talent'): IndexedSprite {
  */
 export const TALENT_ICON_BY_ID: Record<string, TalentIconKey> = {
   // ── Ironcleave (warrior) ──
-  arms_heroic_strike: 'blade',     arms_deflection: 'guard',       arms_improved_rend: 'bleed',
-  arms_imp_charge: 'stride',       arms_tactical_mastery: 'hourglass', arms_thunder_clap: 'nova',
-  arms_overpower: 'impale',        arms_anger_management: 'fury',  arms_deep_wounds: 'bleed',
-  arms_two_handed: 'blade',        arms_impale: 'impale',          arms_war_cry: 'banner',
-  arms_axe_spec: 'cleave',         arms_sweeping_strikes: 'cleave', arms_sword_spec: 'blade',
-  arms_executioner: 'cleave',      arms_hamstring: 'chain',        arms_mortal_strike: 'crit',
-  arms_juggernaut: 'impale',       arms_bladestorm: 'rage',
+  arms_heroic_strike: 'blade',       arms_deflection: 'guard',          arms_improved_rend: 'bleed',
+  arms_imp_charge: 'fury',           arms_tactical_mastery: 'rage',     arms_thunder_clap: 'chain',
+  arms_overpower: 'crit',            arms_anger_management: 'drain',    arms_deep_wounds: 'bleed',
+  arms_two_handed: 'blade',          arms_impale: 'impale',             arms_war_cry: 'banner',
+  arms_axe_spec: 'crit',             arms_sweeping_strikes: 'cleave',   arms_sword_spec: 'blade',
+  arms_executioner: 'cleave',        arms_hamstring: 'chain',           arms_mortal_strike: 'stride',
+  arms_juggernaut: 'blade',          arms_bladestorm: 'bleed',
 
   // ── Bulwark (warrior) ──
-  bul_iron_hide: 'guard',          bul_shield_spec: 'bash',        bul_toughness: 'fury',
-  bul_anticipation: 'eye',         bul_defiance: 'guard',          bul_improved_bash: 'bash',
-  bul_second_wind: 'drain',        bul_improved_shield_wall: 'ward', bul_retaliation: 'nova',
-  bul_bulwark_stance: 'guard',     bul_spiked_shield: 'bash',      bul_unyielding: 'fury',
-  bul_shield_mastery: 'bash',      bul_indomitable: 'drain',       bul_stalwart: 'guard',
-  bul_absorption: 'ward',          bul_vengeance: 'blade',         bul_iron_will: 'drain',
-  bul_fortress: 'guard',           bul_last_stand: 'skull',
+  bul_iron_hide: 'guard',            bul_shield_spec: 'stride',         bul_toughness: 'fury',
+  bul_anticipation: 'ward',          bul_defiance: 'guard',             bul_improved_bash: 'chain',
+  bul_second_wind: 'drain',          bul_improved_shield_wall: 'banner', bul_retaliation: 'bash',
+  bul_bulwark_stance: 'ward',        bul_spiked_shield: 'bash',         bul_unyielding: 'fury',
+  bul_shield_mastery: 'stride',      bul_indomitable: 'banner',         bul_stalwart: 'guard',
+  bul_absorption: 'ward',            bul_vengeance: 'blade',            bul_iron_will: 'drain',
+  bul_fortress: 'guard',             bul_last_stand: 'skull',
 
   // ── Warbringer (warrior) ──
-  wbr_cruelty: 'dagger',           wbr_booming_voice: 'banner',    wbr_frenzy: 'stride',
-  wbr_unbridled_wrath: 'rage',     wbr_piercing_howl: 'chain',     wbr_blood_craze: 'bleed',
-  wbr_flurry: 'crit',              wbr_enrage: 'rage',             wbr_savage_blows: 'impale',
-  wbr_dual_wield_spec: 'blade',    wbr_bloodthirst: 'bleed',       wbr_death_wish: 'rage',
-  wbr_improved_slam: 'cleave',     wbr_rampage: 'rage',            wbr_precision: 'dagger',
-  wbr_bloodsurge: 'bleed',         wbr_titans_grip: 'impale',      wbr_endless_rage: 'stride',
-  wbr_unquenchable: 'drain',       wbr_reckless_abandon: 'skull',
+  wbr_cruelty: 'crit',               wbr_booming_voice: 'fury',         wbr_frenzy: 'stride',
+  wbr_unbridled_wrath: 'stride',     wbr_piercing_howl: 'chain',        wbr_blood_craze: 'bleed',
+  wbr_flurry: 'crit',                wbr_enrage: 'rage',                wbr_savage_blows: 'impale',
+  wbr_dual_wield_spec: 'blade',      wbr_bloodthirst: 'banner',         wbr_death_wish: 'rage',
+  wbr_improved_slam: 'blade',        wbr_rampage: 'rage',               wbr_precision: 'crit',
+  wbr_bloodsurge: 'bleed',           wbr_titans_grip: 'impale',         wbr_endless_rage: 'crit',
+  wbr_unquenchable: 'bleed',         wbr_reckless_abandon: 'rage',
 
-  // ── Frost (mage) ──
-  frost_warding: 'ward',           frost_imp_frostbolt: 'frostbolt', frost_ice_shards: 'shatter',
-  frost_frostbite: 'freeze',       frost_imp_frost_nova: 'nova',     frost_permafrost: 'freeze',
-  frost_piercing_ice: 'impale',    frost_cold_snap: 'hourglass',     frost_imp_blizzard: 'nova',
-  frost_arctic_reach: 'frostbolt', frost_channeling: 'hourglass',    frost_shatter: 'shatter',
-  frost_ice_block: 'ward',         frost_cone_of_cold: 'frostbolt',  frost_ice_barrier: 'ward',
-  frost_winters_chill: 'freeze',
+  // ── Glacial Rite (mage) ──
+  frost_warding: 'guard',            frost_imp_frostbolt: 'stride',     frost_ice_shards: 'impale',
+  frost_frostbite: 'freeze',         frost_imp_frost_nova: 'eye',       frost_permafrost: 'chain',
+  frost_piercing_ice: 'blade',       frost_cold_snap: 'hourglass',      frost_imp_blizzard: 'blade',
+  frost_arctic_reach: 'blade',       frost_channeling: 'ward',          frost_shatter: 'shatter',
+  frost_ice_block: 'ward',           frost_cone_of_cold: 'eye',         frost_frozen_core: 'impale',
+  frost_ice_barrier: 'ward',         frost_absolute_zero: 'chain',      frost_rimebolt_mastery: 'banner',
+  frost_winters_chill: 'freeze',     frost_deep_freeze: 'shatter',
 
-  // ── Affliction (warlock) ──
-  aff_suppression: 'eye',          aff_imp_corruption: 'skull',    aff_imp_weakness: 'drain',
-  aff_drain_soul: 'drain',         aff_life_tap: 'pact',           aff_imp_agony: 'skull',
-  aff_fel_concentration: 'hourglass', aff_amplify_curse: 'eye',    aff_grim_reach: 'eye',
-  aff_dark_pact: 'pact',           aff_curse_exhaustion: 'hourglass', aff_drain_life: 'drain',
-  aff_imp_exhaustion: 'stride',    aff_nightfall: 'crit',          aff_siphon_life: 'drain',
+  // ── Emberwright (mage) ──
+  emb_kindling: 'eye',               emb_ignite: 'nova',                emb_incineration: 'crit',
+  emb_flame_throwing: 'blade',       emb_kindled_eye: 'eye',            emb_cauterize: 'fury',
+  emb_wildfire: 'vial',              emb_master_of_flame: 'impale',     emb_blast_wave: 'chain',
+  emb_conflagrate: 'vial',           emb_cinderburst_mastery: 'banner', emb_burning_soul: 'blade',
+  emb_pyroclasm: 'blade',            emb_immolation: 'bash',            emb_searing_touch: 'cleave',
+  emb_fire_power: 'nova',            emb_molten_skin: 'ward',           emb_combustion: 'eye',
+  emb_living_bomb: 'impale',         emb_phoenix: 'skull',
 
-  // ── Assassination (rogue) ──
-  ass_improved_eviscerate: 'dagger', ass_remorseless: 'crit',      ass_malice: 'crit',
-  ass_ruthlessness: 'dagger',      ass_murder: 'skull',            ass_slice_dice: 'hourglass',
-  ass_expose_armor: 'guard',       ass_lethality: 'dagger',        ass_vile_poisons: 'vial',
-  ass_improved_poisons: 'vial',    ass_cold_blood: 'crit',         ass_seal_fate: 'crit',
-  ass_vigor: 'stride',
+  // ── The Unwritten (mage) ──
+  unw_arcane_focus: 'eye',           unw_arcane_charge: 'pact',         unw_wand_specialization: 'blade',
+  unw_magic_absorption: 'ward',      unw_arcane_concentration: 'crit',  unw_improved_mana_shield: 'stride',
+  unw_arcane_impact: 'impale',       unw_presence_of_mind: 'hourglass', unw_compounding: 'pact',
+  unw_echo: 'hourglass',             unw_arcane_meditation: 'blade',    unw_prismatic_ward: 'ward',
+  unw_arcane_mind: 'eye',            unw_hour_mastery: 'banner',        unw_spell_power: 'blade',
+  unw_resonance: 'hourglass',        unw_mind_mastery: 'impale',        unw_temporal_shield: 'skull',
+  unw_arcane_power: 'blade',         unw_the_unwritten: 'pact',
+
+  // ── Shadowed Edge (rogue) ──
+  ass_improved_eviscerate: 'blade',  ass_remorseless: 'crit',           ass_malice: 'impale',
+  ass_ruthlessness: 'stride',        ass_murder: 'blade',               ass_slice_dice: 'stride',
+  ass_expose_armor: 'impale',        ass_lethality: 'crit',             ass_vile_poisons: 'vial',
+  ass_improved_poisons: 'vial',      ass_cold_blood: 'hourglass',       ass_deadened_nerves: 'ward',
+  ass_venomous_wounds: 'vial',       ass_seal_fate: 'impale',           ass_cruel_intent: 'crit',
+  ass_vigor: 'stride',               ass_cruel_stroke_mastery: 'banner', ass_master_poisoner: 'vial',
+  ass_hunger_for_blood: 'bleed',     ass_mutilate: 'cleave',
+
+  // ── Gutterwork (rogue) ──
+  gut_lightning_reflexes: 'stride',  gut_dirty_tricks: 'blade',         gut_improved_gouge: 'chain',
+  gut_riposte: 'bash',               gut_adrenaline: 'stride',          gut_footwork: 'chain',
+  gut_precision: 'crit',             gut_dual_wield_spec: 'blade',      gut_opportunity: 'cleave',
+  gut_blade_flurry: 'crit',          gut_slip_the_blade_mastery: 'banner', gut_endurance: 'fury',
+  gut_aggression: 'blade',           gut_close_quarters: 'impale',      gut_nimble: 'stride',
+  gut_weapon_expertise: 'blade',     gut_counterattack: 'bash',         gut_second_wind: 'drain',
+  gut_surprise_attacks: 'stride',    gut_adrenaline_rush: 'rage',
+
+  // ── The Long Quiet (rogue) ──
+  quiet_master_of_deception: 'stride', quiet_opening: 'dagger',           quiet_camouflage: 'stride',
+  quiet_sleight_of_hand: 'crit',     quiet_serrated_blades: 'bleed',    quiet_elusiveness: 'ward',
+  quiet_ambush: 'dagger',            quiet_opportunity: 'impale',       quiet_initiative: 'crit',
+  quiet_duskstep_mastery: 'banner',  quiet_hemorrhage: 'vial',          quiet_deadliness: 'blade',
+  quiet_premeditation: 'hourglass',  quiet_sinister_calling: 'stride',  quiet_ghostly: 'chain',
+  quiet_finishing_touch: 'cleave',   quiet_master_of_subtlety: 'impale', quiet_vanish: 'skull',
+  quiet_shadow_dance: 'dagger',      quiet_the_long_quiet: 'cleave',
+
+  // ── Bleakweave (warlock) ──
+  aff_suppression: 'eye',            aff_imp_corruption: 'skull',       aff_imp_weakness: 'chain',
+  aff_drain_soul: 'blade',           aff_life_tap: 'eye',               aff_imp_agony: 'skull',
+  aff_fel_concentration: 'vial',     aff_amplify_curse: 'banner',       aff_grim_reach: 'blade',
+  aff_dark_pact: 'blade',            aff_curse_exhaustion: 'chain',     aff_drain_life: 'drain',
+  aff_imp_exhaustion: 'chain',       aff_nightfall: 'crit',             aff_shadow_mastery: 'blade',
+  aff_siphon_life: 'drain',          aff_contagion: 'vial',             aff_umbral_mastery: 'banner',
+  aff_everlasting_affliction: 'vial', aff_unstable_affliction: 'crit',
+
+  // ── The Binding (warlock) ──
+  bind_imp: 'skull',                 bind_improved_healthstone: 'fury', bind_demonic_embrace: 'eye',
+  bind_fel_intellect: 'eye',         bind_voidwalker: 'skull',          bind_soul_link: 'ward',
+  bind_fel_stamina: 'fury',          bind_master_summoner: 'skull',     bind_demonic_aegis: 'ward',
+  bind_unholy_power: 'blade',        bind_red_thread_mastery: 'banner', bind_shadow_ward: 'ward',
+  bind_felguard: 'skull',            bind_mana_feed: 'blade',           bind_master_conjuror: 'drain',
+  bind_demonic_knowledge: 'eye',     bind_demonic_tactics: 'crit',      bind_fel_domination: 'bash',
+  bind_demonic_pact: 'skull',        bind_metamorphosis: 'pact',
+
+  // ── Cinderpact (warlock) ──
+  cin_improved_shadow_bolt: 'blade', cin_cataclysm: 'crit',             cin_bane: 'stride',
+  cin_devastation: 'impale',         cin_immolate: 'nova',              cin_intensity: 'eye',
+  cin_conflagrate: 'eye',            cin_destructive_reach: 'blade',    cin_pyroclasm: 'vial',
+  cin_ruin: 'impale',                cin_bargain_mastery: 'banner',     cin_backlash: 'hourglass',
+  cin_emberstorm: 'blade',           cin_soul_leech: 'bleed',           cin_shadowburn: 'cleave',
+  cin_fire_and_brimstone: 'nova',    cin_nether_protection: 'ward',     cin_burning_intent: 'eye',
+  cin_chaos_bolt: 'impale',          cin_cinderpact: 'vial',
 }

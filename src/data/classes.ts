@@ -1,29 +1,21 @@
-import type { ClassDefinition, ClassType, SpecDefinition } from './types'
+import type { ClassDefinition } from './types'
 import { IRONCLEAVE_TALENTS, IRONCLEAVE_CONNECTORS } from './talents/warrior/ironcleave'
 import { BULWARK_TALENTS, BULWARK_CONNECTORS } from './talents/warrior/bulwark'
 import { WARBRINGER_TALENTS, WARBRINGER_CONNECTORS } from './talents/warrior/warbringer'
-import { FROST_TALENTS } from './talents/frost'
-import { ASSASSINATION_TALENTS } from './talents/assassination'
-import { AFFLICTION_TALENTS } from './talents/affliction'
+import { GLACIAL_RITE_TALENTS, GLACIAL_RITE_CONNECTORS } from './talents/mage/glacial_rite'
+import { EMBERWRIGHT_TALENTS, EMBERWRIGHT_CONNECTORS } from './talents/mage/emberwright'
+import { THE_UNWRITTEN_TALENTS, THE_UNWRITTEN_CONNECTORS } from './talents/mage/the_unwritten'
+import { SHADOWED_EDGE_TALENTS, SHADOWED_EDGE_CONNECTORS } from './talents/rogue/shadowed_edge'
+import { GUTTERWORK_TALENTS, GUTTERWORK_CONNECTORS } from './talents/rogue/gutterwork'
+import { THE_LONG_QUIET_TALENTS, THE_LONG_QUIET_CONNECTORS } from './talents/rogue/the_long_quiet'
+import { BLEAKWEAVE_TALENTS, BLEAKWEAVE_CONNECTORS } from './talents/warlock/bleakweave'
+import { THE_BINDING_TALENTS, THE_BINDING_CONNECTORS } from './talents/warlock/the_binding'
+import { CINDERPACT_TALENTS, CINDERPACT_CONNECTORS } from './talents/warlock/cinderpact'
 
-/**
- * A spec whose tree has not been authored yet.
- *
- * The alternative was to ship classes with one tree and pretend that was the design,
- * which is exactly the dead end this rework exists to fix. An empty column that SAYS it
- * is empty tells the player the truth about where their class stands; a missing column
- * tells them their class is finished. Warrior is complete — see below — and these fill
- * the same shape until the rest catch up.
- */
-function pending(
-  classId: ClassType, id: string, name: string, tagline: string, icon: string, accent: string,
-): SpecDefinition {
-  return {
-    id, classId, name, tagline, icon, accent,
-    description: 'This specialization is still being forged. Its talents are not yet available.',
-    talents: [],
-  }
-}
+// Twelve trees, three per class, 60 ranks each — 180 places to put a lifetime budget of
+// 100 points (see TALENT_POINT_MAX). Every spec's `accent` is load-bearing rather than
+// decorative: it drives that column's whole visual identity in the talent panel, and
+// three trees rendered in one colour read as one tree.
 
 export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
   warrior: {
@@ -83,7 +75,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
   mage: {
     id: 'mage',
     name: 'Mage',
-    description: 'An arcane glass cannon. Glacial Rite spec: freeze, shatter, and Deepening Cold stacks.',
+    description: 'An arcane glass cannon. Hold it still, set it alight, or make the hour pay twice.',
     primaryStat: 'intellect',
     colorClass: 'class-mage',
     allowedRaces: ['human', 'elf', 'gnome', 'troll', 'goblin'],
@@ -106,10 +98,31 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
         description: 'Freeze, shatter, and Deepening Cold stacks. An enemy that cannot swing is an enemy that cannot win.',
         icon: 'freeze',
         accent: '#6ac8d8',
-        talents: FROST_TALENTS,
+        talents: GLACIAL_RITE_TALENTS,
+        connectors: GLACIAL_RITE_CONNECTORS,
       },
-      pending('mage', 'emberwright', 'Emberwright', 'Everything burns twice — once now, once after.', 'nova', '#e08040'),
-      pending('mage', 'the_unwritten', 'The Unwritten', 'Arcane debt, called in all at once.', 'hourglass', '#a878d8'),
+      {
+        id: 'emberwright',
+        classId: 'mage',
+        name: 'Emberwright',
+        tagline: 'Everything burns twice — once now, once after.',
+        description: 'Crits light the target, a burning target is easier to crit, and every flame you own bites deeper. Invest in one corner and the other two improve on their own.',
+        icon: 'nova',
+        accent: '#e08040',
+        talents: EMBERWRIGHT_TALENTS,
+        connectors: EMBERWRIGHT_CONNECTORS,
+      },
+      {
+        id: 'the_unwritten',
+        classId: 'mage',
+        name: 'The Unwritten',
+        tagline: 'Arcane debt, called in all at once.',
+        description: 'Charges bank while you keep the pressure on one target and vanish when it dies. The only build in the game that would rather fight one large thing than five small ones.',
+        icon: 'hourglass',
+        accent: '#a878d8',
+        talents: THE_UNWRITTEN_TALENTS,
+        connectors: THE_UNWRITTEN_CONNECTORS,
+      },
     ],
   },
 
@@ -139,17 +152,38 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
         description: 'Poisons, combo points and Dead Calm. Damage that has already happened by the time it is noticed.',
         icon: 'vial',
         accent: '#7ac878',
-        talents: ASSASSINATION_TALENTS,
+        talents: SHADOWED_EDGE_TALENTS,
+        connectors: SHADOWED_EDGE_CONNECTORS,
       },
-      pending('rogue', 'gutterwork', 'Gutterwork', 'Fast hands, cheap tricks, no witnesses.', 'dagger', '#c8a118'),
-      pending('rogue', 'the_long_quiet', 'The Long Quiet', 'One strike from somewhere you were not.', 'stride', '#8878c8'),
+      {
+        id: 'gutterwork',
+        classId: 'rogue',
+        name: 'Gutterwork',
+        tagline: 'Fast hands, cheap tricks, no witnesses.',
+        description: 'No poison, no patience, no plan beyond the next four seconds. The most dice rolls per minute of any build, and the least interest in what any one of them does.',
+        icon: 'dagger',
+        accent: '#c8a118',
+        talents: GUTTERWORK_TALENTS,
+        connectors: GUTTERWORK_CONNECTORS,
+      },
+      {
+        id: 'the_long_quiet',
+        classId: 'rogue',
+        name: 'The Long Quiet',
+        tagline: 'One strike from somewhere you were not.',
+        description: 'Built entirely around the opening blow. It wants short fights and fast kills, because a new target is a new opener — and a long grind against one enemy is the thing it has no answer to.',
+        icon: 'stride',
+        accent: '#8878c8',
+        talents: THE_LONG_QUIET_TALENTS,
+        connectors: THE_LONG_QUIET_CONNECTORS,
+      },
     ],
   },
 
   warlock: {
     id: 'warlock',
     name: 'Warlock',
-    description: 'Shadow curses and void corruption. Bleakweave spec: DoTs, Gathering Dark procs, Tithe of Wounds.',
+    description: 'Shadow curses and void corruption. Rot it slowly, bind something to do it for you, or simply spend.',
     primaryStat: 'intellect',
     colorClass: 'class-warlock',
     allowedRaces: ['human', 'gnome', 'orc', 'goblin', 'troll'],
@@ -172,10 +206,31 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
         description: 'DoTs, Gathering Dark procs and the Tithe of Wounds. You do not kill things so much as finish paperwork on them.',
         icon: 'skull',
         accent: '#9a6ac8',
-        talents: AFFLICTION_TALENTS,
+        talents: BLEAKWEAVE_TALENTS,
+        connectors: BLEAKWEAVE_CONNECTORS,
       },
-      pending('warlock', 'the_binding', 'The Binding', 'Something else does the dying for you.', 'pact', '#c85a7a'),
-      pending('warlock', 'cinderpact', 'Cinderpact', 'Borrowed fire, ruinous interest.', 'nova', '#e06840'),
+      {
+        id: 'the_binding',
+        classId: 'warlock',
+        name: 'The Binding',
+        tagline: 'Something else does the dying for you.',
+        description: 'A bound thing attacks on its own clock — through a cast, through a stun, through the player closing the tab. The most purely idle build in the game, and the one with the least ceiling when somebody is watching.',
+        icon: 'pact',
+        accent: '#c85a7a',
+        talents: THE_BINDING_TALENTS,
+        connectors: THE_BINDING_CONNECTORS,
+      },
+      {
+        id: 'cinderpact',
+        classId: 'warlock',
+        name: 'Cinderpact',
+        tagline: 'Borrowed fire, ruinous interest.',
+        description: 'Direct, immediate and expensive: the whole tree exists to make one number go up. The most fragile spec in the game, whose only sustain is that things tend to already be dead.',
+        icon: 'nova',
+        accent: '#e06840',
+        talents: CINDERPACT_TALENTS,
+        connectors: CINDERPACT_CONNECTORS,
+      },
     ],
   },
 }

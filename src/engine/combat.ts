@@ -77,13 +77,6 @@ export function compileTalentEffects(
   // ── Pass 2: derive ──
   const m = (k: TalentMechanicType) => mechanics[k] ?? 0
 
-  // `two_handed_spec` is a share of the class's BASE weapon damage, not of the hero's
-  // current weapon — otherwise it would scale with gear and quietly become the best
-  // talent in the game at high item level.
-  const damageMultBonus = m('two_handed_spec')
-  if (damageMultBonus > 0) {
-    addStat('weaponDps', CLASS_DEFINITIONS[playerClass].baseStats.weaponDps * damageMultBonus)
-  }
   // Lifesteal talents are still expressed as a damage bonus rather than real leeching;
   // that was true before this rewrite and is preserved verbatim rather than silently
   // changed under cover of a refactor.
@@ -95,44 +88,76 @@ export function compileTalentEffects(
     mechanics,
     abilityMods,
     statBonuses,
-    critDamageMultiplier: CRIT_MULTIPLIER + m('impale') + m('lethality') + m('ice_shards'),
-    mobAttackSpeedFactor: Math.max(0.4, 1.0 - m('mortal_strike') - m('curse_exhaustion')),
-    mobArmorReduction: m('expose_armor'),
-    deepWoundsBleedPct: m('deep_wounds'),
+    /**
+     * A true multiplier on final weapon damage, applied in `compileStats` after every
+     * flat source.
+     *
+     * It used to be a share of the class's BASE weapon damage, on the reasoning that
+     * scaling off the CURRENT weapon would compound with gear and become the best
+     * talent in the game. That reasoning was sound and the implementation was not:
+     * base weaponDps is 8 for a warrior and 5 for a warlock, so once eight trees
+     * started buying this, four ranks of a capstone damage talent were worth +0.7 DPS.
+     * A talent that reads "+8% damage" has to move the number the player can see.
+     *
+     * The compounding worry is handled by the per-rank values instead — every tree
+     * spends 0.015–0.025 a rank, so a fully-committed tree lands around +15%, which is
+     * a real talent and not a multiplier that eats the gear curve.
+     */
+    damageAmp: 1 + m('damage_amp'),
+    critDamageMultiplier: CRIT_MULTIPLIER + m('crit_damage'),
+    mobAttackSpeedFactor: Math.max(0.4, 1.0 - m('enemy_slow')),
+    mobArmorReduction: m('armor_shred'),
+    deepWoundsBleedPct: m('bleed_on_crit'),
     vilePoisons: poisonDps > 0
       ? { procChance: Math.min(0.8, 0.15 + m('poison_chance')), dps: poisonDps }
       : null,
-    corruptionDps: m('corruption'),
+    corruptionDps: m('shadow_dot'),
     curseOfAgonyEnabled: m('curse_of_agony') > 0,
     siphonLifeHpPerTick: m('siphon_life'),
     nightfallProcChance: m('nightfall'),
     amplifyCurseEnabled: m('amplify_curse') > 0,
-    frostbiteChance: m('frostbite'),
-    shatterCritBonus: m('shatter'),
-    winterChillEnabled: m('winters_chill') > 0,
-    iceBlockEnabled: m('ice_block') > 0,
-    iceBarrierAbsorb: m('ice_barrier'),
+    frostbiteChance: m('freeze_chance'),
+    shatterCritBonus: m('frozen_crit'),
+    winterChillEnabled: m('chill_stacks') > 0,
+    iceBlockEnabled: m('death_ward') > 0,
+    iceBarrierAbsorb: m('absorb_shield'),
     sealFateEnabled: m('seal_fate') > 0,
     sealFateRanks: ranksOf['seal_fate'] ?? 0,
     remorselessEnabled: m('remorseless_attacks') > 0,
     sweepingStrikesEnabled: m('sweeping_strikes') > 0,
-    swordSpecEnabled: m('sword_spec') > 0,
-    swordSpecProcChance: m('sword_spec'),
-    // ── Bulwark ──
+    swordSpecEnabled: m('extra_strike') > 0,
+    swordSpecProcChance: m('extra_strike'),
+    // ── Defence ──
     // Capped at half: an idle hero who takes literally no damage never dies, and a zone
-    // that cannot kill you is a zone with no reason to leave it.
+    // that cannot kill you is a zone with no reason to leave it. The same reasoning caps
+    // avoidance — two 50% caps still let a blow through one fight in four.
     damageReduction: Math.min(0.5, m('damage_reduction')),
-    blockChance: Math.min(0.5, m('block_chance')),
+    avoidChance: Math.min(0.5, m('avoid_chance')),
     armorScaling: m('armor_scaling'),
     secondWindHpPerTick: m('second_wind'),
     thornsPct: m('thorns'),
-    lastStandPct: m('last_stand'),
-    // ── Warbringer ──
+    // Clamped to a share of max HP. It is a SHARE, and a data slip that made it 5.0
+    // would otherwise have the hero survive a killing blow at five times full health —
+    // which is exactly what a mistuned rank did before this clamp existed.
+    lastStandPct: Math.min(0.5, m('last_stand')),
+    // ── Offence ──
     attackHasteFactor: Math.max(0.5, 1 - m('attack_haste')),
     flurryChance: Math.min(0.6, m('flurry')),
     enragePct: m('enrage'),
     bloodthirstPct: m('bloodthirst'),
     rampageChance: m('rampage') > 0 ? 1 : 0,
+    openerBurstPct: m('opener_burst'),
+    // Data gives a RATE (fraction of a crit per second); the tick wants an interval.
+    // Expressed that way so ranks add up linearly — inverting per-rank seconds would
+    // make the second point in a talent worth less than the first for no stated reason.
+    timedCritSeconds: m('timed_crit') > 0 ? 1 / m('timed_crit') : 0,
+    arcaneChargePct: m('arcane_charge'),
+    minionDps: m('minion_dps'),
+    echoChance: Math.min(0.5, m('echo_chance')),
+    // ── Enemy state / DoTs ──
+    burningCritBonus: m('burning_crit'),
+    ignitePct: m('ignite'),
+    dotAmp: 1 + m('dot_amp'),
   }
 }
 
@@ -195,7 +220,9 @@ export function compileStats(
     maxHp,
     currentHp: maxHp,
     strength, intellect, agility, stamina, armor,
-    weaponDps: Math.max(1, wDps + primaryStat * 0.1),
+    // `damageAmp` multiplies the finished number, primary stat included, so "+15%
+    // damage" means what a player would assume it means.
+    weaponDps: Math.max(1, (wDps + primaryStat * 0.1) * fx.damageAmp),
     attackSpeedSeconds,
     critChance,
     goldFindBonus,
@@ -284,6 +311,14 @@ export interface AttackContext {
   playerHpFraction?: number
   /** Rampage stacks carried from recent kills. */
   rampageStacks?: number
+  /** Arcane charges built against the current target. */
+  arcaneCharges?: number
+  /** The target is burning — drives the fire trees' crit bonus. */
+  targetBurning?: boolean
+  /** This is the first strike against a freshly engaged target. */
+  isOpener?: boolean
+  /** A free guaranteed crit is banked and about to be spent. */
+  timedCritReady?: boolean
 }
 
 /** Below this share of health, Enrage pays out. */
@@ -293,6 +328,8 @@ const EXECUTE_THRESHOLD = 1 / 3
 /** Damage each Rampage stack adds, and the ceiling on them. */
 export const RAMPAGE_PER_STACK = 0.04
 export const RAMPAGE_MAX_STACKS = 5
+/** Ceiling on arcane charges. Uncapped, a long fight would end in one swing. */
+export const ARCANE_MAX_CHARGES = 8
 
 export function resolvePlayerAttack(
   stats: Stats,
@@ -306,9 +343,11 @@ export function resolvePlayerAttack(
   const fx = compileTalentEffects(playerClass, talentAllocs)
 
   const critGuaranteeBuff = activeBuffs.find(b => b.type === 'crit_guarantee' && (b.stacks ?? 0) > 0)
-  const isCrit = !!(critGuaranteeBuff) || procState.remorselessActive || (Math.random() < (
+  const isCrit = !!(critGuaranteeBuff) || procState.remorselessActive || !!ctx.timedCritReady || (Math.random() < (
     stats.critChance +
     (procState.mobFrozen ? fx.shatterCritBonus : 0) +
+    // Fire's mirror of frost's Shatter: a target already burning is easier to land on.
+    (ctx.targetBurning ? fx.burningCritBonus : 0) +
     (procState.winterChillStacks * 0.02)
   ))
 
@@ -326,19 +365,30 @@ export function resolvePlayerAttack(
   const executing = fx.mechanics.executioner
     && ctx.mobHpFraction !== undefined
     && ctx.mobHpFraction < EXECUTE_THRESHOLD
+  const opener = !!ctx.isOpener && fx.openerBurstPct > 0
   const situational =
     (enraged ? 1 + fx.enragePct : 1) *
     (executing ? 1 + (fx.mechanics.executioner ?? 0) : 1) *
-    (1 + Math.min(RAMPAGE_MAX_STACKS, ctx.rampageStacks ?? 0) * RAMPAGE_PER_STACK)
+    (opener ? 1 + fx.openerBurstPct : 1) *
+    (1 + Math.min(RAMPAGE_MAX_STACKS, ctx.rampageStacks ?? 0) * RAMPAGE_PER_STACK) *
+    (1 + Math.min(ARCANE_MAX_CHARGES, ctx.arcaneCharges ?? 0) * fx.arcaneChargePct)
 
   const damage = Math.max(1, Math.round(baseDmg * mult * critMult * situational))
 
   const dotAmpBuff = activeBuffs.find(b => b.type === 'dot_amplify')
-  const dotAmpFactor = dotAmpBuff ? dotAmpBuff.value : 1
+  // Two amplifiers stack multiplicatively: the temporary one from an ability, and the
+  // permanent one bought in a tree. They are different purchases and neither should
+  // quietly make the other worthless.
+  const dotAmpFactor = (dotAmpBuff ? dotAmpBuff.value : 1) * fx.dotAmp
 
   const triggeredDoTs: ActiveDoT[] = []
   if (isCrit && fx.deepWoundsBleedPct > 0) {
     triggeredDoTs.push(makeBleedDoT(stats.weaponDps, fx.deepWoundsBleedPct * dotAmpFactor))
+  }
+  // Ignite — fire's answer to the bleed. Same trigger (a crit), different curve: fewer,
+  // harder ticks, and it is what `burning_crit` reads to decide the target is alight.
+  if (isCrit && fx.ignitePct > 0) {
+    triggeredDoTs.push(makeIgniteDoT(stats.weaponDps, fx.ignitePct * dotAmpFactor))
   }
   if (fx.vilePoisons && Math.random() < fx.vilePoisons.procChance) {
     triggeredDoTs.push(makePoisonDoT(fx.vilePoisons.dps * dotAmpFactor))
@@ -389,9 +439,9 @@ export function resolveMobAttack(
   mob: MobInstance,
   playerArmor: number,
   mobSpeedFactor: number,
-  fx?: Pick<CompiledTalentEffects, 'blockChance' | 'damageReduction' | 'thornsPct'>,
+  fx?: Pick<CompiledTalentEffects, 'avoidChance' | 'damageReduction' | 'thornsPct'>,
 ): MobAttackResult {
-  const blocked = !!fx && fx.blockChance > 0 && Math.random() < fx.blockChance
+  const blocked = !!fx && fx.avoidChance > 0 && Math.random() < fx.avoidChance
   if (blocked) return { damage: 0, blocked: true, thorns: 0 }
 
   const reductionPct = playerArmor / (playerArmor + 100)
@@ -413,6 +463,12 @@ export function makeBleedDoT(weaponDps: number, pct: number): ActiveDoT {
   return { id: makeId(), sourceType: 'bleed', label: 'Rend', icon: '🩸', color: '#cc2200',
     tickDamage: Math.max(1, Math.round(weaponDps * pct * 2)),
     totalTicks: 6, ticksRemaining: 6, tickIntervalSeconds: 2, tickAccum: 0 }
+}
+
+export function makeIgniteDoT(weaponDps: number, pct: number): ActiveDoT {
+  return { id: makeId(), sourceType: 'burn', label: 'Ignite', icon: '🔥', color: '#ff7722',
+    tickDamage: Math.max(1, Math.round(weaponDps * pct * 3)),
+    totalTicks: 4, ticksRemaining: 4, tickIntervalSeconds: 2, tickAccum: 0 }
 }
 
 export function makePoisonDoT(dps: number): ActiveDoT {

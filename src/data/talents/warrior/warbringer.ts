@@ -52,7 +52,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
     description: 'Reduces enemy attack speed by {n}% per rank.',
     icon: '💥',
     row: 2, col: 2, maxRanks: 3, requiresPoints: 5,
-    effects: [{ type: 'mechanic', mechanic: 'mortal_strike', valuePerRank: 0.04 }],
+    effects: [{ type: 'mechanic', mechanic: 'enemy_slow', valuePerRank: 0.04 }],
   },
   {
     id: 'wbr_blood_craze',
@@ -87,7 +87,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
     icon: '🗡',
     row: 3, col: 3, maxRanks: 1, requiresPoints: 10,
     requires: 'wbr_cruelty',
-    effects: [{ type: 'mechanic', mechanic: 'impale', valuePerRank: 0.25 }],
+    effects: [{ type: 'mechanic', mechanic: 'crit_damage', valuePerRank: 0.25 }],
   },
 
   // ── Row 4 (15 pts) ────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
     name: 'Bloodsurge',
     description: 'Returns a further {n}% of damage dealt as health, per rank.',
     icon: '🩸',
-    row: 6, col: 1, maxRanks: 3, requiresPoints: 25,
+    row: 6, col: 3, maxRanks: 3, requiresPoints: 25,
     effects: [{ type: 'mechanic', mechanic: 'bloodthirst', valuePerRank: 0.025 }],
   },
   {
@@ -163,14 +163,14 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
     description: 'Increases critical hit damage bonus by {n}% per rank.',
     icon: '💪',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
-    effects: [{ type: 'mechanic', mechanic: 'impale', valuePerRank: 0.10 }],
+    effects: [{ type: 'mechanic', mechanic: 'crit_damage', valuePerRank: 0.10 }],
   },
   {
     id: 'wbr_endless_rage',
     name: 'Endless Rage',
     description: 'Your flurries come far more readily.',
     icon: '⚡',
-    row: 6, col: 3, maxRanks: 1, requiresPoints: 25,
+    row: 6, col: 1, maxRanks: 1, requiresPoints: 25,
     requires: 'wbr_flurry',
     effects: [{ type: 'mechanic', mechanic: 'flurry', valuePerRank: 0.12 }],
   },

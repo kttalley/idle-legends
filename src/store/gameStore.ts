@@ -29,7 +29,7 @@ import {
   compileStats, compileTalentEffects,
   resolvePlayerAttack, resolveMobAttack,
   makeShadowBoltHit, makeAbilityBuff, isGearUpgrade,
-  emptyAbilityMod, RAMPAGE_MAX_STACKS,
+  emptyAbilityMod, RAMPAGE_MAX_STACKS, ARCANE_MAX_CHARGES,
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
 import {
@@ -89,6 +89,9 @@ function defaultProcState(): CombatProcState {
     iceBlockUsed: false,
     lastStandUsed: false,
     rampageStacks: 0,
+    arcaneCharges: 0,
+    timedCritTimer: 0,
+    openerUsed: false,
     mobFrozen: false,
     mobFrozenTimer: 0,
     iceBarrierHp: 0,
@@ -848,6 +851,9 @@ let mobAttackAccum    = 0
 let siphonLifeAccum   = 0
 /** Time since the last kill, for shedding Rampage stacks. */
 let rampageDecayAccum = 0
+/** A summoned minion swings on its own clock, not the hero's. */
+let minionAccum = 0
+const MINION_TICK_SECONDS = 2
 
 /**
  * Bumped whenever the talent trees change shape enough that existing allocations
@@ -862,6 +868,7 @@ export function resetCombatAccumulators() {
   mobAttackAccum    = 0
   siphonLifeAccum   = 0
   rampageDecayAccum = 0
+  minionAccum       = 0
 }
 
 /** Seconds without a kill before Rampage sheds a stack. */
@@ -1400,6 +1407,27 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       newLogs.push(log('proc', `⚡ Gathering Dark! Umbral Bolt hits for ${boltDmg}`, '#cc44ff'))
     }
 
+    // ── Timed crit ───────────────────────────────────────────────────────────
+    // Ticks down whether or not the hero is swinging, so the free crit is a rhythm the
+    // fight sits inside rather than a counter the player has to feed.
+    if (fx.timedCritSeconds > 0 && procState.timedCritTimer > 0) {
+      procState.timedCritTimer = Math.max(0, procState.timedCritTimer - deltaSeconds)
+    }
+
+    // ── Summoned minion ──────────────────────────────────────────────────────
+    // Attacks on its own schedule alongside the hero. It exists so a Binding warlock's
+    // damage does not stop the moment they stop pressing anything — which is the
+    // fantasy, and happens to be exactly what an idle game wants.
+    if (fx.minionDps > 0 && mobEngaged && currentMob) {
+      minionAccum += deltaSeconds
+      if (minionAccum >= MINION_TICK_SECONDS) {
+        minionAccum -= MINION_TICK_SECONDS
+        const dmg = Math.max(1, Math.round(fx.minionDps * MINION_TICK_SECONDS))
+        currentMob = { ...currentMob, currentHp: currentMob.currentHp - dmg }
+        newFns.push(fn(dmg, false, false, false, '#b060d0'))
+      }
+    }
+
     // ── Rampage decay ────────────────────────────────────────────────────────
     // Stacks are shed on a timer since the last kill rather than cleared when the
     // target dies — between two kills in a streak `currentMob` is briefly null, and
@@ -1435,14 +1463,37 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (mobEngaged && playerAttackAccum >= stats.attackSpeedSeconds) {
       playerAttackAccum -= stats.attackSpeedSeconds
 
+      // A banked free crit is spent on THIS swing; the timer restarts from full.
+      const timedCritReady = fx.timedCritSeconds > 0 && procState.timedCritTimer <= 0
+      const isOpener = !procState.openerUsed
+
       const result = resolvePlayerAttack(
         stats, state.playerClass, talentAllocs, procState, activeBuffs, undefined,
         {
           mobHpFraction: currentMob!.currentHp / Math.max(1, currentMob!.maxHp),
           playerHpFraction: stats.currentHp / Math.max(1, stats.maxHp),
           rampageStacks: procState.rampageStacks,
+          arcaneCharges: procState.arcaneCharges,
+          targetBurning: activeDoTs.some(d => d.sourceType === 'burn'),
+          isOpener,
+          timedCritReady,
         },
       )
+
+      if (timedCritReady) {
+        procState.timedCritTimer = fx.timedCritSeconds
+        newLogs.push(log('proc', '⚡ A moment of perfect stillness — guaranteed crit!', '#ffcc00'))
+      }
+      if (isOpener) {
+        procState.openerUsed = true
+        if (fx.openerBurstPct > 0) {
+          newLogs.push(log('proc', `🗡 Opening strike! +${Math.round(fx.openerBurstPct * 100)}% damage`, '#c8a0ff'))
+        }
+      }
+      // Arcane charges build on every landed swing and reset with the target.
+      if (fx.arcaneChargePct > 0 && procState.arcaneCharges < ARCANE_MAX_CHARGES) {
+        procState.arcaneCharges++
+      }
 
       // Consume crit guarantee stack
       const cgBuff = activeBuffs.find(b => b.type === 'crit_guarantee' && (b.stacks ?? 0) > 0)
@@ -1548,8 +1599,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           newLogs.push(log('proc', `🔥 Rampage! ${procState.rampageStacks}/${RAMPAGE_MAX_STACKS}`, '#ff8800'))
         }
         rampageDecayAccum = 0
-        // A new fight is a new chance to refuse to die.
+        // A new fight is a new chance to refuse to die, a fresh opener, and a fresh
+        // stack of charges. Rampage is the deliberate exception: it is the ONE thing
+        // meant to carry across kills, which is the whole shape of the talent.
         procState.lastStandUsed = false
+        procState.openerUsed = false
+        procState.arcaneCharges = 0
 
         // Thought: boss kill, elite kill, or regular kill (10% chance to avoid spam)
         if (deadMob.isBoss) {
@@ -2187,9 +2242,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // magnitude the ability carries; `extraEffects` are riders talents bolted on; and
     // the cooldown it starts is the modified one, so a Warbringer's Red Harvest really
     // does come back sooner rather than merely claiming to in a tooltip.
-    const mod = compileTalentEffects(s.playerClass, s.talentAllocs).abilityMods[abilityId]
-      ?? emptyAbilityMod()
-    const scale = mod.damageMult
+    const castFx = compileTalentEffects(s.playerClass, s.talentAllocs)
+    const mod = castFx.abilityMods[abilityId] ?? emptyAbilityMod()
+
+    // Echo — the arcane tree's signature. The ability resolves a SECOND time, at full
+    // strength, for free. Rolled once here rather than per-effect so a multi-effect
+    // ability echoes as one coherent cast instead of partially.
+    const echoed = castFx.echoChance > 0 && Math.random() < castFx.echoChance
+    const scale = mod.damageMult * (echoed ? 2 : 1)
+    if (echoed) newLogs.push(log('proc', `✨ Echo! ${ability.name} resolves twice.`, '#c8a0ff'))
 
     for (const effect of [...ability.effects, ...mod.extraEffects]) {
       switch (effect.type) {

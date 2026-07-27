@@ -35,7 +35,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
     description: 'Your critical strikes apply a serrated bleed. Increases bleed damage per rank.',
     icon: '🩸',
     row: 1, col: 3, maxRanks: 2, requiresPoints: 0,
-    effects: [{ type: 'mechanic', mechanic: 'deep_wounds', valuePerRank: 0.08 }],
+    effects: [{ type: 'mechanic', mechanic: 'bleed_on_crit', valuePerRank: 0.08 }],
   },
 
   // ── Row 2 (5 pts) ─────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
     description: 'Reduces enemy attack speed by {n}% per rank.',
     icon: '💥',
     row: 2, col: 3, maxRanks: 3, requiresPoints: 5,
-    effects: [{ type: 'mechanic', mechanic: 'mortal_strike', valuePerRank: 0.05 }],
+    effects: [{ type: 'mechanic', mechanic: 'enemy_slow', valuePerRank: 0.05 }],
   },
 
   // ── Row 3 (10 pts) ────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
     description: 'Critical strikes cause your target to bleed for {n}% weapon damage per second.',
     icon: '🩸',
     row: 3, col: 3, maxRanks: 3, requiresPoints: 10,
-    effects: [{ type: 'mechanic', mechanic: 'deep_wounds', valuePerRank: 0.12 }],
+    effects: [{ type: 'mechanic', mechanic: 'bleed_on_crit', valuePerRank: 0.16 }],
   },
 
   // ── Row 4 (15 pts) ────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
     description: 'Increases all damage by {n}% per rank.',
     icon: '⚔',
     row: 4, col: 1, maxRanks: 5, requiresPoints: 15,
-    effects: [{ type: 'mechanic', mechanic: 'two_handed_spec', valuePerRank: 0.01 }],
+    effects: [{ type: 'mechanic', mechanic: 'damage_amp', valuePerRank: 0.02 }],
   },
   {
     id: 'arms_impale',
@@ -113,7 +113,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
     icon: '🗡',
     row: 4, col: 2, maxRanks: 2, requiresPoints: 15,
     requires: 'arms_deep_wounds',
-    effects: [{ type: 'mechanic', mechanic: 'impale', valuePerRank: 0.10 }],
+    effects: [{ type: 'mechanic', mechanic: 'crit_damage', valuePerRank: 0.2 }],
   },
   {
     id: 'arms_war_cry',
@@ -150,7 +150,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
     description: 'Gives each attack a {n}% chance per rank to strike again instantly.',
     icon: '✨',
     row: 5, col: 3, maxRanks: 5, requiresPoints: 20,
-    effects: [{ type: 'mechanic', mechanic: 'sword_spec', valuePerRank: 0.01 }],
+    effects: [{ type: 'mechanic', mechanic: 'extra_strike', valuePerRank: 0.01 }],
   },
 
   // ── Row 6 (25 pts) ────────────────────────────────────────────────────────
@@ -168,7 +168,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
     description: 'Reduces enemy attack speed by an additional {n}% per rank.',
     icon: '🦵',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
-    effects: [{ type: 'mechanic', mechanic: 'mortal_strike', valuePerRank: 0.03 }],
+    effects: [{ type: 'mechanic', mechanic: 'enemy_slow', valuePerRank: 0.03 }],
   },
   {
     id: 'arms_mortal_strike',
@@ -177,7 +177,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
     icon: '💀',
     row: 6, col: 3, maxRanks: 1, requiresPoints: 25,
     effects: [
-      { type: 'mechanic', mechanic: 'mortal_strike', valuePerRank: 0.05 },
+      { type: 'mechanic', mechanic: 'enemy_slow', valuePerRank: 0.05 },
       {
         type: 'ability', ability: 'warrior_battle_cry', mod: 'cooldown', valuePerRank: 0.33,
         note: 'Gravewound: cooldown reduced',
@@ -192,7 +192,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
     description: 'Increases all damage by a further {n}% per rank.',
     icon: '⚔',
     row: 7, col: 1, maxRanks: 5, requiresPoints: 30,
-    effects: [{ type: 'mechanic', mechanic: 'two_handed_spec', valuePerRank: 0.02 }],
+    effects: [{ type: 'mechanic', mechanic: 'damage_amp', valuePerRank: 0.03 }],
   },
   {
     id: 'arms_bladestorm',
@@ -202,7 +202,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
     row: 7, col: 2, maxRanks: 1, requiresPoints: 30,
     requires: 'arms_sweeping_strikes',
     effects: [
-      { type: 'mechanic', mechanic: 'deep_wounds', valuePerRank: 0.25 },
+      { type: 'mechanic', mechanic: 'bleed_on_crit', valuePerRank: 0.25 },
       {
         type: 'ability', ability: 'warrior_battle_cry', mod: 'damage', valuePerRank: 0.50,
         note: 'Bladestorm: strikes everything around you',

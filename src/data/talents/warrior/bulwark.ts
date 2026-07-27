@@ -27,7 +27,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
     description: 'Gives your shield a {n}% chance per rank to turn a blow aside entirely.',
     icon: '🛡',
     row: 1, col: 2, maxRanks: 3, requiresPoints: 0,
-    effects: [{ type: 'mechanic', mechanic: 'block_chance', valuePerRank: 0.04 }],
+    effects: [{ type: 'mechanic', mechanic: 'avoid_chance', valuePerRank: 0.04 }],
   },
   {
     id: 'bul_toughness',
@@ -53,7 +53,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
     description: 'Increases your armor by a further {n}% of its own value per rank.',
     icon: '🛡',
     row: 2, col: 2, maxRanks: 5, requiresPoints: 5,
-    effects: [{ type: 'mechanic', mechanic: 'armor_scaling', valuePerRank: 0.04 }],
+    effects: [{ type: 'mechanic', mechanic: 'armor_scaling', valuePerRank: 0.03 }],
   },
   {
     id: 'bul_improved_bash',
@@ -61,7 +61,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
     description: 'Blocked blows stagger the attacker, slowing it by {n}% per rank.',
     icon: '💥',
     row: 2, col: 3, maxRanks: 2, requiresPoints: 5,
-    effects: [{ type: 'mechanic', mechanic: 'mortal_strike', valuePerRank: 0.04 }],
+    effects: [{ type: 'mechanic', mechanic: 'enemy_slow', valuePerRank: 0.04 }],
   },
 
   // ── Row 3 (10 pts) ────────────────────────────────────────────────────────
@@ -131,7 +131,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
     description: 'Increases your chance to block by {n}% per rank.',
     icon: '🛡',
     row: 5, col: 1, maxRanks: 5, requiresPoints: 20,
-    effects: [{ type: 'mechanic', mechanic: 'block_chance', valuePerRank: 0.02 }],
+    effects: [{ type: 'mechanic', mechanic: 'avoid_chance', valuePerRank: 0.02 }],
   },
   {
     id: 'bul_indomitable',
@@ -160,7 +160,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
     name: 'Absorption',
     description: 'Reduces all damage taken by a further {n}% per rank.',
     icon: '🛡',
-    row: 6, col: 1, maxRanks: 3, requiresPoints: 25,
+    row: 6, col: 3, maxRanks: 3, requiresPoints: 25,
     effects: [{ type: 'mechanic', mechanic: 'damage_reduction', valuePerRank: 0.02 }],
   },
   {
@@ -176,7 +176,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
     name: 'Iron Will',
     description: 'Your recovery below half health becomes relentless.',
     icon: '💚',
-    row: 6, col: 3, maxRanks: 1, requiresPoints: 25,
+    row: 6, col: 1, maxRanks: 1, requiresPoints: 25,
     requires: 'bul_second_wind',
     effects: [{ type: 'mechanic', mechanic: 'second_wind', valuePerRank: 4 }],
   },
@@ -188,7 +188,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
     description: 'Increases your armor by a further {n}% of its own value per rank.',
     icon: '🛡',
     row: 7, col: 1, maxRanks: 5, requiresPoints: 30,
-    effects: [{ type: 'mechanic', mechanic: 'armor_scaling', valuePerRank: 0.06 }],
+    effects: [{ type: 'mechanic', mechanic: 'armor_scaling', valuePerRank: 0.035 }],
   },
   {
     id: 'bul_last_stand',

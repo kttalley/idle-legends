@@ -88,24 +88,49 @@ export interface StatBonuses {
  * adding keys, never adding branches.
  */
 export type TalentMechanicType =
-  // ── Warrior / Ironcleave ──
-  | 'deep_wounds' | 'two_handed_spec' | 'impale' | 'sweeping_strikes'
-  | 'sword_spec'  | 'mortal_strike'   | 'executioner'
-  // ── Warrior / Bulwark ──
-  | 'damage_reduction' | 'block_chance' | 'armor_scaling' | 'second_wind'
-  | 'thorns'           | 'last_stand'
-  // ── Warrior / Warbringer ──
-  | 'attack_haste' | 'flurry' | 'enrage' | 'bloodthirst' | 'rampage'
-  // ── Mage / Glacial Rite ──
-  | 'frostbite'   | 'ice_shards'   | 'shatter'  | 'winters_chill'
-  | 'ice_block'   | 'ice_barrier'  | 'cold_snap'
-  // ── Rogue / Shadowed Edge ──
-  | 'lethality'      | 'expose_armor' | 'cold_blood' | 'seal_fate'
-  | 'poison_potency' | 'poison_chance'
+  // ── Damage ──
+  | 'damage_amp'      // all damage +X%
+  | 'crit_damage'     // added to the crit multiplier
+  | 'extra_strike'    // chance any swing strikes again
+  | 'flurry'          // chance a CRIT strikes again
+  | 'executioner'     // bonus against a target below a third health
+  | 'enrage'          // bonus while YOU are below a third health
+  | 'rampage'         // stacking bonus per kill in a streak
+  | 'opener_burst'    // bonus on the first strike against a new target
+  | 'timed_crit'      // periodic guaranteed critical strike
+  | 'sweeping_strikes'
+  | 'seal_fate'       // crits build combo points toward a finisher
   | 'remorseless_attacks'
-  // ── Warlock / Bleakweave ──
-  | 'corruption'  | 'curse_of_agony' | 'nightfall' | 'siphon_life'
-  | 'amplify_curse' | 'curse_exhaustion' | 'lifesteal'
+  | 'arcane_charge'   // stacking damage that builds as you keep swinging
+  | 'minion_dps'      // a summoned thing attacking alongside you
+  | 'echo_chance'     // chance an ACTIVE ability resolves twice
+  // ── Speed ──
+  | 'attack_haste'
+  | 'enemy_slow'
+  // ── Defence ──
+  | 'damage_reduction'
+  | 'avoid_chance'    // blocked, parried or sidestepped — the blow simply misses
+  | 'armor_scaling'
+  | 'absorb_shield'   // a shield granted at the start of each fight
+  | 'second_wind'
+  | 'thorns'
+  | 'last_stand'
+  | 'death_ward'      // once per fight, survive at a sliver instead of dying
+  | 'lifesteal'
+  | 'bloodthirst'
+  // ── Enemy state ──
+  | 'armor_shred'
+  | 'freeze_chance'
+  | 'frozen_crit'     // crit bonus against a frozen target
+  | 'burning_crit'    // crit bonus against a burning target
+  | 'chill_stacks'
+  // ── Damage over time ──
+  | 'bleed_on_crit'
+  | 'ignite'          // crits leave a burn
+  | 'dot_amp'         // every DoT you own ticks harder
+  | 'poison_potency' | 'poison_chance'
+  | 'shadow_dot'     | 'curse_of_agony'
+  | 'siphon_life'    | 'nightfall' | 'amplify_curse'
 
 /** How a talent reshapes one of the three action-bar abilities. */
 export type AbilityModKind = 'damage' | 'cooldown' | 'castTime' | 'rider'
@@ -194,6 +219,8 @@ export interface CompiledTalentEffects {
   /** abilityId → the talent reshaping of that ability. */
   abilityMods: Record<string, AbilityMod>
   statBonuses: StatBonuses
+  /** True multiplier on final weapon damage (1.15 = +15%). */
+  damageAmp: number
   critDamageMultiplier: number
   mobAttackSpeedFactor: number
   mobArmorReduction: number
@@ -215,29 +242,47 @@ export interface CompiledTalentEffects {
   sweepingStrikesEnabled: boolean
   swordSpecEnabled: boolean
   swordSpecProcChance: number
-  // ── Bulwark ──
+  // ── Defence ──
   /** Flat share of incoming damage absorbed, 0–0.5. */
   damageReduction: number
-  blockChance: number
+  /** Chance a blow is turned aside entirely — blocked, parried or sidestepped. */
+  avoidChance: number
   /** Bonus armour as a fraction of base armour. */
   armorScaling: number
-  /** HP regained per combat tick while below half health. */
+  /** HP regained per second while below half health. */
   secondWindHpPerTick: number
   /** Share of damage taken reflected at the attacker. */
   thornsPct: number
   /** Survive a killing blow once per fight at this share of max HP. 0 = off. */
   lastStandPct: number
-  // ── Warbringer ──
+  // ── Offence ──
   /** Attack interval multiplier from haste talents (0.85 = 15% faster). */
   attackHasteFactor: number
-  /** Chance a crit grants a burst of extra attack speed. */
+  /** Chance a crit immediately strikes again. */
   flurryChance: number
   /** Damage bonus while below the enrage HP threshold. */
   enragePct: number
   /** Share of damage dealt returned as health. */
   bloodthirstPct: number
-  /** Chance each kill leaves a stacking damage buff. */
+  /** Whether kills build stacking damage. */
   rampageChance: number
+  /** Bonus on the first strike against a freshly engaged target. */
+  openerBurstPct: number
+  /** Seconds between free guaranteed crits. 0 = off. */
+  timedCritSeconds: number
+  /** Damage added per arcane charge, and the ceiling on them. */
+  arcaneChargePct: number
+  /** Damage per second contributed by a summoned minion. */
+  minionDps: number
+  /** Chance an active ability resolves a second time. */
+  echoChance: number
+  // ── Enemy state / DoTs ──
+  /** Crit bonus against a burning target. */
+  burningCritBonus: number
+  /** Burn damage per second applied by crits. 0 = off. */
+  ignitePct: number
+  /** Multiplier on every DoT tick the hero owns. */
+  dotAmp: number
 }
 
 // ── Active Abilities (Skill Bar) ──────────────────────────────────────────────
@@ -277,7 +322,7 @@ export interface AbilityEffectDef {
 // ── DoT & Buff State ──────────────────────────────────────────────────────────
 export interface ActiveDoT {
   id: string
-  sourceType: 'bleed' | 'poison' | 'corruption' | 'curse' | 'shadow'
+  sourceType: 'bleed' | 'poison' | 'corruption' | 'curse' | 'shadow' | 'burn'
   label: string
   icon: string
   color: string
@@ -320,6 +365,13 @@ export interface CombatProcState {
   lastStandUsed: boolean
   /** Warbringer's Rampage: stacks carried from recent kills, decaying out of combat. */
   rampageStacks: number
+  /** Arcane charges built by swinging, spent on nothing — they simply accumulate
+   *  damage while the hero keeps the pressure up, and reset when the target dies. */
+  arcaneCharges: number
+  /** Counts down to the next free guaranteed crit; 0 means the next swing is one. */
+  timedCritTimer: number
+  /** The opener against THIS target has been spent. Reset on every new engagement. */
+  openerUsed: boolean
   mobFrozen: boolean
   mobFrozenTimer: number
   iceBarrierHp: number
