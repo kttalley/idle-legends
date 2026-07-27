@@ -1,8 +1,18 @@
 import type { ActiveAbilityDef } from './types'
 
 // ── Active Ability Definitions (Skill Bar) ────────────────────────────────────
-// Each class gets 3 slots. These are always available (no talent requirement).
-// Talent tree upgrades can enhance what these do via CompiledTalentEffects.
+// Each class gets the same 3 slots, opening at levels 1 / 8 / 16. There is no talent
+// REQUIREMENT on any of them — a hero always ends up with all three — but what they do
+// is reshaped by whichever tree that hero fed, through `CompiledTalentEffects.abilityMods`.
+//
+// That is the whole trick: three specs press the same three buttons and get three
+// different fights, instead of thirty-six abilities nobody can hold in their head.
+// A Warbringer's Red Harvest comes back twice as often and hastens their swings; an
+// Ironcleave's Battle Cry hits half again as hard and bleeds everything nearby.
+//
+// The staggered unlocks exist so the bar has somewhere to grow. All three live at level
+// 1 meant a brand-new hero was handed the complete kit and progression had nothing left
+// to hand them but numbers.
 
 export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
 
@@ -16,6 +26,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     cooldownSeconds: 3,
     classes: ['warrior'],
     slot: 1,
+    unlockLevel: 1,
     effects: [{ type: 'next_hit_multiplier', value: 2.5, stacks: 1 }],
   },
   {
@@ -26,6 +37,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     cooldownSeconds: 10,
     classes: ['warrior'],
     slot: 2,
+    unlockLevel: 8,
     effects: [{ type: 'armor_buff', value: 60, durationSeconds: 8 }],
   },
   {
@@ -36,6 +48,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     cooldownSeconds: 8,
     classes: ['warrior'],
     slot: 3,
+    unlockLevel: 16,
     effects: [{ type: 'lifesteal_buff', value: 0.20, stacks: 3, durationSeconds: 20 }],
   },
 
@@ -50,6 +63,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     castTimeSeconds: 0.6,
     classes: ['mage'],
     slot: 1,
+    unlockLevel: 1,
     effects: [
       { type: 'next_hit_multiplier', value: 2.0, stacks: 1 },
       { type: 'freeze_mob', value: 1, durationSeconds: 4 },
@@ -63,6 +77,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     cooldownSeconds: 12,
     classes: ['mage'],
     slot: 2,
+    unlockLevel: 8,
     effects: [{ type: 'crit_guarantee', value: 1, stacks: 3, durationSeconds: 30 }],
   },
   {
@@ -73,6 +88,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     cooldownSeconds: 15,
     classes: ['mage'],
     slot: 3,
+    unlockLevel: 16,
     effects: [{ type: 'speed_buff', value: 0.5, durationSeconds: 8 }],
   },
 
@@ -86,6 +102,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     cooldownSeconds: 2.5,
     classes: ['rogue'],
     slot: 1,
+    unlockLevel: 1,
     effects: [{ type: 'next_hit_multiplier', value: 2.0, stacks: 1 }],
   },
   {
@@ -96,6 +113,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     cooldownSeconds: 12,
     classes: ['rogue'],
     slot: 2,
+    unlockLevel: 8,
     effects: [{ type: 'armor_buff', value: 80, durationSeconds: 10 }],
   },
   {
@@ -106,6 +124,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     cooldownSeconds: 5,
     classes: ['rogue'],
     slot: 3,
+    unlockLevel: 16,
     effects: [{ type: 'crit_guarantee', value: 1, stacks: 1, durationSeconds: 8 }],
   },
 
@@ -120,6 +139,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     castTimeSeconds: 0.8,
     classes: ['warlock'],
     slot: 1,
+    unlockLevel: 1,
     effects: [{ type: 'shadow_bolt', value: 3.0 }],
   },
   {
@@ -130,6 +150,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     cooldownSeconds: 8,
     classes: ['warlock'],
     slot: 2,
+    unlockLevel: 8,
     effects: [{ type: 'hot', value: 0.25, durationSeconds: 6 }],
   },
   {
@@ -140,6 +161,7 @@ export const ACTIVE_ABILITIES: ActiveAbilityDef[] = [
     cooldownSeconds: 12,
     classes: ['warlock'],
     slot: 3,
+    unlockLevel: 16,
     effects: [{ type: 'dot_amplify', value: 2.0, durationSeconds: 10 }],
   },
 ]

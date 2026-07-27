@@ -21,11 +21,15 @@ import { ZONE_ORDER } from '../data/zones'
 import { generateZoneMap } from '../engine/mapGen'
 import { ZONES } from '../data/zones'
 import { CLASS_DEFINITIONS } from '../data/classes'
+import {
+  SPEC_OF_TALENT, TALENT_BY_ID, talentGate, canDeallocate, totalSpent,
+} from '../data/specs'
 import { ACTIVE_ABILITIES, getClassAbilities } from '../data/abilities'
 import {
   compileStats, compileTalentEffects,
   resolvePlayerAttack, resolveMobAttack,
   makeShadowBoltHit, makeAbilityBuff, isGearUpgrade,
+  emptyAbilityMod, RAMPAGE_MAX_STACKS,
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
 import {
@@ -45,6 +49,7 @@ import {
   BAG_SLOTS_MAX_PURCHASED, BAG_SLOT_BASE_COST, BAG_SLOT_COST_GROWTH,
   SALVAGE_RATE, HOSTILE_TOWN_MARKUP, RARITY_ORDER,
   MERCHANT_CONTRACT_COST, MERCHANT_UPKEEP_RATE, MERCHANT_UPKEEP_MIN, MERCHANT_UPKEEP_SECONDS,
+  TALENT_POINT_MAX,
 } from '../data/constants'
 import { isTownHostileToPlayer } from '../engine/zoneProgression'
 import { rollLoot, placeDrop, salvageValue } from '../engine/loot'
@@ -82,6 +87,8 @@ function defaultProcState(): CombatProcState {
     comboPoints: 0,
     remorselessActive: false,
     iceBlockUsed: false,
+    lastStandUsed: false,
+    rampageStacks: 0,
     mobFrozen: false,
     mobFrozenTimer: 0,
     iceBarrierHp: 0,
@@ -253,6 +260,7 @@ function defaultState(): GameState {
     stats: {} as Stats,
     talentAllocs: {},
     talentPoints: 1,  // start with 1 point at level 1
+    talentVersion: TALENT_SCHEMA_VERSION,
     equipment: { weapon: null, helm: null, chest: null, legs: null, boots: null, trinket: null },
     inventory: Array(INVENTORY_SLOTS).fill(null),
     bagSlotsPurchased: 0,
@@ -345,10 +353,30 @@ function rehydrateState(saved: GameState): GameState {
   saved.factionNames  = saved.factionNames  ?? generateFactionNamesFallback(Date.now())
   // Recompile stats
   const savedRacialPassive = RACE_DEFINITIONS[saved.playerRace]?.racialPassive ?? {}
-  saved.stats = compileStats(saved.playerClass, saved.level, saved.equipment, saved.talentAllocs ?? {}, savedRacialPassive)
-  saved.stats.currentHp = Math.min(saved.stats.maxHp, (saved.stats as any)._savedHp ?? saved.stats.maxHp)
   saved.talentAllocs  = saved.talentAllocs  ?? {}
   saved.talentPoints  = saved.talentPoints  ?? saved.level
+
+  // ── Talent migration ────────────────────────────────────────────────────────
+  // A save written against an older tree layout is refunded once and re-stamped. Every
+  // id in the old warrior tree still exists (Ironcleave kept them deliberately), so
+  // nothing here is a rescue — it is that the trees were extended and rebalanced under
+  // the player's feet, and choosing again for free is the only honest response.
+  //
+  // The budget line below matters independently of the refund: points used to accrue
+  // one per level forever against a tree that held ~48, so a long-lived save can be
+  // carrying a pile of them that the cap no longer permits. Recomputing from level
+  // rather than trusting the stored number self-heals exactly that.
+  if ((saved.talentVersion ?? 0) < TALENT_SCHEMA_VERSION) {
+    saved.talentAllocs = {}
+    saved.talentVersion = TALENT_SCHEMA_VERSION
+  }
+  saved.talentPoints = Math.max(
+    0,
+    Math.min(saved.level, TALENT_POINT_MAX) - totalSpent(saved.talentAllocs),
+  )
+
+  saved.stats = compileStats(saved.playerClass, saved.level, saved.equipment, saved.talentAllocs, savedRacialPassive)
+  saved.stats.currentHp = Math.min(saved.stats.maxHp, (saved.stats as any)._savedHp ?? saved.stats.maxHp)
   // Bag capacity. A save written before slots were purchasable has neither field, and
   // reads as the 20 it always had. The array is the live capacity, so reconcile it with
   // the counter rather than trusting either alone: grow to fit purchased slots, and if a
@@ -818,12 +846,26 @@ let mobInstanceSeq = 0
 let playerAttackAccum = 0
 let mobAttackAccum    = 0
 let siphonLifeAccum   = 0
+/** Time since the last kill, for shedding Rampage stacks. */
+let rampageDecayAccum = 0
+
+/**
+ * Bumped whenever the talent trees change shape enough that existing allocations
+ * should not be assumed still sensible. Version 2 is the three-specs-per-class rework:
+ * one tree became three, tier gating became per-tree, and the lifetime point budget
+ * gained a ceiling.
+ */
+const TALENT_SCHEMA_VERSION = 2
 
 export function resetCombatAccumulators() {
   playerAttackAccum = 0
   mobAttackAccum    = 0
   siphonLifeAccum   = 0
+  rampageDecayAccum = 0
 }
+
+/** Seconds without a kill before Rampage sheds a stack. */
+const RAMPAGE_DECAY_SECONDS = 8
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 interface GameActions {
@@ -1358,6 +1400,26 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       newLogs.push(log('proc', `⚡ Gathering Dark! Umbral Bolt hits for ${boltDmg}`, '#cc44ff'))
     }
 
+    // ── Rampage decay ────────────────────────────────────────────────────────
+    // Stacks are shed on a timer since the last kill rather than cleared when the
+    // target dies — between two kills in a streak `currentMob` is briefly null, and
+    // clearing on that would wipe the streak the talent exists to reward.
+    if (procState.rampageStacks > 0) {
+      rampageDecayAccum += deltaSeconds
+      while (rampageDecayAccum >= RAMPAGE_DECAY_SECONDS && procState.rampageStacks > 0) {
+        rampageDecayAccum -= RAMPAGE_DECAY_SECONDS
+        procState.rampageStacks--
+      }
+    }
+
+    // ── Second Wind ──────────────────────────────────────────────────────────
+    // Bulwark's mid-fight recovery. Only below half health, which is what stops it
+    // being a flat regen aura and makes it a comeback rather than a cushion.
+    if (fx.secondWindHpPerTick > 0 && isAlive && stats.currentHp > 0
+        && stats.currentHp < stats.maxHp * 0.5) {
+      stats.currentHp = Math.min(stats.maxHp, stats.currentHp + fx.secondWindHpPerTick * deltaSeconds)
+    }
+
     // ── Tithe of Wounds ──────────────────────────────────────────────────────
     if (fx.siphonLifeHpPerTick > 0) {
       siphonLifeAccum += deltaSeconds
@@ -1374,7 +1436,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       playerAttackAccum -= stats.attackSpeedSeconds
 
       const result = resolvePlayerAttack(
-        stats, state.playerClass, talentAllocs, procState, activeBuffs
+        stats, state.playerClass, talentAllocs, procState, activeBuffs, undefined,
+        {
+          mobHpFraction: currentMob!.currentHp / Math.max(1, currentMob!.maxHp),
+          playerHpFraction: stats.currentHp / Math.max(1, stats.maxHp),
+          rampageStacks: procState.rampageStacks,
+        },
       )
 
       // Consume crit guarantee stack
@@ -1418,6 +1485,24 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         newLogs.push(log('proc', `⚡ Turning Steel! Extra strike for ${xtraHit}`, '#aabbff'))
       }
 
+      // Flurry — Warbringer's crit chain. Deliberately weaker per hit than Turning
+      // Steel and gated on a crit rather than on every swing, so the two stack into a
+      // fast-hands build without either one alone carrying it.
+      if (result.flurryHit) {
+        const flurry = Math.round(stats.weaponDps * stats.attackSpeedSeconds * 0.5)
+        currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - flurry }
+        newFns.push(fn(flurry, false, false, false, '#ffaa44'))
+        newLogs.push(log('proc', `⚡ Flurry! ${flurry} damage`, '#ffaa44'))
+      }
+
+      // Bloodthirst — health drawn back out of damage dealt. Warbringer's only
+      // sustain, and the reason it can afford to have no mitigation at all.
+      if (result.lifeDrawn > 0 && stats.currentHp < stats.maxHp) {
+        const healed = Math.min(result.lifeDrawn, stats.maxHp - stats.currentHp)
+        stats.currentHp += healed
+        if (healed > 0) newFns.push(fn(healed, false, false, false, '#44ff88'))
+      }
+
       // Written in Blood combo points
       if (result.sealFatePoint) {
         procState.comboPoints++
@@ -1455,6 +1540,17 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         newLogs.push(log('mob_death', `${deadMob.name} dies!`, '#ff4444'))
         newLogs.push(log('loot_gold',  `+${loot.gold} gold`,   '#ffd700'))
 
+        // Rampage — each kill compounds into the next. Capped, and cleared whenever the
+        // hero stops fighting (see `resetCombatAccumulators`), so it rewards an
+        // uninterrupted streak rather than sitting at max forever.
+        if (fx.rampageChance > 0 && procState.rampageStacks < RAMPAGE_MAX_STACKS) {
+          procState.rampageStacks++
+          newLogs.push(log('proc', `🔥 Rampage! ${procState.rampageStacks}/${RAMPAGE_MAX_STACKS}`, '#ff8800'))
+        }
+        rampageDecayAccum = 0
+        // A new fight is a new chance to refuse to die.
+        procState.lastStandUsed = false
+
         // Thought: boss kill, elite kill, or regular kill (10% chance to avoid spam)
         if (deadMob.isBoss) {
           get().triggerThought('boss_kill', deadMob.name)
@@ -1473,8 +1569,21 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           const newStats = compileStats(state.playerClass, level, equipment, talentAllocs, racialPassive)
           stats = { ...newStats, currentHp: Math.min(newStats.maxHp, stats.currentHp + 20) }
           newLogs.push(log('level_up', `★ Level Up! Now level ${level}!`, '#ffd700'))
-          // Gain a talent point
-          set(s => ({ talentPoints: s.talentPoints + 1 }))
+          // Gain a talent point — but only while the hero is still under the lifetime
+          // cap. Points used to accrue forever against a tree that could hold ~48 of
+          // them; past that every level-up handed out a token with nowhere to spend it.
+          // Levels beyond the cap still raise stats, they just stop paying talents.
+          set(s => {
+            if (s.talentPoints + totalSpent(s.talentAllocs) >= TALENT_POINT_MAX) return {}
+            return { talentPoints: s.talentPoints + 1 }
+          })
+          // An ability slot opening is worth saying out loud — it is the only moment in
+          // levelling where the action bar itself changes.
+          for (const ab of getClassAbilities(state.playerClass)) {
+            if (ab.unlockLevel === level) {
+              newLogs.push(log('ability_use', `✦ ${ab.name} unlocked!`, '#ffd700'))
+            }
+          }
           get().triggerThought('level_up', `level ${level}`)
           // Level-based unlock: only zones whose prerequisite boss is already down.
           for (const rawId of ZONE_ORDER) {
@@ -1593,7 +1702,20 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       mobAttackAccum += deltaSeconds
       if (mobAttackAccum >= currentMob.attackSpeedSeconds) {
         mobAttackAccum -= currentMob.attackSpeedSeconds
-        let mobDmg = resolveMobAttack(currentMob, stats.armor, fx.mobAttackSpeedFactor)
+        const swing = resolveMobAttack(currentMob, stats.armor, fx.mobAttackSpeedFactor, fx)
+        let mobDmg = swing.damage
+
+        if (swing.blocked) {
+          newFns.push(fn(0, false, true, false, '#88aaff'))
+          newLogs.push(log('proc', `🛡 Blocked ${currentMob.name}'s blow!`, '#88aaff'))
+        }
+
+        // Retaliation — measured against damage actually dealt, so it never scales with
+        // how badly the hero happens to be geared.
+        if (swing.thorns > 0) {
+          currentMob = { ...currentMob, currentHp: currentMob.currentHp - swing.thorns }
+          newFns.push(fn(swing.thorns, false, false, false, '#ffaa44'))
+        }
 
         // Winterward absorb
         if (procState.iceBarrierHp > 0) {
@@ -1636,6 +1758,17 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         // Near-death thought (10-20% HP, once per encounter)
         if (mobDmg > 0 && stats.currentHp / stats.maxHp < 0.2 && stats.currentHp > 0) {
           get().triggerThought('near_death', `${Math.round(stats.currentHp / stats.maxHp * 100)}% HP`)
+        }
+
+        // Last Stand — Bulwark's capstone. Once per fight, the blow that would have
+        // killed the hero leaves them standing instead. Consumed via the same
+        // once-per-encounter flag Glacial Tomb uses, and reset by the same
+        // `defaultProcState()` on respawn and on engaging a new enemy.
+        if (stats.currentHp <= 0 && fx.lastStandPct > 0 && !procState.lastStandUsed) {
+          procState.lastStandUsed = true
+          stats.currentHp = Math.max(1, Math.ceil(stats.maxHp * fx.lastStandPct))
+          newLogs.push(log('proc', `💀 Last Stand! You refuse to fall.`, '#ffd700'))
+          newFns.push(fn(stats.currentHp, true, false, true, '#ffd700'))
         }
 
         if (stats.currentHp <= 0) {
@@ -1971,29 +2104,19 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   },
 
   // ── Talents ──────────────────────────────────────────────────────────────────
+  // Both gates delegate to data/specs.ts rather than carrying their own copy of the
+  // rules. The store and the tree UI used to each re-implement "is this legal", which
+  // is one implementation too many: the UI could draw a node as available that the
+  // store would then silently refuse, and the player got no click and no explanation.
   allocateTalent: (talentId) => {
     const s = get()
-    if (s.talentPoints <= 0) return
-    const classDef = CLASS_DEFINITIONS[s.playerClass]
-    const node = classDef.talents.find(t => t.id === talentId)
+    const node = TALENT_BY_ID[talentId]
     if (!node) return
-    const current = s.talentAllocs[talentId] ?? 0
-    if (current >= node.maxRanks) return
-
-    // Check points-in-tree requirement
-    const totalSpent = Object.values(s.talentAllocs).reduce((a, b) => a + b, 0)
-    const rowCost = (node.row - 1) * 5  // need 5 pts per row to unlock
-    if (totalSpent < rowCost) return
-
-    // Check hard prerequisite
-    if (node.requires) {
-      const prereqNode = classDef.talents.find(t => t.id === node.requires)
-      if (!prereqNode) return
-      if ((s.talentAllocs[node.requires] ?? 0) < prereqNode.maxRanks) return
-    }
+    if (SPEC_OF_TALENT[talentId] === undefined) return
+    if (!talentGate(node, s.talentAllocs, s.talentPoints).ok) return
 
     const racialPassive = RACE_DEFINITIONS[s.playerRace]?.racialPassive ?? {}
-    const talentAllocs = { ...s.talentAllocs, [talentId]: current + 1 }
+    const talentAllocs = { ...s.talentAllocs, [talentId]: (s.talentAllocs[talentId] ?? 0) + 1 }
     const stats = compileStats(s.playerClass, s.level, s.equipment, talentAllocs, racialPassive)
     stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
     set({ talentAllocs, talentPoints: s.talentPoints - 1, stats })
@@ -2001,18 +2124,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
   deallocateTalent: (talentId) => {
     const s = get()
-    const current = s.talentAllocs[talentId] ?? 0
-    if (current <= 0) return
-    // Don't deallocate if another talent requires this one maxed
-    const classDef = CLASS_DEFINITIONS[s.playerClass]
-    for (const node of classDef.talents) {
-      if (node.requires === talentId) {
-        const reqNode = classDef.talents.find(t => t.id === talentId)!
-        if (current <= reqNode.maxRanks && (s.talentAllocs[node.id] ?? 0) > 0) return
-      }
-    }
+    const node = TALENT_BY_ID[talentId]
+    if (!node) return
+    if (!canDeallocate(node, s.talentAllocs).ok) return
+
     const racialPassive = RACE_DEFINITIONS[s.playerRace]?.racialPassive ?? {}
-    const talentAllocs = { ...s.talentAllocs, [talentId]: current - 1 }
+    const talentAllocs = { ...s.talentAllocs, [talentId]: (s.talentAllocs[talentId] ?? 0) - 1 }
     const stats = compileStats(s.playerClass, s.level, s.equipment, talentAllocs, racialPassive)
     stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
     set({ talentAllocs, talentPoints: s.talentPoints + 1, stats })
@@ -2021,10 +2138,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   resetTalents: () => {
     const s = get()
     const racialPassive = RACE_DEFINITIONS[s.playerRace]?.racialPassive ?? {}
-    const totalSpent = Object.values(s.talentAllocs).reduce((a, b) => a + b, 0)
+    const spent = totalSpent(s.talentAllocs)
     const stats = compileStats(s.playerClass, s.level, s.equipment, {}, racialPassive)
     stats.currentHp = Math.min(stats.maxHp, s.stats.currentHp)
-    set({ talentAllocs: {}, talentPoints: s.talentPoints + totalSpent, stats })
+    set({ talentAllocs: {}, talentPoints: s.talentPoints + spent, stats })
   },
 
   // ── Skill Bar ────────────────────────────────────────────────────────────────
@@ -2035,12 +2152,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if ((s.skillCooldowns[abilityId] ?? 0) > 0) return
     const ability = ACTIVE_ABILITIES.find(a => a.id === abilityId)
     if (!ability || !ability.classes.includes(s.playerClass)) return
+    if (s.level < ability.unlockLevel) return      // slot not open yet
     // Allow self-target abilities (hot/heals) even without a mob; block others
     if (!s.currentMob && !ability.effects.some(e => e.type === 'hot')) return
 
     // Timed ability → begin a channel. The effect fires in tick when the cast bar
     // fills; cooldown starts on completion so an interrupt doesn't burn it.
-    const castTime = ability.castTimeSeconds ?? 0
+    const mod = compileTalentEffects(s.playerClass, s.talentAllocs).abilityMods[abilityId]
+    const castTime = (ability.castTimeSeconds ?? 0) * (mod?.castTimeMult ?? 1)
     if (castTime > 0) {
       set({ castState: { abilityId, name: ability.name, icon: ability.icon, total: castTime, remaining: castTime, pushback: 0 } })
       return
@@ -2064,7 +2183,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     let currentMob = s.currentMob ? { ...s.currentMob } : null
     let procState = { ...s.procState }
 
-    for (const effect of ability.effects) {
+    // The hero's trees reach into the action bar here. `damageMult` scales every
+    // magnitude the ability carries; `extraEffects` are riders talents bolted on; and
+    // the cooldown it starts is the modified one, so a Warbringer's Red Harvest really
+    // does come back sooner rather than merely claiming to in a tooltip.
+    const mod = compileTalentEffects(s.playerClass, s.talentAllocs).abilityMods[abilityId]
+      ?? emptyAbilityMod()
+    const scale = mod.damageMult
+
+    for (const effect of [...ability.effects, ...mod.extraEffects]) {
       switch (effect.type) {
         case 'freeze_mob':
           procState.mobFrozen = true
@@ -2072,7 +2199,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           break
         case 'shadow_bolt':
           if (currentMob) {
-            const dmg = makeShadowBoltHit(stats.weaponDps, stats.attackSpeedSeconds, effect.value)
+            const dmg = makeShadowBoltHit(stats.weaponDps, stats.attackSpeedSeconds, effect.value * scale)
             currentMob.currentHp -= dmg
             newFns.push(fn(dmg, true, false, false, '#cc44ff'))
             newLogs.push(log('ability_use', `☠ Umbral Bolt strikes for ${dmg}!`, '#cc44ff'))
@@ -2080,18 +2207,21 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           break
         case 'hot':
           // Heal over time — apply as buff
-          newBuffs.push(makeAbilityBuff(abilityId, effect, ability.name, ability.icon))
+          newBuffs.push(makeAbilityBuff(abilityId, { ...effect, value: effect.value * scale }, ability.name, ability.icon))
           newLogs.push(log('ability_use', `💚 ${ability.name} — healing over time...`, '#44ff88'))
           break
         default:
-          newBuffs.push(makeAbilityBuff(abilityId, effect, ability.name, ability.icon))
+          newBuffs.push(makeAbilityBuff(abilityId, { ...effect, value: effect.value * scale }, ability.name, ability.icon))
           newLogs.push(log('ability_use', `✨ ${ability.name} activated!`, '#ffd700'))
       }
     }
 
     // Process hot immediately in tick, but set it up here
     // Handle next_hit_multiplier as well
-    const skillCooldowns = { ...s.skillCooldowns, [abilityId]: ability.cooldownSeconds }
+    const skillCooldowns = {
+      ...s.skillCooldowns,
+      [abilityId]: ability.cooldownSeconds * mod.cooldownMult,
+    }
 
     // If mob died from shadow bolt
     if (currentMob && currentMob.currentHp <= 0) {

@@ -716,3 +716,366 @@ body {
 .avatar-spell-cast { animation: spell-cast 0.28s ease-out !important; }
 .avatar-hit        { animation: hit-recoil 0.30s ease-out !important; }
 .avatar-dead       { animation: death-collapse 0.5s ease-in forwards !important; }
+
+/* ── Talents ──────────────────────────────────────────────────────────────────
+   Three trees replaced one, and one tree fit in the 252px sidebar rail while three
+   emphatically do not — so the tree became a full-screen surface and the rail kept
+   only a summary. Everything colour-coded here takes its accent from the spec's own
+   `SpecDefinition.accent` inline; the rules below are the neutral chrome around it. */
+
+/* Full-screen talent surface. Shares the sheet's scrim and glass vocabulary so it
+   reads as the same family of overlay as every other dismissible surface. */
+.talent-modal {
+  position: fixed;
+  z-index: 901;
+  /* Bounded and centred rather than edge-to-edge: at 1440px an inset-12 panel left the
+     three trees clustered in the middle of a very large empty box. */
+  top: 12px;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1060px, calc(100vw - 24px));
+  border-radius: 14px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  animation: sheet-pop 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@media (max-width: 899px) {
+  .talent-modal {
+    top: 0; bottom: 0; left: 0;
+    transform: none;
+    width: 100vw;
+    border-radius: 0;
+    padding: 8px 8px calc(8px + var(--safe-b));
+  }
+}
+
+.talent-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(206, 170, 90, 0.22);
+  flex-shrink: 0;
+}
+.talent-modal-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffd700;
+  letter-spacing: 0.04em;
+}
+.talent-modal-sub { font-size: 0.58rem; color: #8a8578; }
+
+/* Unspent-point counter. Loud when there is something to spend, quiet when there is
+   not — this is the one number that should pull the eye across the whole screen. */
+.talent-unspent {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #5a544a;
+}
+.talent-unspent > span {
+  font-size: 0.5rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 2px;
+}
+.talent-unspent[data-has="true"] {
+  color: #00ff88;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+/* ── Columns ── */
+.talent-cols {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  justify-content: center;
+}
+.talent-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  max-width: 330px;
+}
+.talent-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border: 1px solid;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.talent-crest {
+  width: 38px; height: 38px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid;
+  border-radius: 50%;
+  transition: box-shadow 0.25s;
+}
+.talent-col-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.talent-col-tag {
+  font-size: 0.5rem;
+  color: #7a7568;
+  font-style: italic;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.talent-col-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.talent-meter {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.talent-meter-fill { height: 100%; transition: width 0.25s ease-out; }
+
+.talent-grid-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+.talent-grid { position: relative; margin: 0 auto; }
+
+/* Tier gutter — the price of going deep, visible before it is paid. */
+.talent-tier {
+  position: absolute;
+  left: 0;
+  width: 22px;
+  text-align: right;
+  font-size: 0.52rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  transition: color 0.2s;
+}
+
+/* ── Nodes ── */
+.talent-node {
+  position: absolute;
+  z-index: 1;
+  border: 2px solid;
+  border-radius: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 3px;
+  touch-action: manipulation;
+  transition: border-color 0.12s, box-shadow 0.2s, transform 0.1s;
+}
+.talent-node:hover:not(.is-locked) { transform: translateY(-1px); }
+.talent-node.is-locked       { opacity: 0.5; }
+.talent-node.is-unaffordable { opacity: 0.75; }
+.talent-node-icon { line-height: 0; display: flex; }
+.talent-node-name {
+  font-size: 0.47rem;
+  text-align: center;
+  line-height: 1.15;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+/* Rank pips. "3/5" is a number to read; five dots is a quantity to see. */
+.talent-pips { display: flex; gap: 2px; margin-top: 1px; }
+.talent-pips > i {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+/* Maxed corner notch — a second, non-colour signal that a node is finished. */
+.talent-notch {
+  position: absolute;
+  top: -1px; right: -1px;
+  width: 0; height: 0;
+  border-top: 8px solid;
+  border-left: 8px solid transparent;
+  border-top-right-radius: 5px;
+}
+
+.talent-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 12px;
+  text-align: center;
+  border: 1px dashed rgba(206, 170, 90, 0.18);
+  border-radius: 8px;
+  color: #6a6458;
+  font-size: 0.58rem;
+  line-height: 1.5;
+}
+.talent-empty-title {
+  font-size: 0.68rem;
+  color: #8a8578;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Mobile spec switcher ── */
+.talent-switch { display: flex; gap: 5px; flex-shrink: 0; }
+.talent-switch > button {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 3px;
+  border: 1px solid;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  touch-action: manipulation;
+  transition: border-color 0.15s, background 0.15s;
+}
+.talent-switch > button.is-active { background: rgba(255, 255, 255, 0.06); }
+.talent-switch-name {
+  font-size: 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.talent-switch-pts { font-size: 0.6rem; font-weight: 700; }
+
+/* ── Docked inspector ──
+   With three columns a floating tooltip has nowhere to go that is not on top of
+   another tree, so the explanation gets a fixed home at the foot of the screen. */
+.talent-inspect {
+  flex-shrink: 0;
+  min-height: 66px;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(206, 170, 90, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.talent-inspect-head { display: flex; align-items: center; gap: 6px; }
+.talent-inspect-name { font-size: 0.7rem; font-weight: 700; color: #ffd700; }
+.talent-inspect-rank { margin-left: auto; font-size: 0.55rem; color: #8a8578; }
+.talent-inspect-body { font-size: 0.62rem; color: #c4bcae; line-height: 1.4; }
+.talent-inspect-rows { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.talent-inspect-cur  { font-size: 0.58rem; color: #c8a118; }
+.talent-inspect-next { font-size: 0.58rem; color: #7ac878; }
+.talent-inspect-warn { font-size: 0.58rem; color: #d8a05a; }
+.talent-inspect-idle {
+  font-size: 0.58rem;
+  color: #6a6458;
+  font-style: italic;
+  margin: auto 0;
+}
+.talent-inspect-actions { display: flex; gap: 6px; margin-top: 3px; }
+.talent-inspect-actions > button { flex: 1; min-height: 40px; }
+
+/* ── Sidebar summary ── */
+.talent-sum-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.62rem;
+}
+.talent-sum-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 3px 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.talent-sum-row:hover { background: rgba(255, 255, 255, 0.05); }
+.talent-sum-crest {
+  width: 24px; height: 24px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid;
+  border-radius: 50%;
+}
+.talent-sum-name {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.talent-sum-soon { color: #5a544a; font-size: 0.5rem; font-style: italic; font-weight: 400; }
+.talent-sum-bar {
+  display: block;
+  height: 3px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.talent-sum-bar > i { display: block; height: 100%; transition: width 0.25s ease-out; }
+.talent-sum-pts {
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── Locked ability slot ──
+   Keeps its place on the bar so the bar never changes shape at levels 8 and 16 — the
+   point of gating is anticipation, and anticipation needs a visible empty chair. */
+.skill-slot-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 2px dashed #3a3630;
+  border-radius: 6px;
+  background: rgba(8, 8, 12, 0.55);
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.skill-slot-locked-label {
+  font-size: 0.45rem;
+  color: #6a6458;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .talent-modal { animation: none; }
+  .talent-node:hover { transform: none; }
+  .talent-meter-fill, .talent-sum-bar > i { transition: none; }
+}

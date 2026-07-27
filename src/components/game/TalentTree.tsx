@@ -1,345 +1,95 @@
-import React, { useState, useRef, useMemo } from 'react'
+import React, { useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { CLASS_DEFINITIONS } from '../../data/classes'
-import type { TalentNodeDef } from '../../data/types'
+import { spentInSpec, specCapacity, totalSpent, deepestSpec } from '../../data/specs'
+import { TALENT_POINT_MAX } from '../../data/constants'
 import { SpriteIcon } from '../ui/SpriteIcon'
-import { DetailSheet } from '../ui/DetailSheet'
-import { useCoarsePointer } from '../ui/useLongPress'
+import { TalentPanel } from './TalentPanel'
 
-// ── Layout constants ──────────────────────────────────────────────────────────
-// Sidebar is 220px; 4 cols × 48 + 8 padding = 200px, fits with room to spare
-// Node geometry, sized up on touch so a fingertip clears the 44px minimum. Derived from
-// the same reactive source as the behaviour swap below — reading the media query at module
-// scope here and at mount there gave two different answers for one device.
-const GEOM = {
-  fine:   { CELL_W: 48, CELL_H: 66, NODE_W: 40, NODE_H: 54 },
-  coarse: { CELL_W: 54, CELL_H: 72, NODE_W: 46, NODE_H: 60 },
-}
-const PAD     = 4    // grid padding
-
-type Geom = typeof GEOM['fine']
-
-// Node center in SVG/absolute space
-function nodeCenter(t: TalentNodeDef, g: Geom) {
-  return {
-    x: PAD + (t.col - 1) * g.CELL_W + g.CELL_W / 2,
-    y: PAD + (t.row - 1) * g.CELL_H + g.CELL_H / 2,
-  }
-}
-
-// Node top-left for absolute positioning
-function nodeOrigin(t: TalentNodeDef, g: Geom) {
-  const c = nodeCenter(t, g)
-  return { x: c.x - g.NODE_W / 2, y: c.y - g.NODE_H / 2 }
-}
-
-// ── Tooltip ───────────────────────────────────────────────────────────────────
-interface Tooltip {
-  node: TalentNodeDef
-  rank: number
-  x: number
-  y: number
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
+/**
+ * The talent SUMMARY, in the character sidebar.
+ *
+ * This used to be the whole talent tree, crammed into a 252px rail. Three specs cannot
+ * live there, so the tree moved to a full-screen surface (`TalentPanel`) and what stays
+ * behind is the thing a sidebar is actually good at: telling you at a glance where your
+ * points went and whether you have any left. One button opens the real screen.
+ */
 export function TalentTree() {
-  const {
-    playerClass, talentAllocs, talentPoints,
-    allocateTalent, deallocateTalent, resetTalents,
-  } = useGameStore()
+  const { playerClass, level, talentAllocs, talentPoints } = useGameStore()
+  const [open, setOpen] = useState(false)
 
-  const classDef   = CLASS_DEFINITIONS[playerClass]
-  const talents    = classDef.talents
-  const [tooltip, setTooltip] = useState<Tooltip | null>(null)
-  const [inspected, setInspected] = useState<TalentNodeDef | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  // A touch device has no hover and no second button, so the tree switches from
-  // "click to act" to "tap to inspect, then act", and its nodes grow to fingertip size.
-  const coarsePointer = useCoarsePointer()
-  const geom = GEOM[coarsePointer ? 'coarse' : 'fine']
-  const { CELL_W, CELL_H, NODE_W, NODE_H } = geom
-
-  const maxRow = talents.reduce((m, t) => Math.max(m, t.row), 0)
-  const maxCol = talents.reduce((m, t) => Math.max(m, t.col), 0)
-  const totalSpent = Object.values(talentAllocs).reduce((a, b) => a + b, 0)
-
-  const gridW = PAD * 2 + maxCol * CELL_W
-  const gridH = PAD * 2 + maxRow * CELL_H
-
-  // Build SVG connector lines from `requires` field
-  const connections: { from: TalentNodeDef; to: TalentNodeDef }[] = []
-  for (const node of talents) {
-    if (node.requires) {
-      const parent = talents.find(t => t.id === node.requires)
-      if (parent) connections.push({ from: parent, to: node })
-    }
-  }
-
-  // Determine node visual state
-  function nodeState(t: TalentNodeDef): 'maxed' | 'partial' | 'available' | 'locked' {
-    const rank = talentAllocs[t.id] ?? 0
-    if (rank >= t.maxRanks) return 'maxed'
-    if (rank > 0) return 'partial'
-
-    // Check unlock requirements
-    const rowNeeded = (t.row - 1) * 5
-    if (totalSpent < rowNeeded) return 'locked'
-    if (t.requires) {
-      const prereq = talents.find(p => p.id === t.requires)
-      if (!prereq) return 'locked'
-      if ((talentAllocs[t.requires] ?? 0) < prereq.maxRanks) return 'locked'
-    }
-    if (talentPoints <= 0) return 'locked'
-    return 'available'
-  }
-
-  const STATE_COLORS = {
-    maxed:     { border: '#ffd700', bg: '#2a1f00', icon: '#ffd700', rank: '#ffd700' },
-    partial:   { border: '#c8a118', bg: '#1a1200', icon: '#d4b896', rank: '#c8a118' },
-    available: { border: '#6a5228', bg: '#12100a', icon: '#888',    rank: '#666' },
-    locked:    { border: '#2a2010', bg: '#0d0b05', icon: '#333',    rank: '#333' },
-  }
-
-  // Desktop keeps its fast path: left-click learns, right-click unlearns. Touch gets
-  // the same two actions as labelled buttons in the sheet, because a right-click has no
-  // finger equivalent and a talent tree is not somewhere to hide a gesture.
-  function handleNodeClick(e: React.MouseEvent, t: TalentNodeDef) {
-    e.preventDefault()
-    if (e.button === 2) deallocateTalent(t.id)
-    else if (e.button === 0 && !coarsePointer) allocateTalent(t.id)
-    else if (e.button === 0) setInspected(t)
-  }
-
-  function handleMouseEnter(e: React.MouseEvent, t: TalentNodeDef) {
-    const rank = talentAllocs[t.id] ?? 0
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const containerRect = containerRef.current?.getBoundingClientRect()
-    if (!containerRect) return
-    setTooltip({
-      node: t,
-      rank,
-      x: rect.right - containerRect.left + 6,
-      y: rect.top - containerRect.top,
-    })
-  }
+  const specs = CLASS_DEFINITIONS[playerClass].specs
+  const spent = totalSpent(talentAllocs)
+  const earned = Math.min(level, TALENT_POINT_MAX)
+  const title = deepestSpec(playerClass, talentAllocs)
 
   return (
-    <div style={{ overflow: 'hidden' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2" style={{ fontSize: '0.65rem' }}>
-        <span style={{ color: '#ffd700', fontWeight: 700 }}>
-          {totalSpent} pts spent
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* The hero's title — whichever tree they have fed most. Blank until they have
+          actually committed to one, because "no spec yet" is true and worth saying. */}
+      <div className="talent-sum-head">
+        <span style={{ color: title ? title.accent : '#6a6458', fontWeight: 700 }}>
+          {title ? title.name : 'No specialization yet'}
         </span>
-        <span style={{
-          color: talentPoints > 0 ? '#00ff88' : '#666',
-          fontWeight: talentPoints > 0 ? 700 : 400,
-        }}>
-          {talentPoints} unspent
+        <span style={{ color: '#6a6458', fontSize: '0.55rem' }}>
+          {spent}/{earned} pts
         </span>
-        <button
-          className="rp-button"
-          style={{ fontSize: '0.55rem', padding: '2px 6px' }}
-          onClick={resetTalents}
-          disabled={totalSpent === 0}
-        >
-          Reset
-        </button>
       </div>
 
-      {/* Hint — states whichever grammar this device actually has. */}
-      <div style={{ fontSize: '0.55rem', color: '#555', marginBottom: 4, textAlign: 'center' }}>
-        {coarsePointer ? 'Tap a talent to learn or unlearn it' : 'Left-click to learn · Right-click to unlearn'}
-      </div>
-
-      {/* Grid container — scrollable, height-bounded */}
-      <div style={{ overflowY: 'auto', overflowX: 'hidden', maxHeight: '44vh' }}>
-      <div
-        ref={containerRef}
-        style={{ position: 'relative', width: gridW, height: gridH, margin: '0 auto' }}
-        onContextMenu={e => e.preventDefault()}
-      >
-        {/* SVG connector lines */}
-        <svg
-          width={gridW}
-          height={gridH}
-          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }}
-        >
-          {connections.map(({ from, to }) => {
-            const f = nodeCenter(from, geom)
-            const t2 = nodeCenter(to, geom)
-            const parentRank = talentAllocs[from.id] ?? 0
-            const parentNode = talents.find(n => n.id === from.id)!
-            const isActive = parentRank >= parentNode.maxRanks
-            return (
-              <line
-                key={`${from.id}-${to.id}`}
-                x1={f.x} y1={f.y + NODE_H / 2 - 2}
-                x2={t2.x} y2={t2.y - NODE_H / 2 + 2}
-                stroke={isActive ? '#c8a118' : '#2a2010'}
-                strokeWidth={isActive ? 2 : 1}
-                strokeDasharray={isActive ? undefined : '3 3'}
-              />
-            )
-          })}
-        </svg>
-
-        {/* Talent nodes */}
-        {talents.map(t => {
-          const rank   = talentAllocs[t.id] ?? 0
-          const state  = nodeState(t)
-          const colors = STATE_COLORS[state]
-          const origin = nodeOrigin(t, geom)
-
-          return (
-            <button
-              key={t.id}
-              onMouseDown={e => handleNodeClick(e, t)}
-              onMouseEnter={e => handleMouseEnter(e, t)}
-              onMouseLeave={() => setTooltip(null)}
-              onContextMenu={e => e.preventDefault()}
+      {specs.map(spec => {
+        const pts = spentInSpec(talentAllocs, spec.id)
+        const cap = specCapacity(spec)
+        return (
+          <button
+            key={spec.id}
+            className="talent-sum-row"
+            onClick={() => setOpen(true)}
+            title={`${spec.name} — ${spec.tagline}`}
+          >
+            <span
+              className="talent-sum-crest"
               style={{
-                position: 'absolute',
-                left: origin.x,
-                top: origin.y,
-                width: NODE_W,
-                height: NODE_H,
-                background: colors.bg,
-                border: `2px solid ${colors.border}`,
-                borderRadius: 6,
-                cursor: state === 'locked' ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 1,
-                padding: '2px 3px',
-                opacity: state === 'locked' ? 0.45 : 1,
-                zIndex: 1,
-                transition: 'border-color 0.1s',
-                boxShadow: state === 'maxed' ? '0 0 6px rgba(200,161,0,0.4)' : undefined,
+                borderColor: pts > 0 ? spec.accent : '#3a352c',
+                boxShadow: pts > 0 ? `0 0 8px ${spec.accent}55` : 'none',
               }}
             >
-              {/* Icon */}
-              <span style={{
-                lineHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                // Rank state reads through as opacity: a locked node dims rather than
-                // recolouring, so the archetype silhouette stays legible at 20px.
-                opacity: state === 'locked' ? 0.35 : state === 'available' ? 0.7 : 1,
-              }}>
-                <SpriteIcon talentId={t.id} emoji={t.icon} size={20} title={t.name} />
+              <SpriteIcon talent={spec.icon as any} emoji="⚔" size={16} />
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span className="talent-sum-name" style={{ color: pts > 0 ? spec.accent : '#8a8578' }}>
+                {spec.name}
+                {cap === 0 && <em className="talent-sum-soon"> · soon</em>}
               </span>
-
-              {/* Name */}
-              <span style={{
-                fontSize: '0.48rem',
-                color: state === 'maxed' ? '#ffd700' : '#9d9d9d',
-                textAlign: 'center',
-                lineHeight: 1.2,
-                maxWidth: NODE_W - 6,
-                overflow: 'hidden',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-              }}>
-                {t.name}
+              <span className="talent-sum-bar">
+                <i style={{
+                  width: `${cap ? (pts / cap) * 100 : 0}%`,
+                  background: spec.accent,
+                }} />
               </span>
+            </span>
+            <span className="talent-sum-pts" style={{ color: pts > 0 ? spec.accent : '#5a544a' }}>
+              {pts}
+            </span>
+          </button>
+        )
+      })}
 
-              {/* Rank display */}
-              <span style={{
-                fontSize: '0.5rem',
-                color: colors.rank,
-                fontWeight: 700,
-                lineHeight: 1,
-              }}>
-                {rank}/{t.maxRanks}
-              </span>
-            </button>
-          )
-        })}
-
-        {/* Tooltip */}
-        {tooltip && (
-          <div
-            style={{
-              position: 'absolute',
-              left: Math.min(tooltip.x, gridW - 170),
-              top: Math.max(0, tooltip.y),
-              zIndex: 10,
-              background: '#1a1508',
-              border: '1px solid #c8a118',
-              borderRadius: 6,
-              padding: '6px 8px',
-              width: 160,
-              pointerEvents: 'none',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.8)',
-            }}
-          >
-            <div style={{ color: '#ffd700', fontWeight: 700, fontSize: '0.65rem', marginBottom: 2 }}>
-              <SpriteIcon talentId={tooltip.node.id} emoji={tooltip.node.icon} size={14} />{' '}
-              {tooltip.node.name}
-            </div>
-            <div style={{ color: '#9d9d9d', fontSize: '0.58rem', lineHeight: 1.4, marginBottom: 4 }}>
-              {tooltip.node.description.replace('{n}', String(
-                tooltip.node.effects.find(e => e.type === 'stat')?.valuePerRank
-                ?? tooltip.node.effects[0]?.valuePerRank
-                ?? '?'
-              ))}
-            </div>
-            <div style={{ color: '#666', fontSize: '0.55rem' }}>
-              Rank {tooltip.rank} / {tooltip.node.maxRanks}
-              {tooltip.node.requiresPoints > 0 && (
-                <span> · Requires {tooltip.node.requiresPoints} pts</span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-      </div>
-
-      <DetailSheet
-        open={!!inspected}
-        onClose={() => setInspected(null)}
-        title={inspected && (
-          <span>
-            <SpriteIcon talentId={inspected.id} emoji={inspected.icon} size={16} /> {inspected.name}
-          </span>
-        )}
-        actions={inspected ? (() => {
-          const rank = talentAllocs[inspected.id] ?? 0
-          const state = nodeState(inspected)
-          return [
-            {
-              label: 'Learn',
-              tone: 'primary' as const,
-              onClick: () => allocateTalent(inspected.id),
-              disabled: state === 'locked' || state === 'maxed' || talentPoints <= 0,
-              hint: state === 'locked' ? 'Prerequisites not met'
-                : state === 'maxed' ? 'Already at maximum rank'
-                : talentPoints <= 0 ? 'No unspent points' : undefined,
-            },
-            {
-              label: 'Unlearn',
-              onClick: () => deallocateTalent(inspected.id),
-              disabled: rank <= 0,
-              hint: rank <= 0 ? 'Nothing invested here' : undefined,
-            },
-          ]
-        })() : undefined}
+      <button
+        className="rp-button"
+        onClick={() => setOpen(true)}
+        style={{
+          width: '100%',
+          fontSize: '0.6rem',
+          padding: '5px 0',
+          borderColor: talentPoints > 0 ? '#00cc66' : undefined,
+          color: talentPoints > 0 ? '#00ff88' : undefined,
+          fontWeight: talentPoints > 0 ? 700 : 400,
+        }}
       >
-        {inspected && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div>{inspected.description.replace('{n}', String(
-              inspected.effects.find(e => e.type === 'stat')?.valuePerRank
-              ?? inspected.effects[0]?.valuePerRank ?? '?'
-            ))}</div>
-            <div style={{ color: '#9d9d9d', fontSize: '0.65rem' }}>
-              Rank {talentAllocs[inspected.id] ?? 0} / {inspected.maxRanks}
-              {inspected.requiresPoints > 0 && <> · Requires {inspected.requiresPoints} pts spent</>}
-              {' · '}{talentPoints} unspent
-            </div>
-          </div>
-        )}
-      </DetailSheet>
+        {talentPoints > 0 ? `Spend ${talentPoints} point${talentPoints === 1 ? '' : 's'}` : 'View talents'}
+      </button>
+
+      <TalentPanel open={open} onClose={() => setOpen(false)} />
     </div>
   )
 }

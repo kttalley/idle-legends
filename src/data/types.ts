@@ -77,22 +77,59 @@ export interface StatBonuses {
 }
 
 // ── Talent System ─────────────────────────────────────────────────────────────
+/**
+ * Every distinct thing a talent can do to combat, as a flat vocabulary of keys.
+ *
+ * These are SUMMED (valuePerRank × ranks) into `CompiledTalentEffects.mechanics` and
+ * only then derived into the named fields combat reads. One key means exactly one
+ * thing: three of these used to be overloaded on the magnitude of their own value
+ * (`lethality` meant crit-damage below 1 and armour-shred above it), which made the
+ * data unreadable and the compiler's job a guessing game. Adding a tree should be
+ * adding keys, never adding branches.
+ */
 export type TalentMechanicType =
+  // ── Warrior / Ironcleave ──
   | 'deep_wounds' | 'two_handed_spec' | 'impale' | 'sweeping_strikes'
-  | 'sword_spec'  | 'mortal_strike'
+  | 'sword_spec'  | 'mortal_strike'   | 'executioner'
+  // ── Warrior / Bulwark ──
+  | 'damage_reduction' | 'block_chance' | 'armor_scaling' | 'second_wind'
+  | 'thorns'           | 'last_stand'
+  // ── Warrior / Warbringer ──
+  | 'attack_haste' | 'flurry' | 'enrage' | 'bloodthirst' | 'rampage'
+  // ── Mage / Glacial Rite ──
   | 'frostbite'   | 'ice_shards'   | 'shatter'  | 'winters_chill'
   | 'ice_block'   | 'ice_barrier'  | 'cold_snap'
-  | 'lethality'   | 'vile_poisons' | 'cold_blood' | 'seal_fate'
+  // ── Rogue / Shadowed Edge ──
+  | 'lethality'      | 'expose_armor' | 'cold_blood' | 'seal_fate'
+  | 'poison_potency' | 'poison_chance'
   | 'remorseless_attacks'
+  // ── Warlock / Bleakweave ──
   | 'corruption'  | 'curse_of_agony' | 'nightfall' | 'siphon_life'
-  | 'amplify_curse' | 'lifesteal'
+  | 'amplify_curse' | 'curse_exhaustion' | 'lifesteal'
 
-export interface TalentEffectDef {
-  type: 'stat' | 'mechanic'
-  stat?: keyof StatBonuses
-  valuePerRank: number
-  mechanic?: TalentMechanicType
-}
+/** How a talent reshapes one of the three action-bar abilities. */
+export type AbilityModKind = 'damage' | 'cooldown' | 'castTime' | 'rider'
+
+export type TalentEffectDef =
+  | { type: 'stat';     stat: keyof StatBonuses; valuePerRank: number }
+  | { type: 'mechanic'; mechanic: TalentMechanicType; valuePerRank: number }
+  /**
+   * Reaches into the action bar. This is what makes three specs who press the SAME
+   * three buttons fight three different fights — see `AbilityMod`.
+   *
+   * `valuePerRank` is a FRACTION for damage/cooldown/castTime (0.1 = +10% damage, or
+   * -10% cooldown — see `AbilityMod` for the sign convention) and is ignored for
+   * 'rider', which instead attaches `rider` once per rank.
+   */
+  | {
+      type: 'ability'
+      ability: string
+      mod: AbilityModKind
+      valuePerRank: number
+      rider?: AbilityEffectDef
+      /** Player-facing line shown under the ability's own description. */
+      note?: string
+    }
 
 export interface TalentNodeDef {
   id: string
@@ -102,12 +139,60 @@ export interface TalentNodeDef {
   row: number           // 1–7
   col: number           // 1–4
   maxRanks: number
+  /** Points that must be spent IN THIS SPEC's tree before the node opens. Canonically
+   *  `(row - 1) * 5`. Per-tree, not global — that distinction is the whole difference
+   *  between three specialisations and one tree wearing three hats. */
   requiresPoints: number
   requires?: string     // talent ID that must be maxed first
   effects: TalentEffectDef[]
 }
 
+/**
+ * One specialisation: a self-contained tree with its own identity and its own point
+ * pool for gating purposes. A class has exactly three, and points may be spent freely
+ * across all of them — commitment is enforced by `requiresPoints` being counted
+ * per-tree, not by forbidding the spend.
+ */
+export interface SpecDefinition {
+  id: string
+  classId: ClassType
+  name: string
+  /** One line under the crest. Says what fighting as this spec feels like. */
+  tagline: string
+  description: string
+  /** Crest drawn from the shared talent icon sheet (render/talentIcons.ts). */
+  icon: string
+  /** Hex accent driving this column's whole visual identity — meters, node glow,
+   *  connectors, the crest ring. Three trees that look alike are one tree. */
+  accent: string
+  talents: TalentNodeDef[]
+  /** Extra connector lines beyond those implied by `requires`. */
+  connectors?: [string, string][]
+}
+
+/**
+ * Talent-driven changes to one action-bar ability, resolved at cast time.
+ *
+ * Sign convention: `damageMult` and `castTimeMult` multiply directly (1.2 = +20%
+ * damage), while `cooldownMult` is ALSO a direct multiplier (0.8 = 20% faster) — a
+ * talent that reads "reduces cooldown by 10%" contributes 0.1 and the compiler turns
+ * it into the multiplier, so tree data never has to think in reciprocals.
+ */
+export interface AbilityMod {
+  damageMult: number
+  cooldownMult: number
+  castTimeMult: number
+  extraEffects: AbilityEffectDef[]
+  /** Lines the ability's inspector shows beneath its base description. */
+  notes: string[]
+}
+
 export interface CompiledTalentEffects {
+  /** Raw summed mechanic totals. The single storage; everything below is derived
+   *  from it so a new tree is data, not an engine change. */
+  mechanics: Partial<Record<TalentMechanicType, number>>
+  /** abilityId → the talent reshaping of that ability. */
+  abilityMods: Record<string, AbilityMod>
   statBonuses: StatBonuses
   critDamageMultiplier: number
   mobAttackSpeedFactor: number
@@ -130,6 +215,29 @@ export interface CompiledTalentEffects {
   sweepingStrikesEnabled: boolean
   swordSpecEnabled: boolean
   swordSpecProcChance: number
+  // ── Bulwark ──
+  /** Flat share of incoming damage absorbed, 0–0.5. */
+  damageReduction: number
+  blockChance: number
+  /** Bonus armour as a fraction of base armour. */
+  armorScaling: number
+  /** HP regained per combat tick while below half health. */
+  secondWindHpPerTick: number
+  /** Share of damage taken reflected at the attacker. */
+  thornsPct: number
+  /** Survive a killing blow once per fight at this share of max HP. 0 = off. */
+  lastStandPct: number
+  // ── Warbringer ──
+  /** Attack interval multiplier from haste talents (0.85 = 15% faster). */
+  attackHasteFactor: number
+  /** Chance a crit grants a burst of extra attack speed. */
+  flurryChance: number
+  /** Damage bonus while below the enrage HP threshold. */
+  enragePct: number
+  /** Share of damage dealt returned as health. */
+  bloodthirstPct: number
+  /** Chance each kill leaves a stacking damage buff. */
+  rampageChance: number
 }
 
 // ── Active Abilities (Skill Bar) ──────────────────────────────────────────────
@@ -150,6 +258,12 @@ export interface ActiveAbilityDef {
   castTimeSeconds?: number
   classes: ClassType[]
   slot: 1 | 2 | 3
+  /**
+   * Level the slot opens at. Locked slots still RENDER on the bar — greyed and
+   * captioned — so the action bar keeps its shape from level 1 and reads as something
+   * growing rather than something missing.
+   */
+  unlockLevel: number
   effects: AbilityEffectDef[]
 }
 
@@ -202,6 +316,10 @@ export interface CombatProcState {
   comboPoints: number
   remorselessActive: boolean
   iceBlockUsed: boolean
+  /** Bulwark's Last Stand fires once per encounter, like Glacial Tomb above it. */
+  lastStandUsed: boolean
+  /** Warbringer's Rampage: stacks carried from recent kills, decaying out of combat. */
+  rampageStacks: number
   mobFrozen: boolean
   mobFrozenTimer: number
   iceBarrierHp: number
@@ -314,7 +432,8 @@ export interface ClassDefinition {
   description: string
   primaryStat: 'strength' | 'intellect' | 'agility'
   baseStats: Omit<Stats, 'currentHp' | 'maxHp' | 'critChance'>
-  talents: TalentNodeDef[]
+  /** Exactly three, in display order. See data/specs.ts for the lookups over them. */
+  specs: SpecDefinition[]
   colorClass: string
   allowedRaces: RaceType[]
 }
@@ -377,6 +496,9 @@ export interface GameState {
   stats: Stats
   talentAllocs: Record<string, number>   // talentId → currentRank
   talentPoints: number
+  /** Schema stamp for the talent trees. A save written against an older layout is
+   *  refunded once on load and re-stamped — see `rehydrateState`. */
+  talentVersion: number
   equipment: Record<Slot, Item | null>
   inventory: (Item | null)[]
   /** Bag slots bought with gold, on top of INVENTORY_SLOTS. `inventory.length` is the

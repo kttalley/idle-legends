@@ -63,8 +63,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
     description: 'Reduces enemy effective armor by 10 per rank.',
     icon: '🎯',
     row: 3, col: 1, maxRanks: 2, requiresPoints: 10,
-    effects: [{ type: 'mechanic', mechanic: 'lethality', valuePerRank: 10 }],
-    // repurposed to mob armor reduction
+    effects: [{ type: 'mechanic', mechanic: 'expose_armor', valuePerRank: 10 }],
   },
   {
     id: 'ass_lethality',
@@ -81,7 +80,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
     description: 'Attacks apply a poison DoT dealing 8 damage/tick per rank.',
     icon: '☠',
     row: 3, col: 3, maxRanks: 5, requiresPoints: 10,
-    effects: [{ type: 'mechanic', mechanic: 'vile_poisons', valuePerRank: 8 }],
+    effects: [{ type: 'mechanic', mechanic: 'poison_potency', valuePerRank: 8 }],
   },
 
   // ── Row 4 (15 pts required) ───────────────────────────────────────────────
@@ -91,7 +90,7 @@ export const ASSASSINATION_TALENTS: TalentNodeDef[] = [
     description: 'Increases poison proc chance by 2% per rank.',
     icon: '☠',
     row: 4, col: 1, maxRanks: 5, requiresPoints: 15,
-    effects: [{ type: 'mechanic', mechanic: 'vile_poisons', valuePerRank: 0.02 }],
+    effects: [{ type: 'mechanic', mechanic: 'poison_chance', valuePerRank: 0.02 }],
   },
   {
     id: 'ass_cold_blood',

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { getClassAbilities } from '../../data/abilities'
+import { compileTalentEffects } from '../../engine/combat'
 import { SpriteIcon } from '../ui/SpriteIcon'
 import { DetailSheet } from '../ui/DetailSheet'
 import { useLongPress } from '../ui/useLongPress'
@@ -9,17 +10,39 @@ import type { ActiveAbilityDef } from '../../data/types'
 interface SlotProps {
   ability: ActiveAbilityDef
   remaining: number
+  /** Effective cooldown after talents — what the sweep and the timer measure against. */
+  cooldown: number
+  /** Null once unlocked; the required level while the slot is still shut. */
+  lockedUntil: number | null
   onActivate: () => void
   onInspect: () => void
   compact?: boolean
 }
 
-function SkillSlot({ ability, remaining, onActivate, onInspect, compact }: SlotProps) {
-  const pct = remaining > 0 ? remaining / ability.cooldownSeconds : 0
+function SkillSlot({ ability, remaining, cooldown, lockedUntil, onActivate, onInspect, compact }: SlotProps) {
+  const pct = remaining > 0 ? remaining / Math.max(0.1, cooldown) : 0
   const onCd = remaining > 0
+  const locked = lockedUntil !== null
   // 64px slots plus four mode toggles overflowed a 390px viewport, which is why the bar
   // was pressed against both edges. 56 still clears the touch minimum comfortably.
   const size = compact ? 56 : 64
+
+  // A locked slot still occupies the bar. Hiding it would mean the bar changes SHAPE at
+  // levels 8 and 16, and a new player would have no way to know a third slot was ever
+  // coming — the point of gating is anticipation, which requires seeing the empty chair.
+  if (locked) {
+    return (
+      <div
+        className="skill-slot-locked"
+        title={`${ability.name} — unlocks at level ${lockedUntil}`}
+        aria-label={`${ability.name}, locked until level ${lockedUntil}`}
+        style={{ width: size, height: size }}
+      >
+        <SpriteIcon ui="lock" emoji="🔒" size={compact ? 18 : 20} />
+        <span className="skill-slot-locked-label">Level {lockedUntil}</span>
+      </div>
+    )
+  }
 
   // Abilities are the one place tap CANNOT open an inspector: firing them is a combat
   // action and has to stay a single instant press. So the description — which used to
@@ -30,7 +53,7 @@ function SkillSlot({ ability, remaining, onActivate, onInspect, compact }: SlotP
 
   return (
     <button
-      title={`${ability.name}\n${ability.description}\nCooldown: ${ability.cooldownSeconds}s — hold to inspect`}
+      title={`${ability.name}\n${ability.description}\nCooldown: ${+cooldown.toFixed(1)}s — hold to inspect`}
       {...press}
       aria-label={`${ability.name}. Hold to inspect.`}
       disabled={onCd}
@@ -121,9 +144,20 @@ function SkillSlot({ ability, remaining, onActivate, onInspect, compact }: SlotP
 
 export function SkillBar({ embedded = false, compact = false }:
   { embedded?: boolean; compact?: boolean } = {}) {
-  const { playerClass, skillCooldowns, activateAbility, currentMob, isAlive } = useGameStore()
+  const { playerClass, level, talentAllocs, skillCooldowns, activateAbility, isAlive } = useGameStore()
   const abilities = getClassAbilities(playerClass)
   const [inspected, setInspected] = useState<ActiveAbilityDef | null>(null)
+
+  // The hero's trees reach into the bar here — a Warbringer's Red Harvest really does
+  // show a shorter cooldown than an Ironcleave's, because it has one.
+  const mods = useMemo(
+    () => compileTalentEffects(playerClass, talentAllocs).abilityMods,
+    [playerClass, talentAllocs],
+  )
+  const cooldownOf = (a: ActiveAbilityDef) => a.cooldownSeconds * (mods[a.id]?.cooldownMult ?? 1)
+  const lockOf = (a: ActiveAbilityDef) => (level < a.unlockLevel ? a.unlockLevel : null)
+
+  const inspectedMod = inspected ? mods[inspected.id] : undefined
 
   const sheet = (
     <DetailSheet
@@ -134,18 +168,30 @@ export function SkillBar({ embedded = false, compact = false }:
         label: 'Use',
         tone: 'primary',
         onClick: () => activateAbility(inspected.id),
-        disabled: !isAlive || (skillCooldowns[inspected.id] ?? 0) > 0,
-        hint: (skillCooldowns[inspected.id] ?? 0) > 0 ? 'Still on cooldown' : undefined,
+        disabled: !isAlive || (skillCooldowns[inspected.id] ?? 0) > 0 || level < inspected.unlockLevel,
+        hint: level < inspected.unlockLevel ? `Unlocks at level ${inspected.unlockLevel}`
+          : (skillCooldowns[inspected.id] ?? 0) > 0 ? 'Still on cooldown' : undefined,
       }] : undefined}
     >
       {inspected && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <SpriteIcon emoji={inspected.icon} size={28} />
-            <span style={{ color: '#9d9d9d' }}>Cooldown {inspected.cooldownSeconds}s
-              {inspected.castTimeSeconds ? ` · ${inspected.castTimeSeconds}s cast` : ''}</span>
+            <span style={{ color: '#9d9d9d' }}>Cooldown {+cooldownOf(inspected).toFixed(1)}s
+              {inspected.castTimeSeconds
+                ? ` · ${+(inspected.castTimeSeconds * (inspectedMod?.castTimeMult ?? 1)).toFixed(1)}s cast`
+                : ''}</span>
           </div>
           <div>{inspected.description}</div>
+          {/* Talent riders, listed under the base text so the player can see which of
+              their trees is doing what to this button. */}
+          {inspectedMod && inspectedMod.notes.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {inspectedMod.notes.map(n => (
+                <div key={n} style={{ color: '#7ac878', fontSize: '0.65rem' }}>▸ {n}</div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </DetailSheet>
@@ -156,13 +202,15 @@ export function SkillBar({ embedded = false, compact = false }:
       // Ignore if focus is on an input/textarea to avoid blocking text entry
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
-      if (e.key === '1' && abilities[0]) activateAbility(abilities[0].id)
-      if (e.key === '2' && abilities[1]) activateAbility(abilities[1].id)
-      if (e.key === '3' && abilities[2]) activateAbility(abilities[2].id)
+      const idx = e.key === '1' ? 0 : e.key === '2' ? 1 : e.key === '3' ? 2 : -1
+      const ability = idx >= 0 ? abilities[idx] : undefined
+      // The keyboard obeys the same lock the buttons draw. Without this, 1/2/3 would
+      // fire abilities the bar is showing as padlocked.
+      if (ability && level >= ability.unlockLevel) activateAbility(ability.id)
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [abilities, activateAbility])
+  }, [abilities, activateAbility, level])
 
   if (abilities.length === 0) return null
 
@@ -176,6 +224,8 @@ export function SkillBar({ embedded = false, compact = false }:
             key={ability.id}
             ability={ability}
             remaining={skillCooldowns[ability.id] ?? 0}
+            cooldown={cooldownOf(ability)}
+            lockedUntil={lockOf(ability)}
             onActivate={() => isAlive && activateAbility(ability.id)}
             onInspect={() => setInspected(ability)}
             compact={compact}
@@ -211,6 +261,8 @@ export function SkillBar({ embedded = false, compact = false }:
           key={ability.id}
           ability={ability}
           remaining={skillCooldowns[ability.id] ?? 0}
+          cooldown={cooldownOf(ability)}
+          lockedUntil={lockOf(ability)}
           onActivate={() => isAlive && activateAbility(ability.id)}
           onInspect={() => setInspected(ability)}
         />

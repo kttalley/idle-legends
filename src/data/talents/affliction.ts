@@ -27,8 +27,7 @@ export const AFFLICTION_TALENTS: TalentNodeDef[] = [
     description: 'Reduces enemy attack damage by 3% per rank.',
     icon: '🕸',
     row: 1, col: 3, maxRanks: 2, requiresPoints: 0,
-    effects: [{ type: 'mechanic', mechanic: 'amplify_curse', valuePerRank: 0.03 }],
-    // repurposed: reduces mob attack speed
+    effects: [{ type: 'mechanic', mechanic: 'curse_exhaustion', valuePerRank: 0.03 }],
   },
 
   // ── Row 2 (5 pts required) ────────────────────────────────────────────────
@@ -99,7 +98,7 @@ export const AFFLICTION_TALENTS: TalentNodeDef[] = [
     icon: '🕸',
     row: 4, col: 2, maxRanks: 1, requiresPoints: 15,
     requires: 'aff_imp_weakness',
-    effects: [{ type: 'mechanic', mechanic: 'amplify_curse', valuePerRank: 0.08 }],
+    effects: [{ type: 'mechanic', mechanic: 'curse_exhaustion', valuePerRank: 0.08 }],
   },
   {
     id: 'aff_drain_life',
@@ -118,7 +117,7 @@ export const AFFLICTION_TALENTS: TalentNodeDef[] = [
     icon: '🕸',
     row: 5, col: 1, maxRanks: 4, requiresPoints: 20,
     requires: 'aff_curse_exhaustion',
-    effects: [{ type: 'mechanic', mechanic: 'amplify_curse', valuePerRank: 0.04 }],
+    effects: [{ type: 'mechanic', mechanic: 'curse_exhaustion', valuePerRank: 0.04 }],
   },
   {
     id: 'aff_nightfall',

@@ -1,123 +1,139 @@
 import type {
   Stats, MobInstance, Item, Slot, ClassType,
-  CompiledTalentEffects, StatBonuses,
+  CompiledTalentEffects, StatBonuses, TalentMechanicType, AbilityMod,
   ActiveDoT, ActiveBuff, CombatProcState,
   AbilityEffectDef,
 } from '../data/types'
 import { CLASS_DEFINITIONS } from '../data/classes'
+import { allClassTalents } from '../data/specs'
 import { HP_PER_STAMINA, CRIT_MULTIPLIER, AGILITY_CRIT_DIVISOR } from '../data/constants'
 
+/** A mod that changes nothing — the identity every ability starts from. */
+export function emptyAbilityMod(): AbilityMod {
+  return { damageMult: 1, cooldownMult: 1, castTimeMult: 1, extraEffects: [], notes: [] }
+}
+
 // ── Talent Effect Compilation ─────────────────────────────────────────────────
+/**
+ * Two passes, deliberately.
+ *
+ * The first sums every talent into a flat `mechanics` bag keyed by what the mechanic
+ * IS; the second derives the named fields combat actually reads. This replaced a
+ * 45-case switch that both summed and interpreted at once — and interpreted by
+ * inspecting the magnitude of the data ("if valuePerRank < 1 this means crit damage,
+ * otherwise armour shred"), which meant a tree could change meaning by being retuned.
+ *
+ * The payoff is that the nine trees still to be authored are pure data: a new mechanic
+ * adds a key and one line of derivation, and a tree that only reuses existing
+ * mechanics costs zero engine changes.
+ */
 export function compileTalentEffects(
   playerClass: ClassType,
   talentAllocs: Record<string, number>,
 ): CompiledTalentEffects {
-  const classDef = CLASS_DEFINITIONS[playerClass]
-  const out: CompiledTalentEffects = {
-    statBonuses: {},
-    critDamageMultiplier: CRIT_MULTIPLIER,
-    mobAttackSpeedFactor: 1.0,
-    mobArmorReduction: 0,
-    deepWoundsBleedPct: 0,
-    vilePoisons: null,
-    corruptionDps: 0,
-    curseOfAgonyEnabled: false,
-    siphonLifeHpPerTick: 0,
-    nightfallProcChance: 0,
-    amplifyCurseEnabled: false,
-    frostbiteChance: 0,
-    shatterCritBonus: 0,
-    winterChillEnabled: false,
-    iceBlockEnabled: false,
-    iceBarrierAbsorb: 0,
-    sealFateEnabled: false,
-    sealFateRanks: 0,
-    remorselessEnabled: false,
-    sweepingStrikesEnabled: false,
-    swordSpecEnabled: false,
-    swordSpecProcChance: 0,
-  }
-
-  let damageMultBonus = 0
-  let lethality = 0
-  let iceShards = 0
-  let mobAtkSpdReduction = 0
-  let poisonBaseDps = 0
-  let poisonProcChance = 0.15
+  const mechanics: Partial<Record<TalentMechanicType, number>> = {}
+  const statBonuses: StatBonuses = {}
+  const abilityMods: Record<string, AbilityMod> = {}
+  // Ranks are tracked separately from summed value for the handful of mechanics that
+  // care how many TIMES they were taken rather than how much they add up to.
+  const ranksOf: Partial<Record<TalentMechanicType, number>> = {}
 
   const addStat = (stat: keyof StatBonuses, val: number) => {
-    out.statBonuses[stat] = ((out.statBonuses[stat] ?? 0) as number) + val
+    statBonuses[stat] = ((statBonuses[stat] ?? 0) as number) + val
   }
+  const modFor = (id: string) => (abilityMods[id] ??= emptyAbilityMod())
 
-  for (const talent of classDef.talents) {
+  // ── Pass 1: sum ──
+  for (const talent of allClassTalents(playerClass)) {
     const ranks = talentAllocs[talent.id] ?? 0
     if (ranks === 0) continue
 
     for (const effect of talent.effects) {
-      const total = effect.valuePerRank * ranks
-
-      if (effect.type === 'stat' && effect.stat) {
-        addStat(effect.stat, total)
-      } else if (effect.type === 'mechanic' && effect.mechanic) {
-        switch (effect.mechanic) {
-          case 'deep_wounds':       out.deepWoundsBleedPct += total; break
-          case 'two_handed_spec':   damageMultBonus += total; break
-          case 'impale':            lethality += total; break
-          case 'sweeping_strikes':  out.sweepingStrikesEnabled = true; break
-          case 'sword_spec':
-            out.swordSpecEnabled = true
-            out.swordSpecProcChance += total
-            break
-          case 'mortal_strike':     mobAtkSpdReduction += total; break
-          case 'frostbite':         if (total > 0) out.frostbiteChance += total; break
-          case 'ice_shards':        iceShards += total; break
-          case 'shatter':           out.shatterCritBonus += total; break
-          case 'winters_chill':     out.winterChillEnabled = true; break
-          case 'ice_block':         out.iceBlockEnabled = true; break
-          case 'ice_barrier':       out.iceBarrierAbsorb += total; break
-          case 'cold_snap':         break
-          case 'lethality':
-            if (effect.valuePerRank < 1) lethality += total
-            else out.mobArmorReduction += total
-            break
-          case 'vile_poisons':
-            if (effect.valuePerRank >= 1) poisonBaseDps += total
-            else poisonProcChance += total
-            break
-          case 'cold_blood':        break
-          case 'seal_fate':
-            out.sealFateEnabled = true
-            out.sealFateRanks = Math.max(out.sealFateRanks, ranks)
-            break
-          case 'remorseless_attacks':
-            out.remorselessEnabled = true
-            break
-          case 'corruption':        out.corruptionDps += total; break
-          case 'curse_of_agony':    out.curseOfAgonyEnabled = true; break
-          case 'nightfall':         out.nightfallProcChance += total; break
-          case 'siphon_life':       out.siphonLifeHpPerTick += total; break
-          case 'amplify_curse':
-            if (total === 1) out.amplifyCurseEnabled = true
-            else mobAtkSpdReduction += total
-            break
-          case 'lifesteal':
-            addStat('weaponDps', total * 8)
-            break
-        }
+      if (effect.type === 'stat') {
+        addStat(effect.stat, effect.valuePerRank * ranks)
+        continue
       }
+      if (effect.type === 'mechanic') {
+        mechanics[effect.mechanic] = (mechanics[effect.mechanic] ?? 0) + effect.valuePerRank * ranks
+        ranksOf[effect.mechanic] = Math.max(ranksOf[effect.mechanic] ?? 0, ranks)
+        continue
+      }
+      // effect.type === 'ability'
+      const mod = modFor(effect.ability)
+      const total = effect.valuePerRank * ranks
+      switch (effect.mod) {
+        case 'damage':   mod.damageMult   += total; break
+        // Data says "reduces cooldown by 10%" and contributes 0.1, so no tree ever has
+        // to think in reciprocals. Floored at a quarter of the base so no stack of
+        // talents can drive a cooldown to zero.
+        case 'cooldown': mod.cooldownMult  = Math.max(0.25, mod.cooldownMult - total); break
+        case 'castTime': mod.castTimeMult  = Math.max(0.25, mod.castTimeMult - total); break
+        case 'rider':    if (effect.rider) mod.extraEffects.push(effect.rider); break
+      }
+      if (effect.note && !mod.notes.includes(effect.note)) mod.notes.push(effect.note)
     }
   }
 
+  // ── Pass 2: derive ──
+  const m = (k: TalentMechanicType) => mechanics[k] ?? 0
+
+  // `two_handed_spec` is a share of the class's BASE weapon damage, not of the hero's
+  // current weapon — otherwise it would scale with gear and quietly become the best
+  // talent in the game at high item level.
+  const damageMultBonus = m('two_handed_spec')
   if (damageMultBonus > 0) {
     addStat('weaponDps', CLASS_DEFINITIONS[playerClass].baseStats.weaponDps * damageMultBonus)
   }
-  out.critDamageMultiplier = CRIT_MULTIPLIER + lethality + iceShards
-  out.mobAttackSpeedFactor = Math.max(0.4, 1.0 - mobAtkSpdReduction)
-  if (poisonBaseDps > 0) {
-    out.vilePoisons = { procChance: Math.min(0.8, poisonProcChance), dps: poisonBaseDps }
-  }
+  // Lifesteal talents are still expressed as a damage bonus rather than real leeching;
+  // that was true before this rewrite and is preserved verbatim rather than silently
+  // changed under cover of a refactor.
+  if (m('lifesteal') > 0) addStat('weaponDps', m('lifesteal') * 8)
 
-  return out
+  const poisonDps = m('poison_potency')
+
+  return {
+    mechanics,
+    abilityMods,
+    statBonuses,
+    critDamageMultiplier: CRIT_MULTIPLIER + m('impale') + m('lethality') + m('ice_shards'),
+    mobAttackSpeedFactor: Math.max(0.4, 1.0 - m('mortal_strike') - m('curse_exhaustion')),
+    mobArmorReduction: m('expose_armor'),
+    deepWoundsBleedPct: m('deep_wounds'),
+    vilePoisons: poisonDps > 0
+      ? { procChance: Math.min(0.8, 0.15 + m('poison_chance')), dps: poisonDps }
+      : null,
+    corruptionDps: m('corruption'),
+    curseOfAgonyEnabled: m('curse_of_agony') > 0,
+    siphonLifeHpPerTick: m('siphon_life'),
+    nightfallProcChance: m('nightfall'),
+    amplifyCurseEnabled: m('amplify_curse') > 0,
+    frostbiteChance: m('frostbite'),
+    shatterCritBonus: m('shatter'),
+    winterChillEnabled: m('winters_chill') > 0,
+    iceBlockEnabled: m('ice_block') > 0,
+    iceBarrierAbsorb: m('ice_barrier'),
+    sealFateEnabled: m('seal_fate') > 0,
+    sealFateRanks: ranksOf['seal_fate'] ?? 0,
+    remorselessEnabled: m('remorseless_attacks') > 0,
+    sweepingStrikesEnabled: m('sweeping_strikes') > 0,
+    swordSpecEnabled: m('sword_spec') > 0,
+    swordSpecProcChance: m('sword_spec'),
+    // ── Bulwark ──
+    // Capped at half: an idle hero who takes literally no damage never dies, and a zone
+    // that cannot kill you is a zone with no reason to leave it.
+    damageReduction: Math.min(0.5, m('damage_reduction')),
+    blockChance: Math.min(0.5, m('block_chance')),
+    armorScaling: m('armor_scaling'),
+    secondWindHpPerTick: m('second_wind'),
+    thornsPct: m('thorns'),
+    lastStandPct: m('last_stand'),
+    // ── Warbringer ──
+    attackHasteFactor: Math.max(0.5, 1 - m('attack_haste')),
+    flurryChance: Math.min(0.6, m('flurry')),
+    enragePct: m('enrage'),
+    bloodthirstPct: m('bloodthirst'),
+    rampageChance: m('rampage') > 0 ? 1 : 0,
+  }
 }
 
 // ── Stat Compilation ──────────────────────────────────────────────────────────
@@ -145,15 +161,21 @@ export function compileStats(
   const intellect = base.intellect + levelBonus + (fx.statBonuses.intellect ?? 0) + (eqBonuses.intellect ?? 0) + (racialPassive.intellect ?? 0)
   const agility   = base.agility   + levelBonus + (fx.statBonuses.agility   ?? 0) + (eqBonuses.agility   ?? 0) + (racialPassive.agility   ?? 0)
   const stamina   = base.stamina   + levelBonus + (fx.statBonuses.stamina   ?? 0) + (eqBonuses.stamina   ?? 0) + (racialPassive.stamina   ?? 0)
-  const armor     = Math.max(0, base.armor + (fx.statBonuses.armor ?? 0) + (eqBonuses.armor ?? 0) + (racialPassive.armor ?? 0))
+  // Bulwark's `armor_scaling` is a share of the armour you already have, so it rewards
+  // stacking armour everywhere else rather than replacing it — applied last, over the
+  // flat sum, which is the only ordering where "+4% armour" means what it says.
+  const flatArmor = base.armor + (fx.statBonuses.armor ?? 0) + (eqBonuses.armor ?? 0) + (racialPassive.armor ?? 0)
+  const armor     = Math.max(0, Math.round(flatArmor * (1 + fx.armorScaling)))
   const wDps      = base.weaponDps + (fx.statBonuses.weaponDps ?? 0) + (eqBonuses.weaponDps ?? 0) + (racialPassive.weaponDps ?? 0)
 
-  const attackSpeedSeconds = Math.max(0.5,
+  // Warbringer buys swings per second here. Multiplicative on the final interval and
+  // floored at 0.5s, the same floor every other speed source respects.
+  const attackSpeedSeconds = Math.max(0.5, (
     base.attackSpeedSeconds +
     (fx.statBonuses.attackSpeedSeconds ?? 0) +
     (eqBonuses.attackSpeedSeconds ?? 0) +
     (racialPassive.attackSpeedSeconds ?? 0)
-  )
+  ) * fx.attackHasteFactor)
 
   const primaryStat = playerClass === 'warrior' ? strength
     : (playerClass === 'mage' || playerClass === 'warlock') ? intellect
@@ -241,7 +263,36 @@ export interface AttackResult {
   triggeredDoTs: ActiveDoT[]
   extraHit: boolean
   sealFatePoint: boolean
+  /** Warbringer's Flurry: a crit that immediately swings again. */
+  flurryHit: boolean
+  /** Health drawn back out of the damage dealt (Bloodthirst). Already rounded. */
+  lifeDrawn: number
+  /** True while the hero is under the Enrage threshold and getting its bonus. */
+  enraged: boolean
 }
+
+/**
+ * Fight context the attack needs but cannot see from stats alone. Optional so callers
+ * that do not care (gear scoring, the sim harness) are unaffected; omitting it simply
+ * turns off the conditionals that depend on it, rather than defaulting them ON, which
+ * would silently overvalue Executioner in every score it touches.
+ */
+export interface AttackContext {
+  /** Target's remaining health, 0–1. Drives Executioner. */
+  mobHpFraction?: number
+  /** Hero's remaining health, 0–1. Drives Enrage. */
+  playerHpFraction?: number
+  /** Rampage stacks carried from recent kills. */
+  rampageStacks?: number
+}
+
+/** Below this share of health, Enrage pays out. */
+const ENRAGE_THRESHOLD = 1 / 3
+/** Below this share of health, a target is Executioner-eligible. */
+const EXECUTE_THRESHOLD = 1 / 3
+/** Damage each Rampage stack adds, and the ceiling on them. */
+export const RAMPAGE_PER_STACK = 0.04
+export const RAMPAGE_MAX_STACKS = 5
 
 export function resolvePlayerAttack(
   stats: Stats,
@@ -250,6 +301,7 @@ export function resolvePlayerAttack(
   procState: CombatProcState,
   activeBuffs: ActiveBuff[],
   multiplierOverride?: number,
+  ctx: AttackContext = {},
 ): AttackResult {
   const fx = compileTalentEffects(playerClass, talentAllocs)
 
@@ -264,7 +316,22 @@ export function resolvePlayerAttack(
   const nextHitBuff = activeBuffs.find(b => b.type === 'next_hit_multiplier' && (b.stacks ?? 0) > 0)
   const mult = multiplierOverride ?? (nextHitBuff ? nextHitBuff.value : 1)
   const critMult = isCrit ? fx.critDamageMultiplier : 1
-  const damage = Math.max(1, Math.round(baseDmg * mult * critMult))
+
+  // ── Conditional damage: Executioner, Enrage, Rampage ──
+  // All three are multiplicative on the same swing and all three are Warrior-tree
+  // conditionals, so a hybrid build gets each one it actually paid for and no more.
+  const enraged = fx.enragePct > 0
+    && ctx.playerHpFraction !== undefined
+    && ctx.playerHpFraction < ENRAGE_THRESHOLD
+  const executing = fx.mechanics.executioner
+    && ctx.mobHpFraction !== undefined
+    && ctx.mobHpFraction < EXECUTE_THRESHOLD
+  const situational =
+    (enraged ? 1 + fx.enragePct : 1) *
+    (executing ? 1 + (fx.mechanics.executioner ?? 0) : 1) *
+    (1 + Math.min(RAMPAGE_MAX_STACKS, ctx.rampageStacks ?? 0) * RAMPAGE_PER_STACK)
+
+  const damage = Math.max(1, Math.round(baseDmg * mult * critMult * situational))
 
   const dotAmpBuff = activeBuffs.find(b => b.type === 'dot_amplify')
   const dotAmpFactor = dotAmpBuff ? dotAmpBuff.value : 1
@@ -289,13 +356,54 @@ export function resolvePlayerAttack(
     triggeredDoTs,
     extraHit: fx.swordSpecEnabled && Math.random() < fx.swordSpecProcChance,
     sealFatePoint: isCrit && fx.sealFateEnabled,
+    flurryHit: isCrit && fx.flurryChance > 0 && Math.random() < fx.flurryChance,
+    lifeDrawn: fx.bloodthirstPct > 0 ? Math.round(damage * fx.bloodthirstPct) : 0,
+    enraged,
   }
 }
 
-export function resolveMobAttack(mob: MobInstance, playerArmor: number, mobSpeedFactor: number): number {
+export interface MobAttackResult {
+  /** Damage that actually lands on the hero, after armour, block and reduction. */
+  damage: number
+  /** The blow was turned aside entirely (Bulwark). */
+  blocked: boolean
+  /** Damage sent back at the attacker (Retaliation / Spiked Shield). */
+  thorns: number
+}
+
+/**
+ * Order matters and is deliberate: **block → armour → flat reduction**.
+ *
+ * Block is all-or-nothing and happens first, so a blocked blow costs the hero nothing
+ * and the reduction stack is not "wasted" on it. Armour then applies its usual
+ * diminishing curve, and Bulwark's flat reduction takes its share of what survives —
+ * last, because a flat share applied BEFORE armour would compound with it and let a
+ * deep Bulwark build reach effective immunity, which is why the compiler also caps it
+ * at 50%.
+ *
+ * Thorns is measured against the damage the mob actually DEALT (post-armour, post-
+ * reduction), not the damage it swung for. Reflecting the raw swing would make the
+ * talent scale with how badly you are geared.
+ */
+export function resolveMobAttack(
+  mob: MobInstance,
+  playerArmor: number,
+  mobSpeedFactor: number,
+  fx?: Pick<CompiledTalentEffects, 'blockChance' | 'damageReduction' | 'thornsPct'>,
+): MobAttackResult {
+  const blocked = !!fx && fx.blockChance > 0 && Math.random() < fx.blockChance
+  if (blocked) return { damage: 0, blocked: true, thorns: 0 }
+
   const reductionPct = playerArmor / (playerArmor + 100)
   const baseDmg = mob.damage * mob.attackSpeedSeconds * mobSpeedFactor
-  return Math.max(1, Math.round(baseDmg * (1 - reductionPct)))
+  const afterArmor = baseDmg * (1 - reductionPct)
+  const damage = Math.max(1, Math.round(afterArmor * (1 - (fx?.damageReduction ?? 0))))
+
+  return {
+    damage,
+    blocked: false,
+    thorns: fx && fx.thornsPct > 0 ? Math.round(damage * fx.thornsPct) : 0,
+  }
 }
 
 // ── DoT Factories ─────────────────────────────────────────────────────────────

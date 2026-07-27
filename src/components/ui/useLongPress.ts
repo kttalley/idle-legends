@@ -71,9 +71,12 @@ export function useLongPress(
     onPointerLeave: clear,
     onPointerCancel: clear,
     onContextMenu: (e: React.MouseEvent) => { e.preventDefault() },
-    /** True while the most recent gesture was a hold — callers suppress their own click. */
-    didLongPress: () => fired.current,
   }
+  // Everything returned here is spread straight onto a DOM node by its caller, so this
+  // object may contain ONLY real DOM props. It used to also carry a `didLongPress()`
+  // helper that nothing ever called, and React warned about the unknown attribute on
+  // every ability button, every render — the hold suppression it was meant to support
+  // is already handled internally by `fired`.
 }
 
 /**

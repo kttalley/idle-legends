@@ -21,6 +21,23 @@ export const OFFLINE_MIN_MEASURED_SECONDS = 120
 export const XP_BASE = 75
 export const XP_EXPONENT = 1.4
 
+// ── Talents ──────────────────────────────────────────────────────────────────
+/**
+ * Total talent points a hero can ever earn: one per level, stopping at the level the
+ * zone content itself stops at (`zones.ts` tops out at `levelRange: [95, 100]`).
+ *
+ * Before this existed, points accrued forever against a single ~48-rank tree, so every
+ * level past the mid-forties handed the player a point with nowhere on earth to put it.
+ * Three trees of ~60 ranks give 180 places to put 100 points, which is the ratio the
+ * whole design rests on: a hero can max one tree and go two-thirds into a second, and
+ * can never have all three. Raising this number is not a buff, it is a decision to make
+ * specialisation mean less.
+ *
+ * Level itself stays uncapped — levelling past 100 keeps raising stats. It just stops
+ * being the thing that pays for talents.
+ */
+export const TALENT_POINT_MAX = 100
+
 // ── Stats ────────────────────────────────────────────────────────────────────
 export const HP_PER_STAMINA = 10
 export const CRIT_MULTIPLIER = 2.0

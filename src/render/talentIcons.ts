@@ -4,8 +4,9 @@
 // Every one of the 60 talents shipped with the SAME '🌑' glyph, so the trees carried no
 // per-node identity at all: you navigated them by position and text alone. These are
 // archetype icons keyed by what a talent DOES (bleed, freeze, drain, crit, …) rather than
-// one bespoke drawing per node — a tree is read by silhouette at a glance, and 18 legible
-// shapes reused across four trees beats 60 mushy ones. The mapping below is arranged so
+// one bespoke drawing per node — a tree is read by silhouette at a glance, and two dozen
+// legible shapes reused across every tree beats a hundred mushy ones. The set grows only
+// when a new tree would otherwise have to reuse a shape next to itself. The mapping below is arranged so
 // no two neighbouring nodes in a tree share an icon.
 //
 // Ships on the `icon/base` palette, the same UI contract the ability/nav icons use:
@@ -42,6 +43,7 @@ export const TALENT_ICON = {
   blade: 0, cleave: 1, bleed: 2, guard: 3, impale: 4, fury: 5, stride: 6,
   frostbolt: 7, freeze: 8, shatter: 9, ward: 10, nova: 11,
   skull: 12, drain: 13, eye: 14, vial: 15, dagger: 16, crit: 17, hourglass: 18, pact: 19,
+  banner: 20, bash: 21, rage: 22, chain: 23,
 } as const
 export type TalentIconKey = keyof typeof TALENT_ICON
 
@@ -173,10 +175,40 @@ const R_HOURGLASS: IconSketch = [
   '..E33333333333E.', '..EEEEEEEEEEEE..', '................', '................',
 ]
 
+// ── Warrior / Bulwark + Warbringer ────────────────────────────────────────────
+// Added for the three-specs-per-class rework. The existing twenty archetypes covered
+// Ironcleave completely, but a shield tree and a dual-wield tree kept reaching for the
+// same 'guard' and 'fury' shapes, which is how a tree stops being readable by silhouette.
+const A_BANNER: IconSketch = [
+  '....444444......', '....466664......', '....466664......', '....466664......',
+  '....4666644.....', '....46666664....', '....4666664.....', '....466664......',
+  '....44444.......', '......33........', '......33........', '......33........',
+  '......33........', '.....3223.......', '....322223......', '................',
+]
+const A_BASH: IconSketch = [
+  '..8..........8..', '...8..2222..8...', '....22333322....', '...2333333332...',
+  '...2338888332...', '...2338888332...', '...2333333332...', '8...23333332...8',
+  '....23333332....', '.....233332.....', '......2332......', '.......22.......',
+  '..8..........8..', '................', '................', '................',
+]
+const A_RAGE: IconSketch = [
+  '.......5........', '......565.......', '......675.......', '.....56765......',
+  '.....67876......', '....5678765.....', '....6788876.....', '...567888765....',
+  '...667888766....', '..56788888765...', '..66788888766...', '..56678887665...',
+  '...566787665....', '....5566655.....', '.....55555......', '................',
+]
+const A_CHAIN: IconSketch = [
+  '....2222........', '...2....2.......', '..22....22......', '..2......2......',
+  '..2......2......', '..22....22......', '...2....2.......', '....22222222....',
+  '.......2....2...', '......22....22..', '......2......2..', '......2......2..',
+  '......22....22..', '.......2....2...', '........2222....', '................',
+]
+
 const SKETCHES: IconSketch[] = [
   A_BLADE, A_CLEAVE, A_BLEED, A_GUARD, A_IMPALE, A_FURY, A_STRIDE,
   F_FROSTBOLT, F_FREEZE, F_SHATTER, F_WARD, F_NOVA,
   W_SKULL, W_DRAIN, W_EYE, R_VIAL, R_DAGGER, R_CRIT, R_HOURGLASS, W_PACT,
+  A_BANNER, A_BASH, A_RAGE, A_CHAIN,
 ]
 
 export function makeTalentIconSheet(id = 'icons/talent'): IndexedSprite {
@@ -199,13 +231,32 @@ export function makeTalentIconSheet(id = 'icons/talent'): IndexedSprite {
  * newly authored talent renders rather than vanishing.
  */
 export const TALENT_ICON_BY_ID: Record<string, TalentIconKey> = {
-  // ── Arms (warrior) ──
+  // ── Ironcleave (warrior) ──
   arms_heroic_strike: 'blade',     arms_deflection: 'guard',       arms_improved_rend: 'bleed',
   arms_imp_charge: 'stride',       arms_tactical_mastery: 'hourglass', arms_thunder_clap: 'nova',
   arms_overpower: 'impale',        arms_anger_management: 'fury',  arms_deep_wounds: 'bleed',
-  arms_two_handed: 'blade',        arms_impale: 'impale',          arms_axe_spec: 'cleave',
-  arms_sweeping_strikes: 'cleave', arms_sword_spec: 'blade',       arms_hamstring: 'stride',
-  arms_mortal_strike: 'crit',
+  arms_two_handed: 'blade',        arms_impale: 'impale',          arms_war_cry: 'banner',
+  arms_axe_spec: 'cleave',         arms_sweeping_strikes: 'cleave', arms_sword_spec: 'blade',
+  arms_executioner: 'cleave',      arms_hamstring: 'chain',        arms_mortal_strike: 'crit',
+  arms_juggernaut: 'impale',       arms_bladestorm: 'rage',
+
+  // ── Bulwark (warrior) ──
+  bul_iron_hide: 'guard',          bul_shield_spec: 'bash',        bul_toughness: 'fury',
+  bul_anticipation: 'eye',         bul_defiance: 'guard',          bul_improved_bash: 'bash',
+  bul_second_wind: 'drain',        bul_improved_shield_wall: 'ward', bul_retaliation: 'nova',
+  bul_bulwark_stance: 'guard',     bul_spiked_shield: 'bash',      bul_unyielding: 'fury',
+  bul_shield_mastery: 'bash',      bul_indomitable: 'drain',       bul_stalwart: 'guard',
+  bul_absorption: 'ward',          bul_vengeance: 'blade',         bul_iron_will: 'drain',
+  bul_fortress: 'guard',           bul_last_stand: 'skull',
+
+  // ── Warbringer (warrior) ──
+  wbr_cruelty: 'dagger',           wbr_booming_voice: 'banner',    wbr_frenzy: 'stride',
+  wbr_unbridled_wrath: 'rage',     wbr_piercing_howl: 'chain',     wbr_blood_craze: 'bleed',
+  wbr_flurry: 'crit',              wbr_enrage: 'rage',             wbr_savage_blows: 'impale',
+  wbr_dual_wield_spec: 'blade',    wbr_bloodthirst: 'bleed',       wbr_death_wish: 'rage',
+  wbr_improved_slam: 'cleave',     wbr_rampage: 'rage',            wbr_precision: 'dagger',
+  wbr_bloodsurge: 'bleed',         wbr_titans_grip: 'impale',      wbr_endless_rage: 'stride',
+  wbr_unquenchable: 'drain',       wbr_reckless_abandon: 'skull',
 
   // ── Frost (mage) ──
   frost_warding: 'ward',           frost_imp_frostbolt: 'frostbolt', frost_ice_shards: 'shatter',
