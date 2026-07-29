@@ -294,6 +294,27 @@ for `Math.random` before P0); cheat surface (P0 accepts client-trust snapshots, 
 server-side in P1); scope pressure — Track P is explicitly **not a launch blocker**; the
 graphics rebuild and Track M/R own the runway to launch.
 
+**Determinism debt — measured 2026-07-28, and growing.** The seedable-RNG audit above is
+the load-bearing prerequisite for the entire ghost-PvP premise: if both clients cannot
+replay a duel to the same result from one seed, there is no async PvP. Current state is
+**28 unseeded `Math.random` call sites** across the combat path:
+
+- `engine/combat.ts` — 6: crit roll (L346), poison proc (L393), extra-strike proc (L407),
+  **flurry proc (L409)**, **avoidance/block roll (L444)**, and DoT id minting (L460).
+- `store/gameStore.ts` — 18, including the in-tick combat rolls at L1388 / L1570 / L1614
+  (echo, mob selection, spawn), with the rest in world/spawn/name generation.
+- `engine/loot.ts` — 4: drop chance, rarity weighting, gold variance, elite roll.
+
+The 2026-07-27 talent rework **added to this** — flurry, avoidance and Echo are all new
+unseeded rolls introduced by the three-specs-per-class pass, and the ignite/crit branches
+widened the existing ones. The count was smaller when this risk line was first written.
+
+Shape of the fix when P0 starts: thread a seeded PRNG (a small xorshift/mulberry32) through
+`AttackContext` and the tick rather than reaching for the global — combat already passes a
+context object per swing, so the plumbing exists. `makeId()` and the world/name generators
+do **not** need seeding; only rolls that change the OUTCOME of a fight do. Doing this as
+one deliberate pass is far cheaper than discovering a desync after rosters are live.
+
 ## Track L — living world / ambient MMO sim (post-launch vision, composes with Track P)
 
 **Shape:** the world feels populated. As our idle legend wanders a zone, *other*
@@ -425,6 +446,14 @@ submission this default must flip** — the FFTA scaffold is never shipped, so o
 default (or the roster swaps to `hero_*`/`mob_*` ids) before build.
 
 Remaining before store submission:
+- **Talent-name regression (2026-07-27, from the three-specs-per-class rework).** The nine
+  trees authored in that pass reintroduced **97 verbatim WoW talent names** across 238
+  (`Chaos Bolt`, `Metamorphosis`, `Blade Flurry`, `Shadow Dance`, `Vanish`, `Presence of
+  Mind`, `Healthstone`, `Soul Link`, `Conflagrate`, `Titan's Grip`, …). The four trees
+  rebranded on 2026-07-21 are still clean (0/20 each); the damage is in `warbringer.ts`
+  (14/20), `emberwright.ts` (12), `the_unwritten.ts` (10), `gutterwork.ts` (15),
+  `the_long_quiet.ts` (16), `cinderpact.ts` (16), `the_binding.ts` (16), `shadowed_edge.ts`
+  (3). Display names only — internal ids untouched, so saves are unaffected. ~1 hour.
 - Art polish pass on the weakest rigs (the 7 brief-designed monsters are functional but
   coarser than the spec rigs) and the optional distinct back-facing (`/ne`) rows.
 - The [Speculative] fork pool (dwarf stoutguard, hornborn horns, tuskhog boar, carrionkite
