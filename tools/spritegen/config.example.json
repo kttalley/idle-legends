@@ -1,0 +1,50 @@
+{
+  "_comment": "Copy to config.json on the Windows rig and edit. config.json is gitignored — it holds machine-local paths and model filenames that differ per box.",
+
+  "comfy": {
+    "_comment": "Two ComfyUI instances, one pinned per GPU. ComfyUI will not split a single generation across cards, so throughput comes from running two servers, not one.",
+    "instances": [
+      { "url": "http://127.0.0.1:8188", "gpu": 0 },
+      { "url": "http://127.0.0.1:8189", "gpu": 1 }
+    ],
+    "outputDir": "C:/StabilityMatrix/Data/Packages/ComfyUI/output",
+    "timeoutMs": 300000
+  },
+
+  "models": {
+    "_comment": "Fill in the exact filenames as they appear in ComfyUI's dropdowns. SDXL-class is the sweet spot on 3090s — no fp8 acceleration on Ampere makes Flux painful for iteration.",
+    "checkpoint": "TODO_sdxl_checkpoint.safetensors",
+    "controlnetLineart": "TODO_controlnet_sdxl_lineart.safetensors",
+    "controlnetDepth": "TODO_controlnet_sdxl_depth.safetensors",
+    "loras": []
+  },
+
+  "generation": {
+    "width": 768,
+    "height": 1024,
+    "steps": 30,
+    "cfg": 6.5,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "batchPerUnit": 12,
+    "controlnetStrength": 0.85,
+    "seed": 1
+  },
+
+  "rig": {
+    "_comment": "Must match the shipped manifests: 24x32 frames, anchor at the feet. Do not change without regenerating every sprite.",
+    "frameW": 24,
+    "frameH": 32,
+    "anchorX": 12,
+    "anchorY": 30,
+    "conditioningScale": 32
+  },
+
+  "paths": {
+    "_comment": "Relative to repo root. Generated intermediates stay out of git.",
+    "work": "local-assets/spritegen",
+    "concepts": "local-assets/spritegen/concepts",
+    "quantized": "local-assets/spritegen/quantized",
+    "spriteOut": "public/sprites/units"
+  }
+}

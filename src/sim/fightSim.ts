@@ -15,6 +15,7 @@
 
 import type { ClassType, Item, MobInstance, Slot, StatBonuses } from '../data/types'
 import { formatFightLog, runFight, type FightResult, type HeroCombatant } from '../engine/fight'
+import { combatantOnlyWorldFields } from '../engine/mobBehaviour'
 import { mulberry32, type Rng } from '../engine/rng'
 
 const SLOTS: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket']
@@ -81,6 +82,7 @@ export function makeMob(seed: number, level: number, name = 'Sim Beast'): MobIns
     isBoss: false,
     offset: { dx: 0, dy: 0 },
     dots: [],
+    ...combatantOnlyWorldFields(),
   }
 }
 
@@ -181,6 +183,98 @@ export function standardCases(seeds: number[]): DeterminismCase[] {
     })
   }
   return cases
+}
+
+// ── The golden log ────────────────────────────────────────────────────────────
+//
+// `checkDeterminism` compares a case against ITSELF, twice, inside one process. That
+// proves the fight is reproducible; it proves nothing about whether the fight still
+// resolves the way it did yesterday. Change the RNG draw order — which is exactly what
+// widening the loop from two combatants to N does — and every case still agrees with its
+// own re-run, so the suite goes on reporting PASS while no longer covering the thing that
+// changed. The failure mode is silent, which is the worst kind.
+//
+// So: a committed artefact of what the resolver produces TODAY, byte for byte. A
+// behaviour change must then either preserve it or explicitly rewrite it, and rewriting
+// it is a reviewable diff rather than an invisible non-event.
+//
+// Seeds are pinned here rather than taken from `--seeds`, because a golden file whose
+// contents depend on a command-line flag is not a baseline.
+
+export const GOLDEN_SEEDS = [1000, 8717, 16434, 24151, 31868, 39585]
+
+/** Serialise the whole standard suite into one comparable artefact. */
+export function formatGolden(cases: DeterminismCase[]): string {
+  const out: string[] = [
+    '# Idle Legends — fight resolver golden log',
+    '# Regenerate with: node tools/sim/fight.mjs --update-golden',
+    '# A diff here is a COMBAT BEHAVIOUR CHANGE. Read it before accepting it.',
+    '',
+  ]
+  for (const c of cases) {
+    out.push(`## ${c.label} | seed=${c.seed}`)
+    out.push(formatFightLog(c.run()))
+    out.push('')
+  }
+  return out.join('\n')
+}
+
+export interface GoldenReport {
+  matched: boolean
+  /** Null when there is no committed baseline yet. */
+  missing: boolean
+  totalLines: number
+  diffLines: number
+  /** First divergence, rendered for a terminal. */
+  firstDiff?: string
+}
+
+export function compareGolden(expected: string | null, actual: string): GoldenReport {
+  const actualLines = actual.split('\n')
+  if (expected === null) {
+    return { matched: false, missing: true, totalLines: actualLines.length, diffLines: 0 }
+  }
+  if (expected === actual) {
+    return { matched: true, missing: false, totalLines: actualLines.length, diffLines: 0 }
+  }
+
+  const exp = expected.split('\n')
+  let firstDiff: string | undefined
+  let diffLines = 0
+  for (let i = 0; i < Math.max(exp.length, actualLines.length); i++) {
+    if (exp[i] === actualLines[i]) continue
+    diffLines++
+    if (firstDiff) continue
+    // Carry the nearest preceding case header, or a bare line number is unreadable.
+    let ctx = ''
+    for (let k = i; k >= 0; k--) {
+      if (exp[k]?.startsWith('## ')) { ctx = exp[k]; break }
+    }
+    firstDiff =
+      `line ${i + 1}${ctx ? `  (in ${ctx.slice(3)})` : ''}\n` +
+      `  golden: ${exp[i] ?? '<eof>'}\n` +
+      `  now:    ${actualLines[i] ?? '<eof>'}`
+  }
+  return { matched: false, missing: false, totalLines: actualLines.length, diffLines, firstDiff }
+}
+
+export function formatGoldenReport(r: GoldenReport): string {
+  const lines = ['── Golden log ────────────────────────────────────────────────────']
+  if (r.missing) {
+    lines.push('NO BASELINE — run with --update-golden to record one.')
+    return lines.join('\n')
+  }
+  if (r.matched) {
+    lines.push(`matched: ${r.totalLines} lines byte-identical to the committed baseline`)
+    return lines.join('\n')
+  }
+  lines.push(`CHANGED — ${r.diffLines} line(s) differ from the committed baseline`)
+  lines.push('')
+  lines.push(r.firstDiff ?? '  (baseline and current differ in length only)')
+  lines.push('')
+  lines.push('If this change is intended, regenerate with --update-golden and')
+  lines.push('review the resulting diff as part of the change.')
+  return lines.join('\n')
 }
 
 export function formatDeterminismReport(rs: DeterminismReport[]): string {

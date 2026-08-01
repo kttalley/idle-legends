@@ -1,0 +1,33 @@
+{
+  "_comment": "Canonical AUTHORING palette. Every generated sprite is quantized into these 16 slots and imported with importSprite.mjs --palette. It is NOT a look — it is the slot contract. All in-game variety (race, gear tier, rarity, elite, prismatic) comes from src/render/palettes.ts recoloring these slots at runtime. Values mirror BASE_UNIT in src/render/palettes.ts so authored art previews in the game's default look.",
+  "slots": [
+    { "slot": 0,  "label": "transparent", "group": "alpha",     "hex": "" },
+    { "slot": 1,  "label": "skin1",       "group": "skin",      "hex": "#5c3a24" },
+    { "slot": 2,  "label": "skin2",       "group": "skin",      "hex": "#8a5c38" },
+    { "slot": 3,  "label": "skin3",       "group": "skin",      "hex": "#c08a58" },
+    { "slot": 4,  "label": "skin4",       "group": "skin",      "hex": "#e8b888" },
+    { "slot": 5,  "label": "primary1",    "group": "primary",   "hex": "#3a2818" },
+    { "slot": 6,  "label": "primary2",    "group": "primary",   "hex": "#5c4028" },
+    { "slot": 7,  "label": "primary3",    "group": "primary",   "hex": "#7c5838" },
+    { "slot": 8,  "label": "primary4",    "group": "primary",   "hex": "#9c7048" },
+    { "slot": 9,  "label": "secondary1",  "group": "secondary", "hex": "#2c2c34" },
+    { "slot": 10, "label": "secondary2",  "group": "secondary", "hex": "#44444e" },
+    { "slot": 11, "label": "secondary3",  "group": "secondary", "hex": "#5c5c68" },
+    { "slot": 12, "label": "secondary4",  "group": "secondary", "hex": "#787884" },
+    { "slot": 13, "label": "accent1",     "group": "accent",    "hex": "#4a4a52" },
+    { "slot": 14, "label": "accent2",     "group": "accent",    "hex": "#8a8a96" },
+    { "slot": 15, "label": "accent3",     "group": "accent",    "hex": "#c8c8d4" }
+  ],
+  "groups": {
+    "skin":      { "slots": [1, 2, 3, 4],    "meaning": "exposed flesh: face, hands, any bare limb. Race swaps this ramp." },
+    "primary":   { "slots": [5, 6, 7, 8],    "meaning": "dominant worn material: leathers, robe body, hide, carapace. Gear tier drives this." },
+    "secondary": { "slots": [9, 10, 11, 12], "meaning": "supporting material: cloth, straps, lining, under-layer. Gear tier drives this too." },
+    "accent":    { "slots": [13, 14, 15],    "meaning": "metal and trim ONLY — buckles, blade, rivets, gem. RESERVED as the rarity-signal channel; keep its pixel count small and deliberate." }
+  },
+  "rules": [
+    "Within a group, slot index ascends dark -> light. Never break the ramp ordering; the recolor system assumes it.",
+    "Accent (13-15) is the rarity channel. If a unit floods it, every rarity tier looks the same. Budget roughly 3-8% of opaque pixels.",
+    "Slot 0 is transparent and never carries color. Alpha is binary — no partial alpha survives the pipeline.",
+    "A sprite that uses colors outside these groups still imports, but it cannot be recolored, so it cannot become a SKU."
+  ]
+}

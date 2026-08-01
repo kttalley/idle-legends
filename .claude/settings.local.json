@@ -28,7 +28,8 @@
       "Bash(pi)",
       "Bash(npm_config_cache=/Users/ktt/.npm-cache-fresh pi install npm:@mjasnikovs/pi-task)",
       "Bash(pi remove *)",
-      "Bash(expect -c ' *)"
+      "Bash(expect -c ' *)",
+      "Bash(pkill -f \"validate-control-mode\")"
     ]
   }
 }

@@ -667,6 +667,536 @@ screen measures a static menu and reports a *flattering* ~60fps with no world re
 at all. Any FPS probe here must assert the world scene is mounted (`window.__ilScene`,
 dev-only) before and after sampling, or the number is meaningless.
 
+## Track C — combat depth: pathfinding, party rhythm, multi-enemy battles
+
+**Shape:** the world moves and fights like a world rather than like a demo. Enemies and
+companions *route* around terrain instead of grinding into it; a party member walks with
+you rather than commuting behind you; more than one thing can be in a fight at once; and
+an elite is elite relative to the group that meets it, not to a flat 5% roll.
+
+Composes with Track L (which built the crowd, the companion and the fight loop) and
+Track P (which needs the fight loop to be N-sided and seeded before duels can be
+anything but 1v1). Everything below extends existing machinery — the standing rule from
+L0 applies: **this is depth, not a second combat model.**
+
+**Runway honesty, stated first.** Track C is **not a launch blocker and competes with
+work that has not started.** Verified 2026-07-31: there is no `capacitor.config.*`, no
+`ios/` directory, and no Capacitor or RevenueCat dependency in `package.json` — Track M's
+entire store-submission path is at zero. Track R still owes 97 verbatim WoW talent names
+(~1 hour) which *is* a submission blocker. If Track C is being funded out of the launch
+runway rather than alongside it, the honest recommendation is C0 only (below), then stop.
+
+### C0 — the character-select regression, and the save layer underneath it
+
+Reported as "the app spontaneously returns to the character-select screen mid-session."
+It is fully root-caused, and the headline is that **it is not a reset — it is a missing
+resume.** Everything else follows from that.
+
+`initialized` (`App.tsx:78`) is the only gate, it lives **only in memory**, and it is set
+false in exactly two places, both explicit user actions (`returnToMenu` `gameStore.ts:1016`,
+`resetGame` `:1025`). Ruled out by direct inspection: no zustand persist middleware, no
+error boundary, no `visibilitychange`/`pagehide`/`beforeunload`/bfcache handler, no service
+worker, no save/load race (both are synchronous on one thread), and StrictMode's
+double-mount does not clear state. So "back at character select" can only mean **the
+`gameStore.ts` module was re-evaluated**, producing a fresh store at `defaultState()`.
+
+**The regression: `git show 11966fe^:src/App.tsx` contains `useEffect(() => { loadGame() }, [])`.**
+Commit 11966fe ("Track S — save slots + character select", 2026-07-19) replaced `loadGame`
+with `loadSlot(id)` and **deleted that boot-time auto-load without replacing it**.
+`loadSlot` is now reachable from exactly one place in the entire app — a human clicking
+Continue (`App.tsx:90`). The save on disk is fine the whole time; nothing ever goes back
+for it. This predates every commit on this branch.
+
+Two mechanisms re-evaluate the module, and the second is the one that reads as *spontaneous*:
+
+- **A full reload.** `combatAdapter.ts:3547` does `import.meta.hot.accept(() => window.location.reload())`.
+  That hook is correct and should stay — the comment above it explains that the adapter is
+  a long-lived controller built in a `[]`-deps effect, so Fast Refresh would otherwise
+  leave a stale controller running. But it is a 3,547-line file, the most-edited one in
+  this track, so an instrumented session reloads constantly. This is almost certainly what
+  corrupted last session's measurements.
+- **An in-place HMR module swap, with no reload at all.** `gameStore.ts` is **not a Fast
+  Refresh boundary** — it exports `useGameStore` (a lowercase const, `:924`) and
+  `resetCombatAccumulators` (`:866`), so not all exports look like components. Vite
+  therefore propagates an update of *any* non-component `.ts` module up to the importing
+  `.tsx` boundary and re-executes `gameStore.ts` as a fresh module. The app simply blinks
+  to character select mid-session with nothing in the console. That is the "spontaneous".
+
+In production the same missing resume means a **WKWebView reload under memory pressure
+dumps the player at character select mid-run** — which reads exactly like a crash.
+
+**The save layer under it is in worse shape, and this is the part that is genuinely more
+serious than anything else in this track:**
+
+- **A character's save is ~3.31 MB.** `toSaveBlob` (`gameStore.ts:463`) spreads the whole
+  state and carries `zoneMaps` — the full 64×64 tile grid, with `charSet: string[]` per
+  tile, for **every unlocked zone** — even though `rehydrateState` (`:443-447`)
+  regenerates every one of them from the seed on load. With `MAX_SLOTS = 5` the ceiling is
+  ~16.5 MB in a single localStorage key against a ~5 MB origin quota. **The second
+  fully-progressed character throws `QuotaExceededError`.** Not stripping `zoneMaps` is
+  both the fix and a ~99% size reduction.
+- **That throw kills the game permanently.** `saveSlots.ts:82` calls `setItem` unguarded
+  (compare `gameStore.ts:111`, which guards the same call). It travels
+  `writeFile → save → saveGame → gameLoop.ts:24`, and `gameLoop.ts` schedules the next
+  frame *after* the body (`:29`) — so the rAF chain dies and never restarts. Symptom is a
+  frozen world, not character select.
+- **`readFile` destroys a corrupt or evicted saves file.** `saveSlots.ts:72-78` catches a
+  parse failure and immediately `writeFile`s `{ slots: [] }` over the original. It runs on
+  every `list`/`load`/`save`/`delete`, i.e. every 10s autosave. After Safari ITP storage
+  eviction this presents as **CharacterCreate with zero heroes** — the real data-loss path.
+- **Autosave parses the multi-megabyte file twice per write** (`saveGame` does its own
+  `slotStorage.load` at `:1000`, then `save` calls `readFile` again at `saveSlots.ts:117`).
+- **`loadSlot` swallows everything** — one bare `catch { return false }` (`:990`) around
+  `rehydrateState`/`compileStats`/`generateZoneMap`, and `App.tsx:90` discards the boolean.
+  A failed Continue is a silent no-op that looks identical to "bounced back".
+- **The nameGen continuation can corrupt a different slot.** `gameStore.ts:965` resolves
+  ~30s later and calls `set(...)` + `saveGame()` with **no check that `activeSlotId` is
+  still the slot that started it** — create hero A, switch to hero B, and A's generated
+  name, traits and faction names are written into B.
+- **The "Heroes" button is a 14px, unconfirmed eject.** `CharacterPanel.tsx:52` —
+  `fontSize: 0.55rem, padding: 2px 7px` beside the gold chip — calls `returnToMenu()` with
+  no confirmation. The rest of the social UI was raised to 44pt in the mobile pass; this
+  was missed.
+
+**Confirming instrumentation, before any fix** (the L2 lesson: two rounds were already
+lost to guessing). One line at module scope in `gameStore.ts`:
+`console.warn('[il] gameStore evaluated — nav=', performance.getEntriesByType('navigation')[0]?.type, 'uptime=', Math.round(performance.now()))`.
+Printing at the instant the app snaps to select confirms re-evaluation; `uptime` under
+~300ms means a real reload, a large `uptime` means an in-place HMR swap. If it does *not*
+print, the cause is `returnToMenu` instead — `console.trace` at `:1013` catches the mistap.
+
+**Fix order:** persist a last-active-slot key and resume it on boot (fixes the reported bug
+outright, dev and shipped); strip `zoneMaps` from `toSaveBlob`; guard `writeFile` and stop
+`readFile` destroying an unreadable file; guard the nameGen continuation on `activeSlotId`;
+raise and confirm the Heroes button. Leave the HMR hook alone.
+
+### Live bugs found en route (unrelated to this track, all verified, all cheap)
+
+Recording them here because they are shipping defects and two of them are in the HUD this
+track is about to add to:
+
+- **The Respawn button and the party's leave button do nothing.** `.hud-layer` is
+  `pointer-events: none` (`index.css:330`) and `HudOverlay.tsx` states in its own comment
+  that "each panel re-enables pointer-events for its own interactive bits" — `ActionBar.tsx:50`
+  does; **`UnitFrames.tsx` and `PartyFrame.tsx` do not.** So `respawnNow`
+  (`UnitFrames.tsx:78`) and leave-party (`PartyFrame.tsx:97`) are unclickable. Respawn also
+  runs on a timer, which is why this has gone unnoticed: the button is a skip-the-wait
+  affordance that silently never worked.
+- **`ELITE_DAMAGE_MULTIPLIER` and `BOSS_DAMAGE_MULTIPLIER` are no-ops.** `spawnMob`
+  applies `dmgMult` to `attackSpeedSeconds` (`gameStore.ts:813`), and `resolveMobAttack`
+  computes `mob.damage * mob.attackSpeedSeconds * mobSpeedFactor` (`combat.ts:463`). The
+  two cancel exactly: an elite hits 1.8× harder 1.8× less often, for **identical DPS**.
+  Only `ELITE_HP_MULTIPLIER` (applied to HP directly) does anything. Elites are currently
+  pure health sponges — which matters a great deal to C6, since the dial that exists for
+  "make elites hit harder" is connected to nothing.
+- **`.hud-tl` has no `max-height` and no `overflow`** (`index.css:331`). Relevant the
+  moment C4 stacks a second and third party frame under the unit frame.
+
+### Corrections to the brief, found by reading rather than assuming
+
+Recording these because three of the six items are smaller or larger than they looked, and
+the L2 write-up above is emphatic that guessing at this codebase has already cost two
+rounds. **Several load-bearing constants turned out to be dead**, so any plan that reasons
+from them is reasoning about numbers the code does not use:
+
+- **Engaged mobs already pathfind.** `combatAdapter.ts:1910` routes `this.mob` through
+  `followPath` + `mobPath`, and the comment there records the lake-crossing bug it fixed.
+  What still walks blind is the **ambient crowd**: follow (`:2632`), approach (`:2656`) and
+  wander (`:2676`) are all direct-vector plus a per-axis `walkableAt` test. So item 1 is
+  narrower than "teach mobs to path" — it is "teach the crowd what the mob already knows."
+- **`followPath` cannot be reused as-is on ambient heroes.** It mutates `e.tx/e.ty` in
+  *buffer* coordinates, while ambient heroes are authoritative in *game* coordinates
+  (`a.gx/a.gy`) and have their entity position derived from the player each frame
+  (`:2686`). Extending pathfinding means a game-coord variant of `followPath`, not a
+  call-site change. This is the single most under-estimated piece of work in the track.
+- **`FOLLOW_FAR = 3.4` is declared at `:245` and never used** — verified, one occurrence in
+  the file. The follow leash therefore has a *single* threshold (`FOLLOW_NEAR = 2.2`), so a
+  companion stops dead at 2.2 tiles and re-triggers the instant the player moves. That
+  missing hysteresis band is a real, mechanical cause of the observed oscillation, and it
+  is separate from the 70%-commuting figure the L2 tuning pass measured.
+- **`spawnMob` does not read player power at all.** `gameStore.ts:794` rolls a flat
+  `ELITE_SPAWN_CHANCE` (0.05, `data/constants.ts:104`); HP and damage come from
+  `template × ELITE/BOSS multiplier × circuitMult` where `circuitMult = 1 + zoneCircuit*0.5`
+  (`:801`). There is no player term anywhere. So "scale elites to party power" is not a
+  retune of an existing curve — it is introducing the first power-coupling between the
+  player and the spawn table, and it lands directly on the economy.
+- **`mobs: MobInstance[]` already exists with `MOB_POPULATION = 4`** (`gameStore.ts:831`),
+  and `:1251` records that "`mobs` is the source of truth; currentMob/mobMapOffset/
+  activeDoTs are projections." Multi-enemy is therefore half-scaffolded: the field exists,
+  the *fight* is what is 1v1.
+- **There is no *working* unique-item concept, but there is a decoy.** `NAMED_ITEMS` and
+  `getNamedItemDrop` exist in `data/items.ts:157-178` with **zero call sites**, and
+  `getNamedItemDrop` re-rolls procedurally anyway — it discards the template's name and
+  rarity. It looks like a unique-drop system and is not one; building on it as-is silently
+  produces ordinary procedural items with unique-sounding table ids. Everything real goes
+  through `generateItem(slot, level, rarityBias)` (`loot.ts:34`).
+- **Seeding loot is 9 rolls, not 4.** `loot.ts` has four (`:23`, `:24`, `:31`, `:33`), but
+  `generateItem`/`rollRarity` add five more (`items.ts:75`, `:84`, `:88`, `:94`, `:144`). A
+  half-seeded pipeline reads as reproducible while still diverging. There is also no good
+  seed material at the drop site: `mobInstanceSeq` (`gameStore.ts:848`) is a module counter
+  that resets on reload, so `deadMob.id` is not stable across sessions.
+- **Three constants this track would naturally reason from are dead.**
+  `AMBIENT_HERO_BUDGET = 8` (`ambient.ts:35`) is exported and **never referenced** —
+  verified, zero non-declaration hits. Actual population comes from
+  `AMBIENT_GROUPS_WORLD = 5` groups through the weighted `AMBIENT_GROUPS` table
+  (`combatAdapter.ts:271-278`). `FOLLOW_FAR` (`:245`) and `AMBIENT_GROUPS_TOWN` (`:279`)
+  are likewise dead. The L2 note above reasons about "eight heroes" — that number is not
+  in the code, which is worth knowing before re-deriving the monster-supply arithmetic.
+- **The isolation rule is prose-only.** The import graph is clean today (verified both
+  directions), but there is no eslint config, no test, no tsconfig path restriction and no
+  CI check — `npm run build` is just `tsc && vite build`. Adding
+  `import { useGameStore } from '../store/gameStore'` to `engine/ambient.ts` would compile
+  clean and ship. Store data also already reaches ambient code **by value** via
+  `combatAdapter.sync(state)` and via `PlayerCard.tsx` passing `useGameStore.getState()`
+  into `runDuel`; the rule is one-directional (ambient never writes to the store), which is
+  the property worth keeping and worth making mechanical.
+
+### C1 — pathfinding for the crowd
+
+Give ambient heroes a `PathState` each and route follow/approach/wander through a
+game-coordinate `followPath`. `engine/walkability.ts` needs no new capability — `findPath`
+(`:238`) is A* over the 64×64 torus, 8-connected, no corner-cutting, string-pulled, with a
+lazy-deletion binary heap. Five things to respect, in order of how badly they bite:
+
+1. **Determinism is the sharpest risk, and it is not obvious.** `ambient.ts:17-22` chose
+   per-hero sub-streams specifically so that *draw* culling is safe. But the per-frame
+   ambient **position** loop (`combatAdapter.ts:2607-2687`) runs for every ambient entity
+   with **no viewport gate** — only the 5Hz *brain* is gated. So any path budget that skips
+   off-screen movers, or any "nearest-first" path-request ordering, makes ambient positions
+   depend on camera and window size, which culling has never done. Two runs at different
+   window sizes would diverge. Any budgeting scheme here must be a function of entity
+   identity, not of what is on screen.
+2. **Allocation, not CPU, is the first symptom.** `findPath` allocates
+   `Float32Array(4096) + Int32Array(4096) + Uint8Array(4096)` = **36,864 B per call**,
+   unpooled (`walkability.ts:248-250`). Pool those three into module-level scratch with a
+   generation counter *before* adding callers — it is the cheapest fix in the track and it
+   removes the only real perf objection.
+3. **Unreachable is a real state, not a theoretical one.** `walkability.ts:26` records
+   **7 disconnected components** in the worst zone (the seal loop keeps any region ≥
+   `MIN_REGION = 24`). A companion stranded across water burns a full 4,096-node search
+   returning `null` every 0.35s forever. Worse, `followPath` collapses `null` and `[]` with
+   `?? []` (`combatAdapter.ts:1044`), so **"unreachable" and "already arrived" are
+   indistinguishable** and both fall through to the straight-line slide that grinds against
+   the shoreline — precisely the failure routing exists to fix. Split those two cases first.
+4. **The mask contains terrain and scenery only — no entities** (`walkability.ts:72-82`),
+   and string-pulling actively collapses movers onto identical straight segments
+   (`:322-338`). N pathed movers converging on the player will overlap. There is no local
+   avoidance layer to add them to, and C2's formation slots are the cheapest substitute.
+5. **Town mode is outside the mask entirely** — `walkableAt` short-circuits to `true`
+   (`combatAdapter.ts:911`) and the town crowd does not collide at all (`:2473`). Pathing
+   work must branch on `townMode` or town NPCs will path against a null mask.
+
+Two smaller notes: `followPath`'s cooldown is decremented only inside the
+non-line-of-sight branch (`:1041`), so a mover that regains and re-loses sight can be
+forced down the degenerate slide for up to 0.35s — invisible with 2 movers, a visible
+stutter with 20. And `walkability.ts:234-236` explicitly documents that A* "runs on a tap
+or a mob spawn, never per frame"; extending it to every mover inverts a stated premise, so
+that comment must be rewritten or it actively misleads the next reader. Trust the code over
+the comments in the adapter generally — `advanceBystanders` already claims routing it does
+not do (`:1418`).
+
+### C2 — party walker rhythm
+
+Add the missing `FOLLOW_NEAR`/`FOLLOW_FAR` hysteresis; hold a formation *slot* (an offset
+that rotates with the player's heading) rather than a bare distance leash; and gate
+fight-picking on whether the fight can be finished without leaving frame. The L2 data
+already says what to measure: state histogram over 60s, target `approach` well under the
+70% it was, with `fight` up correspondingly.
+
+### C3 — engaging the party member's target: **THE ISOLATION DECISION**
+
+This is the item that actually costs something, and it must be decided before C4.
+
+Today a companion fights a **sparring partner** — a synthetic ambient monster
+(`combatAdapter.ts:3046-3090`, `companionFoeIdx`) that exists only in `this.ambient`. It
+has no `MobInstance`, is not in `state.mobs`, and yields no XP, loot or gold. The player's
+tap path (`:1660`, `:1672`) hit-tests store mobs; `:1643` hit-tests ambient *heroes* and
+opens the target card. The two combat worlds do not currently intersect anywhere, which is
+precisely why the isolation rule has held structurally rather than by discipline.
+
+**The cost is sharper than "econSim would have to model it."** `sim/econSim.ts` drives the
+**real store** headlessly — `store.getState().tick(o.stepSeconds)` at `:239` — so it does
+not model kills/minute, it *measures* them. But it has **zero coupling to `engine/party.ts`
+or to the render adapter** (verified: no import, no reference). The companion body lives
+entirely in the adapter, which econSim never instantiates. So a companion that added real
+DPS would raise the player's true kills/minute while **every balance sweep kept measuring a
+soloing player** — the harness would not be wrong-by-a-margin, it would be silently blind.
+That is the real bill: not "retune the economy," but "give the party a headless
+representation independent of the renderer, or lose the harness."
+
+Three options, with what each actually costs:
+
+1. **Hold the line (cheapest).** The player may tap the companion's foe to *look* at it,
+   but not fight it; companion damage stays zero. Isolation stays structural, econSim stays
+   honest, and item 3 becomes a UI affordance rather than a combat feature. Weakest fantasy.
+2. **Reverse the direction (recommended).** Let the **companion visibly join the player's
+   fight** against a real store mob — same animation cadence, real target — while dealing
+   **zero** store damage; the player's tap keeps working unchanged because the target was
+   always a store mob. Reads as fighting together, changes no number, needs no econSim work.
+   Honest caveat: an attentive player can notice the mob's HP does not fall faster, so this
+   buys the *rhythm* of a party without the substance.
+3. **Cross the line deliberately (most expensive, best game).** Companion DPS becomes real.
+   Then `econSim` needs a headless party — lift companion combat out of the adapter into an
+   engine module the store can tick — and the full balance pass has to absorb a kills/minute
+   increase that also moves gold, XP, drop rate and zone-advance pacing. This is a
+   multi-session change and it invalidates prior economy measurements.
+
+   The **offline projection** is the part most at risk, and it is easy to miss:
+   `projectOfflineProgress` (`offline.ts:166-174`) replays a kills/sec, gold/kill and
+   xp/kill rate derived from `accrueRates` (`gameStore.ts:1909`). Credit companion kills to
+   the player without also crediting companion loot and gold-per-kill silently dilutes,
+   and the offline projection inherits whatever imbalance results. The invariant that
+   breaks is "offline never pays better than online" (`econSim.ts:69-73`, `MEAN_TOLERANCE
+   = 0.10` at `:574`).
+
+**Recommendation: option 2 now, option 3 only as its own funded track.** Option 2 delivers
+the felt experience of items 3 and 4 without spending the harness, and it does not
+foreclose option 3 later.
+
+### C4 — 2+ party members
+
+Blocked on C3, because two companions dealing zero damage is twice as noticeable as one.
+`PARTY_MAX = 1` (`engine/party.ts:39`) is a soft cap; the single-companion assumption is
+hard-wired in four other places, and **raising the cap without them reproduces exactly the
+failure `PLAN.md` already documents at L583-616** — one companion fighting, the rest
+trailing in silence:
+
+- **The sparring-partner supply is structurally single.** `spawnCompanionFoe` reuses one
+  entity slot (`combatAdapter.ts:3046-3063`), `nearestAmbientMob` skips any monster already
+  claimed (`:3101`), and `companionSparCd` is one shared timer that the first companion
+  resets (`:2840`) — and which drains **N× faster** than `COMPANION_SPAR_INTERVAL` intends,
+  because `-= step` runs once per follower inside the brain loop (`:2830`). The second
+  companion finds `foe < 0` and never gets its own spawn. This is the real work in C4.
+- **`this.followerIdx = found` takes the *last* match**, because `found = i` (`:2733`) is
+  unconditional in the loop. At `PARTY_MAX ≥ 2` the party frame's status, the follow-speed
+  selector (`:2654`), the rejoin decisions (`:2902`, `:2912`, `:2941`) and the
+  `companionAttacks` counter (`:3188`) all silently describe one arbitrary member.
+- **`CompanionStatus` is one nullable module-level object** (`party.ts:215-240`), and
+  `leaveParty` calls `setCompanionStatus(null)` unconditionally (`:200`) — removing one of
+  two members blanks the HUD for the survivor until the next 5Hz tick.
+- **All followers steer to the same point** with only `FOLLOW_NEAR` as a stop radius, so
+  they overlap. `FOLLOW_FAR` being declared-and-unused suggests slot logic was contemplated
+  and never written; C2 should write it.
+
+Also: the spar monster's stream is `subStream(zoneSeed, 'companion-foe')` with a **literal**
+label (`:3057`) — a second spar monster reusing that label shares the identical stream and
+rolls identical placements, the exact determinism regression per-hero sub-streams exist to
+prevent. And `party.ts:100` hardcodes the singular ("you can only party with 1 hero").
+
+HUD: `.hud-tl` has no `max-height` and no `overflow` (`index.css:331`); three frames push
+the column to ~250-265px and can collide with `.hud-bottom` on short/landscape viewports
+with nothing reporting it. Check the vertical budget at the mobile breakpoint **before**
+building this, and fix the `pointer-events` bug above first or the leave button stays dead.
+
+### C5 — N-sided combat
+
+`runFight` is `[Side, Side]` with `side: 0 | 1`, `winner: 0 | 1 | null` and
+`hp: [number, number]` (`engine/fight.ts:150-284`). N-sided means `sides: Side[]`, a team
+id, a target-selection rule, and `side: number` in `FightEvent`. That loop rewrite is the
+easy part. Four things are harder, and the first one invalidates the plan's own assumption
+that this refactor arrives with a safety net:
+
+- **The determinism harness has no golden file.** `checkDeterminism` compares run-to-run
+  *within a single process* (`fightSim.ts:105-108`). So changing the RNG **draw order** —
+  which any multi-target model inevitably does — will **not** fail the test. The suite goes
+  on passing while no longer covering the thing that changed. Type-level breakage is
+  limited to `hp: [number, number]`, `side: 0|1`, `winner: 0|1|null` and the positional
+  `runFight(seed,a,b)` calls (`fightSim.ts:170`/`176`, `fightMain.ts:30`). **Commit a golden
+  log file before touching `fight.ts`** — otherwise this refactor is unverified by
+  construction. (Current measured baseline is 30/30 at `--seeds 6`, not the 20/20 recorded
+  at L326; that figure is stale.)
+- **Per-target proc state is the real cost, not the loop.** `mobFrozen`, `arcaneCharges`,
+  `winterChillStacks`, `comboPoints` and `openerUsed` all live on the *attacker's* single
+  `CombatProcState` (`types.ts:359-378`) and are read directly inside `resolvePlayerAttack`
+  (`combat.ts:359`, `:364`). `resolvePlayerAttack` never receives a target at all — target
+  state arrives as loose scalars (`mobHpFraction`, `targetBurning`). Splitting these into a
+  per-target map changes the **persisted save shape** (`procState` is in `GameState`,
+  `types.ts:597`) and needs a migration.
+- **`FightEvent` needs an explicit `target` index, and that is mandatory, not optional.**
+  Playback binds one opponent throughout: `Ambient.foe: number` (`combatAdapter.ts:342`),
+  `playAmbientFightEvent` resolving attacker/target as `ev.side === 0 ? a : foe` (`:3180`),
+  and the companion HP scan searching backwards for `e.side === 1` (`:2772`). Without a
+  target index the log is ambiguous about who took the hit.
+- **There is no cleave to generalise.** The only multi-target-looking talent,
+  `sweeping_strikes`, compiles to `sweepingStrikesEnabled` which is **read by nothing**
+  (`combat.ts:128` is the sole assignment); Bladestorm's AoE is a display note
+  (`ironcleave.ts:208`), not an effect. N-sided does not *unlock* AoE talents — it creates
+  the obligation to design them.
+
+**Decide first whether the store adopts `runFight` or the two stay forked.** They are
+already two loops that disagree: the store computes extra/flurry as flat 0.7×/0.5×
+multipliers (`gameStore.ts:1533`, `:1543`) while `fight.ts` recursively re-resolves a full
+attack (`:245-248`); the store has Seal Fate, Ice Barrier, Glacial Tomb, Last Stand, minion
+DPS, Second Wind, Siphon Life, Rampage decay and the frozen state, and `fight.ts` has none
+of them. Going N-sided in `fight.ts` alone widens a gap that is already real, and doing the
+migration twice is the expensive path.
+
+Two latent bugs that only multi-target exposes: **DoTs on non-targeted mobs never tick** —
+`activeDoTs` is a projection of only the engaged target's dots (`gameStore.ts:1265`) and
+only that list is advanced (`:1382`), invisible today because only one enemy is ever
+fought. And `resetDotIds`/`dotSeq` are module-global (`combat.ts:490`), pinned per fight by
+`fight.ts:165`; that is safe **only** because fights resolve synchronously one at a time,
+so any model that interleaves concurrent fights mints colliding ids.
+
+The store's tick should follow, not lead. Its combat path is also entirely unseeded —
+`resolvePlayerAttack` is called with no `rng` (`gameStore.ts:1470-1481`), `resolveMobAttack`
+with no fifth arg (`:1760`) — on top of the three named procs, Nightfall (`~:1388`),
+Creeping Freeze (`~:1570`), Echo (`~:2251`), which are outstanding **Track P0** work. N
+targets multiplies the unseeded rolls per tick, so N-sided work in the store makes the
+determinism debt strictly worse before it gets better. Lift the procs into `combat.ts`
+first.
+
+### C6 — elite scaling and unique drops
+
+Depends on C3's answer (party power is only meaningful once the party has power) and on
+C5 (a scaled elite that still fights 1v1 is just a bigger health bar). Introducing a
+player/party-power term into `spawnMob` is an economy change on its own, independent of
+the companion question — measure it with `econSim` before and after rather than by eye.
+
+Specific traps, all verified:
+
+- **The difficulty dial is disconnected.** Per the live-bugs section above,
+  `ELITE_DAMAGE_MULTIPLIER`/`BOSS_DAMAGE_MULTIPLIER` cancel out to identical DPS. Fix that
+  (move the multiplier onto `MobInstance.damage`) *before* tuning anything, or every
+  "elites hit harder" change will keep doing nothing.
+- **Party power has no data path.** `spawnMob` receives only `(zoneId, state)`, and party
+  membership lives in `engine/party.ts` module state behind the no-store-import rule.
+  Either party state moves into `GameState` or the documented boundary is broken — this is
+  a second, quieter instance of the C3 decision and should be decided with it.
+- **Item level comes from the *player*, not the mob** (`gameStore.ts:1587` → `loot.ts:34`),
+  so a party-scaled elite still drops player-level gear. Changing that moves the
+  loot-value curve `econSim` measures.
+- **Tier is signalled by prefixing the mob's name** (`'★ '`, `'[BOSS] '`), and downstream
+  code regex-matches the name for temperament (`AGGRESSIVE_RE`/`RANGED_RE`,
+  `combatAdapter.ts:95-104`) and for sprite choice (`resolveMobSprite` via `strHash(name)`,
+  `fftaRoster.ts:156-161`). A new tier prefix silently changes a mob's sprite and whether
+  it charges you.
+- **Bosses empty the field.** `mobs = [spawned]` (`gameStore.ts:1336`) plus `isBossPresent`
+  blocks further spawns; a multi-elite or party-scaled boss encounter has to work around
+  that and around `persistedBoss` re-entry (`:1329`, `:1837`).
+- **There are two kill handlers.** `gameStore.ts:2291` (the Umbral Bolt path) calls
+  `rollLoot` but skips XP, kill counting, boss bookkeeping and `placeDrop` entirely. Any
+  drop logic added to the main tick will be missing here.
+- **`offline.ts:196-212` duplicates the drop roll** with `rarityBias 0` and no tier
+  awareness, so elite/unique drop changes break online/offline parity unless mirrored.
+- **`placeDrop` has no protected-item concept** — a unique with low `itemPower` can be
+  auto-sold by the merchant contract or salvaged on a full bag (`loot.ts:145-165`). `Item`
+  needs a flag before uniques exist.
+
+### C7 — the world model (BUILT 2026-08-01, one invariant outstanding)
+
+Taken ahead of the rest of the track by owner decision, because the manual-control
+experience was the actual goal and everything else was scaffolding for it. Owner decisions
+recorded: **unified world** (idle and manual share one physics, accepting the economy
+shift) and **per-temperament aggro** (reuse `AGGRESSIVE_RE` rather than author 48 entries).
+
+**The diagnosis that reframed the work.** Mobs had no position. `MobInstance.offset` was a
+bearing *from the player*, and only the engaged mob's bearing shrank — so the population
+was arranged around the camera and walking east took every monster east with you. Worse,
+the store had no idea where the hero was under manual control: `playerMapPos` was a fixed
+sine drift (`driftMapPos`) that ignored input entirely, while WASD/taps lived only in the
+renderer. Proximity aggro was therefore not "unimplemented", it was **unrepresentable**.
+
+Built:
+- `MobInstance.pos/home/patrolTarget/patrolPause/aggro/aggroRadius/path/pathCool`. `pos` is
+  authoritative in zone tile coords; `offset` is now DERIVED each tick, so the renderer,
+  `nearestMob`, `setTarget` and `engageTarget` were untouched. Mobs are not persisted
+  (`saved.mobs = []`), so no save migration was needed.
+- `engine/mobBehaviour.ts` — temperament single-sourced out of the render adapter, which
+  now imports it. Predators charge at 8.5 tiles, territorial hold to 3.0, bosses never
+  pursue; patrol ranges and gaits alongside.
+- Real patrol routes, proximity aggro, attack aggro, and a 14-tile leash home.
+- `routeToward` — A* routing **in the store**, which is where Track C's pathfinding
+  actually landed. `combatAdapter.onPlayerMoved` → `reportPlayerWorldPos` closes the
+  manual-position loop through a callback, keeping the adapter store-free like its peers.
+- **Deleted the teleport ambush** (`ROAMING_AGGRO_CHANCE`): it spawned a mob 2 tiles away,
+  made it the target and seized control. That was the slot machine, literally.
+
+**Four bugs the harness caught that reading could not.** Recording these because every one
+presented as "the economy stopped" and none was visible in the diff:
+1. `stepToward` had no unwedge fallback (which `driftMapPos` always had) — the hero froze
+   on a shoreline for 25 simulated minutes. Fixed by routing, plus an 8-bearing escape.
+2. Mobs spawned in **disconnected terrain components** (the worst zone has 7). Placement
+   now checks reachability, not just walkability.
+3. Auto-pilot walked to the *nearest* mob without asking whether it was reachable, so one
+   marooned mob held the hero hostage past three reachable ones. Now skipped after 3s and
+   retired after 12s so a replacement spawns. Bosses exempt.
+4. **`initGame` seeded `worldSeed` from `Date.now()`, so the economy harness was never
+   reproducible.** `--seed` pinned `Math.random` but not the terrain; three `--assert` runs
+   of identical code gave parity 5.9% / 10.9% / 23.0% and invariant failures that wandered
+   between shapes. Pre-existing, and invisible until terrain started deciding the economy.
+   Now drawn from seeded `Math.random` alone; runs are byte-stable. **Any economy number
+   measured before 2026-08-01 was a single random-terrain sample, including the 818g
+   baseline below.**
+
+**Measured (30 min, warrior, `--advance --equip --seed 1`):** 712g / 23.7 per min, 13
+deaths, against a pre-change baseline of 818g / 27.3 per min, 12 deaths — about −13%, with
+the caveat above that the baseline was not terrain-stable. All 8 scenario shapes hold
+across 10 seeds; `fight.mjs` golden log byte-identical; `npm run build` green.
+
+**Offline parity: RESOLVED, and the earlier diagnosis was wrong.** It was recorded here as
+18.0% against a ±10% tolerance and attributed to the unified-world decision — "the kill
+rate is now non-stationary because travel time depends on where mobs are" — with a
+measured window sweep (600→18.0%, 900→16.9%, 1500→14.6%, 2400→12.5%) offered as evidence
+of systematic bias. That reasoning was plausible and wrong. The cause was a bug:
+
+**The no-target branch of `tick` skipped the entire world simulation.** `if (!currentMob)`
+wrote a handful of combat fields and returned, so whenever the hero had nothing targeted,
+no mob patrolled, no aggro check ran, and the hero did not move. Online play therefore
+contained dead stretches the EMA rate sampled inconsistently, which is what the parity
+number was measuring. The same partial write dropped `controlMode`/`manualIdleTimer`, so
+the countdown decremented a local that was then discarded — manual control never expired,
+because manual control clears the target and so runs through this branch constantly.
+
+Both are fixed by extracting `tickWorld` and calling it on both paths. **Offline parity is
+now 0.0% and every invariant holds** — the first fully green `--assert` of this work.
+`OFFLINE_RATE_WINDOW_SECONDS` was left at its original 600; the sweep above was chasing a
+symptom.
+
+**Measured after the fix** (30 min, warrior, `--advance --equip --seed 1`): 1019g /
+34.0 per min, 12 deaths, against a pre-change baseline of 818g / 27.3 per min, 12 deaths —
+**about +25%**. All 8 scenario shapes hold across 10 seeds, offline parity 0.0%, golden
+fight log byte-identical, `npm run build` green. The +25% is a balance question rather than
+a correctness one and is a single dial (`PLAYER_WALK_SPEED`, currently 3.0, plus the
+12–26 tile spawn band); note again that the baseline predates the `worldSeed` fix and so
+was a single random-terrain sample.
+
+**Still unverified:** the Venom Hollows immobile-spawn report. A rescue was added to the
+adapter's `slide()` for a hero standing inside blocked ground, reasoned from
+`walkability.ts:155` (spawn point 32,32 is blocked in exactly `venom_hollows` and
+`grimshade_forest`). It is guarded so it only fires from inside blocked terrain, where the
+alternative is being permanently wedged — but the one position sampled while stuck
+reported `walkable: true`, which is evidence against that being the cause. The frozen-world
+bug above is a better candidate and may have been the real one. Treat the `slide()` rescue
+as speculative until someone walks into that zone.
+
+### Sequencing
+
+**C0** first and alone — it is the only part of this track that is arguably launch-relevant,
+and its save-layer half (3.31 MB blobs, unguarded quota, destructive `readFile`) is a real
+data-loss path that should not wait behind combat work.
+
+Then **C1 → C2**, which are independent of the isolation decision and safe to build.
+**C3 is a decision, not a task**, and it gates **C4** and (quietly) **C6**. **C5** is
+independently valuable — it is Track P0 work regardless — but must be preceded by
+committing a golden determinism log, without which it is unverified by construction.
+
+Riskiest item is **C6**: it changes the economy whichever way C3 is decided, and it sits
+on top of a difficulty multiplier that currently does nothing.
+
+**Verification baseline, measured 2026-07-31 (all green before any change):**
+`npm run build` exit 0, zero TS errors; `node tools/sim/fight.mjs --seeds 6` → 30/30
+byte-identical, 32/32 seeds distinct; `node tools/sim/run.mjs --assert` → all 8 invariants,
+offline parity, save migration ok. Two caveats worth recording: `run.mjs --assert`
+**always exits 0** (`src/sim/main.ts` never calls `process.exit`), so it cannot gate
+anything as written; and `esbuild` is imported by both runners but is **not in
+`package.json`** — it resolves only because Vite hoists it, so a Vite bump breaks all
+verification at once with an unrelated-looking error. Neither runner typechecks (esbuild
+strips types), and nothing at all covers `combatAdapter.ts`'s 3,547 lines.
+
+**Branch note:** work is on `battle-refactor`; the working practice at L112 names
+`hackathon-refactor` and allows a different branch only if stated — stated here.
+
 ## Track S — accounts, character slots & creation (launch-critical; local now → hosted later)
 
 **Shape:** a proper entry flow in front of the game — a **character select / login screen**

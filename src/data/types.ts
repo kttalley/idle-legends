@@ -441,8 +441,37 @@ export interface MobInstance {
   attackSpeedSeconds: number
   isElite: boolean
   isBoss: boolean
-  /** This mob's own position relative to the player, in map tiles. The engaged target
-   *  closes to 0; the rest hold station until chosen. */
+  /** Where this mob actually STANDS, in zone tile coordinates on the 64×64 torus.
+   *
+   *  This is the authoritative position. `offset` used to be it, which meant a mob had no
+   *  place in the world at all — only a bearing from the player — so the whole population
+   *  slid along with the camera as the hero walked and every zone read as a slot machine
+   *  rather than as ground you move through. */
+  pos: { x: number; y: number }
+  /** The patrol anchor this mob belongs to; it walks a loop around this and returns here
+   *  after losing interest. Fixed at spawn, in the same zone tile coordinates. */
+  home: { x: number; y: number }
+  /** Current patrol waypoint, in zone tile coordinates. Null while aggroed — a mob
+   *  chasing the hero is not walking its route. */
+  patrolTarget: { x: number; y: number } | null
+  /** Seconds until this mob picks a new patrol waypoint (it pauses at each one; a body
+   *  that never stops reads as a conveyor belt rather than as something living). */
+  patrolPause: number
+  /** Cached A* route to wherever this mob is going, in zone tile coordinates.
+   *  Collide-and-slide alone wedges against any concave shoreline — the "stuck on the
+   *  lake edge" failure — so deliberate destinations are routed, not slid toward. */
+  path: { x: number; y: number }[] | null
+  /** Seconds until this mob may recompute its route. A* over 4096 nodes is cheap but
+   *  not free, and every mob repathing every tick is the one real cost here. */
+  pathCool: number
+  /** Has this mob noticed the hero? Set by proximity (per temperament) or by being hit,
+   *  and it is what makes the world reactive instead of scripted. */
+  aggro: boolean
+  /** How close the hero must come before this mob notices, in tiles. Derived from
+   *  temperament at spawn: predators charge from far, territorial things wait. */
+  aggroRadius: number
+  /** DERIVED each tick as `pos - playerMapPos` on the torus. Kept because the renderer,
+   *  `nearestMob`, `setTarget` and existing saves all read it; it is no longer authored. */
   offset: { dx: number; dy: number }
   /** Damage-over-time effects live ON the mob, so switching targets can't leak another
    *  mob's bleeds onto the new one. `activeDoTs` mirrors the current target's list. */
@@ -654,6 +683,11 @@ export interface GameState {
   // ── Zone Quests ─────────────────────────────────────────────────────────────
   activeQuest: ZoneQuest | null
   completedQuestIds: string[]
+  // ── Control mode ───────────────────────────────────────────────────────────
+  /** 'idle' = auto-pilot (existing behavior). 'manual' = player-driven movement/abilities. */
+  controlMode: 'idle' | 'manual'
+  /** Seconds remaining before manual mode falls back to idle. Only counts down in combat. */
+  manualIdleTimer: number
 }
 
 // ── Gathering: the optional strike-meter overlay ──────────────────────────────

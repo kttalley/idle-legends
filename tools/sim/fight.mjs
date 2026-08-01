@@ -12,13 +12,25 @@
 // whole process was pinned. If a `Math.random` leaks back into the combat path, this
 // harness must fail — and with a global swap installed, it wouldn't.
 //
-// Exit code is 0 on PASS, 1 on any desync or seed-insensitivity, so it can gate CI.
+// Exit code is 0 on PASS, 1 on any desync, seed-insensitivity, or golden-log change, so
+// it can gate CI.
+//
+// ── The golden log ────────────────────────────────────────────────────────────
+// `tools/sim/golden/fight-golden.txt` is a committed byte-exact record of what the
+// resolver produces. The in-process determinism check compares each fight against its own
+// re-run, which cannot notice that the fight itself changed — so a refactor that reorders
+// RNG draws (going N-sided, for one) keeps it green while silently altering every result.
+// This runner holds the baseline because `src/` has no `@types/node` and importing
+// `node:fs` there would break `npm run build`.
+//
+//   node tools/sim/fight.mjs                  # check against the baseline
+//   node tools/sim/fight.mjs --update-golden  # rewrite it, then read the diff
 
 import { build } from 'esbuild'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, writeFile, readFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { join, dirname } from 'node:path'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 
 const result = await build({
   entryPoints: [new URL('../../src/sim/fightMain.ts', import.meta.url).pathname],
@@ -33,7 +45,38 @@ const result = await build({
   },
 })
 
+const GOLDEN_PATH = join(
+  dirname(fileURLToPath(import.meta.url)), 'golden', 'fight-golden.txt',
+)
+const updating = process.argv.includes('--update-golden')
+
+// A missing baseline reads as null, which the harness reports as "absent" rather than as
+// a failure — the first run on a fresh clone should not fail, it should record.
+let expected = null
+try {
+  expected = await readFile(GOLDEN_PATH, 'utf8')
+} catch (err) {
+  if (err.code !== 'ENOENT') throw err
+}
+
+globalThis.__IL_GOLDEN_EXPECTED = expected
+globalThis.__IL_GOLDEN_MODE = updating ? 'update' : 'check'
+
 const dir = await mkdtemp(join(tmpdir(), 'il-fight-'))
 const bundlePath = join(dir, 'fight.mjs')
 await writeFile(bundlePath, result.outputFiles[0].text)
 await import(pathToFileURL(bundlePath).href)
+
+const outcome = globalThis.__IL_RESULT
+if (!outcome) {
+  process.stdout.write('\nFAIL — harness produced no result\n')
+  process.exit(1)
+}
+
+if (updating || expected === null) {
+  await mkdir(dirname(GOLDEN_PATH), { recursive: true })
+  await writeFile(GOLDEN_PATH, outcome.goldenText)
+  process.stdout.write(`golden baseline written: ${GOLDEN_PATH}\n`)
+}
+
+process.exit(outcome.ok ? 0 : 1)

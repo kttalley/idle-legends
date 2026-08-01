@@ -34,6 +34,10 @@ export function DimetricWorldScene() {
     // intent, the store owns the state change.
     controller.onEngageTarget = () => useGameStore.getState().engageTarget()
     controller.onSelectTarget = (id: string) => useGameStore.getState().setTarget(id)
+    // Manual steering: the canvas owns the hero's feet, so it tells the store where they
+    // are. This is what lets mobs notice the player by proximity.
+    controller.onPlayerMoved = (x: number, y: number) =>
+      useGameStore.getState().reportPlayerWorldPos(x, y)
     controller.onTownNpcChanged = id => useGameStore.getState().setActiveTownNpc(id)
     // Tapping another player opens their card (whisper / invite / duel). Routed through
     // the selection module's own observable rather than React props: the tap starts in
@@ -136,6 +140,11 @@ export function DimetricWorldScene() {
       const k = e.key
       if (k === ' ' || k.startsWith('Arrow')) e.preventDefault()
       controller.setKey(k, true)
+      // Movement / jump counts as taking manual control of the hero.
+      const isManualKey = (k.length === 1 && /[wasd ]/i.test(k)) || k.startsWith('Arrow')
+      if (isManualKey) {
+        useGameStore.getState().bumpManualInput()
+      }
     }
     const onKeyUp = (e: KeyboardEvent) => {
       // Release regardless of focus: a key pressed in the world and released after
@@ -165,6 +174,7 @@ export function DimetricWorldScene() {
       downId = -1
       if (!moved && performance.now() - downT < 500) {
         controller.moveTo(e.clientX, e.clientY)
+        useGameStore.getState().bumpManualInput()
         navigator.vibrate?.(8)
       }
     }

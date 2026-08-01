@@ -56,3 +56,6 @@ local-assets/
 
 # Background-agent scratch worktrees — never part of the project history.
 .claude/worktrees/
+
+# Sprite-generation machine-local config (model filenames, GPU ports)
+tools/spritegen/config.json

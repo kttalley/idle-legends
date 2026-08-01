@@ -23,6 +23,7 @@ import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } fro
 import { Animator } from '../animation'
 import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId } from './fftaRoster'
 import { mulberry32, subStream, type Rng } from '../../engine/rng'
+import { AGGRESSIVE_RE, combatantOnlyWorldFields, isRangedMob } from '../../engine/mobBehaviour'
 import { runFight, type FightEvent, type HeroCombatant } from '../../engine/fight'
 import {
   makeAmbientHero, pickBark, BARK_CHANCE, BARK_SECONDS, BARK_COOLDOWN_SECONDS,
@@ -90,19 +91,9 @@ const RARITY_RANK: Record<Rarity, number> = {
 }
 
 // Ranged/caster mobs keep a multi-tile engagement distance and cast (spawn a bolt)
-// instead of lunging. Matched on the mob name so the bestiary's archers/shamans/
-// warlocks read as ranged without a data flag.
-const RANGED_RE = /archer|ranger|hunter|gunner|warlock|mage|magus|caster|spellcaster|shaman|priest|seer|oracle|necromancer|sorcerer|conjurer|elementalist|pyromancer|cryomancer/
-
-// Temperament. Predators and raiders CHARGE — they close the distance and you stand and
-// receive them. Everything else is territorial: it holds its ground and you have to walk
-// in and start the fight yourself, which is the more deliberate, hunt-like read. Bosses
-// never charge; you approach the lair. Matches the RANGED_RE idiom above so no per-mob
-// data authoring is needed across 12 zones.
-const AGGRESSIVE_RE = /wolf|worgen|raptor|tiger|stalker|boar|beast|berserker|marauder|raider|reaver|hound|vulture|swarm|prowler|savage|rabid|feral|thug|bandit|brute|charger/
-function isRangedMob(mob: MobInstance): boolean {
-  return RANGED_RE.test(mob.name.toLowerCase())
-}
+// instead of lunging; predators charge while territorial things hold their ground. Both
+// patterns moved to `engine/mobBehaviour.ts` when the STORE started needing temperament
+// too — see the note there on why this is single-sourced rather than duplicated.
 
 function bestEquipmentRarity(state: GameState): Rarity {
   let best: Rarity = 'common'
@@ -487,6 +478,14 @@ export class WorldSceneController {
   /** Tapping an ambient hero opens their player card. The adapter stays read-only over
    *  game state: it reports who was tapped and where, the host owns the UI. */
   onHeroTapped: ((speaker: ChatSpeaker, clientX: number, clientY: number) => void) | null = null
+  /** Where the hero's feet ended up, in game tile coords, while under MANUAL control.
+   *
+   *  Under manual steering this controller is the only thing that knows the hero's
+   *  position — it owns WASD and taps, while the store's `playerMapPos` was historically
+   *  a sine drift that ignored input. Nothing in the simulation could answer "how close
+   *  is the player to that wolf", so proximity aggro was impossible. Reported through a
+   *  callback rather than by importing the store, like every other write this file makes. */
+  onPlayerMoved: ((x: number, y: number) => void) | null = null
   // Entities for the enemies the player is NOT currently fighting. The engaged one keeps
   // its own dedicated machinery (`this.mob`: approach anchor, bearing, routing, death
   // fade); these just stand in the world, depth-sorted and clickable, so the player has a
@@ -532,6 +531,7 @@ export class WorldSceneController {
   private manualMode = false
   private jumpActive = false
   private jumpT = 0
+  private lastControlMode: 'idle' | 'manual' = 'idle'
   // Last movement vector (for facing when auto-drift would otherwise leave it stale).
   private lastFaceDx = 1
   private lastFaceDy = 1
@@ -915,6 +915,20 @@ export class WorldSceneController {
   /** Collide-and-slide one step in buffer space: each axis applies only if it lands on
    *  walkable ground, so brushing a shoreline slides along it instead of stopping dead. */
   private slide(x: number, y: number, dx: number, dy: number): { x: number; y: number; blocked: boolean } {
+    // Escape hatch first: if we are ALREADY standing on blocked ground, every candidate
+    // below fails and the body can never move again. Venom Hollows and Grimshade Forest
+    // both put the zone spawn point (32,32) inside blocked terrain
+    // (walkability.ts:155), so a hero can enter the zone already wedged — and manual
+    // control routes every step through here, which made those two zones unplayable.
+    // Sliding out is impossible from inside a wall; the only way out is to be placed.
+    if (this.walkMask && !this.walkableAt(x, y)) {
+      const w = nearestWalkable(this.walkMask, x - PAD, y - PAD)
+      return {
+        x: PAD + WorldSceneController.wrapMod(w.x),
+        y: PAD + WorldSceneController.wrapMod(w.y),
+        blocked: true,
+      }
+    }
     let nx = x, ny = y, blocked = false
     if (dx !== 0) { if (this.walkableAt(x + dx, y)) nx = x + dx; else blocked = true }
     if (dy !== 0) { if (this.walkableAt(nx, y + dy)) ny = y + dy; else blocked = true }
@@ -1094,6 +1108,22 @@ export class WorldSceneController {
     this.zoneDisplayName = state.generatedZoneNames?.[state.currentZone] ?? ZONES[state.currentZone]?.name ?? ''
     this.factionNames = state.factionNames ?? {}
     this.playerName = state.playerName || 'You'
+
+    // ── Idle / manual control transitions ───────────────────────────────────────
+    const controlMode = state.controlMode ?? 'idle'
+    if (controlMode !== this.lastControlMode) {
+      if (controlMode === 'idle') {
+        // Returning to auto-pilot: drop any in-flight manual movement and commitment
+        // so the hero resumes auto-follow and idle can pick its own targets.
+        this.manualMode = false
+        this.input = { up: false, down: false, left: false, right: false }
+        this.tapMoveActive = false
+        this.tapStuckT = 0
+        this.targetLocked = false
+        this.engageSent = false
+      }
+      this.lastControlMode = controlMode
+    }
 
     // ── Town-hub transitions ──────────────────────────────────────────────────
     // Entering a town swaps the whole scene to the flat FFTA town backdrop + crowd;
@@ -1382,27 +1412,59 @@ export class WorldSceneController {
             wx = PAD + WorldSceneController.wrapMod(w.x)
             wy = PAD + WorldSceneController.wrapMod(w.y)
           }
-          // Enter from beyond the horizon and WALK to that station, rather than fading
-          // into existence in plain sight. The spawn ring (9–16 tiles) sits well inside
-          // a visible radius that reaches ~45 tiles on a large display, so materialising
-          // at the station is always on-screen — hence the "phasing in".
-          const bearing = Math.atan2(wy - this.player.ty, wx - this.player.tx)
-          const R = this.visibleTileRadius() + 6
-          const e = this.scene.spawn(
-            sprite, mobPaletteId(m),
-            this.player.tx + Math.cos(bearing) * R,
-            this.player.ty + Math.sin(bearing) * R,
-          )
+          // Spawn AT the mob's real position, and let the simulation move it from there.
+          //
+          // This used to enter from beyond the horizon and walk to a fixed station at
+          // BYSTANDER_SPEED. That made sense while a station never moved. It is actively
+          // wrong now: the station tracks the mob's own position every frame, so the
+          // walk-in chases a moving goal, never gets within its arrival epsilon, and
+          // never ends — measured as a mob travelling a dead-constant 1.70 tiles per
+          // 500ms (3.4 t/s, i.e. BYSTANDER_SPEED) indefinitely, overriding the patrol
+          // and chase speeds the simulation had chosen. Mobs now spawn far enough out
+          // (12–26 tiles) that appearing in place does not read as popping in.
+          const e = this.scene.spawn(sprite, mobPaletteId(m), wx, wy)
           e.animator.set('idle')
           rec = { e, wx, wy }
           this.otherMobEnts.set(m.id, rec)
-          this.arriving.add(m.id)
         }
-        // Position is owned by advanceBystanders while walking in; pinned once arrived.
-        if (!this.arriving.has(m.id)) {
-          rec.e.tx = rec.wx
-          rec.e.ty = rec.wy
-          this.faceToward(rec.e, this.player.tx, this.player.ty)
+        // ── Track the mob's ACTUAL position, every frame ────────────────────────
+        // This used to pin the entity to `rec.wx/wy`, the station computed once at spawn.
+        // That was right when a mob's offset never changed after it arrived; it is wrong
+        // now that mobs patrol, chase and leash, because the whole simulation was being
+        // drawn at its spawn coordinates. `offset` is derived from the mob's real world
+        // position each tick, so re-deriving the station here is what puts the world on
+        // screen — without it the store simulates a living zone that nobody can see.
+        // Anchor to the mob's OWN world position, measured against the player entity's
+        // world position — the same formula the ambient crowd uses (see `updateAmbient`).
+        //
+        // Using `m.offset` here instead was subtly wrong and looked exactly like the mob
+        // trailing the hero: the store computes `offset` against `playerMapPos`, but this
+        // adds it to `this.player.tx`, the player ENTITY, which is a different point (it
+        // lerps toward the store value, and `autoOffsetDx` absorbs manual walking into
+        // it). Adding a delta measured from one origin onto a different origin makes the
+        // mob inherit the hero's own motion — camera-glued, just with a world-derived
+        // number rather than a fixed one.
+        const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
+        const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
+        const liveX = this.player.tx + WorldSceneController.wrapDiff(m.pos.x, pgx)
+        const liveY = this.player.ty + WorldSceneController.wrapDiff(m.pos.y, pgy)
+        if (this.arriving.has(m.id)) {
+          // Still walking in from beyond the horizon — keep the destination current so it
+          // heads for where the mob now is rather than where it spawned.
+          rec.wx = liveX; rec.wy = liveY
+        } else {
+          const pdx = liveX - rec.e.tx, pdy = liveY - rec.e.ty
+          const moved = Math.hypot(pdx, pdy)
+          rec.e.tx = liveX; rec.e.ty = liveY
+          rec.wx = liveX; rec.wy = liveY
+          // Face where it is going while it is going somewhere; only look at the hero once
+          // it has stopped. A patrol that stares at you the whole way round reads as a
+          // turret on rails, which is precisely how the old pinned version looked.
+          if (moved > 1e-3) {
+            this.faceToward(rec.e, rec.e.tx + pdx, rec.e.ty + pdy)
+          } else {
+            this.faceToward(rec.e, this.player.tx, this.player.ty)
+          }
         }
         rec.e.paletteId = mobPaletteId(m)
       }
@@ -1837,6 +1899,22 @@ export class WorldSceneController {
     }
     if (this.manualMode && !this.townMode) this.syncOffset()
 
+    // ── Publish the hero's world position back to the store ───────────────────
+    // Under manual control this controller is the ONLY thing that knows where the hero
+    // is: it owns WASD and taps, while the store's `playerMapPos` was historically a
+    // sine-wave drift that ignored input entirely. Nothing in the simulation could
+    // therefore answer "how close is the player to that wolf", which is why proximity
+    // aggro could not exist. Reporting it closes that loop.
+    //
+    // Only while actually steering — in auto mode the store owns the position and writing
+    // to it here would fight `approachAuto` for control of the same value.
+    if (!this.townMode && (this.manualMode || this.tapMoveActive)) {
+      this.onPlayerMoved?.(
+        WorldSceneController.wrapMod(this.player.tx - PAD),
+        WorldSceneController.wrapMod(this.player.ty - PAD),
+      )
+    }
+
     // Jump arc (independent of horizontal movement). sin(πt) lifts and lands softly.
     if (this.jumpActive) {
       this.jumpT += dt / JUMP_DURATION
@@ -2050,6 +2128,19 @@ export class WorldSceneController {
     this.ctx.lineTo(px, py + 5)
     this.ctx.closePath()
     this.ctx.fill()
+
+    // Manual-mode indicator: a faint pulsing ring at the hero's feet.
+    if (this.lastControlMode === 'manual') {
+      const fy = Math.round(this.player.screenY - this.cam.y)
+      this.ctx.save()
+      this.ctx.strokeStyle = '#f4c84a'
+      this.ctx.lineWidth = 2
+      this.ctx.globalAlpha = 0.5 + Math.sin(this.tapPulse * 6) * 0.15
+      this.ctx.beginPath()
+      this.ctx.ellipse(px, fy, 18, 7, 0, 0, Math.PI * 2)
+      this.ctx.stroke()
+      this.ctx.restore()
+    }
 
     // Ambient particles (biome life) then weather overlay — drawn over the world,
     // under the DOM HUD. Advanced on real time so they flow through hit-stop.
@@ -3152,6 +3243,9 @@ export class WorldSceneController {
       spriteKey: 'beast', attackSpeedSeconds: 2,
       isElite: false, isBoss: false,
       offset: { dx: 0, dy: 0 }, dots: [],
+      // Ambient scenery: positioned by the adapter, never in the store's `mobs`, and so
+      // deliberately outside the zone's patrol/aggro simulation.
+      ...combatantOnlyWorldFields(),
     }
     // A distinct seed per fight, drawn from this hero's stream so the whole sequence
     // stays reproducible from the zone seed.

@@ -40,7 +40,12 @@ import {
   deriveActiveQuest,
   type ZoneQuest,
 } from '../engine/zoneProgression'
-import { getWalkMask, moveWithCollision, nearestWalkable } from '../engine/walkability'
+import {
+  findPath, getWalkMask, hasLineOfWalk, isWalkable, moveWithCollision, nearestWalkable,
+} from '../engine/walkability'
+import {
+  aggroRadiusFor, CHASE_SPEED, LEASH_DISTANCE, patrolRangeFor, PATROL_SPEED, temperamentOf,
+} from '../engine/mobBehaviour'
 import {
   INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
   ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE,
@@ -342,6 +347,9 @@ function defaultState(): GameState {
     // Zone Quests
     activeQuest: makeZoneQuest('sunhollow_meadows', 'alliance'),
     completedQuestIds: [],
+    // Control mode
+    controlMode: 'idle',
+    manualIdleTimer: 0,
   }
 }
 
@@ -354,6 +362,8 @@ function rehydrateState(saved: GameState): GameState {
   saved.playerRace    = saved.playerRace    ?? 'human'
   saved.playerFaction = saved.playerFaction ?? 'alliance'
   saved.factionNames  = saved.factionNames  ?? generateFactionNamesFallback(Date.now())
+  saved.controlMode   = saved.controlMode   ?? 'idle'
+  saved.manualIdleTimer = saved.manualIdleTimer ?? 0
   // Recompile stats
   const savedRacialPassive = RACE_DEFINITIONS[saved.playerRace]?.racialPassive ?? {}
   saved.talentAllocs  = saved.talentAllocs  ?? {}
@@ -776,6 +786,373 @@ function resolveCraft(state: GameState, recipe: Recipe, quality: QualityTier): P
   }
 }
 
+/** Auto-pilot gait. Faster than a mob's patrol so the hero closes on things, and faster
+ *  than a chase so a leashing mob genuinely falls behind. */
+const PLAYER_WALK_SPEED = 3.0
+
+/** The hero's cached route under auto-pilot. Module state rather than a `GameState` field
+ *  because it is derived, regenerates in a tick, and has no business in the save blob —
+ *  cleared alongside the other combat accumulators on load and on zone change. */
+const playerPath: PathHolder = { path: null, pathCool: 0 }
+
+/** Mob id → seconds we have spent failing to reach it. Derived, disposable, deliberately
+ *  not in `GameState`. */
+const unreachableFor = new Map<string, number>()
+/** Skip a mob when choosing what to walk to after this long failing to reach it. */
+const UNREACHABLE_SKIP_SECONDS = 3
+/** Give up on it entirely after this long, so a replacement can spawn somewhere sane.
+ *  Needed as well as the skip: auto-targeting picks by raw distance, so a marooned mob
+ *  can still be made the TARGET, and a target the hero can never close on stops the idle
+ *  loop just as dead as walking to it did. */
+const UNREACHABLE_RETIRE_SECONDS = 12
+
+/**
+ * Where the hero is standing after this tick.
+ *
+ * Two owners, one position. Under MANUAL control the renderer owns the hero's feet —
+ * it is the only thing that sees WASD and taps — and reports them back through
+ * `reportPlayerWorldPos`, so the store must not fight it. Under IDLE the store walks the
+ * hero itself, toward whatever it is trying to reach.
+ *
+ * The old behaviour was neither: a fixed sine-wave drift that ignored both input and
+ * objective, which is why the store could never answer "how close is the player to that
+ * wolf" and why proximity aggro was impossible before this.
+ */
+function advancePlayerPosition(
+  state: GameState,
+  controlMode: 'idle' | 'manual',
+  mobs: MobInstance[],
+  currentMob: MobInstance | null,
+  dt: number,
+): { x: number; y: number } {
+  if (controlMode === 'manual') return state.playerMapPos
+
+  const zm = state.zoneMaps[state.currentZone]
+  const mask = zm ? getWalkMask(zm) : null
+
+  // Rescue a hero standing on blocked ground BEFORE trying to move them.
+  //
+  // `driftMapPos` always did this and dropping it was a real regression: the zone spawn
+  // point (32,32) is itself blocked in venom_hollows and grimshade_forest
+  // (walkability.ts:155), and from inside a wall every direction `moveWithCollision`
+  // is offered gets refused — including the 8-way fan-out, which only helps when at
+  // least one bearing lands on open ground. The hero simply could not move, for the
+  // whole run, in exactly those two zones.
+  const here = mask
+    ? nearestWalkable(mask, state.playerMapPos.x, state.playerMapPos.y)
+    : state.playerMapPos
+
+  // Walk to the target if there is one, otherwise to the nearest thing worth walking to.
+  //
+  // "Nearest" must mean nearest REACHABLE. A zone can have several disconnected
+  // landmasses, and picking by raw distance means one mob across a lake — closer than
+  // three perfectly reachable ones — captures the hero permanently. That is not a
+  // hypothetical: it stranded a level-1 hero for 900 simulated seconds twice, in two
+  // different scenario shapes, and each time it presented as "the economy stopped".
+  let goal: { x: number; y: number } | null = null
+  let goalId: string | null = null
+  if (currentMob) {
+    goal = currentMob.pos
+    goalId = currentMob.id
+  } else {
+    let best: MobInstance | null = null
+    let bestD = Infinity
+    for (const m of mobs) {
+      if ((unreachableFor.get(m.id) ?? 0) > UNREACHABLE_SKIP_SECONDS) continue
+      const d = torusDistance(here, m.pos)
+      if (d < bestD) { bestD = d; best = m }
+    }
+    // Everything is blacklisted — clear it and try again rather than stand still. The
+    // world changes (mobs patrol, the hero is pushed around), so a verdict from ten
+    // seconds ago is not binding forever.
+    if (!best) {
+      unreachableFor.clear()
+      for (const m of mobs) {
+        const d = torusDistance(here, m.pos)
+        if (d < bestD) { bestD = d; best = m }
+      }
+    }
+    if (best) { goal = best.pos; goalId = best.id }
+  }
+
+  if (goal) {
+    // Stop at conversational distance rather than standing on top of it — the renderer
+    // holds an engagement gap for melee, and marching into the same tile undoes it.
+    const d = torusDistance(here, goal)
+    if (d <= 1.2) {
+      if (goalId) unreachableFor.delete(goalId)
+      return here
+    }
+    const next = routeToward(mask, playerPath, here, goal, PLAYER_WALK_SPEED, dt)
+    if (goalId) {
+      if (playerPath.failed) {
+        unreachableFor.set(goalId, (unreachableFor.get(goalId) ?? 0) + dt)
+      } else if (torusDistance(next, here) > 1e-4) {
+        // Making progress — forgive any earlier verdict.
+        unreachableFor.delete(goalId)
+      }
+    }
+    return next
+  }
+
+  // Nothing to walk to (empty zone, everything dead, waiting on a respawn). Keep the old
+  // slow drift so the map still scrolls past and the hero does not stand frozen.
+  const driftAngle = state.totalPlayTime * 0.08
+  return driftMapPos(
+    state,
+    Math.cos(driftAngle) * 0.5 * dt,
+    Math.sin(driftAngle * 0.7) * 0.3 * dt,
+  )
+}
+
+/** Anything that walks somewhere deliberately and caches a route to get there. */
+interface PathHolder {
+  path: { x: number; y: number }[] | null
+  pathCool: number
+  /** True when the last A* attempt came back `null` — genuinely unreachable, as opposed
+   *  to merely not computed yet. Callers need the difference: sliding toward something
+   *  you can never reach grinds at a shoreline forever. */
+  failed?: boolean
+}
+
+/**
+ * Slide one step toward a goal, with an escape hatch when wedged.
+ *
+ * Collide-and-slide is the right per-frame primitive, but on its own it grinds forever
+ * against a concave shoreline: the blocked direction is retried every tick and the body
+ * never moves again. `driftMapPos` always had an 8-direction fallback for exactly this;
+ * omitting it here froze the hero on a lake edge for 25 straight minutes of simulated
+ * time, which the economy harness caught as a dead stop at 7 kills.
+ */
+function slideToward(
+  mask: Uint8Array | null,
+  from: { x: number; y: number },
+  goal: { x: number; y: number },
+  speed: number,
+  dt: number,
+): { x: number; y: number } {
+  const dx = torusDelta(from.x, goal.x)
+  const dy = torusDelta(from.y, goal.y)
+  const d = Math.hypot(dx, dy)
+  if (d < 0.05) return from
+  const step = Math.min(d, speed * dt)
+  const nx = dx / d * step, ny = dy / d * step
+  if (!mask) return { x: wrapTileCoord(from.x + nx), y: wrapTileCoord(from.y + ny) }
+
+  let moved = moveWithCollision(mask, from.x, from.y, nx, ny)
+  if (moved.blocked && moved.x === from.x && moved.y === from.y) {
+    // Wedged. Fan out around the intended heading and take the first bearing that moves.
+    const base = Math.atan2(ny, nx)
+    for (let i = 1; i < 8; i++) {
+      const a = base + (i * Math.PI) / 4
+      const t = moveWithCollision(mask, from.x, from.y, Math.cos(a) * step, Math.sin(a) * step)
+      if (t.x !== from.x || t.y !== from.y) { moved = t; break }
+    }
+  }
+  return { x: wrapTileCoord(moved.x), y: wrapTileCoord(moved.y) }
+}
+
+/**
+ * Walk toward a goal along a real route, recomputing only when it goes stale.
+ *
+ * This is where Track C's pathfinding actually lands. `findPath` is A* over the 64×64
+ * torus and already existed; what was missing was anything in the STORE calling it, so
+ * every body in the simulation moved by direct vector and got caught on terrain.
+ */
+function routeToward(
+  mask: Uint8Array | null,
+  holder: PathHolder,
+  from: { x: number; y: number },
+  goal: { x: number; y: number },
+  speed: number,
+  dt: number,
+): { x: number; y: number } {
+  if (!mask) return slideToward(null, from, goal, speed, dt)
+
+  holder.pathCool -= dt
+
+  // Near enough, or in open sight of the goal: skip A* entirely. This is the common case
+  // and keeps the pathfinder off the hot path for anything already in the open.
+  const direct = torusDistance(from, goal)
+  if (direct < 1.5 || hasLineOfWalk(mask, from.x, from.y, goal.x, goal.y)) {
+    holder.path = null
+    holder.failed = false
+    return slideToward(mask, from, goal, speed, dt)
+  }
+
+  const stale = !holder.path || !holder.path.length
+  if (stale && holder.pathCool <= 0) {
+    holder.path = findPath(mask, from.x, from.y, goal.x, goal.y)
+    // A null result means genuinely unreachable — a different state from "arrived", and
+    // conflating the two is what makes a stranded body grind at a shoreline. Cool down
+    // either way so an unreachable goal cannot burn a full-grid search every tick.
+    holder.failed = holder.path === null
+    holder.pathCool = holder.path ? 0.5 : 2.0
+  }
+
+  const wp = holder.path?.[0]
+  if (!wp) return slideToward(mask, from, goal, speed, dt)
+
+  const next = slideToward(mask, from, wp, speed, dt)
+  if (torusDistance(next, wp) < 0.35) holder.path!.shift()
+  return next
+}
+
+/**
+ * Advance every mob in the zone: patrol its route, notice the hero, chase, or give up.
+ *
+ * This is what replaces "the targeted mob's bearing shrinks to zero". A mob is somewhere,
+ * doing something, whether or not it is the player's current target — which is the whole
+ * difference between a populated zone and a queue of enemies waiting to be served.
+ *
+ * Returns any log lines worth surfacing (being noticed is information the player needs).
+ */
+function advanceMobs(
+  state: GameState,
+  mobs: MobInstance[],
+  player: { x: number; y: number },
+  dt: number,
+  targetMobId: string | null,
+): ReturnType<typeof log>[] {
+  const zm = state.zoneMaps[state.currentZone]
+  const mask = zm ? getWalkMask(zm) : null
+  const logs: ReturnType<typeof log>[] = []
+
+  for (const m of mobs) {
+    const distToPlayer = torusDistance(m.pos, player)
+    const temperament = temperamentOf(m)
+
+    // ── Noticing ────────────────────────────────────────────────────────────
+    // You started it. Whoever the hero has targeted is aggroed regardless of distance —
+    // a thing you are shooting at from across the zone should turn and come for you, and
+    // this is also what makes idle auto-pilot's chosen quarry walk in to meet it.
+    if (targetMobId && m.id === targetMobId) m.aggro = true
+
+    // Proximity aggro, per temperament.
+    if (!m.aggro && distToPlayer <= m.aggroRadius) {
+      m.aggro = true
+      m.patrolTarget = null
+      // Only predators announce themselves. A territorial thing you walked into does not
+      // need a line of combat log; you can see it, and narrating every mushroom you brush
+      // past turns the feed into noise.
+      if (temperament === 'predator') {
+        logs.push(log('mob_attack', `${m.name} spots you and charges!`, '#ff8844'))
+      }
+    }
+
+    if (m.aggro) {
+      // ── Leash ─────────────────────────────────────────────────────────────
+      // Without this a single wolf tows the hero across the entire zone and every
+      // encounter ends up happening wherever the player happened to be running.
+      const fromHome = torusDistance(m.pos, m.home)
+      if (fromHome > LEASH_DISTANCE && distToPlayer > m.aggroRadius) {
+        m.aggro = false
+        m.patrolTarget = { ...m.home }
+        continue
+      }
+      // A lair boss defends its ground and does not pursue.
+      if (temperament === 'lair') continue
+      m.pos = routeToward(mask, m, m.pos, player, CHASE_SPEED, dt)
+      continue
+    }
+
+    // ── Patrol ──────────────────────────────────────────────────────────────
+    const range = patrolRangeFor(m)
+    if (range <= 0) continue   // bosses hold the lair
+
+    if (m.patrolPause > 0) { m.patrolPause -= dt; continue }
+
+    if (!m.patrolTarget) {
+      const ang = Math.random() * Math.PI * 2
+      const dist = Math.random() * range
+      let tx = wrapTileCoord(m.home.x + Math.cos(ang) * dist)
+      let ty = wrapTileCoord(m.home.y + Math.sin(ang) * dist)
+      if (mask && !isWalkable(mask, tx, ty)) {
+        const near = nearestWalkable(mask, tx, ty)
+        tx = wrapTileCoord(near.x); ty = wrapTileCoord(near.y)
+      }
+      m.patrolTarget = { x: tx, y: ty }
+    }
+
+    const before = m.pos
+    m.pos = routeToward(mask, m, m.pos, m.patrolTarget, PATROL_SPEED, dt)
+    const arrived = torusDistance(m.pos, m.patrolTarget) < 0.3
+    // Wedged against terrain counts as arrived, or a mob grinds into a cliff forever.
+    const stuck = Math.hypot(torusDelta(before.x, m.pos.x), torusDelta(before.y, m.pos.y)) < 1e-4
+    if (arrived || stuck) {
+      m.patrolTarget = null
+      // Pause at the waypoint. A body that pivots and departs the instant it arrives
+      // reads as a patrol route; one that stops and looks around reads as an animal.
+      m.patrolPause = 1.5 + Math.random() * 4
+    }
+  }
+
+  return logs
+}
+
+/**
+ * One step of the world: move the hero, move every mob, re-derive the player-relative
+ * projections, and retire anything provably unreachable.
+ *
+ * Extracted so it can run on BOTH tick paths. The no-target branch returns early (there
+ * is no fight to resolve), and it used to skip all of this — which meant that the moment
+ * the hero had no target, the entire zone froze: no patrols, no aggro checks, no hero
+ * movement. In idle that was nearly invisible because a target is almost always set, but
+ * manual control deliberately clears the target, so it froze the world for exactly the
+ * mode this work exists to serve.
+ */
+function tickWorld(
+  state: GameState,
+  controlMode: 'idle' | 'manual',
+  mobs: MobInstance[],
+  currentMob: MobInstance | null,
+  targetMobId: string | null,
+  dt: number,
+): {
+  playerMapPos: { x: number; y: number }
+  mobs: MobInstance[]
+  currentMob: MobInstance | null
+  targetMobId: string | null
+  mobMapOffset: { dx: number; dy: number }
+  logs: ReturnType<typeof log>[]
+} {
+  const playerMapPos = advancePlayerPosition(state, controlMode, mobs, currentMob, dt)
+  const logs = advanceMobs(state, mobs, playerMapPos, dt, targetMobId)
+
+  // Retire the marooned. A mob the hero provably cannot walk to is not content, it is a
+  // deadlock: auto-targeting picks by raw distance, so it can be selected and then never
+  // closed on. Bosses are exempt — quietly deleting one would be worse than the stall.
+  if (unreachableFor.size) {
+    const marooned = mobs.filter(
+      m => !m.isBoss && (unreachableFor.get(m.id) ?? 0) > UNREACHABLE_RETIRE_SECONDS,
+    )
+    for (const m of marooned) {
+      unreachableFor.delete(m.id)
+      mobs = mobs.filter(x => x.id !== m.id)
+      if (targetMobId === m.id) { targetMobId = null; currentMob = null }
+      logs.push(log('proc', `${m.name} wanders out of reach.`, '#8a8070'))
+    }
+  }
+
+  // Derive the player-relative projections every existing consumer still reads: the
+  // renderer's entity placement, `nearestMob`, `setTarget`, `engageTarget`.
+  for (const m of mobs) {
+    m.offset = {
+      dx: torusDelta(playerMapPos.x, m.pos.x),
+      dy: torusDelta(playerMapPos.y, m.pos.y),
+    }
+  }
+  if (currentMob) {
+    const live = mobs.find(m => m.id === currentMob!.id)
+    if (live) currentMob = live
+  }
+  return {
+    playerMapPos, mobs, currentMob, targetMobId,
+    mobMapOffset: currentMob ? currentMob.offset : { dx: 0, dy: 0 },
+    logs,
+  }
+}
+
 function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
   const zone = ZONES[zoneId]
   if (!zone) return null
@@ -799,10 +1176,16 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
   // Circuit scaling: each completed loop increases mob HP and damage by 50%
   const circuitMult = 1 + (state.zoneCircuit ?? 0) * 0.5
 
+  // Hoisted: temperament and placement are both derived from the display name, since
+  // that is what `mobBehaviour` matches on.
+  const name = isBoss ? `[BOSS] ${template.name}`
+    : isElite ? `★ ${template.name}`
+    : template.name
+
   return {
     id: `mob_${++mobInstanceSeq}`,
     templateId: template.id,
-    name: isBoss ? `[BOSS] ${template.name}` : isElite ? `★ ${template.name}` : template.name,
+    name,
     currentHp: Math.round(template.hp * hpMult * circuitMult),
     maxHp:     Math.round(template.hp * hpMult * circuitMult),
     damage: Math.round(template.damage * circuitMult),
@@ -814,16 +1197,111 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
     attackSpeedSeconds: template.attackSpeedSeconds * dmgMult,
     isElite,
     isBoss,
-    offset: spawnOffset(),
+    ...placeInWorld(state, { name, isBoss }),
     dots: [],
   }
 }
 
-/** A fresh spawn ring position: far enough to walk to, near enough to find. */
-function spawnOffset(): { dx: number; dy: number } {
-  const ang = Math.random() * Math.PI * 2
-  const dist = 9 + Math.random() * 7
-  return { dx: Math.cos(ang) * dist, dy: Math.sin(ang) * dist }
+/** Wrap a tile coordinate onto the 64×64 torus. */
+function wrapTileCoord(v: number): number {
+  return ((v % 64) + 64) % 64
+}
+
+/** Shortest signed distance a→b across the torus seam. */
+function torusDelta(a: number, b: number): number {
+  let d = b - a
+  if (d > 32) d -= 64
+  if (d < -32) d += 64
+  return d
+}
+
+export function torusDistance(
+  a: { x: number; y: number }, b: { x: number; y: number },
+): number {
+  return Math.hypot(torusDelta(a.x, b.x), torusDelta(a.y, b.y))
+}
+
+/**
+ * Give a newly spawned mob a real place to stand.
+ *
+ * The old `spawnOffset` returned a bearing from the player, which meant a mob had no
+ * location at all: walk east and the whole population walked east with you, permanently
+ * arranged around the camera. Every zone therefore read as a slot machine dispensing
+ * enemies rather than as ground with things living on it.
+ *
+ * A home anchor is chosen on walkable ground at a plausible remove — far enough that
+ * arriving somewhere feels like travel, near enough that a zone is not empty — and the
+ * mob spawns on it. `offset` is no longer authored here at all; the tick derives it.
+ */
+function placeInWorld(
+  state: GameState, mob: { name: string; isBoss: boolean },
+): Pick<MobInstance,
+  'pos' | 'home' | 'patrolTarget' | 'patrolPause' | 'aggro' | 'aggroRadius' | 'offset'
+  | 'path' | 'pathCool'> {
+  const zm = state.zoneMaps[state.currentZone]
+  const player = state.playerMapPos
+  // Bosses hold a fixed lair rather than milling about the zone, so they are placed
+  // further out: the walk to them is part of the encounter.
+  const min = mob.isBoss ? 14 : 12
+  const span = mob.isBoss ? 6 : 14
+
+  let x = 0, y = 0
+  const mask = zm ? getWalkMask(zm) : null
+
+  // Try a few bearings before settling. Two things have to hold, and the second is the
+  // one that is easy to miss: the ground must be walkable, AND it must be REACHABLE from
+  // where the hero is standing.
+  //
+  // `walkability` seals small pockets but keeps any region of 24+ tiles, so a zone can
+  // have several disconnected landmasses — the worst measured has seven. A mob placed on
+  // the far side of a lake passes `isWalkable` and is still unreachable forever, and
+  // because the hero walks to whatever is nearest, one such spawn can hold the entire
+  // idle loop hostage. The economy harness caught exactly that: a level-1 hero, 900
+  // seconds, zero kills.
+  let placed = false
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const ang = Math.random() * Math.PI * 2
+    const dist = min + Math.random() * span
+    x = wrapTileCoord(player.x + Math.cos(ang) * dist)
+    y = wrapTileCoord(player.y + Math.sin(ang) * dist)
+    if (!mask) { placed = true; break }
+    if (!isWalkable(mask, x, y)) continue
+    // Reachable? A straight walk is the cheap answer; A* is the honest one.
+    if (hasLineOfWalk(mask, player.x, player.y, x, y)
+        || findPath(mask, player.x, player.y, x, y) !== null) {
+      placed = true
+      break
+    }
+  }
+  if (!placed && mask) {
+    // Nothing sampled was reachable — rather than strand a spawn on an island, fall back
+    // to ground the hero is provably standing on and push out from there.
+    const near = nearestWalkable(mask, player.x, player.y)
+    const ang = Math.random() * Math.PI * 2
+    for (let r = min; r >= 2; r -= 2) {
+      const cx = wrapTileCoord(near.x + Math.cos(ang) * r)
+      const cy = wrapTileCoord(near.y + Math.sin(ang) * r)
+      if (isWalkable(mask, cx, cy) && hasLineOfWalk(mask, near.x, near.y, cx, cy)) {
+        x = cx; y = cy; break
+      }
+      x = wrapTileCoord(near.x); y = wrapTileCoord(near.y)
+    }
+  }
+
+  const home = { x, y }
+  return {
+    pos: { x, y },
+    home,
+    patrolTarget: null,
+    path: null,
+    pathCool: 0,
+    // Stagger the first waypoint pick, or every mob in a fresh zone steps off together
+    // and the whole population moves in lockstep — which reads as a machine, not a place.
+    patrolPause: Math.random() * 4,
+    aggro: false,
+    aggroRadius: aggroRadiusFor(mob),
+    offset: { dx: torusDelta(player.x, x), dy: torusDelta(player.y, y) },
+  }
 }
 
 /** How many enemies populate a zone at once. The boss fights alone — a lair should not
@@ -855,6 +1333,9 @@ let rampageDecayAccum = 0
 let minionAccum = 0
 const MINION_TICK_SECONDS = 2
 
+/** Seconds of inactivity before manual control falls back to idle. */
+const MANUAL_IDLE_TIMEOUT_SECONDS = 15
+
 /**
  * Bumped whenever the talent trees change shape enough that existing allocations
  * should not be assumed still sensible. Version 2 is the three-specs-per-class rework:
@@ -869,6 +1350,10 @@ export function resetCombatAccumulators() {
   siphonLifeAccum   = 0
   rampageDecayAccum = 0
   minionAccum       = 0
+  playerPath.path   = null
+  playerPath.pathCool = 0
+  playerPath.failed = false
+  unreachableFor.clear()
 }
 
 /** Seconds without a kill before Rampage sheds a stack. */
@@ -909,6 +1394,9 @@ interface GameActions {
   cancelTravel: () => void
   cycleZoom: () => void
   setMode: (mode: GameMode) => void
+  setControlMode: (mode: 'idle' | 'manual') => void
+  bumpManualInput: () => void
+  reportPlayerWorldPos: (x: number, y: number) => void
   startCrafting: (recipeId: RecipeId) => void
   strikeNode: () => void
   dismissCraftResult: () => void
@@ -938,7 +1426,18 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Roll this character's world. Zone identity used to be the entire seed, so every
     // playthrough shared one fixed map; now each hero gets their own terrain, node
     // placement and scenery, and every prestige circuit re-rolls it again.
-    s.worldSeed = (Math.floor(Math.random() * 0xFFFFFFFF) ^ Date.now()) | 0
+    // Drawn from `Math.random` ALONE. This used to XOR in `Date.now()`, which made the
+    // world unseedable: `tools/sim/run.mjs` installs a seeded global `Math.random`, so
+    // every other roll in a scenario is reproducible, but the terrain still changed with
+    // the wall clock. Consecutive `--assert` runs of identical code therefore disagreed —
+    // offline parity measured 5.9%, 10.9% and 23.0% on three runs — and invariant
+    // failures appeared and vanished between shapes.
+    //
+    // That was invisible until mobs and the hero started occupying real ground: when
+    // enemies simply walked in from a ring, terrain barely touched the economy. Now it
+    // decides all of it, so an unseeded map means an unmeasurable game. 32 bits of
+    // `Math.random` is ample uniqueness for a real character.
+    s.worldSeed = Math.floor(Math.random() * 0xFFFFFFFF) | 0
     s.zoneMaps = { sunhollow_meadows: generateZoneMap('sunhollow_meadows', mapSeed(s)) }
     s.activeQuest = makeZoneQuest('sunhollow_meadows', s.playerFaction)
     s.completedQuestIds = []
@@ -1206,6 +1705,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       gold, xp, level, inventory, equipment, activeDoTs, activeBuffs,
       procState, castState, floatingNumbers, totalZoneKills, zoneKillCounts,
       bossesDefeated, unlockedZones, currentZone, skillCooldowns, talentAllocs,
+      controlMode, manualIdleTimer,
     } = state
 
     // Clone
@@ -1257,9 +1757,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     let target = mobs.find(m => m.id === targetMobId) ?? null
     if (!target) {
       // No valid choice standing — auto-play picks the nearest. The player's pick always
-      // wins while it lives; this only fills the vacuum.
-      target = nearestMob(mobs)
-      targetMobId = target?.id ?? null
+      // wins while it lives; this only fills the vacuum. In manual mode the hero does not
+      // auto-acquire a target so the player can move freely.
+      if (controlMode === 'idle') {
+        target = nearestMob(mobs)
+        targetMobId = target?.id ?? null
+      }
     }
     currentMob = target
     activeDoTs = target ? target.dots : []
@@ -1284,6 +1787,19 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (procState.mobFrozen) {
       procState.mobFrozenTimer -= deltaSeconds
       if (procState.mobFrozenTimer <= 0) procState.mobFrozen = false
+    }
+
+    // ── Manual-mode idle fallback ─────────────────────────────────────────────
+    // Only counts down in active combat; menus/travel/gathering/town are not "manual"
+    // control contexts, so they don't steal the player's 15 seconds.
+    if (controlMode === 'manual') {
+      manualIdleTimer = Math.max(0, manualIdleTimer - deltaSeconds)
+      if (manualIdleTimer <= 0) {
+        controlMode = 'idle'
+        manualIdleTimer = 0
+        targetMobId = null   // let idle auto-pilot pick freely next tick
+        newLogs.push(log('proc', 'Manual control released — resuming idle patrol.', '#aaaaff'))
+      }
     }
 
     // ── Advance the player's spell cast ─────────────────────────────────────
@@ -1329,7 +1845,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (!isBossPresent(mobs) && (persistedBoss || mobs.length < MOB_POPULATION)) {
       mobRespawnTimer = Math.max(0, mobRespawnTimer - deltaSeconds)
       if (mobRespawnTimer <= 0) {
-        const spawned = persistedBoss ?? spawnMob(currentZone, state)
+        let spawned = persistedBoss ?? spawnMob(currentZone, state)
         persistedBoss = null
         if (spawned) {
           if (spawned.isBoss) {
@@ -1343,6 +1859,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             resetCombatAccumulators()
           } else {
             mobs.push(spawned)
+            // The roaming ambush that used to live here teleported a freshly spawned mob
+            // to 2 tiles off the hero, made it the target, and yanked control back to
+            // idle — a fight arriving out of nowhere on a dice roll. That is the exact
+            // slot-machine beat this rework exists to remove. A mob now spawns somewhere
+            // real and walks its patrol; if it comes for you it is because you got close
+            // enough for it to notice, or because you hit it. See `advanceMobs`.
           }
           if (fx.iceBarrierAbsorb > 0 && procState.iceBarrierHp <= 0) {
             procState.iceBarrierHp = fx.iceBarrierAbsorb
@@ -1357,8 +1879,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         mobRespawnTimer = MOB_RESPAWN_SECONDS
       }
       // Re-resolve: the population may have just gained the mob we should be fighting.
+      //
+      // Honours manual control, which the equivalent block above already did — this one
+      // did not, and since it runs whenever a mob spawns (i.e. constantly), it re-acquired
+      // a target within a second or two of the player taking over and defeated the gate
+      // entirely. That is the auto-attacking and auto-walking that survived: with a target
+      // set, the store fights it and the adapter's committed-target branch walks the hero
+      // to it, neither of which ever consults `controlMode`.
       if (!currentMob) {
-        target = mobs.find(m => m.id === targetMobId) ?? nearestMob(mobs)
+        target = mobs.find(m => m.id === targetMobId)
+          ?? (controlMode === 'idle' ? nearestMob(mobs) : null)
         targetMobId = target?.id ?? null
         currentMob = target
         activeDoTs = target ? target.dots : []
@@ -1366,10 +1896,24 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
     }
 
-    // Nothing to fight at all — hold here until the population refills.
+    // Nothing to FIGHT — but the world still turns, and the hero still has a body.
+    //
+    // This branch used to `set` a handful of combat fields and return, which quietly made
+    // it the most consequential line in the tick: it skipped the world simulation AND
+    // dropped `controlMode`/`manualIdleTimer` from the write, so the locals the countdown
+    // had just decremented were discarded and the timer reverted to 15 every tick. Manual
+    // control therefore never expired — and since manual control deliberately clears the
+    // target, this branch is the one manual mode runs through constantly. The same
+    // omission froze every mob's patrol and every aggro check for as long as the hero had
+    // nothing targeted.
     if (!currentMob) {
-      set({ mobs, targetMobId, currentMob: null, mobMapOffset: { dx: 0, dy: 0 },
+      const idle = tickWorld(state, controlMode, mobs, null, targetMobId, deltaSeconds)
+      if (idle.logs.length) newLogs.push(...idle.logs)
+      set({ mobs: idle.mobs, targetMobId: idle.targetMobId, currentMob: null,
+            mobMapOffset: idle.mobMapOffset, playerMapPos: idle.playerMapPos,
+            controlMode, manualIdleTimer,
             persistedBoss, mobRespawnTimer, procState, skillCooldowns, castState,
+            totalPlayTime: state.totalPlayTime + deltaSeconds,
             combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX) })
       return
     }
@@ -1859,33 +2403,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if (enteredNode) nextGameMode = 'gathering'
     }
 
-    // ── World drift (combat) — slow wander so map scrolls past player ────────
-    const driftAngle = state.totalPlayTime * 0.08
-    const driftX = Math.cos(driftAngle) * 0.5 * deltaSeconds
-    const driftY = Math.sin(driftAngle * 0.7) * 0.3 * deltaSeconds
-    const playerMapPos = driftMapPos(state, driftX, driftY)
-
-    // ── Mob movement ──────────────────────────────────────────────────────────
-    // Only the ENGAGED target closes; the rest hold station so the player has a standing
-    // choice of enemies rather than a queue that walks into them one at a time.
-    let mobMapOffset = { dx: 0, dy: 0 }
-    if (currentMob) {
-      const off = currentMob.offset
-      const dist = Math.sqrt(off.dx * off.dx + off.dy * off.dy)
-      if (dist !== 0) {
-        const speed = 2.5  // tiles per second
-        if (dist < 0.3) currentMob.offset = { dx: 0, dy: 0 }
-        else {
-          const factor = Math.max(0, 1 - speed * deltaSeconds / dist)
-          currentMob.offset = { dx: off.dx * factor, dy: off.dy * factor }
-        }
-      }
-      mobMapOffset = currentMob.offset
-    }
-
     // ── Write the projections back into the population ────────────────────────
     // currentMob/activeDoTs were handed to the (single-target) combat code above; fold
     // the results back so `mobs` stays authoritative.
+    //
+    // This now runs BEFORE the world tick rather than after it. The combat code rebuilds
+    // `currentMob` as a fresh object on every hit (`{ ...currentMob, currentHp: … }`), so
+    // by this point it is no longer the same reference as its entry in `mobs` — and a
+    // world tick that moved one of the two would silently have its work discarded when
+    // the other was written out.
     if (currentMob) {
       currentMob.dots = activeDoTs
       const i = mobs.findIndex(m => m.id === currentMob!.id)
@@ -1894,6 +2420,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if (i >= 0) { mobs[i] = currentMob; targetMobId = currentMob.id }
       else { currentMob = null; targetMobId = null }
     }
+
+    // ── The world tick ────────────────────────────────────────────────────────
+    // One simulation, both control modes and both tick paths — see `tickWorld`.
+    const world = tickWorld(state, controlMode, mobs, currentMob, targetMobId, deltaSeconds)
+    const playerMapPos = world.playerMapPos
+    mobs = world.mobs
+    currentMob = world.currentMob
+    targetMobId = world.targetMobId
+    const mobMapOffset = world.mobMapOffset
+    if (world.logs.length) newLogs.push(...world.logs)
 
     // Prune old floating numbers
     const now = Date.now()
@@ -1905,6 +2441,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       inventory, equipment, activeDoTs, activeBuffs, procState, castState, skillCooldowns,
       floatingNumbers: allFns,
       totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones, currentZone,
+      controlMode, manualIdleTimer,
       totalPlayTime: state.totalPlayTime + deltaSeconds,
       offlineRates: accrueRates(
         state.offlineRates, deltaSeconds, killGoldThisTick, xpThisTick, killsThisTick,
@@ -2203,6 +2740,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   activateAbility: (abilityId) => {
     const s = get()
     if (!s.isAlive) return
+    // Using an ability keeps manual control ALIVE, but does not seize it. Seizing now
+    // drops the auto-pilot's target (see `bumpManualInput`), and firing a spell at the
+    // thing you are fighting must not untarget it one line before the effect resolves.
+    // Taking control is what movement input is for.
+    if (s.controlMode === 'manual') get().bumpManualInput()
     if (s.castState) return                       // one cast at a time — no spam/queue
     if ((s.skillCooldowns[abilityId] ?? 0) > 0) return
     const ability = ACTIVE_ABILITIES.find(a => a.id === abilityId)
@@ -2407,6 +2949,58 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     }
   },
 
+  setControlMode: (mode) => {
+    if (mode === get().controlMode) {
+      if (mode === 'manual') set({ manualIdleTimer: MANUAL_IDLE_TIMEOUT_SECONDS })
+      return
+    }
+    if (mode === 'manual') {
+      set({ controlMode: 'manual', manualIdleTimer: MANUAL_IDLE_TIMEOUT_SECONDS })
+    } else {
+      set({ controlMode: 'idle', manualIdleTimer: 0 })
+    }
+  },
+
+  // The renderer owns the hero's feet under manual control — it is the only thing that
+  // sees WASD and taps — so it reports them back here. Without this the store has no idea
+  // where the player actually is while they are steering, which is what made proximity
+  // aggro impossible: `playerMapPos` was a sine-wave drift that ignored input entirely.
+  reportPlayerWorldPos: (x, y) => {
+    const wrap = (v: number) => ((v % 64) + 64) % 64
+    const p = get().playerMapPos
+    const nx = wrap(x), ny = wrap(y)
+    // Sub-tenth-of-a-tile moves are below anything the simulation reacts to, and this is
+    // called every frame — skipping them avoids a store write (and a React re-render
+    // storm) 60 times a second while the hero stands still.
+    if (Math.abs(p.x - nx) < 0.05 && Math.abs(p.y - ny) < 0.05) return
+    set({ playerMapPos: { x: nx, y: ny } })
+  },
+
+  bumpManualInput: () => {
+    if (get().controlMode === 'manual') {
+      set({ manualIdleTimer: MANUAL_IDLE_TIMEOUT_SECONDS })
+      return
+    }
+    // ── Taking control releases the auto-pilot's fight ────────────────────────
+    // Gating target ACQUISITION was not enough: those checks are all `if (!currentMob)`,
+    // so a fight already under way when the player grabs the reins simply continued —
+    // the hero kept swinging and the adapter's committed-target branch kept walking them
+    // back in. Measured as `engaged: true` persisting for 18s after a keypress, which is
+    // exactly the "manual mode still autoattacks and autowalks" report.
+    //
+    // Dropping the target is what "override" has to mean. Anything with aggro on you
+    // still chases and can still hit you — you are simply no longer swinging at something
+    // you did not choose. Re-target deliberately by tapping it.
+    set({
+      controlMode: 'manual',
+      manualIdleTimer: MANUAL_IDLE_TIMEOUT_SECONDS,
+      targetMobId: null,
+      currentMob: null,
+      activeDoTs: [],
+    })
+    resetCombatAccumulators()
+  },
+
   startCrafting: (recipeId) => {
     const s = get()
     const recipe = RECIPES.find(r => r.id === recipeId)
@@ -2521,6 +3115,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const mob = s.mobs.find(m => m.id === mobId)
     if (!mob || !s.isAlive || s.gameMode !== 'combat') return
     if (s.targetMobId === mobId) return
+    get().bumpManualInput()
     set({ targetMobId: mobId, currentMob: mob, activeDoTs: mob.dots, mobMapOffset: mob.offset })
     resetCombatAccumulators()
   },
@@ -2530,6 +3125,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const mob = s.currentMob
     if (!mob || s.gameMode !== 'combat' || !s.isAlive) return
     if (mob.offset.dx === 0 && mob.offset.dy === 0) return
+    // Deliberately does NOT bump manual control. This fires from the render adapter when
+    // a committed target is REACHED (`onEngageTarget`), which happens on every idle kill —
+    // so bumping here re-asserted manual control a few times a minute forever, the 15s
+    // timeout never elapsed, and `controlMode` was pinned to 'manual' for the whole
+    // session. That is why manual mode was indistinguishable from idle: the flag never
+    // meant anything. Arriving at a mob is the auto-pilot working, not the player
+    // steering. Explicit intent still bumps it — `setTarget` (tapping an enemy),
+    // `activateAbility` (pressing a button), WASD and tap-to-move.
     // Collapse the target's own approach, and fold it back into the population so the
     // next tick's projection sees the closed gap.
     const closed = { ...mob, offset: { dx: 0, dy: 0 } }

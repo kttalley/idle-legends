@@ -1,0 +1,112 @@
+// What kind of animal is this, and how does it behave when you walk past?
+//
+// ── Why this is its own module ────────────────────────────────────────────────
+// These patterns started in the render adapter, where they decided whether a mob charged
+// you or held its ground and whether it lunged or cast from range. Once the STORE also
+// needed temperament — to decide who notices the hero and from how far — the choice was
+// to duplicate the regexes or to lift them somewhere both layers can import. Duplicating
+// behaviour tables is how a mob ends up charging in the simulation and standing still on
+// screen, so: one definition, imported by both.
+//
+// ── Why regexes over per-mob data ─────────────────────────────────────────────
+// Matching on the name means 12 zones × 4 mobs need no authoring pass to get distinct
+// behaviour, and the bestiary already names things descriptively. The cost is real and
+// worth stating: a mob's NAME now changes how it acts, so renaming content changes
+// gameplay silently. If temperament ever needs to diverge from what a thing is called,
+// this becomes a `MobTemplate` field and these patterns become its default.
+
+import type { MobInstance } from '../data/types'
+
+/** Ranged/caster archetypes — they keep their distance and cast rather than closing. */
+export const RANGED_RE =
+  /archer|ranger|hunter|gunner|warlock|mage|magus|caster|spellcaster|shaman|priest|seer|oracle|necromancer|sorcerer|conjurer|elementalist|pyromancer|cryomancer/
+
+/** Predators and raiders. These CHARGE — they close on you and you receive them. */
+export const AGGRESSIVE_RE =
+  /wolf|worgen|raptor|tiger|stalker|boar|beast|berserker|marauder|raider|reaver|hound|vulture|swarm|prowler|savage|rabid|feral|thug|bandit|brute|charger/
+
+export type Temperament =
+  /** Charges on sight from a long way off. */
+  | 'predator'
+  /** Ignores you until you get close, or until you hit it first. */
+  | 'territorial'
+  /** Never comes to you. You walk to the lair. */
+  | 'lair'
+
+export function isRangedMob(mob: Pick<MobInstance, 'name'>): boolean {
+  return RANGED_RE.test(mob.name.toLowerCase())
+}
+
+export function temperamentOf(mob: Pick<MobInstance, 'name' | 'isBoss'>): Temperament {
+  // Bosses never charge, whatever they are called — a lair encounter that walks out to
+  // meet you in a corridor stops reading as a climax.
+  if (mob.isBoss) return 'lair'
+  return AGGRESSIVE_RE.test(mob.name.toLowerCase()) ? 'predator' : 'territorial'
+}
+
+// ── Aggro ranges, in tiles ────────────────────────────────────────────────────
+// The gap between these two numbers is the entire feel of walking through a zone: too
+// close together and every mob behaves the same, too far apart and predators are
+// unavoidable while everything else is scenery. A predator's radius is deliberately wider
+// than the hero's own visible radius is comfortable with, so being noticed happens BEFORE
+// you have finished deciding whether to engage — that is what makes a wolf a threat and a
+// mushroom a landmark.
+
+export const AGGRO_PREDATOR = 8.5
+export const AGGRO_TERRITORIAL = 3.0
+/** A lair boss still defends itself once you are on top of it. */
+export const AGGRO_LAIR = 2.0
+
+export function aggroRadiusFor(mob: Pick<MobInstance, 'name' | 'isBoss'>): number {
+  switch (temperamentOf(mob)) {
+    case 'predator':    return AGGRO_PREDATOR
+    case 'lair':        return AGGRO_LAIR
+    default:            return AGGRO_TERRITORIAL
+  }
+}
+
+/** How far a mob will wander from its home anchor while patrolling. Predators range
+ *  wider — a territorial thing that strayed six tiles from its post is not territorial. */
+export function patrolRangeFor(mob: Pick<MobInstance, 'name' | 'isBoss'>): number {
+  switch (temperamentOf(mob)) {
+    case 'predator':    return 6
+    case 'lair':        return 0   // a boss holds the lair; it does not pace the zone
+    default:            return 3
+  }
+}
+
+/**
+ * World fields for a mob that is NOT part of the zone simulation.
+ *
+ * Two of these exist and both are legitimate: the ambient sparring partner the render
+ * adapter spawns for a party companion (positioned by the adapter, never in the store's
+ * `mobs`), and the synthetic combatant the determinism harness feeds to `runFight`.
+ * Neither patrols and neither notices the hero, so rather than inventing plausible
+ * coordinates for them — which would put fake bodies into a system that assumes its
+ * contents are real — they get one explicitly inert shape with a name that says so.
+ */
+export function combatantOnlyWorldFields(): Pick<
+  MobInstance,
+  'pos' | 'home' | 'patrolTarget' | 'patrolPause' | 'aggro' | 'aggroRadius' | 'path' | 'pathCool'
+> {
+  return {
+    pos: { x: 0, y: 0 },
+    home: { x: 0, y: 0 },
+    patrolTarget: null,
+    patrolPause: 0,
+    path: null,
+    pathCool: 0,
+    // Already fighting, by construction — nothing needs to notice anyone.
+    aggro: true,
+    aggroRadius: 0,
+  }
+}
+
+/** Patrol gait, tiles/sec. Slower than the hero on purpose: you should be able to walk
+ *  away from something that has not decided to chase you yet. */
+export const PATROL_SPEED = 1.1
+/** Chase gait once aggroed. Faster than patrol, and predators run down what they notice. */
+export const CHASE_SPEED = 2.5
+/** Beyond this from its home, an aggroed mob gives up and walks back — the leash that
+ *  stops one wolf towing you across the entire zone. */
+export const LEASH_DISTANCE = 14

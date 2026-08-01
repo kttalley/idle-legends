@@ -1,0 +1,505 @@
+# Idle Legends — fight resolver golden log
+# Regenerate with: node tools/sim/fight.mjs --update-golden
+# A diff here is a COMBAT BEHAVIOUR CHANGE. Read it before accepting it.
+
+## warrior vs mob | seed=1000
+seed=1000 winner=0 duration=15 hp=1705,0
+2.00 s1 swing dmg=45 crit=0 hp=1975
+2.50 s0 swing dmg=91 crit=0 hp=611
+4.00 s1 swing dmg=45 crit=0 hp=1930
+5.00 s0 swing dmg=91 crit=0 hp=520
+6.00 s1 swing dmg=45 crit=0 hp=1885
+7.50 s0 swing dmg=91 crit=0 hp=429
+8.00 s1 swing dmg=45 crit=0 hp=1840
+10.00 s0 swing dmg=91 crit=0 hp=338
+10.00 s1 swing dmg=45 crit=0 hp=1795
+12.00 s1 swing dmg=45 crit=0 hp=1750
+12.50 s0 swing dmg=181 crit=1 hp=157
+14.00 s1 swing dmg=45 crit=0 hp=1705
+15.00 s0 swing dmg=181 crit=1 hp=0
+15.00 s1 death dmg=0 crit=0 hp=0
+
+## mage vs mob | seed=1000
+seed=1000 winner=0 duration=14.5 hp=1513,0
+2.00 s0 swing dmg=61 crit=0 hp=641
+2.00 s1 swing dmg=51 crit=0 hp=1819
+3.75 s0 swing dmg=61 crit=0 hp=580
+4.00 s1 swing dmg=51 crit=0 hp=1768
+5.50 s0 swing dmg=61 crit=0 hp=519
+6.00 s1 swing dmg=51 crit=0 hp=1717
+7.25 s0 swing dmg=61 crit=0 hp=458
+8.00 s1 swing dmg=51 crit=0 hp=1666
+9.25 s0 swing dmg=121 crit=1 hp=337
+10.00 s1 swing dmg=51 crit=0 hp=1615
+11.00 s0 swing dmg=121 crit=1 hp=216
+12.00 s1 swing dmg=51 crit=0 hp=1564
+12.75 s0 swing dmg=121 crit=1 hp=95
+14.00 s1 swing dmg=51 crit=0 hp=1513
+14.50 s0 swing dmg=121 crit=1 hp=0
+14.50 s1 death dmg=0 crit=0 hp=0
+
+## rogue vs mob | seed=1000
+seed=1000 winner=0 duration=15 hp=1547,0
+1.50 s0 swing dmg=53 crit=0 hp=649
+2.00 s1 swing dmg=49 crit=0 hp=1841
+3.00 s0 swing dmg=53 crit=0 hp=596
+4.00 s1 swing dmg=49 crit=0 hp=1792
+4.50 s0 swing dmg=53 crit=0 hp=543
+6.00 s0 swing dmg=53 crit=0 hp=490
+6.00 s1 swing dmg=49 crit=0 hp=1743
+7.50 s0 swing dmg=105 crit=1 hp=385
+8.00 s1 swing dmg=49 crit=0 hp=1694
+9.00 s0 swing dmg=105 crit=1 hp=280
+10.00 s1 swing dmg=49 crit=0 hp=1645
+10.50 s0 swing dmg=105 crit=1 hp=175
+12.00 s0 swing dmg=105 crit=1 hp=70
+12.00 s1 swing dmg=49 crit=0 hp=1596
+13.50 s0 swing dmg=53 crit=0 hp=17
+14.00 s1 swing dmg=49 crit=0 hp=1547
+15.00 s0 swing dmg=53 crit=0 hp=0
+15.00 s1 death dmg=0 crit=0 hp=0
+
+## warlock vs mob | seed=1000
+seed=1000 winner=0 duration=15.5 hp=1570,0
+2.00 s1 swing dmg=50 crit=0 hp=1870
+2.25 s0 swing dmg=71 crit=0 hp=631
+4.00 s1 swing dmg=50 crit=0 hp=1820
+4.50 s0 swing dmg=71 crit=0 hp=560
+6.00 s1 swing dmg=50 crit=0 hp=1770
+6.75 s0 swing dmg=71 crit=0 hp=489
+8.00 s1 swing dmg=50 crit=0 hp=1720
+9.00 s0 swing dmg=71 crit=0 hp=418
+10.00 s1 swing dmg=50 crit=0 hp=1670
+11.25 s0 swing dmg=143 crit=1 hp=275
+12.00 s1 swing dmg=50 crit=0 hp=1620
+13.25 s0 swing dmg=143 crit=1 hp=132
+14.00 s1 swing dmg=50 crit=0 hp=1570
+15.50 s0 swing dmg=143 crit=1 hp=0
+15.50 s1 death dmg=0 crit=0 hp=0
+
+## warrior vs mage (duel) | seed=1000
+seed=1000 winner=1 duration=20 hp=0,1880
+2.00 s1 swing dmg=119 crit=0 hp=2131
+2.50 s0 swing dmg=110 crit=0 hp=3200
+3.75 s1 swing dmg=237 crit=1 hp=1894
+5.00 s0 swing dmg=110 crit=0 hp=3090
+5.50 s1 swing dmg=237 crit=1 hp=1657
+7.25 s1 swing dmg=237 crit=1 hp=1420
+7.50 s0 swing dmg=220 crit=1 hp=2870
+9.25 s1 swing dmg=237 crit=1 hp=1183
+10.00 s0 swing dmg=110 crit=0 hp=2760
+11.00 s1 swing dmg=237 crit=1 hp=946
+12.50 s0 swing dmg=220 crit=1 hp=2540
+12.75 s1 swing dmg=237 crit=1 hp=709
+14.50 s1 swing dmg=119 crit=0 hp=590
+15.00 s0 swing dmg=220 crit=1 hp=2320
+16.25 s1 swing dmg=237 crit=1 hp=353
+17.50 s0 swing dmg=220 crit=1 hp=2100
+18.25 s1 swing dmg=237 crit=1 hp=116
+20.00 s0 swing dmg=220 crit=1 hp=1880
+20.00 s1 swing dmg=237 crit=1 hp=0
+20.00 s0 death dmg=0 crit=0 hp=0
+
+## warrior vs mob | seed=8717
+seed=8717 winner=0 duration=10 hp=2008,0
+2.00 s1 swing dmg=38 crit=0 hp=2122
+2.50 s0 swing dmg=122 crit=0 hp=654
+4.00 s1 swing dmg=38 crit=0 hp=2084
+5.00 s0 swing dmg=244 crit=1 hp=410
+6.00 s1 swing dmg=38 crit=0 hp=2046
+7.50 s0 swing dmg=244 crit=1 hp=166
+8.00 s1 swing dmg=38 crit=0 hp=2008
+10.00 s0 swing dmg=244 crit=1 hp=0
+10.00 s1 death dmg=0 crit=0 hp=0
+
+## mage vs mob | seed=8717
+seed=8717 winner=0 duration=11 hp=1800,0
+2.00 s0 swing dmg=92 crit=0 hp=684
+2.00 s1 swing dmg=42 crit=0 hp=1968
+3.75 s0 swing dmg=184 crit=1 hp=500
+4.00 s1 swing dmg=42 crit=0 hp=1926
+5.50 s0 swing dmg=184 crit=1 hp=316
+6.00 s1 swing dmg=42 crit=0 hp=1884
+7.25 s0 swing dmg=92 crit=0 hp=224
+8.00 s1 swing dmg=42 crit=0 hp=1842
+9.25 s0 swing dmg=92 crit=0 hp=132
+10.00 s1 swing dmg=42 crit=0 hp=1800
+11.00 s0 swing dmg=184 crit=1 hp=0
+11.00 s1 death dmg=0 crit=0 hp=0
+
+## rogue vs mob | seed=8717
+seed=8717 winner=0 duration=10.5 hp=1825,0
+1.50 s0 swing dmg=71 crit=0 hp=705
+2.00 s1 swing dmg=41 crit=0 hp=1989
+3.00 s0 swing dmg=141 crit=1 hp=564
+4.00 s1 swing dmg=41 crit=0 hp=1948
+4.50 s0 swing dmg=141 crit=1 hp=423
+6.00 s0 swing dmg=141 crit=1 hp=282
+6.00 s1 swing dmg=41 crit=0 hp=1907
+7.50 s0 swing dmg=71 crit=0 hp=211
+8.00 s1 swing dmg=41 crit=0 hp=1866
+9.00 s0 swing dmg=141 crit=1 hp=70
+10.00 s1 swing dmg=41 crit=0 hp=1825
+10.50 s0 swing dmg=141 crit=1 hp=0
+10.50 s1 death dmg=0 crit=0 hp=0
+
+## warlock vs mob | seed=8717
+seed=8717 winner=0 duration=13.25 hp=1808,0
+2.00 s1 swing dmg=42 crit=0 hp=2018
+2.25 s0 swing dmg=110 crit=0 hp=666
+4.00 s1 swing dmg=42 crit=0 hp=1976
+4.50 s0 swing dmg=219 crit=1 hp=447
+6.00 s1 swing dmg=42 crit=0 hp=1934
+6.75 s0 swing dmg=219 crit=1 hp=228
+8.00 s1 swing dmg=42 crit=0 hp=1892
+9.00 s0 swing dmg=110 crit=0 hp=118
+10.00 s1 swing dmg=42 crit=0 hp=1850
+11.25 s0 swing dmg=110 crit=0 hp=8
+12.00 s1 swing dmg=42 crit=0 hp=1808
+13.25 s0 swing dmg=219 crit=1 hp=0
+13.25 s1 death dmg=0 crit=0 hp=0
+
+## warrior vs mage (duel) | seed=8717
+seed=8717 winner=1 duration=47 hp=0,156
+2.00 s1 swing dmg=56 crit=0 hp=2474
+2.50 s0 swing dmg=108 crit=1 hp=1992
+3.75 s1 swing dmg=113 crit=1 hp=2361
+5.00 s0 swing dmg=108 crit=1 hp=1884
+5.50 s1 swing dmg=113 crit=1 hp=2248
+7.25 s1 swing dmg=113 crit=1 hp=2135
+7.50 s0 swing dmg=108 crit=1 hp=1776
+9.25 s1 swing dmg=113 crit=1 hp=2022
+10.00 s0 swing dmg=108 crit=1 hp=1668
+11.00 s1 swing dmg=113 crit=1 hp=1909
+12.50 s0 swing dmg=108 crit=1 hp=1560
+12.75 s1 swing dmg=113 crit=1 hp=1796
+14.50 s1 swing dmg=113 crit=1 hp=1683
+15.00 s0 swing dmg=108 crit=1 hp=1452
+16.25 s1 swing dmg=56 crit=0 hp=1627
+17.50 s0 swing dmg=108 crit=1 hp=1344
+18.25 s1 swing dmg=56 crit=0 hp=1571
+20.00 s0 swing dmg=108 crit=1 hp=1236
+20.00 s1 swing dmg=56 crit=0 hp=1515
+21.75 s1 swing dmg=113 crit=1 hp=1402
+22.50 s0 swing dmg=108 crit=1 hp=1128
+23.50 s1 swing dmg=113 crit=1 hp=1289
+25.00 s0 swing dmg=108 crit=1 hp=1020
+25.25 s1 swing dmg=113 crit=1 hp=1176
+27.25 s1 swing dmg=56 crit=0 hp=1120
+27.50 s0 swing dmg=108 crit=1 hp=912
+29.00 s1 swing dmg=113 crit=1 hp=1007
+30.00 s0 swing dmg=108 crit=1 hp=804
+30.75 s1 swing dmg=113 crit=1 hp=894
+32.50 s0 swing dmg=108 crit=1 hp=696
+32.50 s1 swing dmg=113 crit=1 hp=781
+34.25 s1 swing dmg=113 crit=1 hp=668
+35.00 s0 swing dmg=108 crit=1 hp=588
+36.25 s1 swing dmg=113 crit=1 hp=555
+37.50 s0 swing dmg=108 crit=1 hp=480
+38.00 s1 swing dmg=113 crit=1 hp=442
+39.75 s1 swing dmg=113 crit=1 hp=329
+40.00 s0 swing dmg=108 crit=1 hp=372
+41.50 s1 swing dmg=56 crit=0 hp=273
+42.50 s0 swing dmg=108 crit=1 hp=264
+43.25 s1 swing dmg=56 crit=0 hp=217
+45.00 s0 swing dmg=108 crit=1 hp=156
+45.25 s1 swing dmg=113 crit=1 hp=104
+47.00 s1 swing dmg=113 crit=1 hp=0
+47.00 s0 death dmg=0 crit=0 hp=0
+
+## warrior vs mob | seed=16434
+seed=16434 winner=0 duration=5 hp=2364,0
+2.00 s1 swing dmg=43 crit=0 hp=2407
+2.50 s0 swing dmg=631 crit=1 hp=43
+4.00 s1 swing dmg=43 crit=0 hp=2364
+5.00 s0 swing dmg=631 crit=1 hp=0
+5.00 s1 death dmg=0 crit=0 hp=0
+
+## mage vs mob | seed=16434
+seed=16434 winner=0 duration=3.75 hp=2252,0
+2.00 s0 swing dmg=446 crit=1 hp=228
+2.00 s1 swing dmg=48 crit=0 hp=2252
+3.75 s0 swing dmg=446 crit=1 hp=0
+3.75 s1 death dmg=0 crit=0 hp=0
+
+## rogue vs mob | seed=16434
+seed=16434 winner=0 duration=3 hp=2273,0
+1.50 s0 swing dmg=375 crit=1 hp=299
+2.00 s1 swing dmg=47 crit=0 hp=2273
+3.00 s0 swing dmg=375 crit=1 hp=0
+3.00 s1 death dmg=0 crit=0 hp=0
+
+## warlock vs mob | seed=16434
+seed=16434 winner=0 duration=4.5 hp=2254,0
+2.00 s1 swing dmg=48 crit=0 hp=2302
+2.25 s0 swing dmg=539 crit=1 hp=135
+4.00 s1 swing dmg=48 crit=0 hp=2254
+4.50 s0 swing dmg=539 crit=1 hp=0
+4.50 s1 death dmg=0 crit=0 hp=0
+
+## warrior vs mage (duel) | seed=16434
+seed=16434 winner=1 duration=41.5 hp=0,1054
+2.00 s1 swing dmg=165 crit=1 hp=3025
+2.50 s0 swing dmg=84 crit=1 hp=2146
+3.75 s1 swing dmg=165 crit=1 hp=2860
+5.00 s0 swing dmg=84 crit=1 hp=2062
+5.50 s1 swing dmg=165 crit=1 hp=2695
+7.25 s1 swing dmg=165 crit=1 hp=2530
+7.50 s0 swing dmg=84 crit=1 hp=1978
+9.25 s1 swing dmg=83 crit=0 hp=2447
+10.00 s0 swing dmg=84 crit=1 hp=1894
+11.00 s1 swing dmg=165 crit=1 hp=2282
+12.50 s0 swing dmg=84 crit=1 hp=1810
+12.75 s1 swing dmg=165 crit=1 hp=2117
+14.50 s1 swing dmg=83 crit=0 hp=2034
+15.00 s0 swing dmg=84 crit=1 hp=1726
+16.25 s1 swing dmg=165 crit=1 hp=1869
+17.50 s0 swing dmg=84 crit=1 hp=1642
+18.25 s1 swing dmg=165 crit=1 hp=1704
+20.00 s0 swing dmg=84 crit=1 hp=1558
+20.00 s1 swing dmg=165 crit=1 hp=1539
+21.75 s1 swing dmg=165 crit=1 hp=1374
+22.50 s0 swing dmg=42 crit=0 hp=1516
+23.50 s1 swing dmg=165 crit=1 hp=1209
+25.00 s0 swing dmg=42 crit=0 hp=1474
+25.25 s1 swing dmg=165 crit=1 hp=1044
+27.25 s1 swing dmg=83 crit=0 hp=961
+27.50 s0 swing dmg=42 crit=0 hp=1432
+29.00 s1 swing dmg=165 crit=1 hp=796
+30.00 s0 swing dmg=42 crit=0 hp=1390
+30.75 s1 swing dmg=83 crit=0 hp=713
+32.50 s0 swing dmg=84 crit=1 hp=1306
+32.50 s1 swing dmg=83 crit=0 hp=630
+34.25 s1 swing dmg=165 crit=1 hp=465
+35.00 s0 swing dmg=84 crit=1 hp=1222
+36.25 s1 swing dmg=165 crit=1 hp=300
+37.50 s0 swing dmg=84 crit=1 hp=1138
+38.00 s1 swing dmg=83 crit=0 hp=217
+39.75 s1 swing dmg=165 crit=1 hp=52
+40.00 s0 swing dmg=84 crit=1 hp=1054
+41.50 s1 swing dmg=83 crit=0 hp=0
+41.50 s0 death dmg=0 crit=0 hp=0
+
+## warrior vs mob | seed=24151
+seed=24151 winner=0 duration=7.5 hp=1289,0
+2.00 s1 swing dmg=57 crit=0 hp=1403
+2.50 s0 swing dmg=299 crit=1 hp=344
+4.00 s1 swing dmg=57 crit=0 hp=1346
+5.00 s0 swing dmg=149 crit=0 hp=195
+6.00 s1 swing dmg=57 crit=0 hp=1289
+7.50 s0 swing dmg=299 crit=1 hp=0
+7.50 s1 death dmg=0 crit=0 hp=0
+
+## mage vs mob | seed=24151
+seed=24151 winner=0 duration=7.25 hp=1115,0
+2.00 s0 swing dmg=211 crit=1 hp=432
+2.00 s1 swing dmg=65 crit=0 hp=1245
+3.75 s0 swing dmg=105 crit=0 hp=327
+4.00 s1 swing dmg=65 crit=0 hp=1180
+5.50 s0 swing dmg=211 crit=1 hp=116
+6.00 s1 swing dmg=65 crit=0 hp=1115
+7.25 s0 swing dmg=211 crit=1 hp=0
+7.25 s1 death dmg=0 crit=0 hp=0
+
+## rogue vs mob | seed=24151
+seed=24151 winner=0 duration=7.5 hp=1141,0
+1.50 s0 swing dmg=172 crit=1 hp=471
+2.00 s1 swing dmg=63 crit=0 hp=1267
+3.00 s0 swing dmg=86 crit=0 hp=385
+4.00 s1 swing dmg=63 crit=0 hp=1204
+4.50 s0 swing dmg=172 crit=1 hp=213
+6.00 s0 swing dmg=172 crit=1 hp=41
+6.00 s1 swing dmg=63 crit=0 hp=1141
+7.50 s0 swing dmg=172 crit=1 hp=0
+7.50 s1 death dmg=0 crit=0 hp=0
+
+## warlock vs mob | seed=24151
+seed=24151 winner=0 duration=9 hp=1104,0
+2.00 s1 swing dmg=64 crit=0 hp=1296
+2.25 s0 swing dmg=252 crit=1 hp=391
+4.00 s1 swing dmg=64 crit=0 hp=1232
+4.50 s0 swing dmg=126 crit=0 hp=265
+6.00 s1 swing dmg=64 crit=0 hp=1168
+6.75 s0 swing dmg=252 crit=1 hp=13
+8.00 s1 swing dmg=64 crit=0 hp=1104
+9.00 s0 swing dmg=252 crit=1 hp=0
+9.00 s1 death dmg=0 crit=0 hp=0
+
+## warrior vs mage (duel) | seed=24151
+seed=24151 winner=0 duration=22.5 hp=1998,0
+2.00 s1 swing dmg=36 crit=1 hp=2304
+2.50 s0 swing dmg=246 crit=1 hp=1434
+3.75 s1 swing dmg=36 crit=1 hp=2268
+5.00 s0 swing dmg=246 crit=1 hp=1188
+5.50 s1 swing dmg=36 crit=1 hp=2232
+7.25 s1 swing dmg=18 crit=0 hp=2214
+7.50 s0 swing dmg=123 crit=0 hp=1065
+9.25 s1 swing dmg=18 crit=0 hp=2196
+10.00 s0 swing dmg=246 crit=1 hp=819
+11.00 s1 swing dmg=18 crit=0 hp=2178
+12.50 s0 swing dmg=123 crit=0 hp=696
+12.75 s1 swing dmg=18 crit=0 hp=2160
+14.50 s1 swing dmg=36 crit=1 hp=2124
+15.00 s0 swing dmg=246 crit=1 hp=450
+16.25 s1 swing dmg=18 crit=0 hp=2106
+17.50 s0 swing dmg=246 crit=1 hp=204
+18.25 s1 swing dmg=36 crit=1 hp=2070
+20.00 s0 swing dmg=123 crit=0 hp=81
+20.00 s1 swing dmg=36 crit=1 hp=2034
+21.75 s1 swing dmg=36 crit=1 hp=1998
+22.50 s0 swing dmg=246 crit=1 hp=0
+22.50 s1 death dmg=0 crit=0 hp=0
+
+## warrior vs mob | seed=31868
+seed=31868 winner=0 duration=7.5 hp=2187,0
+2.00 s1 swing dmg=51 crit=0 hp=2289
+2.50 s0 swing dmg=435 crit=1 hp=379
+4.00 s1 swing dmg=51 crit=0 hp=2238
+5.00 s0 swing dmg=218 crit=0 hp=161
+6.00 s1 swing dmg=51 crit=0 hp=2187
+7.50 s0 swing dmg=218 crit=0 hp=0
+7.50 s1 death dmg=0 crit=0 hp=0
+
+## mage vs mob | seed=31868
+seed=31868 winner=0 duration=7.25 hp=2019,0
+2.00 s0 swing dmg=311 crit=1 hp=503
+2.00 s1 swing dmg=57 crit=0 hp=2133
+3.75 s0 swing dmg=156 crit=0 hp=347
+4.00 s1 swing dmg=57 crit=0 hp=2076
+5.50 s0 swing dmg=156 crit=0 hp=191
+6.00 s1 swing dmg=57 crit=0 hp=2019
+7.25 s0 swing dmg=311 crit=1 hp=0
+7.25 s1 death dmg=0 crit=0 hp=0
+
+## rogue vs mob | seed=31868
+seed=31868 winner=0 duration=7.5 hp=2045,0
+1.50 s0 swing dmg=271 crit=1 hp=543
+2.00 s1 swing dmg=55 crit=0 hp=2155
+3.00 s0 swing dmg=135 crit=0 hp=408
+4.00 s1 swing dmg=55 crit=0 hp=2100
+4.50 s0 swing dmg=135 crit=0 hp=273
+6.00 s0 swing dmg=271 crit=1 hp=2
+6.00 s1 swing dmg=55 crit=0 hp=2045
+7.50 s0 swing dmg=135 crit=0 hp=0
+7.50 s1 death dmg=0 crit=0 hp=0
+
+## warlock vs mob | seed=31868
+seed=31868 winner=0 duration=9 hp=2016,0
+2.00 s1 swing dmg=56 crit=0 hp=2184
+2.25 s0 swing dmg=375 crit=1 hp=439
+4.00 s1 swing dmg=56 crit=0 hp=2128
+4.50 s0 swing dmg=187 crit=0 hp=252
+6.00 s1 swing dmg=56 crit=0 hp=2072
+6.75 s0 swing dmg=187 crit=0 hp=65
+8.00 s1 swing dmg=56 crit=0 hp=2016
+9.00 s0 swing dmg=375 crit=1 hp=0
+9.00 s1 death dmg=0 crit=0 hp=0
+
+## warrior vs mage (duel) | seed=31868
+seed=31868 winner=0 duration=20 hp=1228,0
+2.00 s1 swing dmg=93 crit=1 hp=1927
+2.50 s0 swing dmg=126 crit=0 hp=1514
+3.75 s1 swing dmg=47 crit=0 hp=1880
+5.00 s0 swing dmg=252 crit=1 hp=1262
+5.50 s1 swing dmg=47 crit=0 hp=1833
+7.25 s1 swing dmg=93 crit=1 hp=1740
+7.50 s0 swing dmg=252 crit=1 hp=1010
+9.25 s1 swing dmg=93 crit=1 hp=1647
+10.00 s0 swing dmg=252 crit=1 hp=758
+11.00 s1 swing dmg=47 crit=0 hp=1600
+12.50 s0 swing dmg=252 crit=1 hp=506
+12.75 s1 swing dmg=93 crit=1 hp=1507
+14.50 s1 swing dmg=93 crit=1 hp=1414
+15.00 s0 swing dmg=126 crit=0 hp=380
+16.25 s1 swing dmg=93 crit=1 hp=1321
+17.50 s0 swing dmg=252 crit=1 hp=128
+18.25 s1 swing dmg=93 crit=1 hp=1228
+20.00 s0 swing dmg=252 crit=1 hp=0
+20.00 s1 death dmg=0 crit=0 hp=0
+
+## warrior vs mob | seed=39585
+seed=39585 winner=0 duration=12.5 hp=1082,0
+2.00 s1 swing dmg=53 crit=0 hp=1347
+2.50 s0 swing dmg=158 crit=0 hp=678
+4.00 s1 swing dmg=53 crit=0 hp=1294
+5.00 s0 swing dmg=158 crit=0 hp=520
+6.00 s1 swing dmg=53 crit=0 hp=1241
+7.50 s0 swing dmg=315 crit=1 hp=205
+8.00 s1 swing dmg=53 crit=0 hp=1188
+10.00 s0 swing dmg=158 crit=0 hp=47
+10.00 s1 swing dmg=53 crit=0 hp=1135
+12.00 s1 swing dmg=53 crit=0 hp=1082
+12.50 s0 swing dmg=315 crit=1 hp=0
+12.50 s1 death dmg=0 crit=0 hp=0
+
+## mage vs mob | seed=39585
+seed=39585 winner=0 duration=11 hp=945,0
+2.00 s0 swing dmg=112 crit=0 hp=724
+2.00 s1 swing dmg=61 crit=0 hp=1189
+3.75 s0 swing dmg=112 crit=0 hp=612
+4.00 s1 swing dmg=61 crit=0 hp=1128
+5.50 s0 swing dmg=224 crit=1 hp=388
+6.00 s1 swing dmg=61 crit=0 hp=1067
+7.25 s0 swing dmg=112 crit=0 hp=276
+8.00 s1 swing dmg=61 crit=0 hp=1006
+9.25 s0 swing dmg=224 crit=1 hp=52
+10.00 s1 swing dmg=61 crit=0 hp=945
+11.00 s0 swing dmg=112 crit=0 hp=0
+11.00 s1 death dmg=0 crit=0 hp=0
+
+## rogue vs mob | seed=39585
+seed=39585 winner=0 duration=10.5 hp=975,0
+1.50 s0 swing dmg=93 crit=0 hp=743
+2.00 s1 swing dmg=59 crit=0 hp=1211
+3.00 s0 swing dmg=93 crit=0 hp=650
+4.00 s1 swing dmg=59 crit=0 hp=1152
+4.50 s0 swing dmg=185 crit=1 hp=465
+6.00 s0 swing dmg=93 crit=0 hp=372
+6.00 s1 swing dmg=59 crit=0 hp=1093
+7.50 s0 swing dmg=185 crit=1 hp=187
+8.00 s1 swing dmg=59 crit=0 hp=1034
+9.00 s0 swing dmg=93 crit=0 hp=94
+10.00 s1 swing dmg=59 crit=0 hp=975
+10.50 s0 swing dmg=185 crit=1 hp=0
+10.50 s1 death dmg=0 crit=0 hp=0
+
+## warlock vs mob | seed=39585
+seed=39585 winner=0 duration=11.25 hp=1000,0
+2.00 s1 swing dmg=60 crit=0 hp=1240
+2.25 s0 swing dmg=134 crit=0 hp=702
+4.00 s1 swing dmg=60 crit=0 hp=1180
+4.50 s0 swing dmg=134 crit=0 hp=568
+6.00 s1 swing dmg=60 crit=0 hp=1120
+6.75 s0 swing dmg=268 crit=1 hp=300
+8.00 s1 swing dmg=60 crit=0 hp=1060
+9.00 s0 swing dmg=134 crit=0 hp=166
+10.00 s1 swing dmg=60 crit=0 hp=1000
+11.25 s0 swing dmg=268 crit=1 hp=0
+11.25 s1 death dmg=0 crit=0 hp=0
+
+## warrior vs mage (duel) | seed=39585
+seed=39585 winner=0 duration=25 hp=1450,0
+2.00 s1 swing dmg=90 crit=1 hp=2350
+2.50 s0 swing dmg=279 crit=1 hp=2181
+3.75 s1 swing dmg=90 crit=1 hp=2260
+5.00 s0 swing dmg=279 crit=1 hp=1902
+5.50 s1 swing dmg=90 crit=1 hp=2170
+7.25 s1 swing dmg=45 crit=0 hp=2125
+7.50 s0 swing dmg=279 crit=1 hp=1623
+9.25 s1 swing dmg=90 crit=1 hp=2035
+10.00 s0 swing dmg=140 crit=0 hp=1483
+11.00 s1 swing dmg=45 crit=0 hp=1990
+12.50 s0 swing dmg=279 crit=1 hp=1204
+12.75 s1 swing dmg=90 crit=1 hp=1900
+14.50 s1 swing dmg=90 crit=1 hp=1810
+15.00 s0 swing dmg=279 crit=1 hp=925
+16.25 s1 swing dmg=45 crit=0 hp=1765
+17.50 s0 swing dmg=279 crit=1 hp=646
+18.25 s1 swing dmg=90 crit=1 hp=1675
+20.00 s0 swing dmg=279 crit=1 hp=367
+20.00 s1 swing dmg=90 crit=1 hp=1585
+21.75 s1 swing dmg=45 crit=0 hp=1540
+22.50 s0 swing dmg=279 crit=1 hp=88
+23.50 s1 swing dmg=90 crit=1 hp=1450
+25.00 s0 swing dmg=279 crit=1 hp=0
+25.00 s1 death dmg=0 crit=0 hp=0

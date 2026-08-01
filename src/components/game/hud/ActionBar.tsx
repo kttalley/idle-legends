@@ -34,7 +34,7 @@ const MODE_BTN = (active: boolean, disabled: boolean, touch: boolean): React.CSS
 })
 
 export function ActionBar() {
-  const { playerClass, gameMode, setMode, currentZone, currentTown, enterTown, mobMapOffset, currentMob, level, xp } = useGameStore()
+  const { playerClass, gameMode, setMode, currentZone, currentTown, enterTown, mobMapOffset, currentMob, level, xp, controlMode, manualIdleTimer, setControlMode } = useGameStore()
   const prof = CLASS_PROFESSIONS[playerClass]
   const isTraveling = gameMode === 'traveling'
   const mobDist = Math.sqrt(mobMapOffset.dx ** 2 + mobMapOffset.dy ** 2)
@@ -94,6 +94,32 @@ export function ActionBar() {
               <SpriteIcon emoji="🏠" size={18} />
             </button>
           )}
+
+          {/* Idle / manual control toggle */}
+          {(() => {
+            const manualActive = controlMode === 'manual'
+            const timeoutPct = manualActive ? manualIdleTimer / 15 : 0
+            return (
+              <button
+                onClick={() => setControlMode(manualActive ? 'idle' : 'manual')}
+                title={manualActive ? `Manual control — ${Math.ceil(manualIdleTimer)}s until idle` : 'Idle auto-pilot'}
+                aria-label={manualActive ? 'Manual control' : 'Idle auto-pilot'}
+                aria-pressed={manualActive}
+                style={{ ...MODE_BTN(manualActive, false, touch), position: 'relative', overflow: 'hidden' }}
+              >
+                {manualActive && (
+                  <div style={{
+                    position: 'absolute', inset: 0, borderRadius: 5,
+                    background: `conic-gradient(from -90deg, rgba(0,0,0,0.72) ${timeoutPct * 360}deg, transparent ${timeoutPct * 360}deg)`,
+                    pointerEvents: 'none',
+                  }} />
+                )}
+                <span style={{ position: 'relative', zIndex: 1 }}>
+                  <SpriteIcon emoji={manualActive ? '🎮' : '🤖'} size={18} />
+                </span>
+              </button>
+            )
+          })()}
         </div>
 
         {/* Ability slots — only in active combat */}

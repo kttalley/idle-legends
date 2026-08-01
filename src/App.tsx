@@ -42,7 +42,7 @@ export default function App() {
   // Desktop-only: fold a glass column off the world. Mobile uses `activePanel`
   // drawers instead, and the CSS neutralises `collapsed` there.
   const [collapsed, setCollapsed] = useState({ left: false, right: false })
-  const [logTab, setLogTab] = useState<'combat' | 'chat'>('combat')
+  const [logTab, setLogTab] = useState<'combat' | 'chat'>('chat')
 
   // Publish the iOS keyboard height as --kb-inset so fixed panels can ride above it.
   useEffect(installViewportInsets, [])
@@ -155,29 +155,17 @@ export default function App() {
           around you. Tabs rather than a new layout region, so the mobile dock and the
           collapse tabs keep working unchanged. */}
       <div className={`app-log rp-glass${activePanel === 'log' ? ' panel-open' : ''}`}>
-        <div style={{ display: 'flex', gap: 6, padding: '2px 6px 0' }}>
+        <div className="app-log-tabs">
           <button
+            className={`app-log-tab${logTab === 'combat' ? ' is-active' : ''}`}
             onClick={() => setLogTab('combat')}
-            style={{
-              background: 'none', border: 'none', padding: '2px 0', cursor: 'pointer',
-              fontSize: '0.62rem', letterSpacing: '0.04em',
-              color: logTab === 'combat' ? '#f4c84a' : '#8a8070',
-              fontWeight: logTab === 'combat' ? 700 : 400,
-              borderBottom: logTab === 'combat' ? '1px solid #f4c84a' : '1px solid transparent',
-            }}
           >COMBAT</button>
           <button
+            className={`app-log-tab${logTab === 'chat' ? ' is-active' : ''}`}
             onClick={() => setLogTab('chat')}
-            style={{
-              background: 'none', border: 'none', padding: '2px 0', cursor: 'pointer',
-              fontSize: '0.62rem', letterSpacing: '0.04em',
-              color: logTab === 'chat' ? '#f4c84a' : '#8a8070',
-              fontWeight: logTab === 'chat' ? 700 : 400,
-              borderBottom: logTab === 'chat' ? '1px solid #f4c84a' : '1px solid transparent',
-            }}
           >CHAT</button>
         </div>
-        <div style={{ flex: 1, minHeight: 0 }}>
+        <div className="app-log-content">
           {logTab === 'combat' ? <CombatLog /> : <ChatPanel />}
         </div>
       </div>
