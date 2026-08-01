@@ -33,6 +33,25 @@ body {
   --glass-border:    rgba(206, 170, 90, 0.34);
   --glass-hairline:  rgba(255, 232, 170, 0.22);
   --glass-shadow:    0 8px 32px rgba(0, 0, 0, 0.55);
+  /* Chat is the one place the branded display face actively hurts. Cinzel is small-caps
+     serif — lovely on headings, punishing for lowercase MMO chatter at 10px, which is
+     exactly what this text is. Chat and whispers opt out into the platform UI face and a
+     larger size; everything else keeps the brand. */
+  --font-chat: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Chat glass. Lighter tint and a HEAVIER blur than the standard panels: the point is to
+     keep watching the idle game through the chat, so the world has to stay visible — but
+     a busy, high-contrast, *moving* pixel scene will shred 12px text if it reads through
+     sharp. Blurring it harder is what buys the transparency; the tint alone cannot. */
+  --chat-glass-bg:   rgba(17, 13, 8, 0.50);
+  --chat-glass-blur: 24px;
+  --log-h:           220px;  /* zone-chat panel; the left rail reserves this much */
+  /* Vertical space the action bar + strike meter occupy above the mobile dock. The chat
+     sheet must stop short of this: the action bar is the primary interaction and a chat
+     panel is never allowed to cover it. */
+  --actionbar-h:     96px;
+  /* Height of the on-screen keyboard, published by engine/viewportInsets.ts. 0 when no
+     keyboard is up, and on every platform whose keyboard resizes the layout viewport. */
+  --kb-inset:        0px;
   --dock-h:          58px;   /* mobile tab bar */
   --safe-b:          env(safe-area-inset-bottom, 0px);
   /* Width the floating rails occupy. The HUD (unit frames, minimap, strike meter)
@@ -62,6 +81,9 @@ body {
    raw pixel art. Fall back to near-opaque rather than unreadable. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .rp-glass { background: rgba(16, 13, 8, 0.94); }
+  /* Chat leans hardest on the blur, so it has the furthest to fall: without one, the
+     world would read through sharp behind the text. Go fully opaque instead. */
+  .app-log.rp-glass, .whisper-window { background: rgba(16, 13, 8, 0.95); }
 }
 
 /* Some people turn transparency off at the OS level, and some devices should not be
@@ -70,11 +92,15 @@ body {
    Measured on a 390x844 viewport at 4x CPU throttle: blur costs ~4fps of tail (54.3 vs
    58.6), with the median frame unchanged at vsync. Tolerable, but this stays available. */
 @media (prefers-reduced-transparency: reduce) {
-  .rp-glass, .rp-glass-strong, .sheet, .sheet-scrim {
+  .rp-glass, .rp-glass-strong, .sheet, .sheet-scrim, .whisper-window, .app-log.rp-glass {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
   .rp-glass, .sheet { background: rgba(16, 13, 8, 0.95); }
+  /* Chat's whole readability budget is the blur, so removing it must also remove the
+     transparency — otherwise text lands directly on raw pixel art. */
+  .app-log.rp-glass, .whisper-window { background: rgba(16, 13, 8, 0.96); }
+  .combat-log, .whisper-window-body, .whisper-window-header { text-shadow: none; }
 }
 
 /* ── App Layout — the world is the page ──────────────────────────────────────
@@ -102,7 +128,11 @@ body {
 .app-sidebar-right {
   position: absolute;
   top: 58px;
-  bottom: 12px;
+  /* Height follows CONTENT, capped by the space available — not stretched between top
+     and bottom. Anchoring both edges meant a rail whose sections were all collapsed
+     still painted a full-height slab of glass over the world with nothing in it. */
+  bottom: auto;
+  max-height: calc(100dvh - 58px - 12px);
   z-index: 25;
   width: 232px;
   display: flex;
@@ -115,7 +145,12 @@ body {
   scrollbar-color: #4a3818 transparent;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
 }
-.app-sidebar-left  { left: 10px; bottom: 132px; }  /* the log takes the foot of this column */
+.app-sidebar-left  {
+  left: 10px;
+  /* The zone-chat panel occupies the foot of this column, so the rail may only grow to
+     the space above it. */
+  max-height: calc(100dvh - 58px - var(--log-h) - 20px);
+}
 .app-sidebar-right { right: 10px; width: 250px; }
 
 /* Desktop collapse — the world is the point, so it must be possible to clear the
@@ -144,13 +179,29 @@ body {
 .app-collapse-tab.left  { left: 0; }
 .app-collapse-tab.right { right: 0; }
 
+.app-log.rp-glass,
+.whisper-window {
+  background:
+    linear-gradient(155deg, rgba(255, 232, 170, 0.10) 0%, rgba(255, 232, 170, 0.03) 22%, transparent 55%),
+    var(--chat-glass-bg);
+  -webkit-backdrop-filter: blur(var(--chat-glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--chat-glass-blur)) saturate(150%);
+}
+
+/* Text over a live, moving backdrop needs its own contrast floor — the tint cannot
+   guarantee one when the scene behind it changes every frame. A tight dark shadow does,
+   and costs nothing. */
+.combat-log, .whisper-window-body, .whisper-window-header {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.7);
+}
+
 .app-log {
   position: absolute;
   left: 10px;
   bottom: 12px;
   z-index: 24;
   width: 232px;   /* same column as the left rail, stacked beneath it */
-  height: 112px;
+  height: var(--log-h);
   overflow: hidden;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
 }
@@ -180,13 +231,19 @@ body {
   .app-sidebar-left,
   .app-sidebar-right {
     top: 0;
-    bottom: calc(var(--dock-h) + var(--safe-b));
+    /* Content-height, capped above the dock. The later `bottom` this replaced was
+       re-stretching the drawer to full height and undoing the shrink. */
+    bottom: auto;
+    max-height: calc(100dvh - var(--dock-h) - var(--safe-b));
     width: min(330px, 90vw);
     border-radius: 0;
     padding: 44px 10px 12px;
     z-index: 50;
   }
-  .app-sidebar-left  { left: 0; bottom: calc(var(--dock-h) + var(--safe-b)); border-left: none;  border-top: none; border-bottom: none; transform: translateX(calc(-100% - 4px)); opacity: 1; }
+  /* No `bottom` here: it would win over the `bottom: auto` above and re-stretch the
+     drawer to full height, which is what kept a rail of collapsed sections painting a
+     full-screen slab of empty glass. `max-height` already caps it above the dock. */
+  .app-sidebar-left  { left: 0; border-left: none;  border-top: none; border-bottom: none; transform: translateX(calc(-100% - 4px)); opacity: 1; }
   .app-sidebar-right { right: 0; border-right: none; border-top: none; border-bottom: none; transform: translateX(calc(100% + 4px));  opacity: 1; }
   .app-sidebar-left.panel-open,
   .app-sidebar-right.panel-open { transform: translateX(0); }
@@ -199,14 +256,18 @@ body {
   .app-log {
     left: 0;
     right: 0;
-    bottom: calc(var(--dock-h) + var(--safe-b));
+    /* Sits above the ACTION BAR, not just above the dock. The sheet is z-index 50 and the
+       HUD layer is 20, so anchoring it at the dock put a chat panel directly on top of
+       the primary controls — the action bar simply vanished behind it whenever chat was
+       open. Reserving `--actionbar-h` keeps the controls reachable with chat up. */
+    bottom: calc(var(--dock-h) + var(--safe-b) + var(--actionbar-h));
     width: auto;
-    height: 210px;
-    border-radius: 12px 12px 0 0;
+    height: min(38dvh, 300px);
+    border-radius: 12px;
     z-index: 50;
     /* Must clear its own bottom offset as well as its height, or the top edge of the
        sheet stays visible above the dock while "closed". */
-    transform: translateY(calc(100% + var(--dock-h) + var(--safe-b) + 8px));
+    transform: translateY(calc(100% + var(--dock-h) + var(--safe-b) + var(--actionbar-h) + 8px));
   }
   .app-log.panel-open { transform: translateY(0); }
 
@@ -505,9 +566,12 @@ body {
 
 /* ── Combat Log ───────────────────────────────────────────────────────────── */
 .combat-log {
-  font-family: monospace;
-  font-size: 0.65rem;
-  line-height: 1.4;
+  /* Not `monospace` — the generic keyword resolves to Courier on macOS/iOS, which is
+     cramped and low-contrast at this size. A UI sans reads far better for chat. */
+  font-family: var(--font-chat);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #4a3818 #0a0805;
@@ -1078,4 +1142,213 @@ body {
   .talent-modal { animation: none; }
   .talent-node:hover { transform: none; }
   .talent-meter-fill, .talent-sum-bar > i { transition: none; }
+}
+
+/* ── Whisper window ───────────────────────────────────────────────────────────
+   A conversation with a text input is not a log line, so it does not live in
+   `.app-log` (232×112px on desktop — no room for a message list AND an input; a
+   transform-hidden sheet on mobile — the Whisper button appeared to do nothing).
+   It gets its own floating window instead, which is also how whispers behave in an
+   actual MMO. Desktop: a panel above the action bar, clear of the right rail.
+   Mobile: a bottom sheet over the dock. */
+.whisper-window {
+  font-family: var(--font-chat);
+  font-size: 0.8rem;
+  position: fixed;
+  z-index: 300;                 /* over panels + dock, under the target card (400) */
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-hairline);
+  color: #e6d5bd;
+  overflow: hidden;
+  right: 264px;                 /* clear of the 232px right rail + its margin */
+  bottom: calc(96px + var(--kb-inset));   /* clear of the action bar, and of any keyboard */
+  width: 300px;
+  height: 320px;
+  max-height: 46vh;
+}
+
+.whisper-window-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(200, 161, 0, 0.24);
+  background: rgba(90, 64, 32, 0.22);
+  flex: 0 0 auto;
+}
+.whisper-close {
+  background: none; border: none; color: #8a8070; cursor: pointer;
+  font-size: 0.9rem; line-height: 1; padding: 4px 6px; min-width: 32px; min-height: 32px;
+}
+.whisper-close:hover { color: #ffd700; }
+
+.whisper-window-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: 6px 8px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;  /* don't scroll the page behind the sheet */
+}
+
+.whisper-window-footer {
+  flex: 0 0 auto;
+  display: flex; gap: 5px; padding: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(0, 0, 0, 0.18);
+}
+.whisper-input {
+  font-family: var(--font-chat);
+  flex: 1 1 auto; min-width: 0;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid #4a3a1e; border-radius: 5px;
+  color: #d4b896; padding: 7px 8px; outline: none;
+  /* 16px prevents iOS Safari from zooming the viewport when the field is focused —
+     a zoom that does not undo itself and leaves the whole HUD oversized. */
+  font-size: 16px;
+  min-height: 36px;
+}
+.whisper-input:focus { border-color: #6a5030; }
+.whisper-send {
+  font-family: var(--font-chat);
+  background: #5a4020; border: 1px solid #6a5030; border-radius: 5px;
+  color: #f4c84a; font-size: 0.66rem; padding: 0 12px;
+  min-height: 36px; min-width: 56px; cursor: pointer;
+}
+
+/* Tablet: the right rail is narrower, so sit closer to the edge. */
+@media (max-width: 1180px) and (min-width: 900px) {
+  .whisper-window { right: 12px; bottom: 104px; width: 288px; }
+}
+
+/* Mobile: bottom sheet over the dock, full width. Height is capped with dvh so the
+   on-screen keyboard shrinking the viewport does not leave the input off-screen. */
+@media (max-width: 899px) {
+  .whisper-window {
+    /* Same rule as the chat sheet: never cover the action bar. And when the iOS keyboard
+       is up, sit on top of it — otherwise the field you are typing into is behind it. */
+    left: 0; right: 0;
+    /* With no keyboard, clear the action bar + dock. With a keyboard up, those are behind
+       it anyway, so sit directly on top of the keyboard instead — whichever is larger. */
+    bottom: max(calc(var(--dock-h) + var(--safe-b) + var(--actionbar-h)), var(--kb-inset));
+    width: auto; height: min(46dvh, 380px); max-height: min(46dvh, 380px);
+    border-radius: 12px;
+    z-index: 300;
+  }
+  .whisper-window-body { padding: 8px 10px; }
+  .whisper-window-footer { padding: 8px; padding-bottom: 10px; }
+}
+
+
+/* ── iOS / touch behaviour ────────────────────────────────────────────────────
+   This ships as an iOS app, so the web defaults that read as "a web page in a
+   wrapper" have to go. */
+
+/* Kill the 300ms tap delay and double-tap-to-zoom on everything interactive. Panning
+   the world still works because the canvas opts back in below. */
+button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input {
+  touch-action: manipulation;
+}
+
+/* Long-pressing game chrome should not raise the iOS callout menu ("Copy / Look Up"),
+   and dragging on it should not start a text selection. Chat MESSAGES are excluded —
+   being able to select and copy what someone said is worth keeping. */
+.app-dock, .app-dock-btn, .hud-layer, .rp-panel-header, .whisper-window-header,
+.whisper-send, .whisper-close, button {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.combat-log, .whisper-window-body {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Rubber-band scrolling inside a panel must not drag the whole app with it. */
+.combat-log, .whisper-window-body, .app-sidebar-left, .app-sidebar-right, .app-modepanel {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Apple's minimum comfortable target is 44pt. The new social UI is the most tap-dense
+   thing in the game, so it clears that on coarse pointers specifically — on a mouse the
+   same buttons can stay compact. */
+@media (pointer: coarse) {
+  .whisper-send, .whisper-close { min-height: 44px; min-width: 44px; }
+  .whisper-input { min-height: 44px; }
+  .player-card-btn { min-height: 44px; }
+}
+
+/* ── Target card ─────────────────────────────────────────────────────────────
+   The social UI is the most tap-dense surface in the game, so it uses the plain
+   chat face at a readable size rather than the branded display face. */
+.player-card {
+  font-family: var(--font-chat);
+  border: 1px solid #6a5030;
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(18, 14, 6, 0.97);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75);
+  color: #e6d5bd;
+}
+.player-card-close {
+  min-width: 32px; min-height: 32px;
+  font-size: 1rem; line-height: 1;
+}
+/* Base height for the card's action buttons. Kept in CSS (not inline) so the
+   coarse-pointer rule below can raise it — an inline height would outrank it. */
+.player-card-btn { min-height: 36px; }
+@media (pointer: coarse) {
+  .player-card-close { min-width: 44px; min-height: 44px; }
+  .player-card-btn { min-height: 44px; }
+}
+
+/* ── Collapsible sections ────────────────────────────────────────────────────
+   Every rail panel folds by its own header, so a tall section can no longer starve
+   its neighbours (the character sheet used to crush the zone list to one clipped
+   row). The header keeps the same glass treatment as every other panel header — it
+   gains a chevron and a hit target, not a different look. */
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0;
+}
+.collapsible-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 5px 2px;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 32px;
+}
+.collapsible-toggle:hover .collapsible-title { color: #ffd700; }
+.collapsible-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.collapsible-chevron {
+  flex: 0 0 auto;
+  font-size: 0.6rem;
+  line-height: 1;
+  color: #c8a100;
+  transition: transform 0.18s ease;
+}
+.collapsible-chevron.is-collapsed { transform: rotate(-90deg); }
+.collapsible-header-right { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+
+/* A collapsed section is exactly its header — no border remnant, no residual padding. */
+.rp-panel.collapsible.is-collapsed { overflow: hidden; }
+.rp-panel.collapsible.is-collapsed > .rp-panel-header { border-bottom: none; }
+
+@media (pointer: coarse) {
+  .collapsible-toggle { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .collapsible-chevron { transition: none; }
 }

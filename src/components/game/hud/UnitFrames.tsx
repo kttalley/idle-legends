@@ -6,6 +6,7 @@ import { CLASS_DEFINITIONS } from '../../../data/classes'
 import { xpForLevel } from '../../../engine/progression'
 import type { CastState } from '../../../data/types'
 import { SpriteIcon } from '../../ui/SpriteIcon'
+import { PartyFrame } from './PartyFrame'
 
 // Compact, background-less unit read-outs (mobile-friendly). Just bars + text + status
 // icons floating over the world — no card panel. The HP/XP bar tracks provide their own
@@ -80,6 +81,9 @@ export function UnitFrames() {
           </div>
         )}
       </div>
+
+      {/* ── Party ── directly beneath your own frame, above the target. */}
+      <PartyFrame />
 
       {/* ── Target ── */}
       {currentMob && (

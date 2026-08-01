@@ -7,6 +7,7 @@ import type {
 import { CLASS_DEFINITIONS } from '../data/classes'
 import { allClassTalents } from '../data/specs'
 import { HP_PER_STAMINA, CRIT_MULTIPLIER, AGILITY_CRIT_DIVISOR } from '../data/constants'
+import type { Rng } from './rng'
 
 /** A mod that changes nothing — the identity every ability starts from. */
 export function emptyAbilityMod(): AbilityMod {
@@ -319,6 +320,15 @@ export interface AttackContext {
   isOpener?: boolean
   /** A free guaranteed crit is banked and about to be spent. */
   timedCritReady?: boolean
+  /**
+   * Source of randomness for this swing's rolls (crit, poison, extra-strike, flurry).
+   *
+   * Omitted, it falls back to the global `Math.random`, so every existing caller keeps
+   * its current behaviour. Supplied, the swing becomes a pure function of the stream —
+   * which is what makes a fight replayable from a seed (Track P's ghost duels) and what
+   * lets ambient heroes roll without perturbing the player's own stream.
+   */
+  rng?: Rng
 }
 
 /** Below this share of health, Enrage pays out. */
@@ -341,9 +351,12 @@ export function resolvePlayerAttack(
   ctx: AttackContext = {},
 ): AttackResult {
   const fx = compileTalentEffects(playerClass, talentAllocs)
+  // Every outcome roll in this function draws from here. Unseeded callers get the global
+  // exactly as before; a seeded caller gets a replayable swing.
+  const rng = ctx.rng ?? Math.random
 
   const critGuaranteeBuff = activeBuffs.find(b => b.type === 'crit_guarantee' && (b.stacks ?? 0) > 0)
-  const isCrit = !!(critGuaranteeBuff) || procState.remorselessActive || !!ctx.timedCritReady || (Math.random() < (
+  const isCrit = !!(critGuaranteeBuff) || procState.remorselessActive || !!ctx.timedCritReady || (rng() < (
     stats.critChance +
     (procState.mobFrozen ? fx.shatterCritBonus : 0) +
     // Fire's mirror of frost's Shatter: a target already burning is easier to land on.
@@ -390,7 +403,7 @@ export function resolvePlayerAttack(
   if (isCrit && fx.ignitePct > 0) {
     triggeredDoTs.push(makeIgniteDoT(stats.weaponDps, fx.ignitePct * dotAmpFactor))
   }
-  if (fx.vilePoisons && Math.random() < fx.vilePoisons.procChance) {
+  if (fx.vilePoisons && rng() < fx.vilePoisons.procChance) {
     triggeredDoTs.push(makePoisonDoT(fx.vilePoisons.dps * dotAmpFactor))
   }
   if (fx.corruptionDps > 0) {
@@ -404,9 +417,9 @@ export function resolvePlayerAttack(
     damage,
     isCrit,
     triggeredDoTs,
-    extraHit: fx.swordSpecEnabled && Math.random() < fx.swordSpecProcChance,
+    extraHit: fx.swordSpecEnabled && rng() < fx.swordSpecProcChance,
     sealFatePoint: isCrit && fx.sealFateEnabled,
-    flurryHit: isCrit && fx.flurryChance > 0 && Math.random() < fx.flurryChance,
+    flurryHit: isCrit && fx.flurryChance > 0 && rng() < fx.flurryChance,
     lifeDrawn: fx.bloodthirstPct > 0 ? Math.round(damage * fx.bloodthirstPct) : 0,
     enraged,
   }
@@ -440,8 +453,10 @@ export function resolveMobAttack(
   playerArmor: number,
   mobSpeedFactor: number,
   fx?: Pick<CompiledTalentEffects, 'avoidChance' | 'damageReduction' | 'thornsPct'>,
+  /** Seeded source for the avoidance roll; defaults to the global as before. */
+  rng: Rng = Math.random,
 ): MobAttackResult {
-  const blocked = !!fx && fx.avoidChance > 0 && Math.random() < fx.avoidChance
+  const blocked = !!fx && fx.avoidChance > 0 && rng() < fx.avoidChance
   if (blocked) return { damage: 0, blocked: true, thorns: 0 }
 
   const reductionPct = playerArmor / (playerArmor + 100)
@@ -457,7 +472,27 @@ export function resolveMobAttack(
 }
 
 // ── DoT Factories ─────────────────────────────────────────────────────────────
-function makeId() { return `dot_${Date.now()}_${Math.random().toString(36).slice(2,6)}` }
+// DoT ids are a monotonic counter rather than `Date.now() + Math.random()`. Two
+// reasons, and the boring one is the better one:
+//
+//  - Uniqueness. The old minter could collide outright — two DoTs applied in the same
+//    millisecond with the same 4 random chars is unlikely but not impossible, and a
+//    collision means one DoT silently replacing another in a keyed list.
+//  - Determinism. Ids surface in a replayed fight log, so a random id would make two
+//    identical fights compare as different (Track P) even when every roll matched.
+//
+// The counter starts from a per-session base so ids minted before a reload can never
+// collide with ids minted after one; `resetDotIds` pins it for a headless sim.
+let dotSeq = 0
+let dotBase = Date.now() % 1_000_000
+
+/** Pin the DoT id sequence so a replayed fight mints byte-identical ids. */
+export function resetDotIds(base = 0): void {
+  dotBase = base
+  dotSeq = 0
+}
+
+function makeId() { return `dot_${dotBase}_${++dotSeq}` }
 
 export function makeBleedDoT(weaponDps: number, pct: number): ActiveDoT {
   return { id: makeId(), sourceType: 'bleed', label: 'Rend', icon: '🩸', color: '#cc2200',

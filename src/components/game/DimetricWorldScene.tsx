@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { WorldSceneController, CSS_SCALE } from '../../render/adapter/combatAdapter'
+import { setSelectedHero } from '../../engine/selection'
 
 // Phase 2 host: one full-viewport dimetric canvas replacing the ASCII WorldMapView
 // strip + the side-by-side combat arena. The controller (combatAdapter) owns all
@@ -24,6 +25,7 @@ export function DimetricWorldScene() {
     const floatersHost = floatersRef.current!
     const controller = new WorldSceneController(canvas, floatersHost)
 
+
     let raf = 0
     let last = performance.now()
     let disposed = false
@@ -33,10 +35,27 @@ export function DimetricWorldScene() {
     controller.onEngageTarget = () => useGameStore.getState().engageTarget()
     controller.onSelectTarget = (id: string) => useGameStore.getState().setTarget(id)
     controller.onTownNpcChanged = id => useGameStore.getState().setActiveTownNpc(id)
+    // Tapping another player opens their card (whisper / invite / duel). Routed through
+    // the selection module's own observable rather than React props: the tap starts in
+    // the canvas and is consumed by overlay UI elsewhere in the tree.
+    controller.onHeroTapped = (speaker, clientX, clientY) =>
+      setSelectedHero({ speaker, clientX, clientY })
 
     controller.init().then(() => {
       if (disposed) return
       controller.sync(useGameStore.getState())
+      // Dev-only handle for driving the app headlessly (see the CDP notes in the repo's
+      // memory). Behaviour over time — the ambient crowd especially — cannot be verified
+      // from a screenshot, so a probe needs a way in. Stripped from production builds.
+      //
+      // Published only AFTER init succeeds, and cleared on unmount. StrictMode
+      // double-invokes this effect in dev, and the first controller's init() bails on
+      // `disposed` without ever spawning a crowd — so publishing at construction time
+      // could leave a live-looking handle on a controller that has no entities, which
+      // reads to a probe as "the world is empty" while the real one renders fine.
+      if (import.meta.env.DEV) {
+        ;(window as unknown as { __ilScene?: WorldSceneController }).__ilScene = controller
+      }
     })
 
     // Zoom: a wider dimetric FOV reads better everywhere (the dense living-world crowd
@@ -99,13 +118,28 @@ export function DimetricWorldScene() {
 
     // Keyboard → controller (WASD/arrows walk, Space jumps). Prevent the page from
     // scrolling on Space / arrows while the world scene is mounted.
+    //
+    // ...but NOT while the player is typing. These listeners are on `window`, so before
+    // the chat panel existed they were harmless; now `preventDefault()` on Space eats
+    // every space in a whisper ("want to party up?" arrives as "wanttopartyup?") and WASD
+    // walks the hero around while you compose a message. Any focused text field owns the
+    // keyboard.
+    const isTyping = (t: EventTarget | null): boolean => {
+      const el = t as HTMLElement | null
+      if (!el || !el.tagName) return false
+      const tag = el.tagName.toUpperCase()
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable
+    }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return
+      if (isTyping(e.target)) return
       const k = e.key
       if (k === ' ' || k.startsWith('Arrow')) e.preventDefault()
       controller.setKey(k, true)
     }
     const onKeyUp = (e: KeyboardEvent) => {
+      // Release regardless of focus: a key pressed in the world and released after
+      // focusing an input would otherwise stick down and walk the hero forever.
       controller.setKey(e.key, false)
     }
     const onBlur = () => controller.clearInput()
@@ -170,6 +204,10 @@ export function DimetricWorldScene() {
       canvas.removeEventListener('pointerup', onPointerUp)
       canvas.removeEventListener('pointercancel', onPointerCancel)
       reflowRef.current = () => {}
+      if (import.meta.env.DEV) {
+        const w = window as unknown as { __ilScene?: WorldSceneController }
+        if (w.__ilScene === controller) delete w.__ilScene
+      }
     }
   }, [])
 

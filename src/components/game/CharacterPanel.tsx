@@ -1,3 +1,4 @@
+import { CollapsiblePanel } from '../ui/CollapsiblePanel'
 import React, { useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { CLASS_DEFINITIONS } from '../../data/classes'
@@ -18,20 +19,33 @@ export function CharacterPanel() {
   const [tab, setTab] = useState<Tab>('stats')
 
   return (
-    <div className="rp-panel flex flex-col h-full">
-      <div className="rp-panel-header flex justify-between items-center">
-        <div>
+    // `grow` rather than `h-full`: asking for 100% height made this panel claim the whole
+    // rail and squeeze Zones down to a single clipped row. Growing into leftover space
+    // shares the column instead of taking it.
+    <CollapsiblePanel
+      id="character"
+      grow
+      title={
+        // Stacked, not inline: side by side with the gold chip and the Heroes button the
+        // hero's name had almost no width left and wrapped mid-word ("Rogue Z… the
+        // Vengeful"). A long generated name is the norm here, not the exception.
+        <span style={{ display: 'block', minWidth: 0 }}>
           <span className={classDef.colorClass}>{classDef.name}</span>
           {playerName && (
-            <div style={{ fontSize: '0.55rem', color: '#d4b896', fontStyle: 'italic' }}>
+            <span style={{
+              display: 'block', fontSize: '0.55rem', color: '#d4b896', fontStyle: 'italic',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
               {playerName}
-            </div>
+            </span>
           )}
           {nameGenStatus === 'loading' && (
-            <div style={{ fontSize: '0.5rem', color: '#666' }}>Naming…</div>
+            <span style={{ display: 'block', fontSize: '0.5rem', color: '#666' }}>Naming…</span>
           )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        </span>
+      }
+      headerRight={
+        <>
           <GoldDisplay gold={gold} />
           {/* Was in a floating top bar that spanned the screen for the sake of two
               controls. Gold already lived here; switching hero belongs with the hero. */}
@@ -43,8 +57,9 @@ export function CharacterPanel() {
           >
             Heroes
           </button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       {/* Tab bar */}
       <div className="flex border-b" style={{ borderColor: '#3a2c10' }}>
@@ -125,6 +140,6 @@ export function CharacterPanel() {
 
         {tab === 'talents' && <TalentTree />}
       </div>
-    </div>
+    </CollapsiblePanel>
   )
 }

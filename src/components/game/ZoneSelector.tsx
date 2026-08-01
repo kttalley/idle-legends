@@ -1,3 +1,4 @@
+import { CollapsiblePanel } from '../ui/CollapsiblePanel'
 import React from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { ZONES, ZONE_ORDER } from '../../data/zones'
@@ -15,9 +16,8 @@ export function ZoneSelector() {
   const progression = getZoneProgression(level, bossesDefeated, unlockedZones)
 
   return (
-    <div className="rp-panel" style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      <div className="rp-panel-header">Zones</div>
-      <div className="p-1 flex flex-col gap-1" style={{ overflowY: 'auto', maxHeight: '38vh' }}>
+    <CollapsiblePanel id="zones" title="Zones">
+      <div className="p-1 flex flex-col gap-1" style={{ overflowY: 'auto', minHeight: 0 }}>
         {ZONE_ORDER.map(zoneId => {
           const zone       = ZONES[zoneId]
           const zoneName   = generatedZoneNames[zoneId as ZoneId] ?? zone.name
@@ -99,6 +99,6 @@ export function ZoneSelector() {
           )
         })}
       </div>
-    </div>
+    </CollapsiblePanel>
   )
 }

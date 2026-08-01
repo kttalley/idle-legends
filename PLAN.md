@@ -294,26 +294,42 @@ for `Math.random` before P0); cheat surface (P0 accepts client-trust snapshots, 
 server-side in P1); scope pressure — Track P is explicitly **not a launch blocker**; the
 graphics rebuild and Track M/R own the runway to launch.
 
-**Determinism debt — measured 2026-07-28, and growing.** The seedable-RNG audit above is
-the load-bearing prerequisite for the entire ghost-PvP premise: if both clients cannot
-replay a duel to the same result from one seed, there is no async PvP. Current state is
-**28 unseeded `Math.random` call sites** across the combat path:
+**Determinism debt — mostly PAID DOWN 2026-07-28.** The seedable-RNG audit is the
+load-bearing prerequisite for the entire ghost-PvP premise: if both clients cannot replay
+a duel to the same result from one seed, there is no async PvP.
 
-- `engine/combat.ts` — 6: crit roll (L346), poison proc (L393), extra-strike proc (L407),
-  **flurry proc (L409)**, **avoidance/block roll (L444)**, and DoT id minting (L460).
-- `store/gameStore.ts` — 18, including the in-tick combat rolls at L1388 / L1570 / L1614
-  (echo, mob selection, spawn), with the rest in world/spawn/name generation.
-- `engine/loot.ts` — 4: drop chance, rarity weighting, gold variance, elite roll.
+The raw "28 unseeded `Math.random` sites" count badly overstated the job. Filtered to
+rolls that change the OUTCOME of a *duel*, it was **8 rolls and one id**:
 
-The 2026-07-27 talent rework **added to this** — flurry, avoidance and Echo are all new
-unseeded rolls introduced by the three-specs-per-class pass, and the ignite/crit branches
-widened the existing ones. The count was smaller when this risk line was first written.
+- `engine/combat.ts` — 5 outcome rolls (crit, poison proc, extra-strike, flurry,
+  avoidance/block) plus DoT id minting. **All six now fixed.**
+- `store/gameStore.ts` — 3 in-tick procs: Nightfall (~L1388), Creeping Freeze (~L1570),
+  Echo (~L2251). **Still unseeded** — see below. The other 15 sites are worldgen, naming,
+  log/floater ids and cosmetic jitter, and never needed seeding.
+- `engine/loot.ts` — 4 sites, all loot. A duel drops no loot, so these are irrelevant to
+  determinism; they matter only for reproducible economy sweeps.
 
-Shape of the fix when P0 starts: thread a seeded PRNG (a small xorshift/mulberry32) through
-`AttackContext` and the tick rather than reaching for the global — combat already passes a
-context object per swing, so the plumbing exists. `makeId()` and the world/name generators
-do **not** need seeding; only rolls that change the OUTCOME of a fight do. Doing this as
-one deliberate pass is far cheaper than discovering a desync after rosters are live.
+**What shipped (2026-07-28):**
+- `engine/rng.ts` — mulberry32 + `subStream`, matching the generator `tools/sim/run.mjs`
+  already installs globally, so streams are comparable.
+- `AttackContext.rng` threads a seeded stream through `resolvePlayerAttack`; `resolveMobAttack`
+  gained an `rng` parameter. Both default to `Math.random`, so every existing caller is
+  behaviourally unchanged.
+- DoT ids are a monotonic counter (`resetDotIds`), which also removes a real collision bug:
+  the old `Date.now()`-plus-4-random-chars minter could mint duplicates within one ms.
+- `engine/fight.ts` — **`runFight(seed, a, b)`, the store-free fight loop.** This was the
+  actually-missing piece: `combat.ts` only ever resolved a *swing*, while the fight loop
+  lived inside `gameStore.tick`, tangled with worldgen, loot and XP. It is a LOOP, not a
+  second combat model — every number still comes from the existing resolvers.
+- `tools/sim/fight.mjs` + `src/sim/fightSim.ts` — the acceptance test. Deliberately does
+  NOT install a seeded global `Math.random` (that would make it pass vacuously).
+  **Measured: 20/20 cases byte-identical across runs, 32/32 seeds produce distinct logs.**
+
+**Remaining P0 work:** lift Nightfall / Creeping Freeze / Echo out of the store tick into
+the resolvers. Until then `runFight` does not fire them, so a duel is deterministic but not
+yet a perfect match for the player's own tick. Seeding them in place would need a seed in
+`GameState` and a save migration; moving them into `combat.ts` is the cheaper fix and pays
+off `fight.ts`'s fidelity gap at the same time.
 
 ## Track L — living world / ambient MMO sim (post-launch vision, composes with Track P)
 
@@ -341,13 +357,13 @@ single-player idle game that *reads* like a busy MMO server.
   is already flagged as the game's most unique differentiator.
 
 **Sequencing (post-launch; not a launch blocker):**
-- **L0:** purely local ambient heroes — N per zone, deterministic seeded behavior +
-  headless combat sim, rendered in-world; no backend. Big "alive world" payoff for
-  render-only cost.
+- **L0: SHIPPED 2026-07-28.** Purely local ambient heroes — seeded identity + behaviour,
+  real headless combat sim, rendered in-world; no backend. Details below.
 - **L1:** seed ambient heroes from Track P roster snapshots (real players as world NPCs);
   NPC quest-givers/vendors at town anchors.
-- **L2:** light interactions — party-up with an ambient hero (AI companion), trade barks,
-  world events (a boss draws a crowd of heroes).
+- **L2: PARTIALLY SHIPPED 2026-07-28** — target cards, party-up with an ambient hero
+  (AI companion), and friendly duels. Trade barks and world events (a boss drawing a
+  crowd) remain. Details below.
 
 **Footnote — simulated MMO chat / banter (high-charm, low-cost).** Give ambient heroes
 occasional speech-bubble one-liners (reuse the existing `ThoughtBubble` + `nameGen`/
@@ -362,6 +378,294 @@ even wire the LLM thought system to react to what the nearby ambient hero is *do
 screen sims); behavior determinism (reuse the seedable combat sim Track P already
 requires); scope — this is explicitly a *post-launch* world-depth play, sequenced behind
 the graphics rebuild, Track R rebrand, and the RevenueCat launch milestone.
+
+**L0 as built (2026-07-28).** The starting point was better than this plan assumed: the
+adapter *already* spawned a seeded roaming crowd with real `(spriteId, paletteId)`
+identities, faction nameplates, leashed wander, walkmask-aware anchoring and off-screen
+group recycling. What it lacked was depth — the "fights" were attack animations on a
+timer, heroes never chose a target, and nobody said anything. So L0 was behaviour, not
+population:
+
+- `engine/ambient.ts` — identity with the same shape as the player: class, race, level
+  band (±20% of the player's, read-only), rarity, and a real single-tree talent
+  allocation, so every ambient hero has a `deepestSpec()` title and their builds actually
+  change how their fights go. Budgets are named constants (`AMBIENT_HERO_BUDGET = 8`,
+  `AMBIENT_FIGHT_BUDGET = 3`, `AMBIENT_BRAIN_HZ = 5`).
+- Real state machine — wander → approach → fight → loot → move on, plus idling. Heroes
+  seek a nearby monster within `AMBIENT_SEEK_RANGE` and will not gang up on one already
+  claimed.
+- **Fights are resolved once by `runFight` and then played back over time.** One sim call
+  per encounter, animated from its event log — a real combat model at effectively zero
+  per-frame cost. This is deliberately the same mechanism Track P will use to render a
+  ghost duel, so P0's "render the fight in the dimetric scene" is already prototyped.
+- Per-hero seeded sub-streams (`subStream`), not one shared generator. This is what makes
+  off-screen culling safe: with a shared stream, culling a hero would change what every
+  *other* hero rolled.
+- Brains tick at 5Hz and only within the visible radius; rendering stays at 60fps.
+
+**Speech bubbles — decision.** Ambient barks are drawn on the **canvas**, and
+`ThoughtBubble` was left completely untouched. That component takes no props: it reads a
+single `currentThought`/`thoughtExpiresAt` pair off the store and renders inside the
+player's HUD avatar wrapper in `CombatView`. That is a single global slot, it lives in the
+HUD rather than in the world, and driving 8–20 of them would mean as many
+absolutely-positioned DOM nodes repositioned every frame — straight into the perf risk
+above. So the player keeps their private inner voice, one at a time, and the crowd gets
+its own world-space channel in MMO-chat register. Keeping them separate also means ambient
+chatter can never overwrite what the player is thinking. Barks are canned pools
+(`engine/ambient.ts`), gated three ways — per-event probability, a per-hero cooldown, and
+a ceiling of 3 concurrent bubbles — because ungated, eight heroes killing things reads as
+chat spam rather than as a populated server. The LLM path is the upgrade, not the
+dependency.
+
+**Generative MMO chat + whispers — SHIPPED 2026-07-28.** The footnote's LLM upgrade, on
+the existing Ollama plumbing (`VITE_LLM_URL`, same endpoint `nameGen` already uses).
+
+*Measured latency, against `incept5/llama3.1-claude` (8B):*
+
+| request | tokens | latency |
+|---|---|---|
+| 12-line batch | `num_predict: 300` | 23–42 s |
+| single line | `num_predict: 28`, `stop: ["\n"]` | **3.5–4.4 s** |
+
+That gap is the whole design. The batch figure is a function of TOKEN COUNT, not a slow
+endpoint — reading only that number leads straight to the wrong conclusion that live
+per-event generation is impossible. It isn't: four seconds is an ordinary wait for a line
+of chat. Hence three paths, each matched to what it's for:
+
+- **Pools (batch)** — background zone chatter. Cheapest per line; the panel needs volume
+  more than specificity. Topped up off a 10s tick, single request in flight, exponential
+  backoff, pools cleared on zone change.
+- **Live barks (per-event)** — a hero speaks about what *just happened*, by name
+  ("vesk just pwned that wolf"). A pool can never do this. Canned line shows instantly;
+  the generated line upgrades the bubble and its chat row in place if it lands while the
+  moment is still legible. Capped at 3 concurrent, one per hero.
+- **Whispers** (`engine/whisper.ts`) — tap any ambient hero to open a private thread.
+  Always live, with bounded per-entity conversation memory, so they answer in their own
+  class/faction/spec voice and remember what you just said. They are prompted as *players
+  with their own agenda*, not assistants.
+
+**The bug worth remembering: self-inflicted head-of-line blocking.** Ollama serves one
+request per model at a time, and everything else queues *on the server* where the client
+cannot see or reorder it. The first cut fired pool refills (~30s) and live barks (~4s)
+independently, so every live bark that landed behind a refill sat in the server queue
+until it hit its own timeout and aborted. It presented as "the endpoint is flaky"; it was
+entirely our own doing.
+
+`engine/llmClient.ts` now owns the ordering: one door, one request in flight, a priority
+queue in front of it — `INTERACTIVE` (a whisper the player is watching) > `REACTIVE` (a
+live bark) > `BACKGROUND` (pool refills, which never dispatch while anything else waits).
+Reactive requests carry a `staleAfterMs` so a bark about a kill is abandoned rather than
+spoken thirty seconds late. Backoff is shared, so a sick endpoint makes every subsystem
+stand down together instead of three of them hammering it independently.
+
+Three tiers of graceful degradation, and the floor never involves an error: live line →
+pooled line → canned line, and with `VITE_LLM_URL` unset **no network call is made at
+all**. A failed whisper answers with `…` rather than an error, because a player who
+doesn't reply is an ordinary thing in an MMO and it keeps the illusion intact.
+
+One determinism subtlety, deliberately preserved: `takeChatLine` consumes exactly one
+`rng()` draw, and so does the canned fallback. That keeps each hero's seeded stream
+aligned whether the endpoint is up, down or unconfigured — otherwise network weather
+would silently change where every ambient hero walks next.
+
+`engine/chatLog.ts` is a standalone observable (React reads it via `useSyncExternalStore`)
+rather than store state — same reason as everything else here: ambient output must not
+travel through the player's store. Surfaces as a CHAT tab beside the combat log.
+
+**Endpoint exposure:** `.env.local` only (gitignored). A public build pointed at a personal
+Ollama box would expose an unauthenticated, unmetered endpoint to every player, so that is
+deliberately not the default. If it ever ships, it needs a proxy with auth and rate limits.
+
+**L2 — target cards, party companions, duels (2026-07-28).** Driven by what the whisper
+system started doing on its own: ask a hero what they're up to and they offer to group,
+say they'll lead the way, tell you to stick close — then keep wandering their seeded path.
+The conversation was writing cheques the simulation couldn't cash, and that gap is exactly
+where the illusion snaps. The LLM was effectively *specifying the feature*.
+
+- **Target card** (`components/game/PlayerCard.tsx`). Tapping a hero opens a card — name,
+  level, race/class, spec, faction — with Whisper / Invite / Duel. Replaces jumping
+  straight into a whisper thread, which was merely abrupt on desktop and outright
+  invisible on a phone, where the chat panel it switched sits off-screen behind the dock.
+  Positioned at the tap and clamped into the viewport; 32px minimum touch targets.
+- **Party** (`engine/party.ts`). One companion at a time. The hero decides in character —
+  an Ashmarch hero usually turns down a Concord invite, a busy one brushes you off — via
+  an `ACCEPT:` / `DECLINE:` format, with a deterministic rules floor (same-faction 85%,
+  cross-faction 15%) when the model ignores the format or is unreachable. Being turned
+  down is a real outcome, not a failure; it's the most MMO thing in the game.
+- **Follow state** in the ambient state machine: loose leash rather than a rigid offset (a
+  companion glued to your shoulder reads as a pet), catches up off-frame if you travel,
+  and **breaks off to fight its own nearby monsters** before rejoining. That last part is
+  the difference between a party member and a pet.
+- **Duels** (`engine/duel.ts`). Friendly, resolved by the same seeded `runFight`. This is
+  **Track P's ghost-PvP mechanic running a lap early against a local opponent** — P0 only
+  swaps the opponent source from "the crowd next to you" to a cloud snapshot, so the
+  "fetch opponents, run seeded sim, render in the dimetric scene" path is now prototyped.
+
+**The companion does NOT assist your combat, deliberately.** It fights its own monsters
+with its own numbers and never damages your target. Free DPS would raise your kills per
+minute, which makes it an economy change `econSim` would have to model and the balance
+pass would have to absorb — and it would break the isolation rule below. A companion is
+company, not a damage buff. Duels are likewise friendly: no HP, XP, loot or gold moves.
+
+Party membership is per-zone; travelling disbands it with a line in chat, because the
+crowd is regenerated per zone and a member would otherwise be silently recycled out from
+under you.
+
+**Whisper UX rebuild — the chat window was in the wrong place entirely.** Reported from
+real play: tapping Whisper on mobile did nothing, and the window was buggy at desktop and
+tablet widths. One root cause, two symptoms:
+
+- `.app-log` is **232×112px** on desktop. A tabbed panel with a scrolling message list AND
+  a text input has nowhere to put anything in 112px of height.
+- On mobile `.app-log` is a bottom sheet hidden behind a transform until
+  `activePanel === 'log'`. Tapping Whisper set a target and switched a tab inside a panel
+  that was **off-screen**, so the button genuinely did nothing visible.
+
+A conversation with an input field is not a log line and should not live in the log's real
+estate. Whispers moved to their own fixed-position window (`WhisperWindow` + the
+`.whisper-window` rules in index.css): a floating panel clear of the right rail on desktop,
+a narrower one on tablet, a bottom sheet above the dock on mobile. It does not depend on
+the log sheet being open, so the gesture works identically at every breakpoint. Zone chat
+stays in `.app-log`, where a read-only feed fits fine. Input is `font-size: 16px` to stop
+iOS Safari zooming the viewport on focus (a zoom that never undoes itself), 36px minimum
+control heights, and `overscroll-behavior: contain` so the sheet doesn't scroll the page.
+
+**Chat readability + a layering bug the resize exposed.** Chat inherited the branded
+display face (Cinzel, small-caps serif) at 0.65rem — lovely on headings, punishing for
+lowercase MMO chatter — and `.combat-log` asked for generic `monospace`, which resolves to
+Courier on macOS/iOS. Chat and whispers now opt out into `--font-chat` (platform UI sans)
+at 0.78–0.8rem with higher-contrast colours; everything else keeps the brand. The zone-chat
+panel grew from 112px to `--log-h: 220px`, with the left rail reserving the matching space.
+
+Enlarging the mobile sheet surfaced a **pre-existing layering bug**: `.app-log` is z-index
+50 and `.hud-layer` (which owns the action bar) is z-index 20, so an open chat sheet
+anchored at the dock rendered directly over the primary controls — the action bar simply
+disappeared behind it. Both the chat sheet and the whisper window now reserve
+`--actionbar-h` above the dock, so the action bar stays visible with chat open. Verified by
+hit-testing the bar's centre with `elementFromPoint` at all three breakpoints rather than
+by eye.
+
+**Mobile / iOS pass (2026-07-28).** This ships as an iOS app, so the web defaults that
+read as "a web page in a wrapper" were addressed directly:
+
+- **Chat is no longer modal.** The hero and inventory drawers keep their dismissing scrim —
+  they own the screen. Chat does not: this is an idle game you *watch*, and the point of a
+  living-world feed is reading it while the world runs. The scrim greyed out the world you
+  were chatting about and blocked the action bar, which on a phone is most of the interface.
+  Measured: with chat open, `elementFromPoint` at the action bar's centre now returns the
+  ability button itself rather than a backdrop.
+- **Keyboard-aware panels** (`engine/viewportInsets.ts`). iOS Safari does not change
+  `window.innerHeight` when the keyboard appears, and `100dvh` tracks the layout viewport,
+  not the visual one — so a `position: fixed` panel anchored to `bottom` sits *underneath*
+  the keyboard and the field you just focused becomes invisible. The visual viewport is the
+  only thing that knows; its height is published as `--kb-inset` and the whisper window
+  adds it, via `max()` so it rides the keyboard when one is up and clears the action bar
+  when one isn't.
+- **44pt touch targets** on the whole social UI, per Apple's HIG. Worth recording *how* this
+  was got wrong first: the buttons carried an inline `minHeight: 36`, and an inline style
+  outranks the `@media (pointer: coarse)` rule meant to raise it — so every button silently
+  stayed at mouse size on touch. Measuring (`getBoundingClientRect().height` per button)
+  caught it; reading the CSS would not have.
+- `touch-action: manipulation` on interactive chrome (kills the 300ms tap delay and
+  double-tap zoom), `-webkit-touch-callout: none` + no text selection on game chrome —
+  but chat messages stay selectable, since copying what someone said is worth keeping.
+  `overscroll-behavior: contain` on every scroller so rubber-banding a panel doesn't drag
+  the app. 16px inputs so focusing a field never triggers iOS's viewport zoom.
+
+**Party frame** (`hud/PartyFrame.tsx`) sits directly beneath your own unit frame, above the
+target — where an MMO puts it. Name, level, spec, faction colour, live health bar and a
+current-activity label (following / moving in / fighting / looting). It reads two sources
+because neither alone is sufficient: `party.ts` owns membership, and the render adapter
+publishes a `CompanionStatus` snapshot each behaviour tick for what they're actually doing.
+The health bar is real — it reflects remaining health from the fight the companion is
+currently playing back, and returns to full between fights, since a companion's HP only
+exists inside a resolved fight.
+
+**Companions never fought, and the obvious fix was the wrong one.** First diagnosis was
+"the seek radius is too small", so it went from 6.5 to 13 tiles. That changed nothing,
+because the problem was never range — it was **supply**. The `AMBIENT_GROUPS` weights
+produce roughly **two** ambient monsters for eight heroes, and every one is already
+claimed by a hero standing at its group anchor (`nearestAmbientMob` deliberately skips
+monsters someone else is fighting). A companion walks *away* from those anchors — that is
+what following means — so it was competing for a supply that was both tiny and permanently
+spoken for.
+
+The fix is a dedicated **sparring partner**: one reusable monster entity spawned on
+walkable ground a few tiles off the player, recycled after each fight on a
+`COMPANION_SPAR_INTERVAL` cadence. The companion walks over, fights it with the same
+`runFight` sim and its own numbers, loots, and rejoins. Still ambient scenery — never one
+of the store's real `mobs` — so the player's combat, loot and XP stay untouched.
+
+Guarded against two cleanup paths that would otherwise break it: `retireAmbient()` now
+clears the cached indices (stale indices into a rebuilt array would point the companion at
+whatever landed in that slot), and group recycling skips the sparring partner so it is not
+yanked across the map mid-fight.
+
+**And a second, larger bug the instrumentation then exposed.** Even with a monster to
+fight, the companion still could not fight it. The party-sync block runs before the
+behaviour tick each frame and read:
+
+```
+if (a.state !== 'follow' && a.state !== 'fight' && a.state !== 'loot') { a.state = 'follow'; a.foe = -1 }
+```
+
+`'approach'` is not in that exemption list. The behaviour tick would set `approach`; the
+next tick would stomp it back to `follow` and clear the target. The companion could never
+traverse approach → fight, so the only fight ever seen was one already in progress when
+they accepted the invite. Only `wander` and `idle` promote to `follow` now — `approach` is
+the first beat of their own fight cycle, not idle wandering.
+
+Measured before and after, over 60 seconds with a companion in the party:
+
+| | before | after |
+|---|---|---|
+| companion attack animations | 7, then frozen | 7 → 10 → 15 → **21**, climbing |
+| states observed | `{follow: 20}` | `{approach: 14, fight: 4, loot: 1, follow: 1}` |
+
+`ambientDebug()` now reports `mobs`, `freeMobs` and a live `companionAttacks` counter,
+because "is my party member actually fighting?" is not answerable from a screenshot — and
+two rounds of guessing at it was two too many. Both causes fell out of a single
+instrumented run.
+
+Follow-up tuning from the same data: 70% of the cycle was `approach`, i.e. more commuting
+than fighting, so the sparring partner spawns at 2.5–4.5 tiles instead of 4–7 and a
+companion closes at follow speed rather than the idle-wander gait (it is chasing a target
+while the player walks away from both of them).
+
+**Two UX bugs found by real play, both pre-existing and both worth recording:** the world
+scene's jump handler `preventDefault`s Space on `window`, which was harmless until a text
+input existed and then ate every space in a whisper ("want to party up?" → "wanttopartyup?")
+while WASD walked the hero around mid-sentence. Any focused field now owns the keyboard.
+And the player's own whispers rendered as `To [your own name]` instead of naming the
+recipient.
+
+**The isolation rule holds structurally.** Nothing in `engine/ambient.ts` or
+`engine/fight.ts` can reach the store — there is no import path, and adding one would be
+the bug. Ambient heroes fight synthetic monsters, never the store's real `mobs`. One
+subtle breach found and fixed on the way: the damage-floater pool LRU-evicts, so ambient
+numbers would have pushed the *player's* numbers out of a saturated pool — ambient
+floaters now take only genuinely free slots.
+
+**Perf, measured at 4× CPU throttle** (CDP; throttle and sampling in ONE session, since
+`Emulation.*` overrides are cleared when the client disconnects — splitting them silently
+reverts to unthrottled desktop and produces very convincing false numbers):
+
+| run | mean | p50 | 1% low | worst frame |
+|---|---|---|---|---|
+| baseline (lvl 1, no ambient fights) | 52.6 | 59.9 | 12.2 | 133ms |
+| after L0 (lvl 1) | 56.1 | 59.9 | 29.3 | 100ms |
+| after L0 (lvl 40, 2 concurrent sims) | 50.1 | 59.9 | 15.0 | 100ms |
+
+Read honestly: mean FPS moves ±3 between runs in both directions, so this is
+noise-dominated and the right claim is **no material regression**, not an improvement.
+p50 holds at 60fps throughout, and worst-frame improved consistently (133ms → ~100ms).
+The lvl-40 run is the heavier scenario — two fights simulating concurrently — and still
+holds 60fps p50.
+
+A measurement trap worth recording: a run that bounces back to the character-select
+screen measures a static menu and reports a *flattering* ~60fps with no world rendering
+at all. Any FPS probe here must assert the world scene is mounted (`window.__ilScene`,
+dev-only) before and after sampling, or the number is meaningless.
 
 ## Track S — accounts, character slots & creation (launch-critical; local now → hosted later)
 

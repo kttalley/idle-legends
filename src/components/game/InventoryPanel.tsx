@@ -1,3 +1,4 @@
+import { CollapsiblePanel } from '../ui/CollapsiblePanel'
 import React, { useState } from 'react'
 import { useGameStore, rarityColor } from '../../store/gameStore'
 import { TooltipWrapper, ItemTooltipContent } from '../ui/Tooltip'
@@ -104,9 +105,7 @@ export function InventoryPanel() {
   })()
 
   return (
-    <div className="rp-panel flex flex-col h-full">
-      <div className="rp-panel-header">Inventory</div>
-
+    <CollapsiblePanel id="inventory" title="Inventory" grow>
       {/* Tabs */}
       <div className="flex border-b" style={{ borderColor: '#3a2c10' }}>
         {(['equipment', 'inventory'] as const).map(t => (
@@ -271,6 +270,6 @@ export function InventoryPanel() {
           <ItemTooltipContent item={inspected.item} equippedItem={inspected.compare} hideName />
         )}
       </DetailSheet>
-    </div>
+    </CollapsiblePanel>
   )
 }

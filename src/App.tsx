@@ -8,6 +8,10 @@ import { CharacterPanel } from './components/game/CharacterPanel'
 import { InventoryPanel } from './components/game/InventoryPanel'
 import { ZoneSelector } from './components/game/ZoneSelector'
 import { CombatLog } from './components/game/CombatLog'
+import { ChatPanel } from './components/game/ChatPanel'
+import { PlayerCard } from './components/game/PlayerCard'
+import { WhisperWindow } from './components/game/WhisperWindow'
+import { installViewportInsets } from './engine/viewportInsets'
 import { QuestToast } from './components/game/QuestToast'
 import { OfflineReportToast } from './components/game/OfflineReportToast'
 import { slotStorage } from './store/saveSlots'
@@ -38,6 +42,10 @@ export default function App() {
   // Desktop-only: fold a glass column off the world. Mobile uses `activePanel`
   // drawers instead, and the CSS neutralises `collapsed` there.
   const [collapsed, setCollapsed] = useState({ left: false, right: false })
+  const [logTab, setLogTab] = useState<'combat' | 'chat'>('combat')
+
+  // Publish the iOS keyboard height as --kb-inset so fixed panels can ride above it.
+  useEffect(installViewportInsets, [])
   const [slots, setSlots]   = useState<SaveSlotMeta[]>(() => slotStorage.list())
   // Show creation directly when there are no heroes yet; otherwise the select screen.
   const [creating, setCreating] = useState<boolean>(() => slotStorage.list().length === 0)
@@ -142,10 +150,43 @@ export default function App() {
         {collapsed.right ? '‹' : '›'}
       </button>
 
-      {/* ── Combat log ── */}
+      {/* ── Combat log / zone chat ── */}
+      {/* Two feeds share one slot: what happened TO you, and what the world is saying
+          around you. Tabs rather than a new layout region, so the mobile dock and the
+          collapse tabs keep working unchanged. */}
       <div className={`app-log rp-glass${activePanel === 'log' ? ' panel-open' : ''}`}>
-        <CombatLog />
+        <div style={{ display: 'flex', gap: 6, padding: '2px 6px 0' }}>
+          <button
+            onClick={() => setLogTab('combat')}
+            style={{
+              background: 'none', border: 'none', padding: '2px 0', cursor: 'pointer',
+              fontSize: '0.62rem', letterSpacing: '0.04em',
+              color: logTab === 'combat' ? '#f4c84a' : '#8a8070',
+              fontWeight: logTab === 'combat' ? 700 : 400,
+              borderBottom: logTab === 'combat' ? '1px solid #f4c84a' : '1px solid transparent',
+            }}
+          >COMBAT</button>
+          <button
+            onClick={() => setLogTab('chat')}
+            style={{
+              background: 'none', border: 'none', padding: '2px 0', cursor: 'pointer',
+              fontSize: '0.62rem', letterSpacing: '0.04em',
+              color: logTab === 'chat' ? '#f4c84a' : '#8a8070',
+              fontWeight: logTab === 'chat' ? 700 : 400,
+              borderBottom: logTab === 'chat' ? '1px solid #f4c84a' : '1px solid transparent',
+            }}
+          >CHAT</button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0 }}>
+          {logTab === 'combat' ? <CombatLog /> : <ChatPanel />}
+        </div>
       </div>
+
+      {/* Target card for a tapped hero, and the whisper conversation it can open.
+          Both are fixed overlays so they work identically at every breakpoint — in
+          particular they do NOT depend on the mobile log sheet being open. */}
+      <PlayerCard />
+      <WhisperWindow />
 
       {/* ── Mobile dock ── */}
       <div className="app-dock rp-glass-strong">
@@ -174,7 +215,12 @@ export default function App() {
         </button>
       </div>
 
-      {activePanel && <div className="app-backdrop" onClick={close} />}
+      {/* The hero and inventory drawers are full-height sheets that own the screen, so
+          they get a dismissing scrim. CHAT deliberately does not: this is an idle game
+          you watch, and the whole point of a living-world chat feed is reading it WHILE
+          the world runs. A scrim there greys out the world you're chatting about and
+          blocks the action bar, which on a phone is most of the interface. */}
+      {activePanel && activePanel !== 'log' && <div className="app-backdrop" onClick={close} />}
     </div>
   )
 }

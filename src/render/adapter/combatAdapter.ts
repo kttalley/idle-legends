@@ -22,9 +22,24 @@ import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } fro
 import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } from '../../data/townNpcs'
 import { Animator } from '../animation'
 import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId } from './fftaRoster'
+import { mulberry32, subStream, type Rng } from '../../engine/rng'
+import { runFight, type FightEvent, type HeroCombatant } from '../../engine/fight'
+import {
+  makeAmbientHero, pickBark, BARK_CHANCE, BARK_SECONDS, BARK_COOLDOWN_SECONDS,
+  BARK_MAX_CONCURRENT, AMBIENT_BRAIN_HZ, AMBIENT_FIGHT_BUDGET,
+  type AmbientIdentity, type AmbientState, type BarkEvent,
+} from '../../engine/ambient'
+import {
+  takeChatLine, requestLiveBark, pumpChatPools, type ChatContext, type ChatSpeaker,
+} from '../../engine/chatGen'
+import { pushChat, resolveChat } from '../../engine/chatLog'
+import { getParty, disbandParty, setCompanionStatus } from '../../engine/party'
+import { entityKey } from '../../engine/whisper'
+import { ZONES } from '../../data/zones'
 import type { Facing, IndexedSprite } from '../types'
 import type {
   GameState, MobInstance, ClassType, RaceType, FactionType, Rarity, FloatingNumber, MapNode, MapScenery, WeatherType, ZoneId,
+  Item, Slot,
 } from '../../data/types'
 
 export const CSS_SCALE = 2
@@ -220,6 +235,30 @@ const AMBIENT_RARITY: Rarity[] = ['common', 'common', 'common', 'uncommon', 'unc
 const AMBIENT_MEMBER_LEASH = 3.2   // how far a member roams from its group's anchor
 const AMBIENT_GROUP_SPREAD = 9     // how far group anchors sit from the player (in view)
 const AMBIENT_RECYCLE_DIST = 24    // anchor this far past the player recycles ahead
+// ── L0 behaviour ranges (tiles) ───────────────────────────────────────────────
+const AMBIENT_SEEK_RANGE = 6.5     // how far a hero will look for something to fight
+const AMBIENT_ENGAGE_RANGE = 1.4   // close enough to start swinging
+const AMBIENT_CHAT_RANGE = 4.0     // close enough to say something to another hero
+const AMBIENT_MOB_RESPAWN = 7      // base seconds before a slain ambient monster returns
+// ── Party companion (L2) ──────────────────────────────────────────────────────
+const FOLLOW_NEAR = 2.2            // close enough; stop crowding the player
+const FOLLOW_FAR = 3.4             // beyond this, close the gap
+const FOLLOW_TELEPORT = 26         // hopelessly far (player travelled) → catch up off-screen
+const FOLLOW_SPEED = 2.0           // slightly faster than idle wander, so they keep up
+// A follower hunts over a much wider radius than a wandering hero. It is walking WITH
+// the player, away from the anchored encounter groups, so at the normal 6.5-tile seek
+// range it almost never found anything and simply trailed along in silence — which read
+// as a companion with no behaviour at all.
+const FOLLOW_SEEK_RANGE = 13
+/** Base seconds between companion skirmishes. Low enough that a companion reads as
+ *  actively fighting alongside you rather than occasionally remembering how. */
+const COMPANION_SPAR_INTERVAL = 9
+
+/** Ambient heroes fight unequipped — their power comes from level + spec, and giving
+ *  them real loadouts would mean generating items, which is the player's economy. */
+const EMPTY_EQUIPMENT: Record<Slot, Item | null> = {
+  weapon: null, helm: null, chest: null, legs: null, boots: null, trinket: null,
+}
 
 // Encounter-group templates (heroes h, monsters m). Weighted so the world reads as a
 // mix — parties fighting a mob, a lone monster, a 1v1 duel, a hero patrol — instead of
@@ -277,6 +316,37 @@ interface Ambient {
   level: number
   faction: FactionType
   grp: number               // index into ambientGroups (its encounter cluster)
+
+  // ── L0: behaviour ───────────────────────────────────────────────────────────
+  /** This hero's own stream. Per-hero rather than shared, so culling an off-screen
+   *  hero cannot change what the heroes still on screen roll. */
+  rng: Rng
+  state: AmbientState
+  /** Full identity for heroes (class/race/level/spec/talents); null for monsters. */
+  identity: AmbientIdentity | null
+  /** Current bark text and the seconds it stays up. */
+  bark: string | null
+  barkT: number
+  /** Seconds until this hero may speak again. */
+  barkCd: number
+
+  // ── L0b: real, simulated fights ─────────────────────────────────────────────
+  /** The resolved fight, produced once by `runFight` and then PLAYED BACK over time.
+   *  Resolving up front and replaying is what keeps a real combat sim off the frame
+   *  budget — and it is the same shape Track P will use to render a ghost duel. */
+  fightLog: FightEvent[] | null
+  /** Playback cursor: elapsed sim-seconds, and the next event index to fire. */
+  playT: number
+  playIdx: number
+  /** Index into `ambient` of the opponent this hero committed to. */
+  foe: number
+  /** Did this hero win its last fight? Drives the loot beat and which bark fires. */
+  wonLast: boolean
+  /** Party companion: return to following (not wandering) once this fight/loot ends. */
+  rejoinAfter: boolean
+  /** Monsters only: seconds until this corpse respawns. Without this the zone runs out
+   *  of things to fight within a minute and the "busy server" decays into a stroll. */
+  respawnT: number
 }
 
 /** Movement vector → dimetric facing (se:+x, sw:+y, nw:−x, ne:−y). */
@@ -324,6 +394,30 @@ export class WorldSceneController {
   private ambient: Ambient[] = []
   private ambientGroups: { gx: number; gy: number; fight: boolean }[] = []
   private ambientSkirmishCd = 0
+  /** Player level, mirrored from sync() purely to band ambient hero levels. */
+  private playerLevel = 1
+  /** Zone/faction display names, mirrored from sync() so generated chat uses the
+   *  game's own generated proper nouns rather than generic fantasy filler. */
+  private zoneDisplayName = ''
+  private factionNames: Partial<Record<FactionType, string>> = {}
+  private playerName = 'You'
+  /** Seconds until the next chat-pool top-up check. */
+  private chatPumpT = 0
+  /** Accumulator for the fixed-rate behaviour tick (brains run slower than frames). */
+  private ambientBrainAccum = 0
+  /** Monotonic counter feeding each ambient fight a distinct, reproducible seed. */
+  private ambientFightSeq = 0
+  /** Index into `ambient` of the current party companion, or -1. */
+  private followerIdx = -1
+  /** Reusable sparring-partner slot for the companion, or -1 before it exists. */
+  private companionFoeIdx = -1
+  /** Seconds until the companion is handed a fresh thing to fight. */
+  private companionSparCd = 0
+  /** Attack animations the companion has played this session (debug/instrumentation). */
+  private companionAttackCount = 0
+  /** Group-level stream (recycle placement). Separate from the per-hero streams so
+   *  re-anchoring a group cannot perturb what any individual hero rolls. */
+  private ambientRng: Rng = mulberry32(1)
 
   // Town-hub mode: flat FFTA town backdrop + clamped camera + idle crowd + building
   // anchors. Town entities use RAW tile coords (no PAD/wrap). townMode is entered on
@@ -390,6 +484,9 @@ export class WorldSceneController {
   onEngageTarget: (() => void) | null = null
   /** Fired when the player clicks a DIFFERENT enemy; host maps it to setTarget(id). */
   onSelectTarget: ((mobId: string) => void) | null = null
+  /** Tapping an ambient hero opens their player card. The adapter stays read-only over
+   *  game state: it reports who was tapped and where, the host owns the UI. */
+  onHeroTapped: ((speaker: ChatSpeaker, clientX: number, clientY: number) => void) | null = null
   // Entities for the enemies the player is NOT currently fighting. The engaged one keeps
   // its own dedicated machinery (`this.mob`: approach anchor, bearing, routing, death
   // fade); these just stand in the world, depth-sorted and clickable, so the player has a
@@ -585,14 +682,20 @@ export class WorldSceneController {
   }
 
   /** Spawn a floater anchored to `anchorEntity` (rises from its head). LRU: if the
-   *  pool is saturated, evict the entry with the least remaining time. */
-  private spawnFloater(anchorEntity: Entity, text: string, crit: boolean, color: string): void {
+   *  pool is saturated, evict the entry with the least remaining time.
+   *
+   *  `mayEvict = false` takes only genuinely FREE slots. Ambient heroes pass false: the
+   *  crowd's damage numbers must never push the player's own numbers out of a saturated
+   *  pool. Scenery that can delete the player's feedback is not scenery any more. */
+  private spawnFloater(
+    anchorEntity: Entity, text: string, crit: boolean, color: string, mayEvict = true,
+  ): void {
     let slot = -1
     let least = Infinity
     for (let i = 0; i < this.floaters.length; i++) {
       const f = this.floaters[i]
       if (f.t <= 0) { slot = i; break }      // free slot — take it
-      if (f.t < least) { least = f.t; slot = i } // else track oldest for LRU eviction
+      if (mayEvict && f.t < least) { least = f.t; slot = i } // else track oldest for LRU eviction
     }
     if (slot < 0) return
     const f = this.floaters[slot]
@@ -984,6 +1087,13 @@ export class WorldSceneController {
     // Read before the zone-change branch below, so a rebake uses this run's seed.
     this.worldSeed = state.worldSeed ?? 0
     this.currentZone = state.currentZone
+    // Ambient heroes band around the player's level so the crowd reads as peers. This
+    // is the ONLY thing the ambient system reads off the player, and it is read-only —
+    // nothing here writes back into combat, loot, XP or the economy.
+    this.playerLevel = state.level ?? 1
+    this.zoneDisplayName = state.generatedZoneNames?.[state.currentZone] ?? ZONES[state.currentZone]?.name ?? ''
+    this.factionNames = state.factionNames ?? {}
+    this.playerName = state.playerName || 'You'
 
     // ── Town-hub transitions ──────────────────────────────────────────────────
     // Entering a town swaps the whole scene to the flat FFTA town backdrop + crowd;
@@ -1007,6 +1117,10 @@ export class WorldSceneController {
       // new zone's map isn't ready yet, so stale entities never linger).
       this.retirePropEntities()
       this.retireAmbient()
+      // The crowd is regenerated per zone, so a companion's body is about to stop
+      // existing. Disband explicitly rather than leaving a member pointing at nothing.
+      this.followerIdx = -1
+      disbandParty()
       // Enemies belong to the zone they stood in — their world anchors are meaningless
       // once the ground is rebaked.
       for (const rec of this.otherMobEnts.values()) rec.e.active = false
@@ -1515,6 +1629,28 @@ export class WorldSceneController {
         this.tapFlashT = 0.42
         this.manualMode = false
         this.playerPath.pts = []
+        return
+      }
+    }
+    // Tapping another PLAYER opens a whisper to them. Checked before enemies and before
+    // ground, because an ambient hero is a person you can talk to and the tap should
+    // never fall through to "walk to the dirt they are standing on". Nearest-first so
+    // overlapping bodies resolve to the one in front.
+    {
+      let best: { a: Ambient; d: number } | null = null
+      for (const a of this.ambient) {
+        if (a.kind !== 'hero' || !a.e.active || !a.identity) continue
+        if (!this.hitTestEntity(a.e, clientX, clientY)) continue
+        const d = Math.hypot(a.e.tx - this.player.tx, a.e.ty - this.player.ty)
+        if (!best || d < best.d) best = { a, d }
+      }
+      if (best) {
+        const id = best.a.identity!
+        this.onHeroTapped?.({
+          name: best.a.name, playerClass: id.playerClass, race: id.race,
+          faction: this.factionLabel(best.a.faction), level: best.a.level, spec: id.specTitle,
+          talentAllocs: id.talentAllocs,
+        }, clientX, clientY)
         return
       }
     }
@@ -2117,6 +2253,11 @@ export class WorldSceneController {
     for (const a of this.ambient) a.e.active = false
     this.ambient = []
     this.ambientGroups = []
+    // Indices into `ambient` are now meaningless; holding stale ones would point the
+    // companion at whatever happens to land in that slot next.
+    this.followerIdx = -1
+    this.companionFoeIdx = -1
+    this.companionSparCd = 0
   }
 
   // Place a group anchor a spread's distance from the player's tile, in a seeded
@@ -2143,6 +2284,8 @@ export class WorldSceneController {
     const rnd = (n: number) => { const x = Math.sin(seed * 12.9898 + n * 78.233) * 43758.5453; return x - Math.floor(x) }
     const totalW = AMBIENT_GROUPS.reduce((a, g) => a + g.w, 0)
     const jitter = (b: number) => (rnd(b) * 2 - 1) * 2.2   // member offset within a group
+    let heroIndex = 0   // stable per-zone hero ordinal → stable identity sub-stream
+    this.ambientRng = subStream(seed, 'groups')
     for (let gi = 0; gi < groupCount; gi++) {
       // Weighted-pick this encounter's shape.
       let r = rnd(gi * 13) * totalW
@@ -2152,23 +2295,26 @@ export class WorldSceneController {
       this.ambientGroups.push({ gx: a.gx, gy: a.gy, fight: tmpl.fight })
       for (let k = 0; k < tmpl.h; k++) {
         const s = gi * 100 + k * 11 + 3
-        const faction: FactionType = rnd(s) < 0.5 ? 'alliance' : 'horde'
-        const races = faction === 'alliance' ? CONCORD_RACES : ASHMARCH_RACES
-        const race = races[Math.floor(rnd(s + 1) * races.length)]
-        const cls = AMBIENT_CLASSES[Math.floor(rnd(s + 2) * AMBIENT_CLASSES.length)]
-        const rarity = AMBIENT_RARITY[Math.floor(rnd(s + 3) * AMBIENT_RARITY.length)]
-        const name = AMBIENT_NAMES[Math.floor(rnd(s + 9) * AMBIENT_NAMES.length)]
-        const spriteId = heroSpriteId(race, cls, name)
+        // Identity now comes from `engine/ambient`, so an ambient hero has the same
+        // shape as the player — class, race, level band, AND a real spec allocation
+        // that both titles them and changes how their simulated fights go.
+        const id = makeAmbientHero(seed, heroIndex, this.playerLevel)
+        heroIndex++
+        const spriteId = heroSpriteId(id.race, id.playerClass, id.name)
         const sprite = this.spriteCache[spriteId] ?? this.rigs.player
         const gx = WorldSceneController.wrapMod(a.gx + jitter(s + 4))
         const gy = WorldSceneController.wrapMod(a.gy + jitter(s + 5))
-        const e = this.scene.spawn(sprite, heroPaletteId(cls, race, faction, rarity),
+        const e = this.scene.spawn(sprite, heroPaletteId(id.playerClass, id.race, id.faction, id.rarity),
           PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
         e.shadow = true; e.animator.set('idle')  // idle tag IS the gait (walk is flinchy)
         this.ambient.push({
           e, kind: 'hero', gx, gy, tgx: gx, tgy: gy, t: rnd(s + 8) * 3,
-          fightT: tmpl.fight ? 3 + rnd(s + 6) * 3 : 0, atkCd: rnd(s + 7) * 0.6,
-          name, level: 1 + Math.floor(rnd(s + 10) * 60), faction, grp: gi,
+          fightT: 0, atkCd: rnd(s + 7) * 0.6,
+          name: id.name, level: id.level, faction: id.faction, grp: gi,
+          rng: subStream(seed, `beh:${gi}:${k}`), state: tmpl.fight ? 'approach' : 'wander',
+          identity: id, bark: null, barkT: 0, barkCd: rnd(s + 12) * BARK_COOLDOWN_SECONDS,
+          fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false, respawnT: 0,
+          rejoinAfter: false,
         })
       }
       for (let k = 0; k < tmpl.m; k++) {
@@ -2182,8 +2328,12 @@ export class WorldSceneController {
         e.shadow = true; e.animator.set('idle')
         this.ambient.push({
           e, kind: 'mob', gx, gy, tgx: gx, tgy: gy, t: rnd(s + 4) * 3,
-          fightT: tmpl.fight ? 3 + rnd(s + 5) * 3 : 0, atkCd: rnd(s + 6) * 0.6,
+          fightT: 0, atkCd: rnd(s + 6) * 0.6,
           name: '', level: 0, faction: 'neutral', grp: gi,
+          rng: subStream(seed, `beh:${gi}:m${k}`), state: 'idle',
+          identity: null, bark: null, barkT: 0, barkCd: 0,
+          fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false, respawnT: 0,
+          rejoinAfter: false,
         })
       }
     }
@@ -2406,8 +2556,8 @@ export class WorldSceneController {
     for (let gi = 0; gi < this.ambientGroups.length; gi++) {
       const grp = this.ambientGroups[gi]
       if (Math.hypot(WorldSceneController.wrapDiff(grp.gx, pgx), WorldSceneController.wrapDiff(grp.gy, pgy)) <= recycleAt) continue
-      const ang = travelAng + (Math.random() - 0.5) * Math.PI // ±90° of travel = ahead
-      const dist = R + 2 + Math.random() * 5                  // just beyond the edge
+      const ang = travelAng + (this.ambientRng() - 0.5) * Math.PI // ±90° of travel = ahead
+      const dist = R + 2 + this.ambientRng() * 5                  // just beyond the edge
       grp.gx = WorldSceneController.wrapMod(pgx + Math.cos(ang) * dist)
       grp.gy = WorldSceneController.wrapMod(pgy + Math.sin(ang) * dist)
       // Re-anchor onto walkable ground, else a whole group materialises mid-lake and
@@ -2417,34 +2567,107 @@ export class WorldSceneController {
         grp.gx = WorldSceneController.wrapMod(w.x)
         grp.gy = WorldSceneController.wrapMod(w.y)
       }
-      for (const a of this.ambient) {
+      for (let ai = 0; ai < this.ambient.length; ai++) {
+        const a = this.ambient[ai]
         if (a.grp !== gi) continue
-        a.gx = WorldSceneController.wrapMod(grp.gx + (Math.random() * 2 - 1) * 2.2)
-        a.gy = WorldSceneController.wrapMod(grp.gy + (Math.random() * 2 - 1) * 2.2)
-        a.tgx = a.gx; a.tgy = a.gy; a.t = Math.random() * 3
-        if (grp.fight) { a.fightT = 3 + Math.random() * 3; a.atkCd = Math.random() * 0.6 }
+        // The companion's sparring partner belongs to the player, not to a group anchor —
+        // recycling it across the map would yank it out of a fight in progress.
+        if (ai === this.companionFoeIdx) continue
+        a.gx = WorldSceneController.wrapMod(grp.gx + (a.rng() * 2 - 1) * 2.2)
+        a.gy = WorldSceneController.wrapMod(grp.gy + (a.rng() * 2 - 1) * 2.2)
+        a.tgx = a.gx; a.tgy = a.gy; a.t = a.rng() * 3
+        // The whole group just teleported past the screen edge, so any encounter it was
+        // in no longer exists. Drop it — otherwise a hero carries on playing back a
+        // fight log next to an opponent that is no longer beside it.
+        a.state = 'wander'
+        a.foe = -1
+        a.fightLog = null
+        a.playT = 0
+        a.playIdx = 0
+        a.bark = null
+        a.barkT = 0
+        if (a.kind === 'mob') { a.state = 'idle'; a.respawnT = 0; a.e.active = true }
+        a.e.animator.set('idle')
       }
+    }
+
+    // ── Brains ────────────────────────────────────────────────────────────────
+    // Behaviour runs at a fixed low rate, not per frame. The scene must animate at
+    // 60fps; deciding whether a hero wants to fight something does not, and this is
+    // the single biggest lever on the perf risk the plan calls out.
+    this.ambientBrainAccum += dt
+    const brainStep = 1 / AMBIENT_BRAIN_HZ
+    while (this.ambientBrainAccum >= brainStep) {
+      this.ambientBrainAccum -= brainStep
+      this.ambientBrain(brainStep)
     }
 
     for (const a of this.ambient) {
       if (!a.e) continue
       const anchor = this.ambientGroups[a.grp]
       if (!anchor) continue
-      if (a.fightT > 0) {
-        a.fightT -= dt
-        a.atkCd -= dt
-        if (a.atkCd <= 0) { a.e.animator.set('attack'); a.e.animator.restart(); a.atkCd = 0.6 + Math.random() * 0.5 }
-        else if (a.e.animator.finished) a.e.animator.set('idle')
-        if (a.fightT <= 0) a.e.animator.set('idle')
+      if (a.barkT > 0) a.barkT -= dt
+      if (a.barkCd > 0) a.barkCd -= dt
+      if (a.barkT <= 0) a.bark = null
+      if (a.state === 'fight') {
+        // Position is held; the fight's beats are driven by the playback in
+        // `ambientBrain`, which sets the attack animations.
+        if (a.e.animator.finished) a.e.animator.set('idle')
+      } else if (a.state === 'loot') {
+        if (a.e.animator.finished) a.e.animator.set('idle')
+      } else if (a.state === 'follow') {
+        // Keep station near the player. Deliberately a loose leash rather than a rigid
+        // offset: a companion glued to your shoulder reads as a pet, one that drifts and
+        // catches up reads as a person walking with you.
+        const dx = WorldSceneController.wrapDiff(pgx, a.gx)
+        const dy = WorldSceneController.wrapDiff(pgy, a.gy)
+        const d = Math.hypot(dx, dy)
+        if (d > FOLLOW_TELEPORT) {
+          // The player travelled or tapped far away. Rather than trail hopelessly across
+          // the zone, reappear just off-frame and walk in — the same trick the ambient
+          // group recycler uses to avoid popping in front of the camera.
+          a.gx = WorldSceneController.wrapMod(pgx - dx / (d || 1) * (this.visibleTileRadius() + 3))
+          a.gy = WorldSceneController.wrapMod(pgy - dy / (d || 1) * (this.visibleTileRadius() + 3))
+        } else if (d > FOLLOW_NEAR) {
+          const nx = WorldSceneController.wrapMod(a.gx + dx / d * FOLLOW_SPEED * dt)
+          const ny = WorldSceneController.wrapMod(a.gy + dy / d * FOLLOW_SPEED * dt)
+          if (this.walkableAt(nx + PAD, a.gy + PAD)) a.gx = nx
+          if (this.walkableAt(a.gx + PAD, ny + PAD)) a.gy = ny
+          a.e.animator.face(faceFromVec(dx, dy))
+        } else if (a.e.animator.finished) {
+          a.e.animator.set('idle')
+        }
+      } else if (a.state === 'approach') {
+        // Close on the committed opponent, then hand over to the fight state.
+        const foe = this.ambient[a.foe]
+        if (!foe || !foe.e.active) { a.state = 'wander'; a.foe = -1 }
+        else {
+          const dx = WorldSceneController.wrapDiff(foe.gx, a.gx)
+          const dy = WorldSceneController.wrapDiff(foe.gy, a.gy)
+          const d = Math.hypot(dx, dy)
+          if (d <= AMBIENT_ENGAGE_RANGE) {
+            a.e.animator.face(faceFromVec(dx, dy))
+          } else {
+            // A party companion closes at follow speed. It is chasing a target while the
+            // player walks away from both of them, so the idle-wander gait left it
+            // permanently in transit.
+            const sp = a.state === 'approach' && this.ambient[this.followerIdx] === a ? FOLLOW_SPEED : SPEED
+            const nx = WorldSceneController.wrapMod(a.gx + dx / d * sp * dt)
+            const ny = WorldSceneController.wrapMod(a.gy + dy / d * sp * dt)
+            if (this.walkableAt(nx + PAD, a.gy + PAD)) a.gx = nx
+            if (this.walkableAt(a.gx + PAD, ny + PAD)) a.gy = ny
+            a.e.animator.face(faceFromVec(dx, dy))
+          }
+        }
       } else {
         // Wander within a short leash of the group's anchor (keeps the cluster tight).
         const dx = WorldSceneController.wrapDiff(a.tgx, a.gx)
         const dy = WorldSceneController.wrapDiff(a.tgy, a.gy)
         const d = Math.hypot(dx, dy)
         if (d < 0.4 || a.t <= 0) {
-          a.tgx = WorldSceneController.wrapMod(anchor.gx + (Math.random() * 2 - 1) * AMBIENT_MEMBER_LEASH)
-          a.tgy = WorldSceneController.wrapMod(anchor.gy + (Math.random() * 2 - 1) * AMBIENT_MEMBER_LEASH)
-          a.t = 2 + Math.random() * 4
+          a.tgx = WorldSceneController.wrapMod(anchor.gx + (a.rng() * 2 - 1) * AMBIENT_MEMBER_LEASH)
+          a.tgy = WorldSceneController.wrapMod(anchor.gy + (a.rng() * 2 - 1) * AMBIENT_MEMBER_LEASH)
+          a.t = 2 + a.rng() * 4
         } else {
           // Ambient positions are game coords; walkableAt takes buffer coords, hence +PAD.
           // The crowd obeys the same ground rules as the hero — a dozen heroes wading
@@ -2463,22 +2686,602 @@ export class WorldSceneController {
       a.e.ty = this.player.ty + WorldSceneController.wrapDiff(a.gy, pgy)
     }
 
-    // Keep fight groups skirmishing: when a group's members finish their attack burst,
-    // restart it (facing hero↔mob) so duels/party fights read as ongoing.
-    this.ambientSkirmishCd -= dt
-    if (this.ambientSkirmishCd <= 0) {
-      this.ambientSkirmishCd = 2 + Math.random() * 2
-      for (let gi = 0; gi < this.ambientGroups.length; gi++) {
-        if (!this.ambientGroups[gi].fight) continue
-        const members = this.ambient.filter(a => a.grp === gi)
-        if (members.some(a => a.fightT > 0)) continue
-        const h = members.find(a => a.kind === 'hero'), m = members.find(a => a.kind === 'mob')
-        for (const a of members) { a.fightT = 2.5 + Math.random() * 2.5; a.atkCd = Math.random() * 0.5 }
-        if (h && m) {
-          h.e.animator.face(faceFromVec(m.gx - h.gx, m.gy - h.gy))
-          m.e.animator.face(faceFromVec(h.gx - m.gx, h.gy - m.gy))
+  }
+
+  /**
+   * The behaviour tick — wander → engage → fight → loot → move on.
+   *
+   * Runs at `AMBIENT_BRAIN_HZ`, not per frame, and only for heroes near the viewport.
+   * Everything it rolls comes from the hero's own seeded stream, so the crowd is
+   * reproducible and culling one hero cannot perturb another.
+   *
+   * A fight is resolved ONCE by `runFight` at the moment of engagement and then played
+   * back over the following seconds. That keeps a real combat simulation off the frame
+   * budget entirely, and it is deliberately the same mechanism Track P will use to
+   * render a ghost duel: resolve from a seed, then animate the log.
+   */
+  private ambientBrain(step: number): void {
+    if (!this.player) return
+    const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
+    const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
+    // Only think about heroes that are on (or just off) screen. This is the sim budget
+    // the plan asks for — an off-screen crowd still exists and still drifts, it just
+    // does not run fights or barks nobody can see.
+    const thinkRadius = this.visibleTileRadius() + 4
+
+    let fighting = 0
+    for (const a of this.ambient) if (a.state === 'fight') fighting++
+    let speaking = 0
+    for (const a of this.ambient) if (a.barkT > 0) speaking++
+
+    // ── Party sync ────────────────────────────────────────────────────────────
+    // The party module owns membership; the adapter owns bodies. Reconcile the two each
+    // brain tick by matching on entity key, so a hero who accepted an invite starts
+    // following and one who left goes back to their own business.
+    const party = getParty()
+    if (party.length || this.followerIdx >= 0) {
+      const wantKeys = new Set(party.map(m => m.key))
+      let found = -1
+      for (let i = 0; i < this.ambient.length; i++) {
+        const a = this.ambient[i]
+        if (a.kind !== 'hero' || !a.identity) continue
+        const key = entityKey({
+          name: a.name, playerClass: a.identity.playerClass, race: a.identity.race,
+          faction: this.factionLabel(a.faction), level: a.level, spec: a.identity.specTitle,
+        })
+        if (wantKeys.has(key)) {
+          found = i
+          // Promote into follow ONLY from a free-roaming state.
+          //
+          // This originally exempted 'fight' and 'loot' but not 'approach', which quietly
+          // made companions unable to fight at all: the behaviour tick would set
+          // 'approach', and this block — which runs first on the very next tick — would
+          // stomp it straight back to 'follow' and clear the target. The companion could
+          // never traverse approach → fight, so the only fight you ever saw was one that
+          // happened to already be in progress when they accepted the invite.
+          // 'approach' is the first beat of their own fight cycle, not idle wandering.
+          if (a.state === 'wander' || a.state === 'idle') {
+            a.state = 'follow'
+            a.foe = -1
+          }
+        } else if (a.state === 'follow') {
+          a.state = 'wander'   // they left the party
         }
       }
+      // A member whose body no longer exists (recycled with its group, or the zone
+      // changed) cannot follow anyone. Disband rather than keep a ghost in the roster.
+      if (party.length && found < 0 && this.followerIdx >= 0) {
+        disbandParty()
+      }
+      this.followerIdx = found
+
+      // Publish what the companion is doing, for the party frame. Health comes from the
+      // fight they are currently playing back, so the bar moves for real rather than
+      // being decorative — and returns to full between fights, because a companion's HP
+      // only exists inside a resolved fight.
+      const c = found >= 0 ? this.ambient[found] : null
+      if (c && c.identity) {
+        const ACTIVITY: Record<string, 'following' | 'moving in' | 'fighting' | 'looting' | 'idle'> = {
+          follow: 'following', approach: 'moving in', fight: 'fighting',
+          loot: 'looting', wander: 'idle', idle: 'idle',
+        }
+        let hpFrac = 1
+        if (c.state === 'fight' && c.fightLog) {
+          // Side 1 acted → the companion (side 0) took the hit; that event carries their
+          // remaining and maximum health.
+          for (let k = c.playIdx - 1; k >= 0; k--) {
+            const e = c.fightLog[k]
+            if (e.side === 1 && e.targetMaxHp > 0) { hpFrac = Math.max(0, e.targetHp / e.targetMaxHp); break }
+          }
+        }
+        setCompanionStatus({
+          name: c.name,
+          activity: ACTIVITY[c.state] ?? 'idle',
+          hpFrac,
+          attacking: c.state === 'fight' && !c.e.animator.finished,
+        })
+      } else {
+        setCompanionStatus(null)
+      }
+    }
+
+    // Top up the generated-chat pools. Throttled hard and off the render path: the
+    // request itself is async and the pump is a no-op unless a pool is actually low.
+    this.chatPumpT -= step
+    if (this.chatPumpT <= 0) {
+      this.chatPumpT = 10
+      const ctx = this.chatContext()
+      if (ctx) pumpChatPools(ctx)
+    }
+
+    // Respawn slain ambient monsters back at their group anchor, so the zone keeps
+    // supplying encounters instead of quietly emptying out.
+    for (const m of this.ambient) {
+      if (m.kind !== 'mob' || m.e.active || m.respawnT <= 0) continue
+      m.respawnT -= step
+      if (m.respawnT > 0) continue
+      const anchor = this.ambientGroups[m.grp]
+      if (!anchor) continue
+      m.gx = WorldSceneController.wrapMod(anchor.gx + (m.rng() * 2 - 1) * 2.2)
+      m.gy = WorldSceneController.wrapMod(anchor.gy + (m.rng() * 2 - 1) * 2.2)
+      m.tgx = m.gx; m.tgy = m.gy
+      m.state = 'idle'
+      m.foe = -1
+      m.fightLog = null
+      m.e.active = true
+      m.e.alpha = 1
+      m.e.animator.set('idle')
+    }
+
+    for (let i = 0; i < this.ambient.length; i++) {
+      const a = this.ambient[i]
+      if (a.kind !== 'hero' || !a.identity) continue
+      const near = Math.hypot(
+        WorldSceneController.wrapDiff(a.gx, pgx), WorldSceneController.wrapDiff(a.gy, pgy),
+      ) <= thinkRadius
+      if (!near) continue
+
+      switch (a.state) {
+        case 'follow': {
+          // A companion still has their own agenda: if something worth killing wanders
+          // into reach they will break off, fight it, loot it, and then catch back up.
+          // That is the whole difference between a party member and a pet. Their fight
+          // is entirely their own — it never touches the player's target, HP, XP or loot.
+          this.companionSparCd -= step
+          // Prefer a real world monster if one happens to be free and close.
+          let foe = this.nearestAmbientMob(i, FOLLOW_SEEK_RANGE)
+          // Otherwise give them their own. The zone's ~2 shared monsters are permanently
+          // claimed by the heroes standing on top of them, so without this a companion
+          // simply never fights — which is exactly how it played.
+          if (foe < 0 && this.companionSparCd <= 0) foe = this.spawnCompanionFoe(a)
+          if (foe >= 0) {
+            a.foe = foe
+            a.state = 'approach'
+            this.companionSparCd = COMPANION_SPAR_INTERVAL + a.rng() * COMPANION_SPAR_INTERVAL
+            speaking += this.tryBark(a, 'engage', speaking)
+          } else if (a.rng() < 0.05) {
+            // Nothing to kill yet — talk to the player instead. A companion that never
+            // says anything is just a sprite trailing behind you.
+            speaking += this.tryBark(a, a.rng() < 0.5 ? 'passing' : 'idle', speaking)
+          }
+          break
+        }
+
+        case 'wander':
+        case 'idle': {
+          // Look for something to pick a fight with, within the sim budget.
+          if (fighting >= AMBIENT_FIGHT_BUDGET) break
+          const foe = this.nearestAmbientMob(i)
+          if (foe >= 0) {
+            a.foe = foe
+            a.state = 'approach'
+            speaking += this.tryBark(a, 'engage', speaking)
+          } else if (a.rng() < 0.02) {
+            speaking += this.tryBark(a, 'idle', speaking)
+          } else {
+            // Passing chatter — greeting a neighbour, or trash-talking a rival.
+            const other = this.nearestAmbientHero(i)
+            if (other >= 0) {
+              const rival = this.ambient[other].faction !== a.faction
+              speaking += this.tryBark(a, rival ? 'rivalFaction' : 'passing', speaking)
+            }
+          }
+          break
+        }
+
+        case 'approach': {
+          const foe = this.ambient[a.foe]
+          // The target may have been retired (killed by someone else, or recycled with
+          // its group) while we were walking over.
+          if (!foe || !foe.e.active) { a.state = 'wander'; a.foe = -1; break }
+          const d = Math.hypot(
+            WorldSceneController.wrapDiff(foe.gx, a.gx), WorldSceneController.wrapDiff(foe.gy, a.gy),
+          )
+          if (d <= AMBIENT_ENGAGE_RANGE && fighting < AMBIENT_FIGHT_BUDGET) {
+            this.beginAmbientFight(a, foe)
+            fighting++
+          }
+          break
+        }
+
+        case 'fight': {
+          const foe = this.ambient[a.foe]
+          if (!a.fightLog || !foe) { a.state = 'wander'; a.foe = -1; break }
+          a.playT += step
+          // Fire every event whose simulated time has arrived.
+          while (a.playIdx < a.fightLog.length && a.fightLog[a.playIdx].t <= a.playT) {
+            const ev = a.fightLog[a.playIdx++]
+            this.playAmbientFightEvent(a, foe, ev)
+          }
+          if (a.playIdx >= a.fightLog.length) {
+            // Fight over. `wonLast` was set by the death event during playback.
+            if (a.wonLast) {
+              // The monster holds a death pose through the loot beat, then retires.
+              foe.e.animator.set('death')
+              a.state = 'loot'
+              a.rejoinAfter = i === this.followerIdx
+              a.t = 1.6 + a.rng() * 1.2
+              speaking += this.tryBark(a, 'kill', speaking)
+            } else {
+              // The hero lost. Release the monster back to its idle wander — without
+              // this it stays pinned in 'fight' forever, holding station against an
+              // opponent that walked away.
+              foe.state = 'idle'
+              foe.foe = -1
+              foe.e.animator.set('idle')
+              a.state = i === this.followerIdx ? 'follow' : 'wander'
+              a.foe = -1
+              speaking += this.tryBark(a, 'died', speaking)
+            }
+            a.fightLog = null
+          }
+          break
+        }
+
+        case 'loot': {
+          a.t -= step
+          if (a.t <= 0) {
+            speaking += this.tryBark(a, 'loot', speaking)
+            // Retire the defeated monster and move on — "loot → move on" completed.
+            // The corpse is scheduled to respawn rather than deleted: an ambient zone
+            // that permanently consumes its own monsters empties out within a minute,
+            // and a world of pure wanderers stops reading as a populated server.
+            const foe = this.ambient[a.foe]
+            if (foe && foe.kind === 'mob') {
+              foe.e.active = false
+              foe.state = 'idle'
+              foe.foe = -1
+              // The companion's sparring partner is respawned on the companion's own
+              // cadence next to the player, not on the group-anchor respawn timer.
+              foe.respawnT = a.foe === this.companionFoeIdx
+                ? 0
+                : AMBIENT_MOB_RESPAWN + a.rng() * AMBIENT_MOB_RESPAWN
+            }
+            a.foe = -1
+            a.state = a.rejoinAfter || i === this.followerIdx ? 'follow' : 'wander'
+            a.rejoinAfter = false
+            a.t = 0
+          }
+          break
+        }
+      }
+    }
+  }
+
+  /**
+   * A snapshot of the ambient crowd, for driving the app headlessly over CDP.
+   *
+   * The living world is behaviour over time, so "does it work?" cannot be answered from
+   * a screenshot — a hero mid-fight and a hero standing still look identical in a still
+   * frame. This exposes the state machine so a probe can assert that heroes actually
+   * reach `fight` and `loot` rather than merely milling about.
+   */
+  ambientDebug(): {
+    total: number; heroes: number; mobs: number; freeMobs: number
+    states: Record<string, number>
+    barking: number; fighting: number; companionAttacks: number
+    sample: { name: string; cls: string; lvl: number; spec: string | null; state: string; bark: string | null }[]
+  } {
+    const states: Record<string, number> = {}
+    let heroes = 0, barking = 0, fighting = 0, mobs = 0, freeMobs = 0
+    for (let j = 0; j < this.ambient.length; j++) {
+      const o = this.ambient[j]
+      if (o.kind !== 'mob' || !o.e.active) continue
+      mobs++
+      if (!this.ambient.some(x => x.foe === j && (x.state === 'fight' || x.state === 'approach'))) freeMobs++
+    }
+    const sample: { name: string; cls: string; lvl: number; spec: string | null; state: string; bark: string | null }[] = []
+    for (const a of this.ambient) {
+      if (a.kind !== 'hero') continue
+      heroes++
+      states[a.state] = (states[a.state] ?? 0) + 1
+      if (a.barkT > 0) barking++
+      if (a.state === 'fight') fighting++
+      if (sample.length < 10 && a.identity) {
+        sample.push({
+          name: a.name, cls: a.identity.playerClass, lvl: a.level,
+          spec: a.identity.specTitle, state: a.state, bark: a.bark,
+        })
+      }
+    }
+    return {
+      total: this.ambient.length, heroes, mobs, freeMobs, states, barking, fighting,
+      // How many attack animations the companion has played — the only honest way to
+      // answer "is my party member actually fighting?" from outside.
+      companionAttacks: this.companionAttackCount, sample,
+    }
+  }
+
+  /**
+   * On-screen positions of ambient heroes, for headless drivers that need to TAP one
+   * (whisper flow). Buffer-space coords; a driver scales by canvas-rect / canvas-width.
+   */
+  ambientScreenPositions(): { name: string; sx: number; sy: number }[] {
+    const out: { name: string; sx: number; sy: number }[] = []
+    // Visibility is recomputed here from the camera rather than read off `e.onScreen`.
+    // That flag is only assigned during a render pass, so a probe that asks between
+    // passes — or before the first one — sees `false` for a hero that is plainly visible,
+    // which looks exactly like an empty world.
+    const camR = this.cam.x + this.cam.w, camB = this.cam.y + this.cam.h
+    for (const a of this.ambient) {
+      if (a.kind !== 'hero' || !a.e.active) continue
+      const halfW = a.e.sprite.frameW * 0.5 + 4
+      const top = a.e.sprite.frameH + a.e.z + 4
+      const visible =
+        a.e.screenX + halfW > this.cam.x && a.e.screenX - halfW < camR &&
+        a.e.screenY + 6 > this.cam.y && a.e.screenY - top < camB
+      if (!visible) continue
+      out.push({
+        name: a.name,
+        sx: a.e.screenX - this.cam.x,
+        sy: a.e.screenY - this.cam.y,
+      })
+    }
+    return out
+  }
+
+  /**
+   * Make sure the companion has something to fight, near the player.
+   *
+   * This exists because widening the search radius did NOT work, and it is worth writing
+   * down why. The zone's encounter groups produce roughly **two** ambient monsters for
+   * eight heroes (see `AMBIENT_GROUPS` weights), every one of them already claimed by a
+   * hero standing at its group anchor. A companion walks away from those anchors — that
+   * is what following means — so it was competing for a supply that was both tiny and
+   * permanently spoken for. The problem was never how far it could see.
+   *
+   * So the companion gets its own sparring partner: one dedicated monster entity, spawned
+   * on walkable ground a few tiles off the player, recycled after each fight. That makes
+   * the companion visibly fight on a regular cadence right next to you, which is the
+   * entire point of having one along.
+   *
+   * It is still ambient scenery — its own entity, its own simulated fight, its own
+   * numbers. It is never one of the store's real `mobs`, so the player's combat, loot and
+   * XP remain untouched.
+   */
+  private spawnCompanionFoe(companion: Ambient): number {
+    if (!this.rigs || !this.player) return -1
+
+    // One reusable slot rather than an ever-growing array.
+    if (this.companionFoeIdx < 0 || !this.ambient[this.companionFoeIdx]) {
+      const rng = companion.rng
+      const monsterId = MONSTER_SPRITES[Math.floor(rng() * MONSTER_SPRITES.length)]
+      const sprite = this.spriteCache[monsterId] ?? this.rigs.mobBeast
+      const e = this.scene.spawn(sprite, 'team/enemy', this.player.tx, this.player.ty)
+      e.shadow = true
+      e.animator.set('idle')
+      this.ambient.push({
+        e, kind: 'mob', gx: 0, gy: 0, tgx: 0, tgy: 0, t: 0,
+        fightT: 0, atkCd: 0, name: '', level: 0, faction: 'neutral',
+        grp: companion.grp,
+        rng: subStream(this.zoneSeed(), 'companion-foe'), state: 'idle',
+        identity: null, bark: null, barkT: 0, barkCd: 0,
+        fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false,
+        respawnT: 0, rejoinAfter: false,
+      })
+      this.companionFoeIdx = this.ambient.length - 1
+    }
+
+    const foe = this.ambient[this.companionFoeIdx]
+    const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
+    const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
+    // Place it to one side of the player, far enough that the companion visibly walks
+    // over rather than teleport-fighting on the spot.
+    const ang = foe.rng() * Math.PI * 2
+    // Close enough that the companion is visibly FIGHTING rather than visibly commuting.
+    // Measured at 4–7 tiles the cycle was ~70% approach; the walk is not the interesting
+    // part. Still far enough that they walk over rather than teleport-fight on the spot.
+    const dist = 2.5 + foe.rng() * 2
+    let gx = WorldSceneController.wrapMod(pgx + Math.cos(ang) * dist)
+    let gy = WorldSceneController.wrapMod(pgy + Math.sin(ang) * dist)
+    if (this.walkMask && !this.walkableAt(gx + PAD, gy + PAD)) {
+      const w = nearestWalkable(this.walkMask, gx, gy)
+      gx = WorldSceneController.wrapMod(w.x)
+      gy = WorldSceneController.wrapMod(w.y)
+    }
+    foe.gx = gx; foe.gy = gy; foe.tgx = gx; foe.tgy = gy
+    foe.state = 'idle'
+    foe.foe = -1
+    foe.fightLog = null
+    foe.respawnT = 0
+    foe.e.active = true
+    foe.e.alpha = 1
+    foe.e.animator.set('idle')
+    return this.companionFoeIdx
+  }
+
+  /** Nearest living ambient monster within engage radius, or -1. */
+  private nearestAmbientMob(from: number, range = AMBIENT_SEEK_RANGE): number {
+    const me = this.ambient[from]
+    let best = -1, bestD = range
+    for (let j = 0; j < this.ambient.length; j++) {
+      const o = this.ambient[j]
+      if (o.kind !== 'mob' || !o.e.active) continue
+      // Do not gang up: a monster already being fought is someone else's business.
+      if (this.ambient.some(x => x.foe === j && (x.state === 'fight' || x.state === 'approach'))) continue
+      const d = Math.hypot(
+        WorldSceneController.wrapDiff(o.gx, me.gx), WorldSceneController.wrapDiff(o.gy, me.gy),
+      )
+      if (d < bestD) { bestD = d; best = j }
+    }
+    return best
+  }
+
+  /** Nearest other ambient hero within chat radius, or -1. */
+  private nearestAmbientHero(from: number): number {
+    const me = this.ambient[from]
+    let best = -1, bestD = AMBIENT_CHAT_RANGE
+    for (let j = 0; j < this.ambient.length; j++) {
+      if (j === from) continue
+      const o = this.ambient[j]
+      if (o.kind !== 'hero' || !o.e.active) continue
+      const d = Math.hypot(
+        WorldSceneController.wrapDiff(o.gx, me.gx), WorldSceneController.wrapDiff(o.gy, me.gy),
+      )
+      if (d < bestD) { bestD = d; best = j }
+    }
+    return best
+  }
+
+  /**
+   * Resolve a whole fight up front, then hand the log to the playback state.
+   *
+   * The synthetic `MobInstance` is built here rather than taken from the store's `mobs`
+   * on purpose: an ambient hero fighting a REAL spawned mob would be reaching into the
+   * player's world, which is exactly the boundary Track L0 must not cross.
+   */
+  private beginAmbientFight(a: Ambient, foe: Ambient): void {
+    const id = a.identity!
+    const hero: HeroCombatant = {
+      name: id.name,
+      playerClass: id.playerClass,
+      level: id.level,
+      equipment: EMPTY_EQUIPMENT,
+      talentAllocs: id.talentAllocs,
+      racialPassive: {},
+    }
+    const lvl = Math.max(1, id.level)
+    const maxHp = Math.round(50 + lvl * 16)
+    const mob: MobInstance = {
+      id: `ambient_mob_${a.grp}`,
+      templateId: 'ambient' as MobInstance['templateId'],
+      name: 'Beast',
+      currentHp: maxHp, maxHp,
+      damage: Math.round(3 + lvl * 1.1),
+      xpReward: 0, goldMin: 0, goldMax: 0, lootTableIds: [],
+      spriteKey: 'beast', attackSpeedSeconds: 2,
+      isElite: false, isBoss: false,
+      offset: { dx: 0, dy: 0 }, dots: [],
+    }
+    // A distinct seed per fight, drawn from this hero's stream so the whole sequence
+    // stays reproducible from the zone seed.
+    const seed = (Math.floor(a.rng() * 0xFFFFFFFF) ^ (++this.ambientFightSeq)) >>> 0
+    try {
+      const result = runFight(seed, hero, mob, { stepSeconds: 0.5, maxSeconds: 30, maxEvents: 64 })
+      a.fightLog = result.events
+      a.playT = 0
+      a.playIdx = 0
+      a.wonLast = result.winner === 0
+      a.state = 'fight'
+      foe.state = 'fight'
+      foe.foe = this.ambient.indexOf(a)
+      a.e.animator.face(faceFromVec(foe.gx - a.gx, foe.gy - a.gy))
+      foe.e.animator.face(faceFromVec(a.gx - foe.gx, a.gy - foe.gy))
+    } catch (err) {
+      // A failed ambient sim must never take the scene down with it.
+      console.error('[ambient] fight sim failed:', err)
+      a.state = 'wander'
+      a.foe = -1
+    }
+  }
+
+  /** Turn one simulated fight event into animation + a damage floater. */
+  private playAmbientFightEvent(a: Ambient, foe: Ambient, ev: FightEvent): void {
+    const attacker = ev.side === 0 ? a : foe
+    const target = ev.side === 0 ? foe : a
+    switch (ev.kind) {
+      case 'swing':
+      case 'extra':
+      case 'flurry':
+        attacker.e.animator.set('attack')
+        attacker.e.animator.restart()
+        if (attacker === this.ambient[this.followerIdx]) this.companionAttackCount++
+        if (ev.damage > 0) {
+          this.spawnFloater(target.e, String(ev.damage), ev.crit, ev.crit ? '#ffcc00' : '#ffffff', false)
+        }
+        break
+      case 'dot':
+        this.spawnFloater(target.e, String(ev.damage), false, '#cc44ff', false)
+        break
+      case 'thorns':
+        this.spawnFloater(target.e, String(ev.damage), false, '#88ddff', false)
+        break
+      case 'block':
+        this.spawnFloater(target.e, 'block', false, '#aaccff', false)
+        break
+      case 'death':
+        // `side` on a death event is the side that DIED.
+        if (ev.side === 1) { foe.e.animator.set('idle'); a.wonLast = true }
+        else { a.wonLast = false }
+        break
+    }
+    // Low-health bark as the hero's health fraction crosses the line. `side === 1` means
+    // the monster acted, so the hero is the one taking the hit.
+    if (ev.side === 1 && ev.kind !== 'death' && a.identity && ev.targetMaxHp > 0) {
+      if (ev.targetHp > 0 && ev.targetHp / ev.targetMaxHp < 0.25) {
+        let speaking = 0
+        for (const o of this.ambient) if (o.barkT > 0) speaking++
+        this.tryBark(a, 'lowHp', speaking)
+      }
+    }
+  }
+
+  /**
+   * Speak, maybe. Returns 1 if a bubble actually appeared so callers can keep the
+   * concurrent count honest.
+   *
+   * Gated three ways — per-event probability, a per-hero cooldown, and a global ceiling
+   * on simultaneous bubbles. Ungated, eight heroes killing things turns the zone into
+   * chat spam, which reads as noise rather than as a populated server.
+   */
+  private tryBark(a: Ambient, event: BarkEvent, speaking: number, detail?: string): number {
+    if (a.barkT > 0 || a.barkCd > 0) return 0
+    if (speaking >= BARK_MAX_CONCURRENT) return 0
+    if (a.rng() >= BARK_CHANCE[event]) return 0
+
+    // Three tiers, best-available-immediately: a pre-generated pooled line if one is
+    // waiting, otherwise a canned one. Either way the hero speaks THIS frame.
+    const line = takeChatLine(event, a.rng) ?? pickBark(a.rng, event)
+    a.bark = line
+    a.barkT = BARK_SECONDS
+    a.barkCd = BARK_COOLDOWN_SECONDS + a.rng() * 4
+
+    // Everything a hero says out loud also lands in zone chat, so the panel reads as the
+    // same conversation you can see happening in the world.
+    const faction = a.faction === 'horde' ? 'horde' : 'alliance'
+    const msg = pushChat({ channel: 'zone', from: a.name, faction, text: line })
+
+    // Tier three: ask for a line that knows what actually just happened. ~4s, so it
+    // arrives while the moment is still legible. If it lands and the hero is still
+    // showing the placeholder, upgrade both the bubble and the chat line in place.
+    const ctx = this.chatContext()
+    if (ctx && a.identity) {
+      requestLiveBark(
+        event,
+        {
+          name: a.name, playerClass: a.identity.playerClass, race: a.identity.race,
+          faction: this.factionLabel(a.faction), level: a.level, spec: a.identity.specTitle,
+          talentAllocs: a.identity.talentAllocs,
+        },
+        ctx,
+        generated => {
+          if (a.bark === line && a.barkT > 0) a.bark = generated
+          resolveChat(msg.id, generated)
+        },
+        detail,
+      )
+    }
+    return 1
+  }
+
+  /** Display name for a faction, so generated lines use the game's own words. */
+  private factionLabel(f: FactionType): string {
+    return this.factionNames[f] ?? (f === 'horde' ? 'The Ashmarch' : 'The Lastlight Concord')
+  }
+
+  /** Context every generated line needs. Null until sync() has supplied zone names. */
+  private chatContext(): ChatContext | null {
+    if (!this.currentZone) return null
+    const cfg = ZONES[this.currentZone]
+    return {
+      zoneName: this.zoneDisplayName || cfg?.name || this.currentZone,
+      zoneTheme: cfg
+        ? `${cfg.description} (levels ${cfg.levelRange[0]}–${cfg.levelRange[1]})`
+        : 'open wilderness',
+      factions: {
+        alliance: this.factionLabel('alliance'),
+        horde: this.factionLabel('horde'),
+      },
     }
   }
 
@@ -2502,6 +3305,82 @@ export class WorldSceneController {
       ctx.strokeText(a.name, sx, sy)
       ctx.fillStyle = a.faction === 'horde' ? '#ff8a7a' : '#8ac0ff'
       ctx.fillText(a.name, sx, sy)
+    }
+    ctx.restore()
+    this.drawAmbientBarks()
+  }
+
+  /**
+   * Speech bubbles over ambient heroes.
+   *
+   * Drawn on the canvas rather than as DOM, and deliberately NOT routed through
+   * `ThoughtBubble`. That component takes no props: it reads a single
+   * `currentThought` / `thoughtExpiresAt` pair off the store and renders inside the
+   * player's HUD avatar wrapper in `CombatView`. That is right for one hero and wrong
+   * for a crowd — it is a single global slot, it lives in the HUD rather than in the
+   * world, and driving 8–20 of them would mean as many absolutely-positioned DOM nodes
+   * repositioned every frame, against the entity/perf budget the plan flags as this
+   * track's top risk.
+   *
+   * So the player's bubble stays exactly as it is — their private inner voice, one at a
+   * time — and the crowd gets its own world-space channel. Keeping them separate also
+   * means ambient chatter can never overwrite what the player is thinking, which is the
+   * "must not touch player state" rule showing up in the UI layer.
+   */
+  private drawAmbientBarks(): void {
+    if (!this.ambient.length) return
+    const ctx = this.ctx
+    ctx.save()
+    ctx.font = '500 8px system-ui, -apple-system, "Segoe UI", sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    for (const a of this.ambient) {
+      if (!a.bark || a.barkT <= 0 || a.kind !== 'hero') continue
+      const sx = Math.round(a.e.screenX - this.cam.x)
+      // Sit above the nameplate, which itself sits above the sprite.
+      const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 14)
+      if (sx < -60 || sx > this.cam.w + 60 || sy < 10 || sy > this.cam.h) continue
+
+      // Fade in fast, hold, fade out over the last half second.
+      const alpha = Math.min(1, a.barkT / 0.5, (BARK_SECONDS - a.barkT) / 0.15 + 0.2)
+      ctx.globalAlpha = Math.max(0, alpha)
+
+      const w = Math.ceil(ctx.measureText(a.bark).width) + 10
+      const h = 13
+      const x = sx - w / 2, y = sy - h / 2
+
+      // Bubble body — matches ThoughtBubble's palette so the world and the HUD read as
+      // one game, even though they are two independent systems.
+      ctx.fillStyle = 'rgba(18,14,6,0.90)'
+      ctx.strokeStyle = '#5a4020'
+      ctx.lineWidth = 1
+      const r = 4
+      ctx.beginPath()
+      ctx.moveTo(x + r, y)
+      ctx.lineTo(x + w - r, y)
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+      ctx.lineTo(x + w, y + h - r)
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+      ctx.lineTo(x + r, y + h)
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+      ctx.lineTo(x, y + r)
+      ctx.quadraticCurveTo(x, y, x + r, y)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+
+      // Tail pointing down at the speaker.
+      ctx.beginPath()
+      ctx.moveTo(sx - 3, y + h)
+      ctx.lineTo(sx, y + h + 4)
+      ctx.lineTo(sx + 3, y + h)
+      ctx.closePath()
+      ctx.fillStyle = 'rgba(18,14,6,0.90)'
+      ctx.fill()
+
+      ctx.fillStyle = '#d4b896'
+      ctx.fillText(a.bark, sx, y + h / 2)
+      ctx.globalAlpha = 1
     }
     ctx.restore()
   }
