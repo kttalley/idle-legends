@@ -45,6 +45,7 @@ export type AmbientState =
   | 'loot'      // picking over the corpse
   | 'idle'      // standing around
   | 'follow'    // in the player's party, keeping station with them (L2)
+  | 'assist'    // in the player's party, visibly fighting THE PLAYER'S mob (C3)
 
 export interface AmbientIdentity {
   name: string

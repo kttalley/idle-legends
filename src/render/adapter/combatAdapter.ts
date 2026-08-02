@@ -268,6 +268,14 @@ const COMPANION_LEASH = 9.0
  * which is a pet, not a party member.
  */
 const COMPANION_COMMIT_FRAC = 0.7
+// ── C3: assisting the player's fight ─────────────────────────────────────────
+/** How far to the mob's flank the companion stands — off the player's axis, so it frames
+ *  the fight instead of standing inside the player. */
+const ASSIST_FLANK = 1.15
+/** Close enough to the flank slot to start swinging. */
+const ASSIST_REACH = 0.9
+/** Seconds between companion swings while assisting. Cosmetic cadence only. */
+const ASSIST_SWING = 1.5
 // A follower hunts over a much wider radius than a wandering hero. It is walking WITH
 // the player, away from the anchored encounter groups, so at the normal 6.5-tile seek
 // range it almost never found anything and simply trailed along in silence — which read
@@ -3101,6 +3109,53 @@ export class WorldSceneController {
         if (a.e.animator.finished) a.e.animator.set('idle')
       } else if (a.state === 'loot') {
         if (a.e.animator.finished) a.e.animator.set('idle')
+      } else if (a.state === 'assist') {
+        // ── C3, option 2 ────────────────────────────────────────────────────────
+        // The companion visibly joins the PLAYER'S fight: a real store mob, a real
+        // target, the same swing cadence — and ZERO store damage.
+        //
+        // Isolation is structural rather than disciplined. Nothing in this branch can
+        // reach store state: it moves a scene entity and sets an animation, and that is
+        // the whole of it. That is what keeps econSim honest — the harness drives the
+        // real store headlessly and has no coupling to the party module or this adapter,
+        // so a companion that dealt real damage would raise true kills/minute while every
+        // balance sweep kept measuring a soloing player. Not wrong by a margin: blind.
+        //
+        // Deliberately NO floating damage numbers. The honest caveat on this option is
+        // that an attentive player notices the mob's HP does not fall faster; inventing
+        // numbers would not hide that, it would make the discrepancy louder and turn a
+        // cosmetic flourish into a lie.
+        if (!this.showMob || !this.mob) {
+          a.state = 'follow'
+          a.closing = true
+        } else {
+          const mgx = WorldSceneController.wrapMod(this.mob.tx - PAD)
+          const mgy = WorldSceneController.wrapMod(this.mob.ty - PAD)
+          // Stand on the mob's flank — the left-hand normal of the player→mob axis — so
+          // the two of them bracket it instead of overlapping.
+          const ax = WorldSceneController.wrapDiff(mgx, pgx)
+          const ay = WorldSceneController.wrapDiff(mgy, pgy)
+          const al = Math.hypot(ax, ay) || 1
+          const slotGx = WorldSceneController.wrapMod(mgx + (-ay / al) * ASSIST_FLANK)
+          const slotGy = WorldSceneController.wrapMod(mgy + (ax / al) * ASSIST_FLANK)
+          const d = Math.hypot(
+            WorldSceneController.wrapDiff(slotGx, a.gx),
+            WorldSceneController.wrapDiff(slotGy, a.gy))
+          if (d > ASSIST_REACH) {
+            this.followAmbient(a, slotGx, slotGy, FOLLOW_SPEED, dt)
+          } else {
+            a.e.animator.face(faceFromVec(
+              WorldSceneController.wrapDiff(mgx, a.gx),
+              WorldSceneController.wrapDiff(mgy, a.gy)))
+            a.atkCd -= dt
+            if (a.atkCd <= 0) {
+              a.e.animator.set('attack')
+              a.atkCd = ASSIST_SWING + a.rng() * 0.6
+            } else if (a.e.animator.finished) {
+              a.e.animator.set('idle')
+            }
+          }
+        }
       } else if (a.state === 'follow') {
         // Keep station in a FORMATION SLOT rather than on a bare distance leash. The slot
         // is an offset that rotates with the player's heading, so the companion walks
@@ -3341,6 +3396,24 @@ export class WorldSceneController {
           // That is the whole difference between a party member and a pet. Their fight
           // is entirely their own — it never touches the player's target, HP, XP or loot.
           this.companionSparCd -= step
+          // C3: the player's own fight OUTRANKS the companion's agenda. If you are
+          // engaged with a real store mob, your party member joins that fight rather
+          // than wandering off to find its own — which is the entire point of having
+          // one. Bounded by the same leash, so it will not cross the zone to help.
+          if (this.showMob && this.mob) {
+            const mgx = WorldSceneController.wrapMod(this.mob.tx - PAD)
+            const mgy = WorldSceneController.wrapMod(this.mob.ty - PAD)
+            const dm = Math.hypot(
+              WorldSceneController.wrapDiff(mgx, a.gx),
+              WorldSceneController.wrapDiff(mgy, a.gy))
+            if (dm <= COMPANION_LEASH) {
+              a.state = 'assist'
+              a.foe = -1
+              a.atkCd = a.rng() * ASSIST_SWING   // desync from the player's swing
+              speaking += this.tryBark(a, 'engage', speaking)
+              break
+            }
+          }
           // Prefer a real world monster if one happens to be free and close.
           let foe = this.nearestAmbientMob(i, FOLLOW_SEEK_RANGE)
           // Gate on whether the fight can plausibly FINISH in frame. A companion that
@@ -3363,6 +3436,12 @@ export class WorldSceneController {
             // says anything is just a sprite trailing behind you.
             speaking += this.tryBark(a, a.rng() < 0.5 ? 'passing' : 'idle', speaking)
           }
+          break
+        }
+
+        case 'assist': {
+          // Held by the movement branch, which also returns it to `follow` when the
+          // player's mob is gone. Nothing to decide here — the target is the player's.
           break
         }
 
