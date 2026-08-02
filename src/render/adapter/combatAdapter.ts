@@ -322,6 +322,16 @@ interface Ambient {
   faction: FactionType
   grp: number               // index into ambientGroups (its encounter cluster)
 
+  // ── C1: routing ─────────────────────────────────────────────────────────────
+  // A* route in GAME coords (the crowd lives in game space; only `e.tx/ty` are buffer
+  // coords, derived at the end of the movement loop). Kept per-hero rather than pooled
+  // so one hero's route can never perturb another's — the same reason `rng` is per-hero.
+  path: { x: number; y: number }[]
+  pathI: number
+  pathGx: number; pathGy: number   // goal the route was built for
+  pathCool: number                 // seconds until a repath is allowed
+  pathBlocked: boolean             // A* said unreachable (null), not "already there" ([])
+
   // ── L0: behaviour ───────────────────────────────────────────────────────────
   /** This hero's own stream. Per-hero rather than shared, so culling an off-screen
    *  hero cannot change what the heroes still on screen roll. */
@@ -355,6 +365,31 @@ interface Ambient {
 }
 
 /** Movement vector → dimetric facing (se:+x, sw:+y, nw:−x, ne:−y). */
+/**
+ * How often a routed ambient hero may recompute its path. Generous on purpose: the crowd
+ * is scenery, and a route a fifth of a second stale is invisible, while twenty heroes
+ * each running A* every frame is not.
+ */
+const AMBIENT_REPATH_SECONDS = 0.6
+
+/**
+ * Fresh route state for an ambient hero.
+ *
+ * `index` staggers the FIRST repath so a whole zone's crowd does not all run A* on the
+ * same frame when a zone loads. Keyed to the hero's index — its identity — and never to
+ * the camera: the per-frame ambient position loop has no viewport gate, so a budget that
+ * depended on what was on screen would make positions depend on window size.
+ */
+function freshAmbientPath(index: number): Pick<
+  Ambient, 'path' | 'pathI' | 'pathGx' | 'pathGy' | 'pathCool' | 'pathBlocked'
+> {
+  return {
+    path: [], pathI: 0, pathGx: 0, pathGy: 0,
+    pathCool: ((index % 8) / 8) * AMBIENT_REPATH_SECONDS,
+    pathBlocked: false,
+  }
+}
+
 function faceFromVec(dx: number, dy: number): Facing {
   return Math.abs(dx) > Math.abs(dy) ? (dx >= 0 ? 'se' : 'nw') : (dy >= 0 ? 'sw' : 'ne')
 }
@@ -2432,6 +2467,7 @@ export class WorldSceneController {
           PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
         e.shadow = true; e.animator.set('idle')  // idle tag IS the gait (walk is flinchy)
         this.ambient.push({
+          ...freshAmbientPath(this.ambient.length),
           e, kind: 'hero', gx, gy, tgx: gx, tgy: gy, t: rnd(s + 8) * 3,
           fightT: 0, atkCd: rnd(s + 7) * 0.6,
           name: id.name, level: id.level, faction: id.faction, grp: gi,
@@ -2451,6 +2487,7 @@ export class WorldSceneController {
         const e = this.scene.spawn(sprite, pal, PAD + WorldSceneController.wrapMod(gx), PAD + WorldSceneController.wrapMod(gy))
         e.shadow = true; e.animator.set('idle')
         this.ambient.push({
+          ...freshAmbientPath(this.ambient.length),
           e, kind: 'mob', gx, gy, tgx: gx, tgy: gy, t: rnd(s + 4) * 3,
           fightT: 0, atkCd: rnd(s + 6) * 0.6,
           name: '', level: 0, faction: 'neutral', grp: gi,
@@ -2788,6 +2825,112 @@ export class WorldSceneController {
     return Math.hypot((A + B) / 2, (B - A) / 2)
   }
 
+  /**
+   * Route one ambient hero toward a goal, in GAME coordinates.
+   *
+   * The crowd used to collide-and-slide straight at its target, which grinds along any
+   * concave shoreline — the exact failure A* exists to fix, and very visible once a
+   * dozen heroes are milling around a lake.
+   *
+   * Three properties this has to keep:
+   *
+   * 1. DETERMINISM. The per-frame ambient position loop has no viewport gate (only the
+   *    5Hz brain does), so any budget that skipped off-screen movers, or ordered path
+   *    requests by distance, would make ambient positions depend on camera and window
+   *    size — something culling has never done, and two runs at different window sizes
+   *    would diverge. The repath budget here is therefore per-hero state on a fixed
+   *    cadence, staggered by the hero's own index at spawn. Nothing consults the camera.
+   * 2. LINE OF SIGHT FIRST. A crowd milling in open ground is the overwhelmingly common
+   *    case and never touches A* at all — the search only runs when something is
+   *    genuinely in the way.
+   * 3. UNREACHABLE IS A STATE. `findPath` returns null for "no route" and [] for "no
+   *    waypoints needed"; conflating them is what made a stranded hero grind a shoreline
+   *    forever. A blocked hero stands.
+   *
+   * Deliberately no entity avoidance: the walk mask carries terrain and scenery only, and
+   * string-pulling actively collapses movers onto identical straight segments, so heroes
+   * converging on one point WILL overlap. C2's formation slots are the fix for that.
+   */
+  private followAmbient(a: Ambient, goalGx: number, goalGy: number, speed: number, dt: number): boolean {
+    // Wedge rescue, FIRST — ahead of every early return in this function.
+    //
+    // A mover already inside blocked ground can never leave under collide-and-slide,
+    // because each candidate step is gated on the destination being walkable while the
+    // thing that is wrong is where it already stands. Group anchors are re-anchored onto
+    // walkable ground on recycle, but members are then scattered ±2.2 tiles off that
+    // anchor, which can drop one into a lake.
+    //
+    // This lived in slideAmbient at first, and the measurements said that was the wrong
+    // place: a wedged hero is usually ALSO pathBlocked (nothing is reachable from inside
+    // a lake), and the pathBlocked branch returns before any slide happens — so the
+    // rescue never ran for exactly the heroes that needed it. `onWater` tracked `blocked`
+    // one-for-one across every sample, which is what gave it away.
+    if (this.walkMask && !this.townMode && !this.walkableAt(a.gx + PAD, a.gy + PAD)) {
+      const w = nearestWalkable(this.walkMask, a.gx, a.gy)
+      a.gx = WorldSceneController.wrapMod(w.x)
+      a.gy = WorldSceneController.wrapMod(w.y)
+      a.path = []; a.pathI = 0; a.pathBlocked = false; a.pathCool = 0
+      return true
+    }
+    const step = speed * dt
+    if (step <= 0) return false
+    const dx0 = WorldSceneController.wrapDiff(goalGx, a.gx)
+    const dy0 = WorldSceneController.wrapDiff(goalGy, a.gy)
+    const d0 = Math.hypot(dx0, dy0)
+    if (d0 < 0.05) return false
+
+    // Decremented BEFORE the line-of-sight branch, not inside the routing one. Ticking it
+    // only on the routed path meant a mover that regained and re-lost sight could be held
+    // on the degenerate slide for a full cooldown — invisible with two movers, a visible
+    // stutter with twenty.
+    a.pathCool -= dt
+
+    const mask = this.walkMask
+    // Town has no walk mask at all (walkableAt short-circuits to true there), so routing
+    // is both impossible and unnecessary — the square is open ground by construction.
+    if (!mask || this.townMode || hasLineOfWalk(mask, a.gx, a.gy, goalGx, goalGy)) {
+      if (a.path.length) a.path = []
+      return this.slideAmbient(a, dx0 / d0, dy0 / d0, step)
+    }
+
+    const goalMoved = Math.hypot(
+      WorldSceneController.wrapDiff(goalGx, a.pathGx),
+      WorldSceneController.wrapDiff(goalGy, a.pathGy)) > 1.5
+    if ((a.pathI >= a.path.length || goalMoved) && a.pathCool <= 0) {
+      const route = findPath(mask, a.gx, a.gy, goalGx, goalGy)
+      a.pathBlocked = route === null
+      a.path = route ?? []
+      a.pathI = 0
+      a.pathGx = goalGx; a.pathGy = goalGy
+      a.pathCool = a.pathBlocked ? UNREACHABLE_RETRY_SECONDS : AMBIENT_REPATH_SECONDS
+    }
+
+    if (a.pathI >= a.path.length) {
+      if (a.pathBlocked) return false   // stranded across water — stand, do not grind
+      return this.slideAmbient(a, dx0 / d0, dy0 / d0, step)
+    }
+
+    const wp = a.path[a.pathI]
+    const wx = WorldSceneController.wrapDiff(wp.x, a.gx)
+    const wy = WorldSceneController.wrapDiff(wp.y, a.gy)
+    const wd = Math.hypot(wx, wy)
+    if (wd < 0.35) { a.pathI++; return true }
+    return this.slideAmbient(a, wx / wd, wy / wd, step)
+  }
+
+  /** One collide-and-slide step in GAME coords. Each axis applies only if it lands on
+   *  walkable ground, so brushing a shoreline slides instead of stopping dead. */
+  private slideAmbient(a: Ambient, ux: number, uy: number, step: number): boolean {
+    const nx = WorldSceneController.wrapMod(a.gx + ux * step)
+    const ny = WorldSceneController.wrapMod(a.gy + uy * step)
+    let moved = false
+    // walkableAt takes buffer coords; ambient positions are game coords, hence +PAD.
+    if (this.walkableAt(nx + PAD, a.gy + PAD)) { a.gx = nx; moved = true }
+    if (this.walkableAt(a.gx + PAD, ny + PAD)) { a.gy = ny; moved = true }
+    if (moved) a.e.animator.face(faceFromVec(ux, uy))
+    return moved
+  }
+
   private updateAmbient(dt: number): void {
     if (!this.ambient.length || !this.player) return
     const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
@@ -2824,7 +2967,18 @@ export class WorldSceneController {
         if (ai === this.companionFoeIdx) continue
         a.gx = WorldSceneController.wrapMod(grp.gx + (a.rng() * 2 - 1) * 2.2)
         a.gy = WorldSceneController.wrapMod(grp.gy + (a.rng() * 2 - 1) * 2.2)
+        // The ANCHOR was re-anchored onto walkable ground above, but this scatter can
+        // still drop a member into water beside it. Snap each one too — cheaper and less
+        // visible than rescuing it a frame later.
+        if (this.walkMask && !this.walkableAt(a.gx + PAD, a.gy + PAD)) {
+          const w = nearestWalkable(this.walkMask, a.gx, a.gy)
+          a.gx = WorldSceneController.wrapMod(w.x)
+          a.gy = WorldSceneController.wrapMod(w.y)
+        }
         a.tgx = a.gx; a.tgy = a.gy; a.t = a.rng() * 3
+        // Teleported past the screen edge; any route it held is a path from
+        // somewhere it no longer is.
+        a.path = []; a.pathI = 0; a.pathBlocked = false
         // The whole group just teleported past the screen edge, so any encounter it was
         // in no longer exists. Drop it — otherwise a hero carries on playing back a
         // fight log next to an opponent that is no longer beside it.
@@ -2878,11 +3032,7 @@ export class WorldSceneController {
           a.gx = WorldSceneController.wrapMod(pgx - dx / (d || 1) * (this.visibleTileRadius() + 3))
           a.gy = WorldSceneController.wrapMod(pgy - dy / (d || 1) * (this.visibleTileRadius() + 3))
         } else if (d > FOLLOW_NEAR) {
-          const nx = WorldSceneController.wrapMod(a.gx + dx / d * FOLLOW_SPEED * dt)
-          const ny = WorldSceneController.wrapMod(a.gy + dy / d * FOLLOW_SPEED * dt)
-          if (this.walkableAt(nx + PAD, a.gy + PAD)) a.gx = nx
-          if (this.walkableAt(a.gx + PAD, ny + PAD)) a.gy = ny
-          a.e.animator.face(faceFromVec(dx, dy))
+          this.followAmbient(a, pgx, pgy, FOLLOW_SPEED, dt)
         } else if (a.e.animator.finished) {
           a.e.animator.set('idle')
         }
@@ -2901,11 +3051,7 @@ export class WorldSceneController {
             // player walks away from both of them, so the idle-wander gait left it
             // permanently in transit.
             const sp = a.state === 'approach' && this.ambient[this.followerIdx] === a ? FOLLOW_SPEED : SPEED
-            const nx = WorldSceneController.wrapMod(a.gx + dx / d * sp * dt)
-            const ny = WorldSceneController.wrapMod(a.gy + dy / d * sp * dt)
-            if (this.walkableAt(nx + PAD, a.gy + PAD)) a.gx = nx
-            if (this.walkableAt(a.gx + PAD, ny + PAD)) a.gy = ny
-            a.e.animator.face(faceFromVec(dx, dy))
+            this.followAmbient(a, foe.gx, foe.gy, sp, dt)
           }
         }
       } else {
@@ -2918,16 +3064,14 @@ export class WorldSceneController {
           a.tgy = WorldSceneController.wrapMod(anchor.gy + (a.rng() * 2 - 1) * AMBIENT_MEMBER_LEASH)
           a.t = 2 + a.rng() * 4
         } else {
-          // Ambient positions are game coords; walkableAt takes buffer coords, hence +PAD.
           // The crowd obeys the same ground rules as the hero — a dozen heroes wading
-          // across a lake undoes the "busy server" illusion faster than anything else.
-          const nx = WorldSceneController.wrapMod(a.gx + dx / d * SPEED * dt)
-          const ny = WorldSceneController.wrapMod(a.gy + dy / d * SPEED * dt)
-          const okX = this.walkableAt(nx + PAD, a.gy + PAD)
-          if (okX) a.gx = nx
-          if (this.walkableAt(a.gx + PAD, ny + PAD)) a.gy = ny
-          else if (!okX) a.t = 0   // boxed in → pick a fresh wander target next tick
-          a.e.animator.face(faceFromVec(dx, dy))
+          // across a lake undoes the "busy server" illusion faster than anything else —
+          // and now ROUTES around obstacles rather than grinding into them.
+          if (!this.followAmbient(a, a.tgx, a.tgy, SPEED, dt)) {
+            // Went nowhere: either boxed in or the target is unreachable from here.
+            // Pick a fresh wander target next tick rather than pressing at a wall.
+            a.t = 0
+          }
         }
         a.t -= dt
       }
@@ -3054,6 +3198,7 @@ export class WorldSceneController {
       m.gx = WorldSceneController.wrapMod(anchor.gx + (m.rng() * 2 - 1) * 2.2)
       m.gy = WorldSceneController.wrapMod(anchor.gy + (m.rng() * 2 - 1) * 2.2)
       m.tgx = m.gx; m.tgy = m.gy
+      m.path = []; m.pathI = 0; m.pathBlocked = false
       m.state = 'idle'
       m.foe = -1
       m.fightLog = null
@@ -3300,6 +3445,7 @@ export class WorldSceneController {
       e.shadow = true
       e.animator.set('idle')
       this.ambient.push({
+        ...freshAmbientPath(this.ambient.length),
         e, kind: 'mob', gx: 0, gy: 0, tgx: 0, tgy: 0, t: 0,
         fightT: 0, atkCd: 0, name: '', level: 0, faction: 'neutral',
         grp: companion.grp,
@@ -3329,6 +3475,7 @@ export class WorldSceneController {
       gy = WorldSceneController.wrapMod(w.y)
     }
     foe.gx = gx; foe.gy = gy; foe.tgx = gx; foe.tgy = gy
+    foe.path = []; foe.pathI = 0; foe.pathBlocked = false
     foe.state = 'idle'
     foe.foe = -1
     foe.fightLog = null
