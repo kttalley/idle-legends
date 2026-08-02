@@ -13,7 +13,7 @@
 import { Scene, type Camera, type Entity } from '../scene'
 import { bakeGround, feetX, feetY, HALF_W, HALF_H, type GroundBuffer } from '../tilemap'
 import { loadSprite, loadSpriteOrPlaceholder } from '../indexedSprite'
-import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeBoltRig, makeBurstRig, TILE_ANIMS } from '../placeholderArt'
+import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeBoltRig, makeBurstRig, TILE_ANIMS, TILE } from '../placeholderArt'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { composePalette } from '../palette'
 import { heroPaletteId } from './heroWardrobe'
@@ -21,7 +21,7 @@ import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
 import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } from '../../engine/walkability'
 import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } from '../../data/townNpcs'
 import { Animator } from '../animation'
-import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId } from './fftaRoster'
+import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId, useScaffoldArt } from './fftaRoster'
 import { mulberry32, subStream, type Rng } from '../../engine/rng'
 import { AGGRESSIVE_RE, combatantOnlyWorldFields, isRangedMob } from '../../engine/mobBehaviour'
 import { runFight, type FightEvent, type HeroCombatant } from '../../engine/fight'
@@ -598,12 +598,12 @@ export class WorldSceneController {
     const base = import.meta.env.BASE_URL
     const scaffold = `${base}local-assets/ffta-scaffold/`
     const ffaUnits = `${scaffold}ffta-units/`
-    // Art source. DEFAULT = the FFTA scaffold (gitignored dev asset). The `?noffta`
-    // modifier swaps each scaffold id for its ORIGINAL Idle Legends rig (public/sprites/
-    // units/, the zero-FFTA-pixel set) via ORIGINAL_SPRITE. Both fall back to the
-    // programmatic placeholder if their file is missing. Entities are cached by the
-    // roster's scaffold id in either mode, so swap/lookup stays id-stable.
-    const noFFTA = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noffta')
+    // Art source. DEFAULT = the ORIGINAL Idle Legends rigs in public/sprites/units/,
+    // resolved from the roster key via ORIGINAL_SPRITE. `?ffta` (DEV builds only) loads
+    // the gitignored FFTA scaffold instead. Both fall back to the programmatic
+    // placeholder if their file is missing. Entities are cached by the roster key in
+    // either mode, so swap/lookup stays id-stable.
+    const scaffoldArt = useScaffoldArt
     const realUnits = `${base}sprites/units/`
     const unitIds = new Set<string>()
     for (const race of ['human', 'dwarf', 'elf', 'orc', 'troll', 'goblin', 'gnome', 'tauren'] as RaceType[]) {
@@ -613,15 +613,15 @@ export class WorldSceneController {
     }
     for (const id of MONSTER_SPRITES) unitIds.add(id)
     const loadUnit = async (id: string): Promise<IndexedSprite> => {
-      if (noFFTA) {
-        const origId = ORIGINAL_SPRITE[id] ?? id
-        const make = () => (isMonsterSprite(id) && !isHumanoidMonster(origId)) ? makeBeastRig(`rig/${id}`) : makeHumanoidRig(`rig/${id}`)
-        const real = await loadSprite(`${realUnits}${origId}.json`)
-        // keep the roster id as the sprite's id so cache key === entity sprite id
-        return real ? { ...real, id } : make()
+      if (scaffoldArt) {
+        return loadSpriteOrPlaceholder(`${ffaUnits}${id}.json`, () =>
+          isMonsterSprite(id) ? makeBeastRig(`rig/${id}`) : makeHumanoidRig(`rig/${id}`))
       }
-      return loadSpriteOrPlaceholder(`${ffaUnits}${id}.json`, () =>
-        isMonsterSprite(id) ? makeBeastRig(`rig/${id}`) : makeHumanoidRig(`rig/${id}`))
+      const origId = ORIGINAL_SPRITE[id] ?? id
+      const make = () => (isMonsterSprite(id) && !isHumanoidMonster(origId)) ? makeBeastRig(`rig/${id}`) : makeHumanoidRig(`rig/${id}`)
+      const real = await loadSprite(`${realUnits}${origId}.json`)
+      // keep the roster id as the sprite's id so cache key === entity sprite id
+      return real ? { ...real, id } : make()
     }
     const entries = await Promise.all(
       Array.from(unitIds).map(async (id): Promise<[string, IndexedSprite]> => [id, await loadUnit(id)])
@@ -636,7 +636,7 @@ export class WorldSceneController {
     // FFTA-traced ground tiles (gitignored dev scaffold); falls back to the programmatic
     // tileset set in the constructor. Traced tiles are indexed to our semantic slots, so
     // biome palettes still recolor them.
-    this.tileset = noFFTA ? makeTileset() : await loadSpriteOrPlaceholder(`${scaffold}tiles.json`, makeTileset)
+    this.tileset = scaffoldArt ? await loadSpriteOrPlaceholder(`${scaffold}tiles.json`, makeTileset) : makeTileset()
     this.burstRig = makeBurstRig('fx/burst')
     this.boltRig = makeBoltRig('fx/bolt')
 
@@ -2436,10 +2436,16 @@ export class WorldSceneController {
   // origin is tuned by eye. LOCAL DEV SCAFFOLD ONLY (gitignored art), tear-out safe.
   private async loadTownGround(): Promise<GroundBuffer | null> {
     if (this.townGround) return this.townGround
+    // Originals-by-default builds have no scaffold town PNG at all (local-assets/ is
+    // gitignored and never copied into dist/), so don't even attempt the fetch — bake a
+    // plaza instead. Before 2026-08-01 this path returned null in every production build
+    // and enterTownScene bailed on it, which meant the shipped town was an inert screen:
+    // no ground, no crowd, no NPCs, no services reachable.
+    if (!useScaffoldArt) return this.makeTownPlaza()
     try {
       const base = import.meta.env.BASE_URL
       const res = await fetch(`${base}local-assets/ffta-scaffold/${TOWN_MAP_FILE}`)
-      if (!res.ok) return null
+      if (!res.ok) return this.makeTownPlaza()
       const bmp = await createImageBitmap(await res.blob())
       const c = document.createElement('canvas')
       c.width = Math.round(bmp.width * TOWN_SCALE)
@@ -2456,8 +2462,40 @@ export class WorldSceneController {
       return this.townGround
     } catch (e) {
       console.error('[town] loadTownGround failed', e)
-      return null
+      return this.makeTownPlaza()
     }
+  }
+
+  /**
+   * The committed, shippable town ground: a paved plaza fading to grass, baked from the
+   * same programmatic tileset the open world falls back to. Deliberately flat (no
+   * `heights`) so walkability and NPC anchors need no extra cases.
+   *
+   * Anchoring: bakeGround lays map cell (0,0) at the buffer origin, but town tile coords
+   * are centred on (0,0) and run negative (NPC anchors span roughly ±4). Biasing the
+   * plane by the centre cell's Y makes town tile (0,0) land on map cell (C,C). Only Y
+   * needs the bias — tileToScreenX depends on (tx − ty), so adding C to both cancels.
+   */
+  private makeTownPlaza(): GroundBuffer {
+    const N = 24, C = N >> 1
+    const tiles = new Uint8Array(N * N)
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const d = Math.max(Math.abs(x - C), Math.abs(y - C))
+        tiles[y * N + x] =
+          d <= 6 ? ((x + y) % 2 === 0 ? TILE.PATH : TILE.PATH_ALT)   // chequered paving
+          : d <= 8 ? TILE.PATH_ALT                                    // worn verge
+          : (x * 7 + y * 3) % 11 === 0 ? TILE.FLOWER
+          : (x + y) % 3 === 0 ? TILE.GRASS_ALT
+          : TILE.GRASS
+      }
+    }
+    const g = bakeGround(
+      { w: N, h: N, tiles, props: [] },
+      this.tileset, 'biome/meadow', getPalette('biome/meadow'), TILE_ANIMS, this.propSheet,
+    )
+    this.townGround = { ...g, planeOffsetY: g.planeOffsetY + 2 * C * HALF_H, wrapTiles: 0 }
+    return this.townGround
   }
 
   private async enterTownScene(): Promise<void> {

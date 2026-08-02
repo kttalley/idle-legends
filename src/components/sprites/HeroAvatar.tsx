@@ -24,9 +24,14 @@ interface HeroAvatarProps {
   circle?:     boolean     // default true
 }
 
-/** A single, self-contained dimetric avatar that renders the actual FFTA job sprite
- *  a hero will wear in the world. Falls back to the procedural AvatarRenderer when
- *  `?noffta` is set or the scaffold asset is missing, so the screens always work. */
+/** A single, self-contained dimetric avatar that renders the actual sprite a hero will
+ *  wear in the world (originals by default; the FFTA scaffold under `?ffta` in dev).
+ *  Falls back to the procedural AvatarRenderer only if the sprite genuinely fails to
+ *  load, so the screens always work.
+ *
+ *  Until 2026-08-01 this bailed to the procedural fallback whenever `?noffta` was set,
+ *  which meant character select never once displayed an original rig — the flag that
+ *  selected the shippable art was the same flag that made this component stop using it. */
 export function HeroAvatar({
   race,
   playerClass,
@@ -42,7 +47,6 @@ export function HeroAvatar({
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
 
-  const noffta = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noffta')
   const spriteId = heroSpriteId(race, playerClass, name)
   const paletteId = heroPaletteId(playerClass, race, faction, rarity)
 
@@ -50,7 +54,6 @@ export function HeroAvatar({
   const fallbackSeed = hashStr(name) ^ hashStr(playerClass)
 
   useEffect(() => {
-    if (noffta) return
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -132,10 +135,10 @@ export function HeroAvatar({
       cancelAnimationFrame(raf)
       setReady(false)
     }
-  }, [spriteId, paletteId, size, animate, facing, noffta])
+  }, [spriteId, paletteId, size, animate, facing])
 
   // Fallback path: procedural avatar.
-  if (noffta || failed) {
+  if (failed) {
     return (
       <AvatarRenderer
         seed={fallbackSeed}

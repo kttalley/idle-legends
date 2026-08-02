@@ -1,3 +1,5 @@
+@import './fonts.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -54,6 +56,13 @@ body {
   --kb-inset:        0px;
   --dock-h:          58px;   /* mobile tab bar */
   --safe-b:          env(safe-area-inset-bottom, 0px);
+  /* The other three insets, for the native wrap. The notch/Dynamic Island eats the top
+     and the home indicator the bottom in portrait; in landscape the sensor housing eats
+     one side, which is why left/right are separate rather than one symmetric value.
+     These resolve to 0 in a normal browser and on non-notched devices. */
+  --safe-t:          env(safe-area-inset-top, 0px);
+  --safe-l:          env(safe-area-inset-left, 0px);
+  --safe-r:          env(safe-area-inset-right, 0px);
   /* Width the floating rails occupy. The HUD (unit frames, minimap, strike meter)
      insets by these so it never slides under a glass column — and they collapse to
      0 when a column is folded away, giving the HUD the reclaimed space. */

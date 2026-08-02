@@ -2,10 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Idle Legends — Browser Idle RPG</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&display=swap" rel="stylesheet">
+    <!-- viewport-fit=cover is what makes env(safe-area-inset-*) resolve to anything but
+         0 on a notched iPhone; index.css already reads --safe-b, which was dead without
+         it. user-scalable=no stops a double-tap in the world canvas zooming the WebView. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0"
+    />
+    <meta name="theme-color" content="#0b0906" />
+    <!-- Fonts are self-hosted (src/fonts.css) — no CDN fetch on first launch. -->
+    <title>Idle Legends</title>
   </head>
   <body>
     <div id="root"></div>

@@ -11,7 +11,7 @@ import { loadSprite, loadSpriteOrPlaceholder, decompose } from '../indexedSprite
 import { makeBeastRig, makeHumanoidRig, makeTileset, makePropSheet, TILE, TILE_ANIMS, PROP } from '../placeholderArt'
 import { bakeGround, feetX, feetY, type GroundBuffer } from '../tilemap'
 import { Scene, type Camera, type Entity } from '../scene'
-import { ORIGINAL_SPRITE } from '../adapter/fftaRoster'
+import { ORIGINAL_SPRITE, useScaffoldArt } from '../adapter/fftaRoster'
 import type { Facing, TileMapData, SpriteManifest } from '../types'
 
 const MAP_W = 64
@@ -132,20 +132,18 @@ async function main(): Promise<void> {
   canvas.height = vh
   ctx.imageSmoothingEnabled = false
 
-  // Assets. DEFAULT = the FFTA scaffold (gitignored local-assets/ffta-scaffold/ffta-units/);
-  // `?noffta` swaps each id for its ORIGINAL Idle Legends rig (public/sprites/units/) via
-  // ORIGINAL_SPRITE. Both fall back to the committed programmatic placeholder.
+  // Assets. DEFAULT = the ORIGINAL Idle Legends rigs (public/sprites/units/) resolved via
+  // ORIGINAL_SPRITE; `?ffta` loads the gitignored scaffold instead (dev builds only —
+  // the harness is itself dev-only). Both fall back to the committed programmatic placeholder.
   const base = import.meta.env.BASE_URL
   const scaffold = `${base}local-assets/ffta-scaffold/`
   const ffaUnits = `${scaffold}ffta-units/`
   const realUnits = `${base}sprites/units/`
-  const noFFTA = new URLSearchParams(location.search).has('noffta')
+  const scaffoldArt = useScaffoldArt
   const loadUnit = async (id: string, make: () => import('../types').IndexedSprite) => {
-    if (noFFTA) {
-      const real = await loadSprite(`${realUnits}${ORIGINAL_SPRITE[id] ?? id}.json`)
-      return real ? { ...real, id } : make()
-    }
-    return loadSpriteOrPlaceholder(`${ffaUnits}${id}.json`, make)
+    if (scaffoldArt) return loadSpriteOrPlaceholder(`${ffaUnits}${id}.json`, make)
+    const real = await loadSprite(`${realUnits}${ORIGINAL_SPRITE[id] ?? id}.json`)
+    return real ? { ...real, id } : make()
   }
   const heroRig = await loadUnit('ffa_soldier', makeHumanoidRig)
   const hero2Rig = await loadUnit('ffa_white_monk', () => makeHumanoidRig('rig/humanoid2'))
@@ -156,7 +154,7 @@ async function main(): Promise<void> {
   const tileset = makeTileset()
   const propSheet = makePropSheet()
   document.getElementById('artpath')!.textContent =
-    noFFTA ? 'art: original Idle Legends sprites (?noffta)' : 'art: FFTA scaffold'
+    scaffoldArt ? 'art: FFTA dev scaffold (?ffta)' : 'art: original Idle Legends sprites'
 
   // Ground: auto-exported FFTA field map if present, else the programmatic tileset.
   // The FFTA assets are 8×8 tiles with per-cell palette banks; we recolor the sheet

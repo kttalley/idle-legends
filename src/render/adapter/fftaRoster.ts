@@ -1,14 +1,45 @@
-// FFTA scaffold sprite selection tables.
-// Generated from local-assets/ffta-scaffold/ffta-units/index.json (dev-only, gitignored).
-// Each entry is a manifest id under local-assets/ffta-scaffold/ffta-units/<id>.json.
-// Missing assets fall back to placeholder rigs in combatAdapter, so the repo always
-// builds even when the scaffold is absent.
+// Sprite selection tables.
 //
-// The FFTA scaffold is the DEFAULT art. The `?noffta` URL modifier swaps every scaffold
-// id for its original Idle Legends rig via ORIGINAL_SPRITE below (loaded from
-// public/sprites/units/); with the scaffold present, the game renders FFTA sprites.
+// The `ffa_*` ids below are the STABLE ROSTER KEYS — they are how the resolver, the
+// entity cache and the animator refer to a unit, and they long predate the original art.
+// They are not an art source. Art is resolved from a roster key at load time:
+//
+//   DEFAULT (and the only thing that can ever ship) — the original Idle Legends rigs in
+//   public/sprites/units/, via the ORIGINAL_SPRITE table below.
+//
+//   `?ffta`, DEV ONLY — the extracted FFTA scaffold under local-assets/ (gitignored,
+//   never copied into dist/). A local-only dev scaffold for evaluating animation and
+//   perspective; see the placeholder-art policy in PLAN.md.
+//
+// Flipped 2026-08-01 for store submission. Previously the scaffold was the default and
+// the originals hid behind `?noffta` — which no packaged native build could ever set,
+// so the shipping app rendered programmatic placeholder blobs and a town with no ground.
+// Renaming the `ffa_*` keys is deliberately NOT part of this change: they are load-
+// bearing cache keys, and churning them risks the renderer for zero user-visible gain.
 
 import type { ClassType, RaceType } from '../../data/types'
+
+/**
+ * True when the caller should load the FFTA dev scaffold instead of the original rigs.
+ *
+ * Two independent locks, because shipping scaffold pixels is an IP incident and a URL
+ * flag is not a safe sole guard on its own: the build must be DEV, *and* `?ffta` must
+ * be present.
+ *
+ * Deliberately a `const`, not a function. `import.meta.env.DEV` is substituted with the
+ * literal `false` in a production build, so `false && …` folds at compile time and the
+ * bundler strips every scaffold branch AND the `local-assets/…` URL strings with it — a
+ * release bundle ends up with no code path, and no path *string*, that could request a
+ * scaffold asset. A function call is opaque to the minifier and left the strings behind.
+ *
+ * Evaluated once at module load, which is also when the loaders read it.
+ * The `typeof location` guard is for the headless sim runners (tools/sim/*), which
+ * execute this module under esbuild with no DOM.
+ */
+export const useScaffoldArt: boolean =
+  import.meta.env.DEV &&
+  typeof location !== 'undefined' &&
+  new URLSearchParams(location.search).has('ffta')
 
 // ── Hero race/class → FFTA unit manifest ids ─────────────────────────────────
 // Race mapping (Idle race → FFTA race):
@@ -81,11 +112,13 @@ export function isMonsterSprite(id: string): boolean {
   return MONSTER_SPRITE_SET.has(id)
 }
 
-// ── Original-art override (?noffta) ───────────────────────────────────────────
-// The FFTA scaffold is the default. Under `?noffta`, the renderer resolves each scaffold
-// id below to its original Idle Legends rig, loaded from public/sprites/units/ — the
-// zero-FFTA-pixel set (docs/art-direction.md). Multiple FFTA jobs collapse to one original
-// archetype by design; variety in that mode comes from race/gear/rarity palette swaps.
+// ── Roster key → original rig (the DEFAULT art path) ──────────────────────────
+// Every roster key resolves through here to an original Idle Legends rig in
+// public/sprites/units/ — the zero-FFTA-pixel set (docs/art-direction.md). Multiple
+// roster keys collapse to one original archetype by design; variety comes from
+// race/gear/rarity palette swaps rather than from distinct sheets.
+// INVARIANT: every value here must exist as public/sprites/units/<value>.json, or that
+// unit silently degrades to a programmatic placeholder. All 18 verified present.
 export const ORIGINAL_SPRITE: Record<string, string> = {
   // Hero jobs → 5 humanoid archetypes
   ffa_soldier: 'hero_vanguard', ffa_paladin: 'hero_vanguard', ffa_fighter: 'hero_vanguard', ffa_hunter: 'hero_vanguard',
@@ -107,7 +140,7 @@ export const ORIGINAL_SPRITE: Record<string, string> = {
 }
 
 // Original monster rigs authored on the HUMANOID frame (24×32) rather than the beast frame
-// — governs which placeholder generator to use if the original art is missing under ?noffta.
+// — governs which placeholder generator to use if an original rig fails to load.
 const HUMANOID_ORIGINALS = new Set<string>(['mob_gravewalker', 'mob_shivtail', 'mob_gnarljaw', 'mob_grubkin'])
 
 /** True if an original rig id uses the humanoid frame (24×32). */
