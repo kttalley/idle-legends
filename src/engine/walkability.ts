@@ -230,11 +230,34 @@ export function hasLineOfWalk(mask: Uint8Array, ax: number, ay: number, bx: numb
  * excluding) the start, or null if unreachable. Diagonals may not cut a corner between
  * two blocked tiles.
  *
+ * NOT reentrant: it works out of module-level scratch (PATH_SCRATCH below). That is fine
+ * because it is synchronous and single-threaded, but a caller must not hold a reference
+ * to anything but the returned array.
+ *
  * Grid is 64×64 = 4096 nodes, so this is microseconds; it runs on a tap or a mob spawn,
  * never per frame. Collide-and-slide is the per-frame primitive — sliding alone wedges
  * against any concave shoreline, which is precisely the "hero stuck on the lake edge"
  * failure this exists to fix.
  */
+// ── findPath scratch ──────────────────────────────────────────────────────────
+// Each call used to allocate Float32Array(4096) + Int32Array(4096) + Uint8Array(4096) —
+// 36,864 B, unpooled — plus two heap arrays. Fine while A* ran only on a tap or a mob
+// spawn, but C1 routes the whole ambient crowd through it, so it now runs many times a
+// second and ALLOCATION, not CPU, is the first symptom.
+//
+// The generation stamp is what makes pooling free: rather than clearing three arrays per
+// call, each node records the search that last wrote it, and a mismatch means unvisited.
+// pathGen is a plain counter — at even 1,000 searches/second it needs ~25 days to reach
+// 2^31, and a wrap would only cause one search to see stale data as fresh.
+const PATH_SCRATCH_N = MAP_SIZE * MAP_SIZE
+const scratchG = new Float32Array(PATH_SCRATCH_N)
+const scratchCame = new Int32Array(PATH_SCRATCH_N)
+const scratchClosed = new Uint8Array(PATH_SCRATCH_N)
+const scratchStamp = new Int32Array(PATH_SCRATCH_N)   // 0 = never touched; pathGen starts at 1
+const heapF: number[] = []
+const heapN: number[] = []
+let pathGen = 0
+
 export function findPath(
   mask: Uint8Array, fromX: number, fromY: number, toX: number, toY: number,
 ): { x: number; y: number }[] | null {
@@ -244,10 +267,18 @@ export function findPath(
   if (start === goal) return []
   if (mask[start] !== 1) return null
 
-  const n = MAP_SIZE * MAP_SIZE
-  const g = new Float32Array(n).fill(Infinity)
-  const came = new Int32Array(n).fill(-1)
-  const closed = new Uint8Array(n)
+  // Pooled scratch — see the note on PATH_SCRATCH. `touch` lazily initialises a node the
+  // first time this search sees it, so a stale value from an earlier search reads as
+  // unvisited without anyone having to clear 12 KB to prove it.
+  pathGen++
+  const gen = pathGen
+  const g = scratchG, came = scratchCame, closed = scratchClosed, stamp = scratchStamp
+  const touch = (i: number): void => {
+    if (stamp[i] === gen) return
+    stamp[i] = gen; g[i] = Infinity; came[i] = -1; closed[i] = 0
+  }
+  heapF.length = 0
+  heapN.length = 0
   const gx = goal % MAP_SIZE, gy = (goal / MAP_SIZE) | 0
 
   // Octile heuristic over the torus.
@@ -257,8 +288,7 @@ export function findPath(
     return (dx + dy) + (Math.SQRT2 - 2) * Math.min(dx, dy)
   }
 
-  // Binary min-heap of (f, node).
-  const heapF: number[] = [], heapN: number[] = []
+  // Binary min-heap of (f, node) — pooled, reset above.
   const push = (f: number, node: number) => {
     heapF.push(f); heapN.push(node)
     let i = heapF.length - 1
@@ -290,6 +320,7 @@ export function findPath(
     return top
   }
 
+  touch(start)
   g[start] = 0
   push(h(start), start)
   const DIRS = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
@@ -297,12 +328,14 @@ export function findPath(
   while (heapN.length) {
     const cur = pop()
     if (cur === goal) { found = true; break }
+    touch(cur)
     if (closed[cur]) continue
     closed[cur] = 1
     const cx = cur % MAP_SIZE, cy = (cur / MAP_SIZE) | 0
     for (const [dx, dy] of DIRS) {
       const nx = wrapTile(cx + dx), ny = wrapTile(cy + dy)
       const ni = ny * MAP_SIZE + nx
+      touch(ni)
       if (mask[ni] !== 1 || closed[ni]) continue
       if (dx !== 0 && dy !== 0) {
         // No corner-cutting: both orthogonal neighbours must be open.

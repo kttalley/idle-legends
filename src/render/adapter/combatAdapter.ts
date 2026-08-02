@@ -142,7 +142,21 @@ interface PathState {
   i: number                          // index of the waypoint being walked to
   gx: number; gy: number             // goal the route was built for (game coords)
   cool: number                       // seconds until a repath is allowed
+  /**
+   * True when A* reported the goal genuinely UNREACHABLE, as opposed to "no waypoints
+   * needed". `findPath` returns null for the first and [] for the second, and collapsing
+   * them with `?? []` made them indistinguishable — so a companion stranded across water
+   * (walkability records up to 7 disconnected components in the worst zone) burned a
+   * full 4096-node search every 0.35s forever AND fell through to the straight-line
+   * slide that grinds along the shoreline, which is precisely the failure routing exists
+   * to prevent.
+   */
+  blocked: boolean
 }
+
+/** Repath backoff once a goal is known unreachable. Long, because the answer will not
+ *  change until the goal moves — and `goalMoved` forces a repath when it does. */
+const UNREACHABLE_RETRY_SECONDS = 2.5
 
 interface Lunge {
   active: boolean
@@ -505,8 +519,8 @@ export class WorldSceneController {
   private mobId: string | null = null
   // Cached routes. Straight-line movement plus collide-and-slide wedges against any
   // concave shoreline; these let a mover go AROUND a lake instead of grinding its edge.
-  private playerPath: PathState = { pts: [], i: 0, gx: 0, gy: 0, cool: 0 }
-  private mobPath: PathState = { pts: [], i: 0, gx: 0, gy: 0, cool: 0 }
+  private playerPath: PathState = { pts: [], i: 0, gx: 0, gy: 0, cool: 0, blocked: false }
+  private mobPath: PathState = { pts: [], i: 0, gx: 0, gy: 0, cool: 0, blocked: false }
 
   private cam: Camera = { x: 0, y: 0, w: 0, h: 0 }
 
@@ -1063,13 +1077,22 @@ export class WorldSceneController {
     st.cool -= dt
     const goalMoved = Math.hypot(WorldSceneController.wrapDiff(gx, st.gx), WorldSceneController.wrapDiff(gy, st.gy)) > 1.5
     if ((!st.pts.length || st.i >= st.pts.length || goalMoved) && st.cool <= 0) {
-      st.pts = findPath(this.walkMask, ex, ey, gx, gy) ?? []
+      const route = findPath(this.walkMask, ex, ey, gx, gy)
+      st.blocked = route === null
+      st.pts = route ?? []
       st.i = 0
       st.gx = gx; st.gy = gy
-      st.cool = 0.35   // cap repaths; the grid is tiny but this runs per mover
+      // Back right off once we know there is no route: the answer cannot change until
+      // the goal moves, and `goalMoved` above forces a repath the moment it does.
+      st.cool = st.blocked ? UNREACHABLE_RETRY_SECONDS : 0.35
     }
     if (st.i >= st.pts.length) {
-      // No route (or still cooling down) — slide toward the goal so it at least tries.
+      // Genuinely unreachable: stand. Sliding at an unreachable goal grinds the walker
+      // along whatever shoreline separates them, which reads as a broken animation and
+      // is strictly worse than waiting for the goal to come back into the same region.
+      if (st.blocked) return still
+      // Otherwise: no waypoints needed, or still cooling down — slide toward the goal so
+      // it at least makes progress.
       const dx = goalBx - e.tx, dy = goalBy - e.ty
       const d = Math.hypot(dx, dy)
       if (d < 0.02) return still
