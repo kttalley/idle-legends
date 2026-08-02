@@ -20,6 +20,7 @@ import { heroPaletteId } from './heroWardrobe'
 import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
 import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } from '../../engine/walkability'
 import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } from '../../data/townNpcs'
+import { PARTY_MAX } from '../../engine/party'
 import { Animator } from '../animation'
 import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId, useScaffoldArt } from './fftaRoster'
 import { mulberry32, subStream, type Rng } from '../../engine/rng'
@@ -250,6 +251,23 @@ const FOLLOW_NEAR = 2.2            // close enough; stop crowding the player
 const FOLLOW_FAR = 3.4             // beyond this, close the gap
 const FOLLOW_TELEPORT = 26         // hopelessly far (player travelled) → catch up off-screen
 const FOLLOW_SPEED = 2.0           // slightly faster than idle wander, so they keep up
+/** How far behind the player a companion holds station. Inside FOLLOW_FAR, so a
+ *  companion sitting correctly in its slot is never also "too far" and closing. */
+const FORMATION_RADIUS = 1.9
+/** Fan between adjacent formation slots, radians. One member today; C4 adds the rest. */
+const FORMATION_FAN = 0.7
+/** How far a companion may stray from the player mid-approach before abandoning the
+ *  fight and catching up. */
+const COMPANION_LEASH = 9.0
+/**
+ * How far a foe may be, as a fraction of the leash, for a companion to commit to it.
+ *
+ * This MUST stay below 1: the first cut gated commitment on the visible radius (~14
+ * tiles) while the leash cut the approach at 6, so the companion committed to fights it
+ * could never legally reach and abandoned every one of them — measured at 0% fight time,
+ * which is a pet, not a party member.
+ */
+const COMPANION_COMMIT_FRAC = 0.7
 // A follower hunts over a much wider radius than a wandering hero. It is walking WITH
 // the player, away from the anchored encounter groups, so at the normal 6.5-tile seek
 // range it almost never found anything and simply trailed along in silence — which read
@@ -331,6 +349,10 @@ interface Ambient {
   pathGx: number; pathGy: number   // goal the route was built for
   pathCool: number                 // seconds until a repath is allowed
   pathBlocked: boolean             // A* said unreachable (null), not "already there" ([])
+  /** Follow hysteresis latch: true while actively closing the gap to the formation slot.
+   *  Without it a companion re-triggers `approach` the instant it drifts one step past
+   *  FOLLOW_NEAR, which is the approach/stop chatter C2 exists to remove. */
+  closing: boolean
 
   // ── L0: behaviour ───────────────────────────────────────────────────────────
   /** This hero's own stream. Per-hero rather than shared, so culling an off-screen
@@ -381,12 +403,13 @@ const AMBIENT_REPATH_SECONDS = 0.6
  * depended on what was on screen would make positions depend on window size.
  */
 function freshAmbientPath(index: number): Pick<
-  Ambient, 'path' | 'pathI' | 'pathGx' | 'pathGy' | 'pathCool' | 'pathBlocked'
+  Ambient, 'path' | 'pathI' | 'pathGx' | 'pathGy' | 'pathCool' | 'pathBlocked' | 'closing'
 > {
   return {
     path: [], pathI: 0, pathGx: 0, pathGy: 0,
     pathCool: ((index % 8) / 8) * AMBIENT_REPATH_SECONDS,
     pathBlocked: false,
+    closing: false,
   }
 }
 
@@ -2851,6 +2874,66 @@ export class WorldSceneController {
    * string-pulling actively collapses movers onto identical straight segments, so heroes
    * converging on one point WILL overlap. C2's formation slots are the fix for that.
    */
+  /**
+   * Where a companion should stand: an offset from the player that ROTATES with the
+   * player's heading, so the formation turns with you instead of being a fixed compass
+   * bearing you keep walking out of.
+   *
+   * Slots fan out behind the player. With PARTY_MAX = 1 there is a single slot directly
+   * astern; the fan term is what C4 will spread a real party across, so the geometry is
+   * already right when more members arrive.
+   *
+   * Formation slots are also the substitute for the local avoidance the walk mask cannot
+   * provide: the mask holds terrain and scenery only and string-pulling collapses movers
+   * onto identical segments, so giving each member its OWN goal is what stops them
+   * stacking on one tile.
+   */
+  private formationSlot(a: Ambient, pgx: number, pgy: number): { gx: number; gy: number } {
+    const idx = Math.max(0, this.partySlotOf(a))
+    const heading = Math.atan2(this.lastFaceDy, this.lastFaceDx)
+    const fan = (idx - (PARTY_MAX - 1) / 2) * FORMATION_FAN
+    const ang = heading + Math.PI + fan          // behind the player, fanned
+    let gx = WorldSceneController.wrapMod(pgx + Math.cos(ang) * FORMATION_RADIUS)
+    let gy = WorldSceneController.wrapMod(pgy + Math.sin(ang) * FORMATION_RADIUS)
+    // A slot that lands in a lake would have the companion permanently "closing" on
+    // somewhere it can never stand. Pull it to the nearest ground instead.
+    if (this.walkMask && !this.townMode && !this.walkableAt(gx + PAD, gy + PAD)) {
+      const w = nearestWalkable(this.walkMask, gx, gy)
+      gx = WorldSceneController.wrapMod(w.x); gy = WorldSceneController.wrapMod(w.y)
+    }
+    return { gx, gy }
+  }
+
+  /**
+   * Should a companion commit to this fight?
+   *
+   * Two conditions, both about the player rather than the companion's own appetite: the
+   * foe has to be comfortably inside the leash, so the approach can finish before the
+   * leash yanks it back; and the companion must be ON STATION rather than mid-catch-up.
+   *
+   * That second one looks redundant next to the leash and is not. Dropping it was tried:
+   * the companion then commits while still trailing, the leash yanks it out of the
+   * approach it just started, and BOTH fight and loot fall (9.2% -> 7.0% and 5.2% -> 0%)
+   * while approach rises. Committing from a trailing position mostly produces abandoned
+   * approaches.
+   */
+  private companionCanCommit(a: Ambient, foeIdx: number, pgx: number, pgy: number): boolean {
+    const foe = this.ambient[foeIdx]
+    if (!foe || !foe.e.active) return false
+    if (a.closing) return false
+    const fromPlayer = Math.hypot(
+      WorldSceneController.wrapDiff(foe.gx, pgx),
+      WorldSceneController.wrapDiff(foe.gy, pgy))
+    // Derived from the leash, not from the viewport, so a committed fight is always one
+    // the approach is actually allowed to complete.
+    return fromPlayer <= COMPANION_LEASH * COMPANION_COMMIT_FRAC
+  }
+
+  /** Index of this companion within the party, for slot assignment. */
+  private partySlotOf(a: Ambient): number {
+    return this.ambient[this.followerIdx] === a ? 0 : 0
+  }
+
   private followAmbient(a: Ambient, goalGx: number, goalGy: number, speed: number, dt: number): boolean {
     // Wedge rescue, FIRST — ahead of every early return in this function.
     //
@@ -3019,24 +3102,60 @@ export class WorldSceneController {
       } else if (a.state === 'loot') {
         if (a.e.animator.finished) a.e.animator.set('idle')
       } else if (a.state === 'follow') {
-        // Keep station near the player. Deliberately a loose leash rather than a rigid
-        // offset: a companion glued to your shoulder reads as a pet, one that drifts and
-        // catches up reads as a person walking with you.
-        const dx = WorldSceneController.wrapDiff(pgx, a.gx)
-        const dy = WorldSceneController.wrapDiff(pgy, a.gy)
-        const d = Math.hypot(dx, dy)
-        if (d > FOLLOW_TELEPORT) {
+        // Keep station in a FORMATION SLOT rather than on a bare distance leash. The slot
+        // is an offset that rotates with the player's heading, so the companion walks
+        // behind-and-beside you and holds that relationship as you turn — where homing on
+        // the player's own tile made it converge on your feet and stop dead, then re-close
+        // the moment you moved.
+        const dxP = WorldSceneController.wrapDiff(pgx, a.gx)
+        const dyP = WorldSceneController.wrapDiff(pgy, a.gy)
+        const dPlayer = Math.hypot(dxP, dyP)
+        if (dPlayer > FOLLOW_TELEPORT) {
           // The player travelled or tapped far away. Rather than trail hopelessly across
           // the zone, reappear just off-frame and walk in — the same trick the ambient
           // group recycler uses to avoid popping in front of the camera.
-          a.gx = WorldSceneController.wrapMod(pgx - dx / (d || 1) * (this.visibleTileRadius() + 3))
-          a.gy = WorldSceneController.wrapMod(pgy - dy / (d || 1) * (this.visibleTileRadius() + 3))
-        } else if (d > FOLLOW_NEAR) {
-          this.followAmbient(a, pgx, pgy, FOLLOW_SPEED, dt)
-        } else if (a.e.animator.finished) {
-          a.e.animator.set('idle')
+          a.gx = WorldSceneController.wrapMod(pgx - dxP / (dPlayer || 1) * (this.visibleTileRadius() + 3))
+          a.gy = WorldSceneController.wrapMod(pgy - dyP / (dPlayer || 1) * (this.visibleTileRadius() + 3))
+          a.path = []; a.pathI = 0; a.pathBlocked = false
+          a.closing = true
+        } else {
+          const slot = this.formationSlot(a, pgx, pgy)
+          const dSlot = Math.hypot(
+            WorldSceneController.wrapDiff(slot.gx, a.gx),
+            WorldSceneController.wrapDiff(slot.gy, a.gy))
+          // Hysteresis: start closing only past FOLLOW_FAR, and keep closing until inside
+          // FOLLOW_NEAR. FOLLOW_FAR was declared and never read, so the old test was a
+          // single threshold — the companion re-triggered a close every time it drifted
+          // one step past 2.2 tiles, which is the approach/stop chatter this removes.
+          if (a.closing ? dSlot > FOLLOW_NEAR : dSlot > FOLLOW_FAR) {
+            a.closing = true
+            this.followAmbient(a, slot.gx, slot.gy, FOLLOW_SPEED, dt)
+          } else {
+            a.closing = false
+            // Face where the player is facing, so a companion at rest reads as standing
+            // WITH you rather than staring at you.
+            if (a.e.animator.finished) a.e.animator.set('idle')
+            a.e.animator.face(faceFromVec(this.lastFaceDx, this.lastFaceDy))
+          }
         }
       } else if (a.state === 'approach') {
+        // A COMPANION IS ON A LEASH. Without one it chases its own agenda arbitrarily
+        // far and the "walking with you" relationship breaks: raising fight throughput
+        // pushed its average distance from the player from 4.8 to 7.6 tiles, because
+        // every extra fight is another excursion. Past the leash it drops the fight and
+        // catches up — the player is the reason it is out here.
+        if (this.ambient[this.followerIdx] === a) {
+          const dP = Math.hypot(
+            WorldSceneController.wrapDiff(pgx, a.gx),
+            WorldSceneController.wrapDiff(pgy, a.gy))
+          if (dP > COMPANION_LEASH) {
+            a.state = 'follow'
+            a.foe = -1
+            a.rejoinAfter = false
+            a.path = []; a.pathI = 0; a.pathBlocked = false
+            a.closing = true
+          }
+        }
         // Close on the committed opponent, then hand over to the fight state.
         const foe = this.ambient[a.foe]
         if (!foe || !foe.e.active) { a.state = 'wander'; a.foe = -1 }
@@ -3224,10 +3343,16 @@ export class WorldSceneController {
           this.companionSparCd -= step
           // Prefer a real world monster if one happens to be free and close.
           let foe = this.nearestAmbientMob(i, FOLLOW_SEEK_RANGE)
+          // Gate on whether the fight can plausibly FINISH in frame. A companion that
+          // commits to something at the edge of its seek range is left behind the moment
+          // the player keeps walking, and then spends the next several seconds sprinting
+          // back — which is most of the `approach` time C2 is measuring down.
+          if (foe >= 0 && !this.companionCanCommit(a, foe, pgx, pgy)) foe = -1
           // Otherwise give them their own. The zone's ~2 shared monsters are permanently
           // claimed by the heroes standing on top of them, so without this a companion
-          // simply never fights — which is exactly how it played.
-          if (foe < 0 && this.companionSparCd <= 0) foe = this.spawnCompanionFoe(a)
+          // simply never fights — which is exactly how it played. Not while trailing:
+          // catch up first, then pick a fight.
+          if (foe < 0 && this.companionSparCd <= 0 && !a.closing) foe = this.spawnCompanionFoe(a)
           if (foe >= 0) {
             a.foe = foe
             a.state = 'approach'
