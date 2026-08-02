@@ -366,8 +366,22 @@ interface Ambient {
   /** Its OWN spar cooldown. The shared one was decremented once per follower inside the
    *  brain loop, so it also drained N times faster than the interval intends. */
   sparCd: number
-  /** Index into `ambient` of its OWN sparring partner, or -1. */
-  sparFoeIdx: number
+  /**
+   * Id of the STORE mob this companion is visibly fighting, or null.
+   *
+   * Replaces `sparFoeIdx`, which pointed at a private scenery monster this file spawned
+   * for the companion. That monster was invisible to the store, so it had no id, no
+   * `MobInstance` and no entry in `otherMobEnts` — which meant tapping the thing your
+   * party member was fighting fell all the way through `moveTo`'s hit-test chain to the
+   * ground-walk fallback. You could not target it because, as far as the game was
+   * concerned, it did not exist.
+   *
+   * A companion now picks a real mob out of the zone's population, so the enemy it
+   * fights is the same object the player can tap, and joining is just `setTarget`.
+   * Isolation is unchanged and still structural: this branch moves a scene entity and
+   * sets an animation. It cannot reach store state, so companion damage stays zero.
+   */
+  assistMobId: string | null
   /** Follow hysteresis latch: true while actively closing the gap to the formation slot.
    *  Without it a companion re-triggers `approach` the instant it drifts one step past
    *  FOLLOW_NEAR, which is the approach/stop chatter C2 exists to remove. */
@@ -432,14 +446,14 @@ const AMBIENT_REPATH_SECONDS = 0.6
  */
 function freshAmbientPath(index: number): Pick<
   Ambient, 'path' | 'pathI' | 'pathGx' | 'pathGy' | 'pathCool' | 'pathBlocked' | 'closing'
-        | 'partySlot' | 'sparCd' | 'sparFoeIdx'
+        | 'partySlot' | 'sparCd' | 'assistMobId'
 > {
   return {
     path: [], pathI: 0, pathGx: 0, pathGy: 0,
     pathCool: ((index % 8) / 8) * AMBIENT_REPATH_SECONDS,
     pathBlocked: false,
     closing: false,
-    partySlot: -1, sparCd: 0, sparFoeIdx: -1,
+    partySlot: -1, sparCd: 0, assistMobId: null,
   }
 }
 
@@ -510,8 +524,7 @@ export class WorldSceneController {
    *  match — at 2+ members the follow speed, rejoin decisions, party frame and attack
    *  counter all silently described one arbitrary member. */
   private followerIdxs: number[] = []
-  /** Reusable sparring-partner slot for the companion, or -1 before it exists. */
-  // (per-companion spar state now lives on the Ambient record — see partySlot/sparCd/sparFoeIdx)
+  // (per-companion state lives on the Ambient record — see partySlot/sparCd/assistMobId)
   /** Seconds until the companion is handed a fresh thing to fight. */
 
   /** Attack animations the companion has played this session (debug/instrumentation). */
@@ -3088,9 +3101,6 @@ export class WorldSceneController {
       for (let ai = 0; ai < this.ambient.length; ai++) {
         const a = this.ambient[ai]
         if (a.grp !== gi) continue
-        // The companion's sparring partner belongs to the player, not to a group anchor —
-        // recycling it across the map would yank it out of a fight in progress.
-        if (this.isSparFoe(ai)) continue
         a.gx = WorldSceneController.wrapMod(grp.gx + (a.rng() * 2 - 1) * 2.2)
         a.gy = WorldSceneController.wrapMod(grp.gy + (a.rng() * 2 - 1) * 2.2)
         // The ANCHOR was re-anchored onto walkable ground above, but this scatter can
@@ -3179,12 +3189,19 @@ export class WorldSceneController {
         // that an attentive player notices the mob's HP does not fall faster; inventing
         // numbers would not hide that, it would make the discrepancy louder and turn a
         // cosmetic flourish into a lie.
-        if (!this.showMob || !this.mob) {
+        // `assistMobId === null` means "the player's engaged target"; a set id means the
+        // companion picked its own real mob out of the population. Both are store mobs
+        // the player can tap — that is the whole point of the change.
+        const assistEnt = a.assistMobId === null
+          ? (this.showMob ? this.mob : null)
+          : (this.otherMobEnts.get(a.assistMobId)?.e ?? null)
+        if (!assistEnt || !assistEnt.active) {
           a.state = 'follow'
           a.closing = true
+          a.assistMobId = null
         } else {
-          const mgx = WorldSceneController.wrapMod(this.mob.tx - PAD)
-          const mgy = WorldSceneController.wrapMod(this.mob.ty - PAD)
+          const mgx = WorldSceneController.wrapMod(assistEnt.tx - PAD)
+          const mgy = WorldSceneController.wrapMod(assistEnt.ty - PAD)
           // Stand on the mob's flank — the left-hand normal of the player→mob axis — so
           // the two of them bracket it instead of overlapping.
           const ax = WorldSceneController.wrapDiff(mgx, pgx)
@@ -3477,24 +3494,45 @@ export class WorldSceneController {
               WorldSceneController.wrapDiff(mgy, a.gy))
             if (dm <= COMPANION_LEASH) {
               a.state = 'assist'
+              a.assistMobId = null              // null = the player's own target
               a.foe = -1
               a.atkCd = a.rng() * ASSIST_SWING   // desync from the player's swing
               speaking += this.tryBark(a, 'engage', speaking)
               break
             }
           }
-          // Prefer a real world monster if one happens to be free and close.
+          // No player fight to join → pick a REAL mob out of the zone's population.
+          //
+          // This replaces `spawnCompanionFoe`, which minted a private scenery monster the
+          // store knew nothing about. That monster could not be targeted, so a player who
+          // tapped the thing their party member was fighting got a walk order instead —
+          // the tap fell through `moveTo`'s hit-test chain to the ground fallback. A real
+          // mob is already in `otherMobEnts`, so the existing tap path targets it with no
+          // change at all, and joining in is just the branch above.
+          // Ungated on purpose. `sparCd`/`closing` used to rate-limit CONJURING a monster,
+          // which was worth throttling; choosing one that already exists is not, and
+          // leaving the gates on measured as the branch never firing at all — companions
+          // sat on ambient scenery while real mobs stood a few tiles away.
+          {
+            const mobId = this.nearestFreeStoreMob(a, COMPANION_LEASH)
+            if (mobId) {
+              a.state = 'assist'
+              a.assistMobId = mobId
+              a.foe = -1
+              a.atkCd = a.rng() * ASSIST_SWING
+              speaking += this.tryBark(a, 'engage', speaking)
+              break
+            }
+          }
+          // Nothing of the player's to fight — fall back to the zone's ambient monsters,
+          // the same ones the wandering crowd fights. Untargetable, but pre-existing
+          // scenery rather than a monster conjured for the companion.
           let foe = this.nearestAmbientMob(i, FOLLOW_SEEK_RANGE)
           // Gate on whether the fight can plausibly FINISH in frame. A companion that
           // commits to something at the edge of its seek range is left behind the moment
           // the player keeps walking, and then spends the next several seconds sprinting
           // back — which is most of the `approach` time C2 is measuring down.
           if (foe >= 0 && !this.companionCanCommit(a, foe, pgx, pgy)) foe = -1
-          // Otherwise give them their own. The zone's ~2 shared monsters are permanently
-          // claimed by the heroes standing on top of them, so without this a companion
-          // simply never fights — which is exactly how it played. Not while trailing:
-          // catch up first, then pick a fight.
-          if (foe < 0 && a.sparCd <= 0 && !a.closing) foe = this.spawnCompanionFoe(a)
           if (foe >= 0) {
             a.foe = foe
             a.state = 'approach'
@@ -3598,11 +3636,12 @@ export class WorldSceneController {
               foe.e.active = false
               foe.state = 'idle'
               foe.foe = -1
-              // The companion's sparring partner is respawned on the companion's own
-              // cadence next to the player, not on the group-anchor respawn timer.
-              foe.respawnT = a.foe === a.sparFoeIdx
-                ? 0
-                : AMBIENT_MOB_RESPAWN + a.rng() * AMBIENT_MOB_RESPAWN
+              // Every ambient monster now respawns on the same group-anchor timer. The
+              // spar-foe exception (respawnT = 0, revived by the companion's own cadence)
+              // is gone with the spar foes themselves — and it was a trap besides: a
+              // respawnT of 0 reads as "no timer pending" to the respawn loop, so an
+              // orphaned spar foe stayed dead for the session.
+              foe.respawnT = AMBIENT_MOB_RESPAWN + a.rng() * AMBIENT_MOB_RESPAWN
             }
             a.foe = -1
             a.state = a.rejoinAfter || a.partySlot >= 0 ? 'follow' : 'wander'
@@ -3688,88 +3727,31 @@ export class WorldSceneController {
   }
 
   /**
-   * Make sure the companion has something to fight, near the player.
+   * Nearest real store mob this companion could fight, or null.
    *
-   * This exists because widening the search radius did NOT work, and it is worth writing
-   * down why. The zone's encounter groups produce roughly **two** ambient monsters for
-   * eight heroes (see `AMBIENT_GROUPS` weights), every one of them already claimed by a
-   * hero standing at its group anchor. A companion walks away from those anchors — that
-   * is what following means — so it was competing for a supply that was both tiny and
-   * permanently spoken for. The problem was never how far it could see.
+   * "Free" means: on the field, not the player's engaged target (that fight is joined by
+   * the branch above, which outranks this), and not already claimed by another party
+   * member — otherwise all three companions pile onto the same enemy and the other mobs
+   * stand watching.
    *
-   * So the companion gets its own sparring partner: one dedicated monster entity, spawned
-   * on walkable ground a few tiles off the player, recycled after each fight. That makes
-   * the companion visibly fight on a regular cadence right next to you, which is the
-   * entire point of having one along.
-   *
-   * It is still ambient scenery — its own entity, its own simulated fight, its own
-   * numbers. It is never one of the store's real `mobs`, so the player's combat, loot and
-   * XP remain untouched.
+   * Ranged from the COMPANION, not the player: a mob the companion can reach without
+   * breaking its leash is the one it should pick.
    */
-  /** Is this ambient index some companion's sparring partner? */
-  private isSparFoe(idx: number): boolean {
-    for (const fi of this.followerIdxs) {
-      if (this.ambient[fi]?.sparFoeIdx === idx) return true
+  private nearestFreeStoreMob(a: Ambient, range: number): string | null {
+    const claimed = new Set<string>()
+    for (const other of this.ambient) {
+      if (other !== a && other.assistMobId) claimed.add(other.assistMobId)
     }
-    return false
-  }
-
-  private spawnCompanionFoe(companion: Ambient): number {
-    if (!this.rigs || !this.player) return -1
-
-    // One reusable slot PER COMPANION rather than one shared between all of them. The
-    // shared slot is why the second party member was inert: it found the slot taken and
-    // never got a fight of its own.
-    if (companion.sparFoeIdx < 0 || !this.ambient[companion.sparFoeIdx]) {
-      const rng = companion.rng
-      const monsterId = MONSTER_SPRITES[Math.floor(rng() * MONSTER_SPRITES.length)]
-      const sprite = this.spriteCache[monsterId] ?? this.rigs.mobBeast
-      const e = this.scene.spawn(sprite, 'team/enemy', this.player.tx, this.player.ty)
-      e.shadow = true
-      e.animator.set('idle')
-      this.ambient.push({
-        ...freshAmbientPath(this.ambient.length),
-        e, kind: 'mob', gx: 0, gy: 0, tgx: 0, tgy: 0, t: 0,
-        fightT: 0, atkCd: 0, name: '', level: 0, faction: 'neutral',
-        grp: companion.grp,
-        // Keyed to the companion, NOT a literal: two spar monsters sharing the label
-        // 'companion-foe' would share one stream and roll identical placements — the exact
-        // determinism regression per-hero sub-streams exist to prevent.
-        rng: subStream(this.zoneSeed(), `companion-foe:${companion.name}:${companion.partySlot}`), state: 'idle',
-        identity: null, bark: null, barkT: 0, barkCd: 0,
-        fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false,
-        respawnT: 0, spawnFadeT: 0, rejoinAfter: false,
-      })
-      companion.sparFoeIdx = this.ambient.length - 1
+    let best: string | null = null
+    let bestD = range
+    for (const [id, rec] of this.otherMobEnts) {
+      if (!rec.e.active || claimed.has(id)) continue
+      const d = Math.hypot(
+        WorldSceneController.wrapDiff(WorldSceneController.wrapMod(rec.e.tx - PAD), a.gx),
+        WorldSceneController.wrapDiff(WorldSceneController.wrapMod(rec.e.ty - PAD), a.gy))
+      if (d < bestD) { bestD = d; best = id }
     }
-
-    const foe = this.ambient[companion.sparFoeIdx]
-    const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
-    const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
-    // Place it to one side of the player, far enough that the companion visibly walks
-    // over rather than teleport-fighting on the spot.
-    const ang = foe.rng() * Math.PI * 2
-    // Close enough that the companion is visibly FIGHTING rather than visibly commuting.
-    // Measured at 4–7 tiles the cycle was ~70% approach; the walk is not the interesting
-    // part. Still far enough that they walk over rather than teleport-fight on the spot.
-    const dist = 2.5 + foe.rng() * 2
-    let gx = WorldSceneController.wrapMod(pgx + Math.cos(ang) * dist)
-    let gy = WorldSceneController.wrapMod(pgy + Math.sin(ang) * dist)
-    if (this.walkMask && !this.walkableAt(gx + PAD, gy + PAD)) {
-      const w = nearestWalkable(this.walkMask, gx, gy)
-      gx = WorldSceneController.wrapMod(w.x)
-      gy = WorldSceneController.wrapMod(w.y)
-    }
-    foe.gx = gx; foe.gy = gy; foe.tgx = gx; foe.tgy = gy
-    foe.path = []; foe.pathI = 0; foe.pathBlocked = false
-    foe.state = 'idle'
-    foe.foe = -1
-    foe.fightLog = null
-    foe.respawnT = 0
-    foe.e.active = true
-    foe.e.alpha = 1
-    foe.e.animator.set('idle')
-    return companion.sparFoeIdx
+    return best
   }
 
   /** Nearest living ambient monster within engage radius, or -1. */
