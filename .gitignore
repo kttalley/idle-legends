@@ -59,3 +59,17 @@ local-assets/
 
 # Sprite-generation machine-local config (model filenames, GPU ports)
 tools/spritegen/config.json
+
+# ── Capacitor / iOS ────────────────────────────────────────────────────────────
+# The iOS project IS committed (Info.plist, entitlements, the app icon set) — it is
+# real configuration, and regenerating it loses anything set in Xcode. Only the
+# derived parts are ignored.
+#   ios/App/App/public/ is the copied web build; `npm run cap:sync` rewrites it.
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/DerivedData/
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+**/*.xcuserdatad
