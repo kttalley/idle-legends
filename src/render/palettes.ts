@@ -187,6 +187,41 @@ function biome(ch: { e: readonly string[]; v: readonly string[]; w: readonly str
   return composePalette(MEADOW(), o)
 }
 
+// ── Town palettes ────────────────────────────────────────────────────────────
+// The settlement is BUILT ground, so it does not compose over the meadow: earth becomes
+// worked timber, "vegetation" becomes the roof thatch and awning straw, water becomes
+// dyed cloth (banners, awnings, signage) and stone stays stone.
+//
+// The faction variants below differ ONLY in the cloth ramp (9-12) and the accent (13-15).
+// That is the whole point of the slot contract: reflagging a town from Concord to
+// Ashmarch recolours every banner, awning and sign in the square and touches no walls,
+// no roofs and no paving. One palette id, a completely different allegiance.
+const TOWN_BASE = paletteFromHex([
+  '',
+  '#3a2a1c', '#5c4430', '#7e6144', '#a2825c', // 1-4  worked timber (beam→plank→lit)
+  '#4a3a20', '#6b5630', '#9c7a34', '#f0b44c', // 5-8  thatch / straw; 8 is the ONE warm
+                                             //      value — lamp flame, forge coals, lit glass
+  '#2b3a52', '#3d5273', '#54709c', '#7292c0', // 9-12 dyed cloth — THE FACTION CHANNEL
+  '#4c4a45', '#6e6b63', '#928e84',            // 13-15 dressed stone / iron
+])
+reg('biome/town', TOWN_BASE)
+
+// The faction variants override the CLOTH RAMP ONLY (9-12).
+//
+// The first cut also overrode 13-15 to carry a faction "device" colour, which was a
+// design error worth recording: 13-15 is the *stone* channel, so Concord's gold repainted
+// every paving sett, kerb and wall in the square and the whole town came out uniform
+// gold. A channel cannot be both a material and a signal. Masonry now reads identically
+// under either flag — as it should, since the two factions are occupying the same
+// architecture — and allegiance lives entirely in the cloth: banners, awnings, shop
+// signs, the sacked load on the cart. Slot 12 is the banner device.
+reg('biome/town/concord', composePalette(TOWN_BASE, {
+  9: '#1e2c4c', 10: '#2c4270', 11: '#3f5f9c', 12: '#7fa8e4',   // deep blue, pale device
+}))
+reg('biome/town/ashmarch', composePalette(TOWN_BASE, {
+  9: '#4a1712', 10: '#6e241a', 11: '#983726', 12: '#e0764a',   // ember red, hot device
+}))
+
 // Temperate forest — deeper greens and brown loam than the meadow.
 reg('biome/forest', biome({
   e: ['#4a3c28', '#6c543c', '#8c7048', '#a88858'],

@@ -13,7 +13,7 @@
 import { Scene, type Camera, type Entity } from '../scene'
 import { bakeGround, feetX, feetY, HALF_W, HALF_H, type GroundBuffer } from '../tilemap'
 import { loadSprite, loadSpriteOrPlaceholder } from '../indexedSprite'
-import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeBoltRig, makeBurstRig, TILE_ANIMS, TILE } from '../placeholderArt'
+import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeBoltRig, makeBurstRig, TILE_ANIMS, TILE, makeTownBuildings, TOWN_BUILDING } from '../placeholderArt'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { composePalette } from '../palette'
 import { heroPaletteId } from './heroWardrobe'
@@ -378,6 +378,10 @@ export class WorldSceneController {
   private propSheet: IndexedSprite
   /** Tall prop sprite per kind (Phase E), spawned as depth-sorted entities at nodes. */
   private tallProps: Record<number, IndexedSprite>
+  /** The four town premises, on their own larger canvas (64x80). Built lazily: the
+   *  overwhelming majority of sessions in a zone never enter town. Distinct from
+   *  `townBuildings` below, which is the label list the HUD draws. */
+  private townBuildingArt: Record<number, IndexedSprite> = {}
   /** Spawned tall-prop entities + the node each represents; retired on zone change. */
   private propEntities: { entity: Entity; gx: number; gy: number }[] = []
 
@@ -418,6 +422,10 @@ export class WorldSceneController {
   private townCrowd: TownFolk[] = []
   private townBuildings: { label: string; tx: number; ty: number }[] = []
   private townNpcs: TownNpcEnt[] = []
+  /** Buildings, well, banners and clutter for the town scene. Retired on leaving. */
+  private townProps: Entity[] = []
+  /** Player's faction, synced from state — selects the town's cloth/accent palette. */
+  private playerFaction: FactionType = 'neutral'
   /** Which NPC the hero is currently close enough to talk to; null when nobody. */
   private nearNpc: TownServiceKind | null = null
   /** Fired when that changes, so the store can open/close the right panel. */
@@ -1209,6 +1217,7 @@ export class WorldSceneController {
       this.playerSpriteId = wantedPlayerSprite
       this.swapEntitySprite(this.player, wantedPlayerSprite)
     }
+    this.playerFaction = state.playerFaction
     this.playerBasePalette = heroPaletteId(
       state.playerClass, state.playerRace, state.playerFaction, bestEquipmentRarity(state),
       state.colorway,
@@ -2478,25 +2487,110 @@ export class WorldSceneController {
    * needs the bias — tileToScreenX depends on (tx − ty), so adding C to both cancels.
    */
   private makeTownPlaza(): GroundBuffer {
-    const N = 24, C = N >> 1
+    const N = 28, C = N >> 1
     const tiles = new Uint8Array(N * N)
     for (let y = 0; y < N; y++) {
       for (let x = 0; x < N; x++) {
-        const d = Math.max(Math.abs(x - C), Math.abs(y - C))
+        const dx = x - C, dy = y - C
+        // Chebyshev for the built square (masonry is laid square), Euclidean beyond it
+        // for the road's rounded fade — a hard square edge all the way out reads as a
+        // texture swap rather than as a town ending.
+        const sq = Math.max(Math.abs(dx), Math.abs(dy))
+        const r  = Math.hypot(dx, dy)
         tiles[y * N + x] =
-          d <= 6 ? ((x + y) % 2 === 0 ? TILE.PATH : TILE.PATH_ALT)   // chequered paving
-          : d <= 8 ? TILE.PATH_ALT                                    // worn verge
-          : (x * 7 + y * 3) % 11 === 0 ? TILE.FLOWER
-          : (x + y) % 3 === 0 ? TILE.GRASS_ALT
-          : TILE.GRASS
+          // Civic square: dressed flagstone, with a timber deck strip in front of the
+          // stall run so the market side reads as boarded rather than paved.
+          sq <= 5 ? (dy < -3 && Math.abs(dx) <= 3 ? TILE.TIMBER : TILE.FLAGSTONE)
+          // Apron: coursed cobble. The two frames alternate to keep the bond running.
+          : sq <= 8 ? ((x + y) % 2 === 0 ? TILE.COBBLE : TILE.COBBLE_ALT)
+          // Approach roads leave the square on the four diagonals; everything else
+          // outside the apron goes back to meadow.
+          : r <= 12 && (Math.abs(Math.abs(dx) - Math.abs(dy)) <= 1)
+            ? ((x + y) % 2 === 0 ? TILE.COBBLE : TILE.COBBLE_ALT)
+          // Outskirts are PACKED EARTH, not meadow. The town palette spends 5-8 on
+          // thatch and lamplight rather than vegetation, so a grass tile baked here
+          // comes out as straw and floods the whole scene gold — which is exactly what
+          // the first version did. Earth tiles read off 1-4, which the town palette
+          // does define, so the square sits in a worn approach instead.
+          : (x * 5 + y * 3) % 13 === 0 ? TILE.ROCK
+          : (x + y) % 3 === 0 ? TILE.PATH_ALT
+          : TILE.PATH
       }
     }
+    // Ground is baked on the town palette, not the meadow: paving is worked stone and
+    // mortar, which the wilderness ramps have no values for.
     const g = bakeGround(
       { w: N, h: N, tiles, props: [] },
-      this.tileset, 'biome/meadow', getPalette('biome/meadow'), TILE_ANIMS, this.propSheet,
+      this.tileset, this.townPaletteId(), getPalette(this.townPaletteId()), TILE_ANIMS, this.propSheet,
     )
     this.townGround = { ...g, planeOffsetY: g.planeOffsetY + 2 * C * HALF_H, wrapTiles: 0 }
     return this.townGround
+  }
+
+  /**
+   * Which town palette dresses the square. Ground and walls are identical across
+   * factions — only the cloth ramp (9-12) and the accent (13-15) differ, so switching
+   * this reflags every banner, awning and sign without touching a wall or a paving
+   * stone. That is the slot contract paying rent.
+   */
+  private townPaletteId(): string {
+    return this.playerFaction === 'horde' ? 'biome/town/ashmarch'
+      : this.playerFaction === 'alliance' ? 'biome/town/concord'
+      : 'biome/town'
+  }
+
+  /**
+   * The built settlement: one structure behind each service NPC, a well at the centre,
+   * and the civic furniture that makes a square read as inhabited.
+   *
+   * Structures sit OUTWARD of their NPC (further from the centre on both axes) so the
+   * person you talk to always stands in front of their premises rather than inside the
+   * wall — the scene is the menu, so that relationship has to be legible at a glance.
+   */
+  private spawnTownStructures(): void {
+    if (!this.townBuildingArt[TOWN_BUILDING.INN]) this.townBuildingArt = makeTownBuildings()
+    const pal = this.townPaletteId()
+    const spawn = (sprite: IndexedSprite | undefined, tx: number, ty: number) => {
+      if (!sprite) return
+      const e = this.scene.spawn(sprite, pal, tx, ty)
+      e.shadow = true
+      e.animator.set('idle')
+      this.townProps.push(e)
+    }
+    const place = (kind: number, tx: number, ty: number) => spawn(this.tallProps[kind], tx, ty)
+    const build = (kind: number, tx: number, ty: number) => spawn(this.townBuildingArt[kind], tx, ty)
+
+    // Premises, keyed to the four service anchors in data/townNpcs.ts. These come off
+    // the 64x80 building sheet, not the 32x48 prop sheet — see makeTownBuildings.
+    // Each sits at the SAME screen x as its NPC (so it is unmistakably their premises)
+    // and ~3 tiles further up-screen (so the NPC stands in front of the door, not in the
+    // wall). "Up-screen" is a smaller tx + ty, which is why both coordinates drop.
+    build(TOWN_BUILDING.SMITHY, -4.5, -1.5)   // Bren Halloway, outfitter     (-3,  0)
+    build(TOWN_BUILDING.STALL,  -1.5, -4.5)   // Ilvane Sorr,   factor        ( 0, -3)
+    build(TOWN_BUILDING.INN,     0.0,  3.0)   // Hesta,         rest          ( 1.5, 4.5)
+    build(TOWN_BUILDING.DEPOT,   3.0,  0.0)   // Odger Vale,    quartermaster ( 4.5, 1.5)
+
+    // The well is the square's centre of gravity, but the hero spawns at (0,0) — so it
+    // sits one tile back rather than on the spawn point.
+    place(TALL_PROP.WELL, -0.8, -0.8)
+
+    // Faction banners flank the top approach; lampposts ring the apron.
+    place(TALL_PROP.BANNER, -3.4, -2.6)
+    place(TALL_PROP.BANNER, -2.6, -3.4)
+    place(TALL_PROP.LAMPPOST, -4.2,  1.2)
+    place(TALL_PROP.LAMPPOST,  1.2, -4.2)
+    place(TALL_PROP.LAMPPOST,  4.2,  2.6)
+
+    // Clutter, kept off the walking lines between the hero and each NPC.
+    place(TALL_PROP.CRATES, -2.4,  1.8)
+    place(TALL_PROP.BARREL,  2.0, -2.4)
+    place(TALL_PROP.BARREL,  2.6,  3.4)
+    place(TALL_PROP.CART,    3.6, -2.8)
+  }
+
+  private retireTownProps(): void {
+    for (const e of this.townProps) e.active = false
+    this.townProps = []
   }
 
   private async enterTownScene(): Promise<void> {
@@ -2516,6 +2610,7 @@ export class WorldSceneController {
     this.player.ty = 0
     this.player.z = 0
     this.player.animator.set('idle')
+    this.spawnTownStructures()
     this.spawnTownCrowd()
     this.spawnTownNpcs()
     this.townBuildings = []
@@ -2561,6 +2656,7 @@ export class WorldSceneController {
     this.townCrowd = []
     for (const n of this.townNpcs) n.e.active = false
     this.townNpcs = []
+    this.retireTownProps()
     if (this.nearNpc !== null) { this.nearNpc = null; this.onTownNpcChanged?.(null) }
     this.townBuildings = []
     this.townMode = false

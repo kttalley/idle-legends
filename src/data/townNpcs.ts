@@ -34,6 +34,15 @@ export interface TownNpcDef {
   faction: FactionType
 }
 
+/*
+ * Anchor layout note. Screen x is (tx - ty) and screen y is (tx + ty)/2, so a diamond
+ * that looks balanced in tile space comes out TWICE AS WIDE as it is tall on screen.
+ * The original anchors put the innkeeper and the factor at ±6.5 tiles of screen x —
+ * ±104px against a ~107px half-viewport on a portrait phone — and both their premises
+ * were cropped off the sides. These four hold |tx - ty| <= 3 and spread on (tx + ty)
+ * instead, which reads as a square on screen and fits a phone.
+ */
+
 /**
  * How close the hero must be before an NPC will talk. Generous enough that walking
  * roughly at someone works, tight enough that two neighbours never both open.
@@ -46,7 +55,7 @@ export const TOWN_NPCS: TownNpcDef[] = [
     role: 'Innkeeper',
     name: 'Hesta',
     greeting: 'Bed’s warm and the door bolts. Sit a while.',
-    tx: -3, ty: 3.5,
+    tx: 1.5, ty: 4.5,
     race: 'human', cls: 'warrior', faction: 'alliance',
   },
   {
@@ -54,7 +63,7 @@ export const TOWN_NPCS: TownNpcDef[] = [
     role: 'Outfitter',
     name: 'Bren Halloway',
     greeting: 'Carry more, come back less. That’s the whole trade.',
-    tx: -4, ty: -2.5,
+    tx: -3, ty: 0,
     race: 'dwarf', cls: 'warrior', faction: 'alliance',
   },
   {
@@ -62,7 +71,7 @@ export const TOWN_NPCS: TownNpcDef[] = [
     role: 'Factor',
     name: 'Ilvane Sorr',
     greeting: 'You fight. I’ll handle what falls out of it.',
-    tx: 3.5, ty: -3,
+    tx: 0, ty: -3,
     race: 'elf', cls: 'rogue', faction: 'neutral',
   },
   {
@@ -70,7 +79,7 @@ export const TOWN_NPCS: TownNpcDef[] = [
     role: 'Quartermaster',
     name: 'Odger Vale',
     greeting: 'Standing arrangements. Nothing you’ll carry, everything you’ll feel.',
-    tx: 4, ty: 2.5,
+    tx: 4.5, ty: 1.5,
     race: 'gnome', cls: 'mage', faction: 'neutral',
   },
 ]

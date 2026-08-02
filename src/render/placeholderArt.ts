@@ -258,7 +258,7 @@ export function makeBeastRig(id = 'rig/beast'): IndexedSprite {
 // All palette-indexed so Phase A biome palettes tint them via their semantic channels
 // (earth 1-4, veg 5-8, water 9-12, stone 13-15).
 
-const T_FRAMES = 14
+const T_FRAMES = 18   // 0-13 wilderness, 14-17 town paving (see TILE below)
 const TW = 32
 const TH = 24
 const DIAMOND_TOP = 8 // ground diamond occupies y 8..23
@@ -396,6 +396,42 @@ export function makeTileset(id = 'tileset/base'): IndexedSprite {
     return cell(x, y, 4, 13) < 50 ? 9 : 10
   })
 
+  // ── Town paving (14-17) ────────────────────────────────────────────────────
+  // The town is the one place the ground is BUILT rather than grown, so it gets real
+  // masonry patterns instead of a recoloured meadow. Stone sits on 13-15 and the mortar
+  // on the earth ramp (1-4), so a town palette tints joint and sett independently — that
+  // is what lets one plaza read as Concord granite or Ashmarch basalt.
+
+  // 14/15: cobble — 4x4 setts in a running bond, the two frames offset by half a sett so
+  // a chequerboard of them reads as continuous coursing rather than a repeating stamp.
+  for (const f of [14, 15]) {
+    const off = f === 15 ? 2 : 0
+    fillDiamond(p, f, (x, y) => {
+      if (y >= 14) return 13                              // dark front edge
+      const bond = ((y >> 2) & 1) ? 2 : 0                 // alternate courses stagger
+      if (y % 4 === 0) return 2                           // mortar course
+      if (((x + off + bond) & 3) === 0) return 2          // mortar joint
+      const v = speck(x, y, f + 60)
+      return v < 10 ? 15 : v < 26 ? 13 : 14               // worn / lit / mid sett
+    })
+  }
+  // 16: flagstone — larger irregular slabs, fewer joints. The dressed stone of a civic
+  // square, next to the rougher cobble of the approach roads.
+  fillDiamond(p, 16, (x, y) => {
+    if (y >= 14) return 13
+    const c = cell(x, y, 6, 16)
+    if (c < 8) return 2                                   // joint between slabs
+    return c < 40 ? 15 : c < 72 ? 14 : 13                 // slab value variation
+  })
+  // 17: timber decking — boards on the wood ramp so they stay warm against the stone.
+  fillDiamond(p, 17, (x, y) => {
+    if (y >= 14) return 1
+    if (y % 3 === 0) return 1                             // board gap (shadow)
+    const board = (y / 3) | 0
+    return speck(x, y, 17 + board) < 5 ? 2                // knot
+      : ((x + board * 3) & 7) < 4 ? 3 : 4                 // plank value alternation
+  })
+
   const still = (frame: number) => ({
     se: { frames: [frame], fps: 1, loop: true },
     ne: { frames: [frame], fps: 1, loop: true },
@@ -416,6 +452,8 @@ export const TILE = {
   GRASS: 0, GRASS_ALT: 1, WATER: 2, WATER_ALT: 3, CLIFF: 4, PATH: 5,
   SAND: 6, ROCK: 7, SNOW: 8, MOSS: 9, FLOWER: 10, PATH_ALT: 11,
   EMBER: 12, BOG: 13,
+  // Town paving — built ground, only used by the town scene.
+  COBBLE: 14, COBBLE_ALT: 15, FLAGSTONE: 16, TIMBER: 17,
 } as const
 
 // Animated ground cycles (environment-plan Phase B): water shimmers between its two
@@ -510,11 +548,16 @@ export const TALL_PROP = {
   PILLAR: 13, DEADTREE: 14, STUMP: 15, REEDS: 16,
   // structures (17+) — sparse landmarks (a few per zone)
   HUT: 17, TOWER: 18, ARCH: 19,
+  // town furniture (20+) — HUMAN-SCALE objects only. The four premises are far bigger
+  // than a person and live on their own 64x80 sheet (makeTownBuildings) — authored here
+  // at 32x48 they came out barely taller than the hero standing in front of them, which
+  // read as a doll's house rather than an inn.
+  WELL: 20, BANNER: 21, LAMPPOST: 22, CRATES: 23, BARREL: 24, CART: 25,
 } as const
 
 const TP_W = 32
 const TP_H = 48
-const TP_N = 20
+const TP_N = 26
 
 export function makePropEntities(): Record<number, IndexedSprite> {
   const p = new Painter(TP_W, TP_H, TP_N)
@@ -641,6 +684,84 @@ export function makePropEntities(): Record<number, IndexedSprite> {
   p.rect(TALL_PROP.ARCH, 7, 20, 1, 22, 15)   // lit edge
   p.px(TALL_PROP.ARCH, 22, 26, 13); p.px(TALL_PROP.ARCH, 9, 32, 13) // cracks
 
+
+  // ── Town structures (20-29) ──────────────────────────────────────────────────
+  // Slot discipline matters more here than anywhere: walls on stone (13-15), timber and
+  // thatch on the earth/wood ramp (1-4), cloth — awnings, banners — on the secondary
+  // ramp (9-12), and lit windows/flame on 8. That split is what makes the faction town
+  // palettes work: swapping 9-12 alone reflags every awning and banner in the square
+  // without touching a single wall.
+  //
+  // All are 32x48 on the (16,40) feet anchor, so they depth-sort against units like any
+  // other tall prop and a hero can walk behind them.
+
+  // 24 WELL — the square's centre. Stone ring, roof on posts, bucket on a rope.
+  p.rect(TALL_PROP.WELL, 10, 32, 12, 8, 13)     // ring
+  p.rect(TALL_PROP.WELL, 10, 32, 3, 8, 14)      // lit side
+  p.rect(TALL_PROP.WELL, 10, 30, 12, 3, 15)     // coping
+  p.rect(TALL_PROP.WELL, 13, 33, 6, 3, 1)       // dark water mouth
+  p.rect(TALL_PROP.WELL, 11, 18, 2, 13, 2)      // posts
+  p.rect(TALL_PROP.WELL, 19, 18, 2, 13, 2)
+  p.rect(TALL_PROP.WELL, 8, 14, 16, 4, 3)       // roof
+  p.rect(TALL_PROP.WELL, 11, 11, 10, 3, 4)      // roof ridge
+  p.rect(TALL_PROP.WELL, 13, 19, 6, 1, 2)       // winch beam
+  p.rect(TALL_PROP.WELL, 15, 20, 1, 6, 15)      // rope
+  p.rect(TALL_PROP.WELL, 14, 26, 4, 3, 2)       // bucket
+  p.rect(TALL_PROP.WELL, 14, 26, 4, 1, 3)
+
+  // 25 BANNER — tall pole with a hanging faction banner. The banner is pure cloth ramp
+  // (9-12) with a 13-15 device, so a faction palette swap changes allegiance outright.
+  p.rect(TALL_PROP.BANNER, 15, 6, 2, 36, 2)     // pole
+  p.rect(TALL_PROP.BANNER, 15, 6, 1, 36, 3)     // pole lit edge
+  p.rect(TALL_PROP.BANNER, 13, 4, 6, 2, 15)     // finial
+  p.rect(TALL_PROP.BANNER, 17, 8, 10, 20, 10)   // banner field
+  p.rect(TALL_PROP.BANNER, 17, 8, 10, 2, 11)    // top band
+  p.rect(TALL_PROP.BANNER, 17, 8, 2, 20, 11)    // lit fold
+  p.rect(TALL_PROP.BANNER, 25, 8, 2, 20, 9)     // shade fold
+  // Device on the cloth ramp, NOT the accent: 13-15 is stone, and a faction colour there
+  // repaints the masonry (see the note in palettes.ts).
+  p.rect(TALL_PROP.BANNER, 20, 14, 4, 4, 12)    // device
+  p.px(TALL_PROP.BANNER, 21, 15, 12); p.px(TALL_PROP.BANNER, 22, 16, 12)
+  // ragged lower hem — a war-tired banner, not a parade one
+  p.rect(TALL_PROP.BANNER, 17, 28, 2, 2, 10); p.rect(TALL_PROP.BANNER, 21, 28, 2, 3, 10)
+  p.rect(TALL_PROP.BANNER, 25, 28, 2, 2, 10)
+
+  // 26 LAMPPOST — the square is lit; this is what sells "evening in town".
+  p.rect(TALL_PROP.LAMPPOST, 15, 20, 2, 22, 15)  // post
+  p.rect(TALL_PROP.LAMPPOST, 15, 20, 1, 22, 14)  // lit edge
+  p.rect(TALL_PROP.LAMPPOST, 13, 40, 6, 2, 13)   // base
+  p.rect(TALL_PROP.LAMPPOST, 12, 14, 8, 6, 15)   // lantern housing
+  p.rect(TALL_PROP.LAMPPOST, 13, 15, 6, 4, 8)    // flame
+  p.px(TALL_PROP.LAMPPOST, 15, 16, 8); p.px(TALL_PROP.LAMPPOST, 16, 17, 8)
+  p.rect(TALL_PROP.LAMPPOST, 11, 12, 10, 2, 13)  // cap
+
+  // 27 CRATES — stacked cargo. Reads as trade without needing a shopfront.
+  p.rect(TALL_PROP.CRATES, 8, 30, 11, 11, 2)
+  p.rect(TALL_PROP.CRATES, 8, 30, 11, 2, 3)      // lid
+  p.rect(TALL_PROP.CRATES, 8, 35, 11, 1, 1)      // band
+  p.rect(TALL_PROP.CRATES, 18, 34, 8, 8, 3)      // second crate
+  p.rect(TALL_PROP.CRATES, 18, 34, 8, 2, 4)
+  p.rect(TALL_PROP.CRATES, 11, 22, 7, 8, 2)      // top crate
+  p.rect(TALL_PROP.CRATES, 11, 22, 7, 2, 3)
+
+  // 28 BARREL — banded cask.
+  p.rect(TALL_PROP.BARREL, 12, 28, 9, 13, 2)
+  p.rect(TALL_PROP.BARREL, 12, 28, 3, 13, 3)     // lit stave
+  p.rect(TALL_PROP.BARREL, 12, 28, 9, 2, 4)      // top rim
+  p.rect(TALL_PROP.BARREL, 11, 31, 11, 1, 15)    // iron hoops
+  p.rect(TALL_PROP.BARREL, 11, 37, 11, 1, 15)
+
+  // 29 CART — two-wheeled handcart, shafts down.
+  p.rect(TALL_PROP.CART, 6, 30, 20, 7, 2)        // bed
+  p.rect(TALL_PROP.CART, 6, 30, 20, 2, 3)        // bed top
+  p.rect(TALL_PROP.CART, 6, 28, 3, 9, 3)         // headboard
+  p.rect(TALL_PROP.CART, 24, 36, 6, 1, 2)        // shaft
+  p.rect(TALL_PROP.CART, 9, 36, 8, 8, 1)         // wheel
+  p.rect(TALL_PROP.CART, 11, 38, 4, 4, 15)       // hub
+  p.px(TALL_PROP.CART, 12, 37, 15); p.px(TALL_PROP.CART, 14, 41, 15)
+  p.rect(TALL_PROP.CART, 10, 26, 5, 4, 5)        // sacked load
+  p.rect(TALL_PROP.CART, 16, 27, 5, 3, 12)
+
   const still = (frame: number) => ({
     se: { frames: [frame], fps: 1, loop: true },
     ne: { frames: [frame], fps: 1, loop: true },
@@ -675,6 +796,146 @@ export function makePropEntities(): Record<number, IndexedSprite> {
     [TALL_PROP.HUT]: slice(TALL_PROP.HUT, 'props/tall/hut'),
     [TALL_PROP.TOWER]: slice(TALL_PROP.TOWER, 'props/tall/tower'),
     [TALL_PROP.ARCH]: slice(TALL_PROP.ARCH, 'props/tall/arch'),
+    [TALL_PROP.WELL]: slice(TALL_PROP.WELL, 'props/tall/well'),
+    [TALL_PROP.BANNER]: slice(TALL_PROP.BANNER, 'props/tall/banner'),
+    [TALL_PROP.LAMPPOST]: slice(TALL_PROP.LAMPPOST, 'props/tall/lamppost'),
+    [TALL_PROP.CRATES]: slice(TALL_PROP.CRATES, 'props/tall/crates'),
+    [TALL_PROP.BARREL]: slice(TALL_PROP.BARREL, 'props/tall/barrel'),
+    [TALL_PROP.CART]: slice(TALL_PROP.CART, 'props/tall/cart'),
+  }
+}
+
+// ── Town buildings ───────────────────────────────────────────────────────────
+// A separate, larger canvas from the tall-prop sheet: 64x80 on a (32,72) feet anchor,
+// against 24x32 for a hero. Authored at the tall-prop 32x48 these came out barely a head
+// taller than the person standing in front of them, and the square read as a doll's
+// house — a building has to be ~3x a figure before it reads as architecture.
+//
+// Slot discipline is what makes the faction palettes work: walls and roofs use stone
+// (13-15) and timber (1-4), which are IDENTICAL under either flag, while every piece of
+// cloth — awnings, signage, banners — sits on 9-12, the faction channel. Lamplight and
+// forge-glow use 8 (the top of the thatch/straw ramp), the one warm value the town
+// palette keeps for the purpose.
+
+export const TOWN_BUILDING = { INN: 0, SMITHY: 1, STALL: 2, DEPOT: 3 } as const
+
+const TB_W = 64
+const TB_H = 80
+const TB_N = 4
+
+export function makeTownBuildings(): Record<number, IndexedSprite> {
+  const p = new Painter(TB_W, TB_H, TB_N)
+  const B = TOWN_BUILDING
+
+  // ── 0 INN — two storeys under deep thatch, jettied upper floor, lit windows. The
+  // tallest thing in the square, so it carries the skyline.
+  p.rect(B.INN, 10, 40, 44, 32, 13)          // ground-floor wall
+  p.rect(B.INN, 10, 40, 7, 32, 14)           // lit face
+  p.rect(B.INN, 50, 40, 4, 32, 13)           // shade face
+  p.rect(B.INN, 7, 36, 50, 5, 2)             // jetty beam (upper floor overhangs)
+  p.rect(B.INN, 7, 36, 50, 1, 3)
+  p.rect(B.INN, 9, 22, 46, 14, 15)           // upper storey — lighter plaster
+  p.rect(B.INN, 9, 22, 6, 14, 14)
+  for (let i = 0; i < 5; i++) p.rect(B.INN, 12 + i * 10, 22, 2, 14, 2)   // timber framing
+  p.rect(B.INN, 5, 17, 54, 6, 3)             // eaves
+  p.rect(B.INN, 10, 10, 44, 8, 4)            // thatch lower
+  p.rect(B.INN, 18, 5, 28, 6, 3)             // thatch upper
+  p.rect(B.INN, 27, 2, 10, 4, 4)             // ridge
+  p.rect(B.INN, 27, 56, 11, 16, 1)           // doorway
+  p.rect(B.INN, 27, 56, 2, 16, 2)
+  p.rect(B.INN, 25, 53, 15, 3, 2)            // door lintel
+  p.rect(B.INN, 15, 47, 8, 6, 8)             // lit windows, ground floor
+  p.rect(B.INN, 42, 47, 8, 6, 8)
+  p.rect(B.INN, 16, 26, 7, 6, 8)             // lit windows, upper floor
+  p.rect(B.INN, 29, 26, 7, 6, 8)
+  p.rect(B.INN, 42, 26, 7, 6, 8)
+  p.rect(B.INN, 47, 44, 12, 2, 2)            // sign bracket
+  p.rect(B.INN, 53, 46, 9, 9, 10)            // hanging sign (cloth = faction)
+  p.rect(B.INN, 53, 46, 9, 2, 11)
+  p.rect(B.INN, 56, 49, 4, 4, 12)            // sign device
+  p.rect(B.INN, 4, 68, 56, 4, 13)            // plinth course
+  p.rect(B.INN, 4, 68, 56, 1, 15)
+
+  // ── 1 SMITHY — open-fronted forge under a heavy stone lintel, tall chimney, coals.
+  p.rect(B.SMITHY, 8, 34, 46, 38, 13)
+  p.rect(B.SMITHY, 8, 34, 7, 38, 14)         // lit face
+  p.rect(B.SMITHY, 50, 34, 4, 38, 13)
+  p.rect(B.SMITHY, 5, 28, 52, 6, 15)         // lintel course
+  p.rect(B.SMITHY, 9, 20, 44, 8, 2)          // roof
+  p.rect(B.SMITHY, 15, 14, 32, 6, 3)
+  p.rect(B.SMITHY, 42, 2, 12, 18, 13)        // chimney
+  p.rect(B.SMITHY, 42, 2, 4, 18, 14)
+  p.rect(B.SMITHY, 40, 0, 16, 4, 15)         // chimney cap
+  p.rect(B.SMITHY, 18, 44, 28, 28, 1)        // open forge bay
+  p.rect(B.SMITHY, 22, 56, 20, 10, 5)        // coal bed
+  p.rect(B.SMITHY, 24, 58, 16, 6, 8)         // glowing coals
+  p.px(B.SMITHY, 28, 55, 8); p.px(B.SMITHY, 33, 54, 8); p.px(B.SMITHY, 37, 56, 8)
+  p.rect(B.SMITHY, 47, 58, 10, 6, 15)        // anvil
+  p.rect(B.SMITHY, 50, 64, 5, 8, 14)         // anvil stump
+  p.rect(B.SMITHY, 10, 58, 6, 12, 2)         // rack post
+  p.rect(B.SMITHY, 8, 56, 10, 2, 15)         // hung tools
+  p.rect(B.SMITHY, 4, 68, 56, 4, 13)
+  p.rect(B.SMITHY, 4, 68, 56, 1, 15)
+
+  // ── 2 STALL — a market run: broad awning on posts, counter, goods. Mostly cloth, so
+  // this is the loudest faction statement in the square.
+  p.rect(B.STALL, 9, 34, 4, 38, 2)           // posts
+  p.rect(B.STALL, 51, 34, 4, 38, 2)
+  p.rect(B.STALL, 9, 34, 2, 38, 3)
+  p.rect(B.STALL, 4, 24, 56, 10, 10)         // awning body
+  p.rect(B.STALL, 4, 24, 56, 4, 11)          // awning highlight
+  p.rect(B.STALL, 4, 22, 56, 2, 2)           // awning rail
+  for (let i = 0; i < 8; i++) {              // scalloped fringe
+    p.rect(B.STALL, 5 + i * 7, 34, 4, 4, 9)
+    p.px(B.STALL, 7 + i * 7, 38, 9)
+  }
+  p.rect(B.STALL, 12, 50, 40, 8, 3)          // counter
+  p.rect(B.STALL, 12, 50, 40, 2, 4)          // counter lit edge
+  p.rect(B.STALL, 12, 58, 40, 14, 2)         // counter front
+  p.rect(B.STALL, 16, 42, 8, 8, 5)           // goods: sacks
+  p.rect(B.STALL, 27, 40, 10, 10, 12)        // bolt of cloth (faction)
+  p.rect(B.STALL, 27, 40, 10, 3, 11)
+  p.rect(B.STALL, 41, 44, 7, 6, 15)          // ironmongery
+  p.rect(B.STALL, 18, 62, 8, 8, 1)           // crate under the counter
+
+  // ── 3 DEPOT — squat warehouse, banded double doors, loading platform.
+  p.rect(B.DEPOT, 7, 32, 50, 40, 13)
+  p.rect(B.DEPOT, 7, 32, 7, 40, 14)
+  p.rect(B.DEPOT, 53, 32, 4, 40, 13)
+  p.rect(B.DEPOT, 4, 26, 56, 6, 2)           // eaves
+  p.rect(B.DEPOT, 8, 18, 48, 8, 3)           // roof
+  p.rect(B.DEPOT, 18, 13, 28, 6, 4)          // roof ridge
+  p.rect(B.DEPOT, 22, 44, 22, 28, 1)         // double doors
+  p.rect(B.DEPOT, 32, 44, 2, 28, 2)          // door split
+  p.rect(B.DEPOT, 22, 50, 22, 3, 15)         // iron bands
+  p.rect(B.DEPOT, 22, 62, 22, 3, 15)
+  p.px(B.DEPOT, 30, 57, 15); p.px(B.DEPOT, 36, 57, 15)  // ring handles
+  p.rect(B.DEPOT, 11, 38, 8, 7, 1)           // barred windows
+  p.rect(B.DEPOT, 47, 38, 8, 7, 1)
+  for (let i = 0; i < 3; i++) { p.rect(B.DEPOT, 12 + i * 3, 38, 1, 7, 15); p.rect(B.DEPOT, 48 + i * 3, 38, 1, 7, 15) }
+  p.rect(B.DEPOT, 4, 68, 56, 4, 3)           // loading platform (timber)
+  p.rect(B.DEPOT, 4, 68, 56, 1, 4)
+  p.rect(B.DEPOT, 46, 30, 10, 8, 10)         // consignment banner
+  p.rect(B.DEPOT, 49, 32, 4, 4, 12)
+
+  const still = (frame: number) => ({
+    se: { frames: [frame], fps: 1, loop: true },
+    ne: { frames: [frame], fps: 1, loop: true },
+  })
+  const slice = (f: number, id: string): IndexedSprite => {
+    const indices = new Uint8Array(TB_W * TB_H)
+    indices.set(p.data.subarray(f * TB_W * TB_H, (f + 1) * TB_W * TB_H))
+    return {
+      id, frameW: TB_W, frameH: TB_H, cols: 1, frameCount: 1, indices,
+      anchor: { x: 32, y: 72 },
+      animations: { idle: still(0), walk: still(0), attack: still(0), hit: still(0) },
+    }
+  }
+  return {
+    [B.INN]: slice(B.INN, 'town/inn'),
+    [B.SMITHY]: slice(B.SMITHY, 'town/smithy'),
+    [B.STALL]: slice(B.STALL, 'town/stall'),
+    [B.DEPOT]: slice(B.DEPOT, 'town/depot'),
   }
 }
 
