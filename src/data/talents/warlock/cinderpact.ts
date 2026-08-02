@@ -25,7 +25,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'cin_cataclysm',
-    name: 'Cataclysm',
+    name: 'Ruinfall',
     description: 'Increases crit chance by {n}% per rank.',
     icon: '✨',
     row: 1, col: 2, maxRanks: 3, requiresPoints: 0,
@@ -33,7 +33,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'cin_bane',
-    name: 'Bane',
+    name: 'Hastened Word',
     description: 'Reduces attack interval by {n}s per rank.',
     icon: '⏳',
     row: 1, col: 3, maxRanks: 3, requiresPoints: 0,
@@ -43,7 +43,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   // ── Row 2 (5 pts) ─────────────────────────────────────────────────────────
   {
     id: 'cin_devastation',
-    name: 'Devastation',
+    name: 'Devastating Terms',
     description: 'Increases critical strike damage bonus by {n}% per rank.',
     icon: '💥',
     row: 2, col: 1, maxRanks: 4, requiresPoints: 5,
@@ -51,7 +51,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'cin_immolate',
-    name: 'Immolate',
+    name: 'Slow Burn',
     description: 'Your critical strikes set the target alight for {n}% weapon damage per second, per rank.',
     icon: '🔥',
     row: 2, col: 2, maxRanks: 3, requiresPoints: 5,
@@ -59,7 +59,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'cin_intensity',
-    name: 'Intensity',
+    name: 'Unflinching',
     description: 'Increases intellect by {n} per rank.',
     icon: '🔮',
     row: 2, col: 3, maxRanks: 3, requiresPoints: 5,
@@ -69,7 +69,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   // ── Row 3 (10 pts) ────────────────────────────────────────────────────────
   {
     id: 'cin_conflagrate',
-    name: 'Conflagrate',
+    name: 'Fan the Flames',
     description: 'Increases crit chance against burning targets by {n}% per rank.',
     icon: '👁',
     row: 3, col: 1, maxRanks: 5, requiresPoints: 10,
@@ -78,7 +78,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'cin_destructive_reach',
-    name: 'Destructive Reach',
+    name: 'Far Ruin',
     description: 'Increases weapon DPS by {n} per rank.',
     icon: '☄',
     row: 3, col: 2, maxRanks: 2, requiresPoints: 10,
@@ -86,7 +86,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'cin_pyroclasm',
-    name: 'Pyroclasm',
+    name: 'Cinderfall',
     description: 'Every burn you own bites {n}% deeper per rank.',
     icon: '🌋',
     row: 3, col: 3, maxRanks: 3, requiresPoints: 10,
@@ -96,7 +96,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   // ── Row 4 (15 pts) ────────────────────────────────────────────────────────
   {
     id: 'cin_ruin',
-    name: 'Ruin',
+    name: 'Total Loss',
     description: 'Increases critical strike damage bonus by a further {n}% per rank.',
     icon: '💥',
     row: 4, col: 1, maxRanks: 3, requiresPoints: 15,
@@ -117,7 +117,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'cin_backlash',
-    name: 'Backlash',
+    name: 'The Price',
     description: 'Every 35 seconds, your next attack is a guaranteed critical strike.',
     icon: '⚡',
     row: 4, col: 3, maxRanks: 1, requiresPoints: 15,
@@ -127,7 +127,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   // ── Row 5 (20 pts) ────────────────────────────────────────────────────────
   {
     id: 'cin_emberstorm',
-    name: 'Emberstorm',
+    name: 'Ashfall',
     description: 'Increases all damage by a further {n}% per rank.',
     icon: '🌋',
     row: 5, col: 1, maxRanks: 4, requiresPoints: 20,
@@ -135,7 +135,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'cin_soul_leech',
-    name: 'Soul Leech',
+    name: 'Skimmed Tithe',
     description: 'Returns {n}% of the damage you deal as health, per rank.',
     icon: '💚',
     row: 5, col: 2, maxRanks: 3, requiresPoints: 20,
@@ -143,7 +143,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'cin_shadowburn',
-    name: 'Shadowburn',
+    name: 'Cinderstrike',
     description: 'Deal {n}% more damage per rank to enemies below a third of their health.',
     icon: '☄',
     row: 5, col: 3, maxRanks: 3, requiresPoints: 20,
@@ -153,7 +153,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   // ── Row 6 (25 pts) ────────────────────────────────────────────────────────
   {
     id: 'cin_fire_and_brimstone',
-    name: 'Fire and Brimstone',
+    name: 'Everything Burns',
     description: 'Sets targets alight for a further {n}% weapon damage per second, per rank.',
     icon: '🔥',
     row: 6, col: 3, maxRanks: 3, requiresPoints: 25,
@@ -161,7 +161,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'cin_nether_protection',
-    name: 'Nether Protection',
+    name: 'Warded Bargain',
     description: 'Reduces all damage taken by {n}% per rank.',
     icon: '🛡',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
@@ -180,7 +180,7 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
   // ── Row 7 (30 pts) ────────────────────────────────────────────────────────
   {
     id: 'cin_chaos_bolt',
-    name: 'Chaos Bolt',
+    name: 'Ruinbolt',
     description: 'Increases critical strike damage bonus by a further {n}% per rank.',
     icon: '💥',
     row: 7, col: 1, maxRanks: 3, requiresPoints: 30,

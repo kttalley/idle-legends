@@ -236,7 +236,7 @@ export const ZONES: Record<string, ZoneConfig> = {
       },
       {
         id: 'troll_warchief',
-        name: 'Warchief Vor\'thak',
+        name: 'Drumlord Vorthak',
         hp: 600,
         damage: 180,
         xpReward: 3000,

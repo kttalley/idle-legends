@@ -23,7 +23,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bul_shield_spec',
-    name: 'Shield Specialization',
+    name: 'Shieldwork',
     description: 'Gives your shield a {n}% chance per rank to turn a blow aside entirely.',
     icon: '🛡',
     row: 1, col: 2, maxRanks: 3, requiresPoints: 0,
@@ -31,7 +31,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bul_toughness',
-    name: 'Toughness',
+    name: 'Hardened',
     description: 'Increases stamina by {n} per rank.',
     icon: '💪',
     row: 1, col: 3, maxRanks: 2, requiresPoints: 0,
@@ -41,7 +41,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   // ── Row 2 (5 pts) ─────────────────────────────────────────────────────────
   {
     id: 'bul_anticipation',
-    name: 'Anticipation',
+    name: 'Braced',
     description: 'Reduces all damage taken by {n}% per rank.',
     icon: '🧠',
     row: 2, col: 1, maxRanks: 3, requiresPoints: 5,
@@ -49,7 +49,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bul_defiance',
-    name: 'Defiance',
+    name: 'Held Ground',
     description: 'Increases your armor by a further {n}% of its own value per rank.',
     icon: '🛡',
     row: 2, col: 2, maxRanks: 5, requiresPoints: 5,
@@ -57,7 +57,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bul_improved_bash',
-    name: 'Shield Bash',
+    name: 'Rim Strike',
     description: 'Blocked blows stagger the attacker, slowing it by {n}% per rank.',
     icon: '💥',
     row: 2, col: 3, maxRanks: 2, requiresPoints: 5,
@@ -67,7 +67,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   // ── Row 3 (10 pts) ────────────────────────────────────────────────────────
   {
     id: 'bul_second_wind',
-    name: 'Second Wind',
+    name: 'Still Standing',
     description: 'Below half health you recover {n} HP per second per rank.',
     icon: '💚',
     row: 3, col: 1, maxRanks: 3, requiresPoints: 10,
@@ -75,22 +75,22 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bul_improved_shield_wall',
-    name: 'Improved Shield Wall',
+    name: 'Unbroken Line',
     description: 'Hold the Line lasts half again as long and returns sooner.',
     icon: '🛡',
     row: 3, col: 2, maxRanks: 1, requiresPoints: 10,
     requires: 'bul_defiance',
     effects: [
       { type: 'ability', ability: 'warrior_shield_wall', mod: 'cooldown', valuePerRank: 0.30,
-        note: 'Improved Shield Wall: cooldown reduced' },
+        note: 'Unbroken Line: cooldown reduced' },
       { type: 'ability', ability: 'warrior_shield_wall', mod: 'rider', valuePerRank: 1,
         rider: { type: 'armor_buff', value: 25, durationSeconds: 4 },
-        note: 'Improved Shield Wall: protection extended' },
+        note: 'Unbroken Line: protection extended' },
     ],
   },
   {
     id: 'bul_retaliation',
-    name: 'Retaliation',
+    name: 'Repay in Steel',
     description: 'Returns {n}% of the damage you take to whatever dealt it, per rank.',
     icon: '⚡',
     row: 3, col: 3, maxRanks: 2, requiresPoints: 10,
@@ -127,7 +127,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   // ── Row 5 (20 pts) ────────────────────────────────────────────────────────
   {
     id: 'bul_shield_mastery',
-    name: 'Shield Mastery',
+    name: 'Shieldbearer',
     description: 'Increases your chance to block by {n}% per rank.',
     icon: '🛡',
     row: 5, col: 1, maxRanks: 5, requiresPoints: 20,
@@ -165,7 +165,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bul_vengeance',
-    name: 'Vengeance',
+    name: 'Grudge',
     description: 'Blocking and being struck sharpen you — increases weapon DPS by {n} per rank.',
     icon: '⚔',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
@@ -173,7 +173,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bul_iron_will',
-    name: 'Iron Will',
+    name: 'Unbending',
     description: 'Your recovery below half health becomes relentless.',
     icon: '💚',
     row: 6, col: 1, maxRanks: 1, requiresPoints: 25,
@@ -192,7 +192,7 @@ export const BULWARK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bul_last_stand',
-    name: 'Last Stand',
+    name: 'The Last Yard',
     description: 'Once per fight, a blow that would kill you leaves you standing at a quarter health instead.',
     icon: '💀',
     row: 7, col: 2, maxRanks: 1, requiresPoints: 30,

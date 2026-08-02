@@ -24,7 +24,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_improved_healthstone',
-    name: 'Healthstone',
+    name: 'Bound Vitality',
     description: 'Increases stamina by {n} per rank.',
     icon: '❤',
     row: 1, col: 2, maxRanks: 3, requiresPoints: 0,
@@ -32,7 +32,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_demonic_embrace',
-    name: 'Demonic Embrace',
+    name: 'The Held Shape',
     description: 'Increases intellect by {n} per rank.',
     icon: '🤝',
     row: 1, col: 3, maxRanks: 2, requiresPoints: 0,
@@ -42,7 +42,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   // ── Row 2 (5 pts) ─────────────────────────────────────────────────────────
   {
     id: 'bind_fel_intellect',
-    name: 'Fel Intellect',
+    name: 'Lent Cunning',
     description: 'Increases intellect by {n} per rank.',
     icon: '🔮',
     row: 2, col: 1, maxRanks: 2, requiresPoints: 5,
@@ -59,7 +59,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_soul_link',
-    name: 'Soul Link',
+    name: 'Shared Thread',
     description: 'What is bound to you takes its share — reduces all damage taken by {n}% per rank.',
     icon: '🤝',
     row: 2, col: 3, maxRanks: 3, requiresPoints: 5,
@@ -69,7 +69,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   // ── Row 3 (10 pts) ────────────────────────────────────────────────────────
   {
     id: 'bind_fel_stamina',
-    name: 'Fel Stamina',
+    name: 'Lent Vigour',
     description: 'Increases stamina by {n} per rank.',
     icon: '💪',
     row: 3, col: 1, maxRanks: 3, requiresPoints: 10,
@@ -77,7 +77,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_master_summoner',
-    name: 'Master Summoner',
+    name: 'Swift Binding',
     description: 'Your bound things strike for a further {n} damage per second, per rank.',
     icon: '👹',
     row: 3, col: 2, maxRanks: 4, requiresPoints: 10,
@@ -86,7 +86,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_demonic_aegis',
-    name: 'Demonic Aegis',
+    name: 'Warded Thread',
     description: 'Each fight begins with a ward worth {n} damage.',
     icon: '🛡',
     row: 3, col: 3, maxRanks: 2, requiresPoints: 10,
@@ -96,7 +96,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   // ── Row 4 (15 pts) ────────────────────────────────────────────────────────
   {
     id: 'bind_unholy_power',
-    name: 'Unholy Power',
+    name: 'The Deeper Pact',
     description: 'Increases all damage by {n}% per rank.',
     icon: '🌑',
     row: 4, col: 1, maxRanks: 4, requiresPoints: 15,
@@ -117,7 +117,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_shadow_ward',
-    name: 'Shadow Ward',
+    name: 'Umbral Ward',
     description: 'Reduces all damage taken by a further {n}% per rank.',
     icon: '🛡',
     row: 4, col: 3, maxRanks: 3, requiresPoints: 15,
@@ -136,7 +136,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_mana_feed',
-    name: 'Mana Feed',
+    name: 'Feeding the Thread',
     description: 'Increases weapon DPS by {n} per rank.',
     icon: '🔮',
     row: 5, col: 2, maxRanks: 2, requiresPoints: 20,
@@ -144,7 +144,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_master_conjuror',
-    name: 'Master Conjuror',
+    name: 'Practised Hand',
     description: 'Below half health you recover {n} HP per second per rank.',
     icon: '💚',
     row: 5, col: 3, maxRanks: 3, requiresPoints: 20,
@@ -154,7 +154,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   // ── Row 6 (25 pts) ────────────────────────────────────────────────────────
   {
     id: 'bind_demonic_knowledge',
-    name: 'Demonic Knowledge',
+    name: 'What It Knows',
     description: 'Increases intellect by {n} per rank.',
     icon: '🔮',
     row: 6, col: 1, maxRanks: 3, requiresPoints: 25,
@@ -162,7 +162,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_demonic_tactics',
-    name: 'Demonic Tactics',
+    name: 'What It Learns',
     description: 'Increases crit chance by {n}% per rank.',
     icon: '✨',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
@@ -170,7 +170,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_fel_domination',
-    name: 'Fel Domination',
+    name: 'The Short Leash',
     description: 'Returns {n}% of the damage you take to whatever dealt it, per rank.',
     icon: '👹',
     row: 6, col: 3, maxRanks: 3, requiresPoints: 25,
@@ -180,7 +180,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   // ── Row 7 (30 pts) ────────────────────────────────────────────────────────
   {
     id: 'bind_demonic_pact',
-    name: 'Demonic Pact',
+    name: 'Terms Renewed',
     description: 'Everything bound to you grows fat on the work — a further {n} damage per second, per rank.',
     icon: '👹',
     row: 7, col: 1, maxRanks: 3, requiresPoints: 30,
@@ -188,7 +188,7 @@ export const THE_BINDING_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'bind_metamorphosis',
-    name: 'Metamorphosis',
+    name: 'The Turning',
     description: 'You take on something of what you have been calling. Once per fight, death simply declines.',
     icon: '🤝',
     row: 7, col: 2, maxRanks: 1, requiresPoints: 30,

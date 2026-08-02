@@ -143,7 +143,7 @@ export const GLACIAL_RITE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'frost_frozen_core',
-    name: 'Frozen Core',
+    name: 'Winterheart',
     description: 'Increases critical strike damage bonus by a further {n}% per rank.',
     icon: '💎',
     row: 5, col: 3, maxRanks: 5, requiresPoints: 20,
@@ -193,7 +193,7 @@ export const GLACIAL_RITE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'frost_deep_freeze',
-    name: 'Deep Freeze',
+    name: 'Stillwater',
     description: 'Rimebolt returns twice as often, and the cold takes hold far more readily.',
     icon: '🥶',
     row: 7, col: 2, maxRanks: 1, requiresPoints: 30,
@@ -201,7 +201,7 @@ export const GLACIAL_RITE_TALENTS: TalentNodeDef[] = [
     effects: [
       { type: 'mechanic', mechanic: 'freeze_chance', valuePerRank: 0.10 },
       { type: 'ability', ability: 'mage_frostbolt', mod: 'cooldown', valuePerRank: 0.50,
-        note: 'Deep Freeze: cooldown halved' },
+        note: 'Stillwater: cooldown halved' },
     ],
   },
 ]

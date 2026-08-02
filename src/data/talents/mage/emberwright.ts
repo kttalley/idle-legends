@@ -5,7 +5,7 @@ import type { TalentNodeDef } from '../../types'
 // starts; fire wins by making sure it never really stops — everything it lands leaves
 // something behind that keeps burning after the caster has moved on.
 //
-// The engine of the tree is the Ignite loop, and it is deliberately circular: crits
+// The engine of the tree is the Take Light loop, and it is deliberately circular: crits
 // light the target, a burning target is easier to crit (Kindled Eye), and every burn
 // you own ticks harder (Wildfire). Invest in one corner and the other two get better on
 // their own. That makes it the only mage tree whose damage compounds over a LONG fight,
@@ -16,7 +16,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   // ── Row 1 (0 pts) ─────────────────────────────────────────────────────────
   {
     id: 'emb_kindling',
-    name: 'Kindling',
+    name: 'Tinder',
     description: 'Increases intellect by {n} per rank.',
     icon: '🔥',
     row: 1, col: 1, maxRanks: 5, requiresPoints: 0,
@@ -24,7 +24,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'emb_ignite',
-    name: 'Ignite',
+    name: 'Take Light',
     description: 'Your critical strikes set the target alight, burning for {n}% weapon damage per second.',
     icon: '🔥',
     row: 1, col: 2, maxRanks: 3, requiresPoints: 0,
@@ -32,7 +32,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'emb_incineration',
-    name: 'Incineration',
+    name: 'Cinderfeed',
     description: 'Increases crit chance by {n}% per rank.',
     icon: '✨',
     row: 1, col: 3, maxRanks: 2, requiresPoints: 0,
@@ -42,7 +42,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   // ── Row 2 (5 pts) ─────────────────────────────────────────────────────────
   {
     id: 'emb_flame_throwing',
-    name: 'Flame Throwing',
+    name: 'Throwing Fire',
     description: 'Increases all damage by {n}% per rank.',
     icon: '🌋',
     row: 2, col: 1, maxRanks: 3, requiresPoints: 5,
@@ -59,7 +59,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'emb_cauterize',
-    name: 'Cauterize',
+    name: 'Sear Shut',
     description: 'Your own flames close your wounds — increases stamina by {n} per rank.',
     icon: '💚',
     row: 2, col: 3, maxRanks: 2, requiresPoints: 5,
@@ -77,7 +77,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'emb_master_of_flame',
-    name: 'Master of Flame',
+    name: 'Flamewright',
     description: 'Increases critical strike damage bonus by {n}% per rank.',
     icon: '💥',
     row: 3, col: 2, maxRanks: 3, requiresPoints: 10,
@@ -85,7 +85,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'emb_blast_wave',
-    name: 'Blast Wave',
+    name: 'Firebloom',
     description: 'The heat staggers what it touches — enemies attack {n}% slower per rank.',
     icon: '💥',
     row: 3, col: 3, maxRanks: 2, requiresPoints: 10,
@@ -95,7 +95,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   // ── Row 4 (15 pts) ────────────────────────────────────────────────────────
   {
     id: 'emb_conflagrate',
-    name: 'Conflagrate',
+    name: 'Stoke',
     description: 'Your fires burn hotter still — {n}% more damage from every lingering effect, per rank.',
     icon: '🔥',
     row: 4, col: 1, maxRanks: 3, requiresPoints: 15,
@@ -117,7 +117,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'emb_burning_soul',
-    name: 'Burning Soul',
+    name: 'Ashen Will',
     description: 'Increases weapon DPS by {n} per rank.',
     icon: '🌋',
     row: 4, col: 3, maxRanks: 3, requiresPoints: 15,
@@ -127,7 +127,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   // ── Row 5 (20 pts) ────────────────────────────────────────────────────────
   {
     id: 'emb_pyroclasm',
-    name: 'Pyroclasm',
+    name: 'Emberfall',
     description: 'Increases all damage by a further {n}% per rank.',
     icon: '🌋',
     row: 5, col: 1, maxRanks: 4, requiresPoints: 20,
@@ -135,7 +135,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'emb_immolation',
-    name: 'Immolation',
+    name: 'Wreathe',
     description: 'Heat rolls off you in sheets, returning {n}% of damage taken, per rank.',
     icon: '🔥',
     row: 5, col: 2, maxRanks: 2, requiresPoints: 20,
@@ -143,7 +143,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'emb_searing_touch',
-    name: 'Searing Touch',
+    name: 'Brand',
     description: 'Deal {n}% more damage per rank to enemies below a third of their health.',
     icon: '☄',
     row: 5, col: 3, maxRanks: 2, requiresPoints: 20,
@@ -153,7 +153,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   // ── Row 6 (25 pts) ────────────────────────────────────────────────────────
   {
     id: 'emb_fire_power',
-    name: 'Fire Power',
+    name: 'Furnace',
     description: 'Sets targets alight for a further {n}% weapon damage per second, per rank.',
     icon: '🔥',
     row: 6, col: 1, maxRanks: 3, requiresPoints: 25,
@@ -161,7 +161,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'emb_molten_skin',
-    name: 'Molten Skin',
+    name: 'Slagskin',
     description: 'Reduces all damage taken by {n}% per rank.',
     icon: '🛡',
     row: 6, col: 3, maxRanks: 3, requiresPoints: 25,
@@ -169,7 +169,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'emb_combustion',
-    name: 'Combustion',
+    name: 'Bellows',
     description: 'Increases crit chance against burning targets by a further {n}% per rank.',
     icon: '👁',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
@@ -180,7 +180,7 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   // ── Row 7 (30 pts) ────────────────────────────────────────────────────────
   {
     id: 'emb_living_bomb',
-    name: 'Living Bomb',
+    name: 'Walking Pyre',
     description: 'Increases critical strike damage bonus by a further {n}% per rank.',
     icon: '☄',
     row: 7, col: 1, maxRanks: 3, requiresPoints: 30,

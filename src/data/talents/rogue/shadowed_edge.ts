@@ -110,7 +110,7 @@ export const SHADOWED_EDGE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'ass_deadened_nerves',
-    name: 'Deadened Nerves',
+    name: 'Numbwork',
     description: 'Reduces all damage taken by {n}% per rank.',
     icon: '💉',
     row: 4, col: 3, maxRanks: 3, requiresPoints: 15,
@@ -120,7 +120,7 @@ export const SHADOWED_EDGE_TALENTS: TalentNodeDef[] = [
   // ── Row 5 (20 pts) ────────────────────────────────────────────────────────
   {
     id: 'ass_venomous_wounds',
-    name: 'Venomous Wounds',
+    name: 'Weeping Wounds',
     description: 'Every poison and bleed you own bites {n}% deeper per rank.',
     icon: '☠',
     row: 5, col: 3, maxRanks: 4, requiresPoints: 20,
@@ -172,7 +172,7 @@ export const SHADOWED_EDGE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'ass_master_poisoner',
-    name: 'Master Poisoner',
+    name: 'Venomwright',
     description: 'Your venoms deal a further {n} damage per tick, per rank.',
     icon: '☠',
     row: 6, col: 3, maxRanks: 2, requiresPoints: 25,
@@ -182,7 +182,7 @@ export const SHADOWED_EDGE_TALENTS: TalentNodeDef[] = [
   // ── Row 7 (30 pts) ────────────────────────────────────────────────────────
   {
     id: 'ass_hunger_for_blood',
-    name: 'Hunger for Blood',
+    name: 'The Hunger',
     description: 'Returns {n}% of the damage you deal as health, per rank.',
     icon: '💉',
     row: 7, col: 1, maxRanks: 2, requiresPoints: 30,
@@ -190,7 +190,7 @@ export const SHADOWED_EDGE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'ass_mutilate',
-    name: 'Mutilate',
+    name: 'Twin Fangs',
     description: 'Cruel Stroke strikes a third time, and everything you have poisoned dies faster.',
     icon: '🔪',
     row: 7, col: 2, maxRanks: 1, requiresPoints: 30,
@@ -198,7 +198,7 @@ export const SHADOWED_EDGE_TALENTS: TalentNodeDef[] = [
     effects: [
       { type: 'mechanic', mechanic: 'executioner', valuePerRank: 0.20 },
       { type: 'ability', ability: 'rogue_sinister_strike', mod: 'damage', valuePerRank: 0.50,
-        note: 'Mutilate: a third blade enters the exchange' },
+        note: 'Twin Fangs: a third blade enters the exchange' },
     ],
   },
 ]

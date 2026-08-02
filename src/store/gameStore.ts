@@ -2404,14 +2404,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           get().triggerThought('near_death', `${Math.round(stats.currentHp / stats.maxHp * 100)}% HP`)
         }
 
-        // Last Stand — Bulwark's capstone. Once per fight, the blow that would have
+        // The Last Yard — Bulwark's capstone. Once per fight, the blow that would have
         // killed the hero leaves them standing instead. Consumed via the same
         // once-per-encounter flag Glacial Tomb uses, and reset by the same
         // `defaultProcState()` on respawn and on engaging a new enemy.
         if (stats.currentHp <= 0 && fx.lastStandPct > 0 && !procState.lastStandUsed) {
           procState.lastStandUsed = true
           stats.currentHp = Math.max(1, Math.ceil(stats.maxHp * fx.lastStandPct))
-          newLogs.push(log('proc', `💀 Last Stand! You refuse to fall.`, '#ffd700'))
+          newLogs.push(log('proc', `💀 The Last Yard! You refuse to fall.`, '#ffd700'))
           newFns.push(fn(stats.currentHp, true, false, true, '#ffd700'))
         }
 

@@ -14,7 +14,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   // ── Row 1 (0 pts) ─────────────────────────────────────────────────────────
   {
     id: 'unw_arcane_focus',
-    name: 'Arcane Focus',
+    name: 'Fixed Point',
     description: 'Increases intellect by {n} per rank.',
     icon: '🔮',
     row: 1, col: 1, maxRanks: 5, requiresPoints: 0,
@@ -30,7 +30,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'unw_wand_specialization',
-    name: 'Wand Specialization',
+    name: 'Rodwork',
     description: 'Increases weapon DPS by {n} per rank.',
     icon: '✨',
     row: 1, col: 3, maxRanks: 2, requiresPoints: 0,
@@ -40,7 +40,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   // ── Row 2 (5 pts) ─────────────────────────────────────────────────────────
   {
     id: 'unw_magic_absorption',
-    name: 'Magic Absorption',
+    name: 'Absorbed Interest',
     description: 'Each fight begins with a ward worth {n} damage.',
     icon: '🛡',
     row: 2, col: 1, maxRanks: 2, requiresPoints: 5,
@@ -48,7 +48,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'unw_arcane_concentration',
-    name: 'Arcane Concentration',
+    name: 'Held Thought',
     description: 'Increases crit chance by {n}% per rank.',
     icon: '✨',
     row: 2, col: 2, maxRanks: 5, requiresPoints: 5,
@@ -56,7 +56,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'unw_improved_mana_shield',
-    name: 'Borrowed Time',
+    name: 'Borrowed Hour',
     description: 'Reduces attack interval by {n}s per rank.',
     icon: '⏳',
     row: 2, col: 3, maxRanks: 3, requiresPoints: 5,
@@ -66,7 +66,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   // ── Row 3 (10 pts) ────────────────────────────────────────────────────────
   {
     id: 'unw_arcane_impact',
-    name: 'Arcane Impact',
+    name: 'Sharp Consequence',
     description: 'Increases critical strike damage bonus by {n}% per rank.',
     icon: '💥',
     row: 3, col: 1, maxRanks: 3, requiresPoints: 10,
@@ -74,7 +74,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'unw_presence_of_mind',
-    name: 'Presence of Mind',
+    name: 'Foreknowledge',
     description: 'Every 40 seconds, your next attack is a guaranteed critical strike.',
     icon: '⏳',
     row: 3, col: 2, maxRanks: 1, requiresPoints: 10,
@@ -101,7 +101,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'unw_arcane_meditation',
-    name: 'Arcane Meditation',
+    name: 'Steady Ledger',
     description: 'Increases weapon DPS by {n} per rank.',
     icon: '🔮',
     row: 4, col: 2, maxRanks: 2, requiresPoints: 15,
@@ -109,7 +109,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'unw_prismatic_ward',
-    name: 'Prismatic Ward',
+    name: 'Refracted Ward',
     description: 'Reduces all damage taken by {n}% per rank.',
     icon: '🛡',
     row: 4, col: 3, maxRanks: 3, requiresPoints: 15,
@@ -119,7 +119,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   // ── Row 5 (20 pts) ────────────────────────────────────────────────────────
   {
     id: 'unw_arcane_mind',
-    name: 'Arcane Mind',
+    name: 'Deep Reckoning',
     description: 'Increases intellect by {n} per rank.',
     icon: '🔮',
     row: 5, col: 1, maxRanks: 3, requiresPoints: 20,
@@ -140,7 +140,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'unw_spell_power',
-    name: 'Spell Power',
+    name: 'Principal',
     description: 'Increases all damage by {n}% per rank.',
     icon: '✨',
     row: 5, col: 3, maxRanks: 4, requiresPoints: 20,
@@ -159,7 +159,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'unw_mind_mastery',
-    name: 'Mind Mastery',
+    name: 'Compound Mind',
     description: 'Increases critical strike damage bonus by a further {n}% per rank.',
     icon: '💥',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
@@ -167,7 +167,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'unw_temporal_shield',
-    name: 'Temporal Shield',
+    name: 'Stolen Second',
     description: 'Once per fight, a killing blow is simply undone — you stand at a fifth health.',
     icon: '🛡',
     row: 6, col: 3, maxRanks: 1, requiresPoints: 25,
@@ -177,7 +177,7 @@ export const THE_UNWRITTEN_TALENTS: TalentNodeDef[] = [
   // ── Row 7 (30 pts) ────────────────────────────────────────────────────────
   {
     id: 'unw_arcane_power',
-    name: 'Arcane Power',
+    name: 'Called Due',
     description: 'Increases all damage by a further {n}% per rank.',
     icon: '🔮',
     row: 7, col: 1, maxRanks: 3, requiresPoints: 30,

@@ -13,7 +13,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   // ── Row 1 (0 pts) ─────────────────────────────────────────────────────────
   {
     id: 'quiet_master_of_deception',
-    name: 'Master of Deception',
+    name: 'Unremarkable',
     description: 'Increases agility by {n} per rank.',
     icon: '🌑',
     row: 1, col: 1, maxRanks: 5, requiresPoints: 0,
@@ -29,7 +29,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_camouflage',
-    name: 'Camouflage',
+    name: 'Fade to Grey',
     description: 'Gives you a {n}% chance per rank to go unseen by a blow.',
     icon: '💨',
     row: 1, col: 3, maxRanks: 2, requiresPoints: 0,
@@ -39,7 +39,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   // ── Row 2 (5 pts) ─────────────────────────────────────────────────────────
   {
     id: 'quiet_sleight_of_hand',
-    name: 'Sleight of Hand',
+    name: 'Light Fingers',
     description: 'Increases crit chance by {n}% per rank.',
     icon: '🎯',
     row: 2, col: 1, maxRanks: 3, requiresPoints: 5,
@@ -47,7 +47,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_serrated_blades',
-    name: 'Serrated Blades',
+    name: 'Toothed Steel',
     description: 'Your critical strikes open a wound bleeding for {n}% weapon damage per second, per rank.',
     icon: '🩸',
     row: 2, col: 2, maxRanks: 5, requiresPoints: 5,
@@ -55,7 +55,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_elusiveness',
-    name: 'Elusiveness',
+    name: 'Hard to Follow',
     description: 'Reduces all damage taken by {n}% per rank.',
     icon: '🌑',
     row: 2, col: 3, maxRanks: 2, requiresPoints: 5,
@@ -65,7 +65,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   // ── Row 3 (10 pts) ────────────────────────────────────────────────────────
   {
     id: 'quiet_ambush',
-    name: 'Ambush',
+    name: 'From Behind',
     description: 'Your opening strike deals a further {n}% damage, per rank.',
     icon: '🗡',
     row: 3, col: 1, maxRanks: 3, requiresPoints: 10,
@@ -74,7 +74,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_opportunity',
-    name: 'Opportunity',
+    name: 'The Right Moment',
     description: 'Increases critical strike damage bonus by {n}% per rank.',
     icon: '💀',
     row: 3, col: 2, maxRanks: 4, requiresPoints: 10,
@@ -82,7 +82,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_initiative',
-    name: 'Initiative',
+    name: 'First Move',
     description: 'After a kill, your next attack lands with {n}% more crit chance, per rank.',
     icon: '💀',
     row: 3, col: 3, maxRanks: 3, requiresPoints: 10,
@@ -105,7 +105,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_hemorrhage',
-    name: 'Hemorrhage',
+    name: 'Open Vein',
     description: 'Every bleed and poison you own runs {n}% deeper per rank.',
     icon: '🩸',
     row: 4, col: 2, maxRanks: 5, requiresPoints: 15,
@@ -114,7 +114,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_deadliness',
-    name: 'Deadliness',
+    name: 'Killing Weight',
     description: 'Increases all damage by {n}% per rank.',
     icon: '🔪',
     row: 4, col: 3, maxRanks: 3, requiresPoints: 15,
@@ -124,7 +124,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   // ── Row 5 (20 pts) ────────────────────────────────────────────────────────
   {
     id: 'quiet_premeditation',
-    name: 'Premeditation',
+    name: 'Rehearsed',
     description: 'Every 25 seconds, your next attack is a guaranteed critical strike.',
     icon: '🌑',
     row: 5, col: 1, maxRanks: 1, requiresPoints: 20,
@@ -132,7 +132,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_sinister_calling',
-    name: 'Sinister Calling',
+    name: 'The Quiet Trade',
     description: 'Increases agility by {n} per rank.',
     icon: '🌑',
     row: 5, col: 2, maxRanks: 4, requiresPoints: 20,
@@ -140,7 +140,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_ghostly',
-    name: 'Ghostly',
+    name: 'Unseen',
     description: 'A further {n}% chance per rank that a blow finds nothing where you were.',
     icon: '💨',
     row: 5, col: 3, maxRanks: 3, requiresPoints: 20,
@@ -159,7 +159,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_master_of_subtlety',
-    name: 'Master of Subtlety',
+    name: 'Master of the Quiet',
     description: 'Increases critical strike damage bonus by a further {n}% per rank.',
     icon: '💀',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
@@ -167,7 +167,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'quiet_vanish',
-    name: 'Vanish',
+    name: 'Gone',
     description: 'Once per fight, the blow that should have killed you finds nobody there — you stand at a quarter health.',
     icon: '💨',
     row: 6, col: 3, maxRanks: 1, requiresPoints: 25,
@@ -177,7 +177,7 @@ export const THE_LONG_QUIET_TALENTS: TalentNodeDef[] = [
   // ── Row 7 (30 pts) ────────────────────────────────────────────────────────
   {
     id: 'quiet_shadow_dance',
-    name: 'Shadow Dance',
+    name: 'The Long Step',
     description: 'Every strike opens as though it were the first — a further {n}% opening damage per rank.',
     icon: '🌑',
     row: 7, col: 1, maxRanks: 3, requiresPoints: 30,

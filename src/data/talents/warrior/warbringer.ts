@@ -14,7 +14,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   // ── Row 1 (0 pts) ─────────────────────────────────────────────────────────
   {
     id: 'wbr_cruelty',
-    name: 'Cruelty',
+    name: "Butcher's Eye",
     description: 'Increases crit chance by {n}% per rank.',
     icon: '🗡',
     row: 1, col: 1, maxRanks: 5, requiresPoints: 0,
@@ -22,7 +22,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_booming_voice',
-    name: 'Booming Voice',
+    name: 'Voice Like Thunder',
     description: 'Increases stamina by {n} per rank.',
     icon: '📣',
     row: 1, col: 2, maxRanks: 2, requiresPoints: 0,
@@ -30,7 +30,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_frenzy',
-    name: 'Frenzy',
+    name: 'Bloodfever',
     description: 'Attack {n}% faster per rank.',
     icon: '⚡',
     row: 1, col: 3, maxRanks: 3, requiresPoints: 0,
@@ -40,7 +40,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   // ── Row 2 (5 pts) ─────────────────────────────────────────────────────────
   {
     id: 'wbr_unbridled_wrath',
-    name: 'Unbridled Wrath',
+    name: 'Wrath Unspent',
     description: 'Attack a further {n}% faster per rank.',
     icon: '⚡',
     row: 2, col: 1, maxRanks: 5, requiresPoints: 5,
@@ -48,7 +48,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_piercing_howl',
-    name: 'Piercing Howl',
+    name: 'Wailing Note',
     description: 'Reduces enemy attack speed by {n}% per rank.',
     icon: '💥',
     row: 2, col: 2, maxRanks: 3, requiresPoints: 5,
@@ -56,7 +56,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_blood_craze',
-    name: 'Blood Craze',
+    name: 'Craving',
     description: 'Returns {n}% of the damage you deal to you as health, per rank.',
     icon: '🩸',
     row: 2, col: 3, maxRanks: 2, requiresPoints: 5,
@@ -66,7 +66,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   // ── Row 3 (10 pts) ────────────────────────────────────────────────────────
   {
     id: 'wbr_flurry',
-    name: 'Flurry',
+    name: 'Rain of Blows',
     description: 'Critical strikes send you into a flurry — {n}% chance per rank to strike again at once.',
     icon: '✨',
     row: 3, col: 1, maxRanks: 3, requiresPoints: 10,
@@ -74,7 +74,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_enrage',
-    name: 'Enrage',
+    name: 'Seeing Red',
     description: 'Below a third health you deal {n}% more damage per rank.',
     icon: '🔥',
     row: 3, col: 2, maxRanks: 2, requiresPoints: 10,
@@ -93,7 +93,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   // ── Row 4 (15 pts) ────────────────────────────────────────────────────────
   {
     id: 'wbr_dual_wield_spec',
-    name: 'Dual Wield Specialization',
+    name: 'Two Blades',
     description: 'Increases weapon DPS by {n} per rank.',
     icon: '⚔',
     row: 4, col: 1, maxRanks: 5, requiresPoints: 15,
@@ -101,20 +101,20 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_bloodthirst',
-    name: 'Bloodthirst',
+    name: 'Vein-Seeker',
     description: 'Red Harvest drinks {n}% deeper per rank and returns faster.',
     icon: '🩸',
     row: 4, col: 2, maxRanks: 3, requiresPoints: 15,
     effects: [
       { type: 'ability', ability: 'warrior_bloodthirst', mod: 'damage', valuePerRank: 0.25,
-        note: 'Bloodthirst: lifesteal deepened' },
+        note: 'Vein-Seeker: lifesteal deepened' },
       { type: 'ability', ability: 'warrior_bloodthirst', mod: 'cooldown', valuePerRank: 0.10,
-        note: 'Bloodthirst: cooldown reduced' },
+        note: 'Vein-Seeker: cooldown reduced' },
     ],
   },
   {
     id: 'wbr_death_wish',
-    name: 'Death Wish',
+    name: 'Nothing to Lose',
     description: 'Deal a further {n}% damage per rank while enraged.',
     icon: '🔥',
     row: 4, col: 3, maxRanks: 2, requiresPoints: 15,
@@ -125,7 +125,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   // ── Row 5 (20 pts) ────────────────────────────────────────────────────────
   {
     id: 'wbr_improved_slam',
-    name: 'Improved Slam',
+    name: 'Heavy Follow-Through',
     description: 'Increases weapon DPS by {n} per rank.',
     icon: '⚔',
     row: 5, col: 1, maxRanks: 5, requiresPoints: 20,
@@ -133,7 +133,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_rampage',
-    name: 'Rampage',
+    name: 'The Rout',
     description: 'Every kill leaves you faster and angrier for the next one.',
     icon: '🔥',
     row: 5, col: 2, maxRanks: 1, requiresPoints: 20,
@@ -141,7 +141,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_precision',
-    name: 'Precision',
+    name: 'Sure Hand',
     description: 'Increases crit chance by {n}% per rank.',
     icon: '🗡',
     row: 5, col: 3, maxRanks: 5, requiresPoints: 20,
@@ -151,7 +151,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   // ── Row 6 (25 pts) ────────────────────────────────────────────────────────
   {
     id: 'wbr_bloodsurge',
-    name: 'Bloodsurge',
+    name: 'Sudden Opening',
     description: 'Returns a further {n}% of damage dealt as health, per rank.',
     icon: '🩸',
     row: 6, col: 3, maxRanks: 3, requiresPoints: 25,
@@ -159,7 +159,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_titans_grip',
-    name: "Titan's Grip",
+    name: 'Both Hands Full',
     description: 'Increases critical hit damage bonus by {n}% per rank.',
     icon: '💪',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
@@ -167,7 +167,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_endless_rage',
-    name: 'Endless Rage',
+    name: 'The Long Fury',
     description: 'Your flurries come far more readily.',
     icon: '⚡',
     row: 6, col: 1, maxRanks: 1, requiresPoints: 25,
@@ -186,7 +186,7 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'wbr_reckless_abandon',
-    name: 'Reckless Abandon',
+    name: 'All In',
     description: 'You are always enraged, and Red Harvest never truly ends.',
     icon: '💀',
     row: 7, col: 2, maxRanks: 1, requiresPoints: 30,
@@ -194,10 +194,10 @@ export const WARBRINGER_TALENTS: TalentNodeDef[] = [
     effects: [
       { type: 'mechanic', mechanic: 'enrage', valuePerRank: 0.15 },
       { type: 'ability', ability: 'warrior_bloodthirst', mod: 'cooldown', valuePerRank: 0.40,
-        note: 'Reckless Abandon: cooldown slashed' },
+        note: 'All In: cooldown slashed' },
       { type: 'ability', ability: 'warrior_bloodthirst', mod: 'rider', valuePerRank: 1,
         rider: { type: 'speed_buff', value: 0.25, durationSeconds: 10 },
-        note: 'Reckless Abandon: also hastens your swings',
+        note: 'All In: also hastens your swings',
       },
     ],
   },

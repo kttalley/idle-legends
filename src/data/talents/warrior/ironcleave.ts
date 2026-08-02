@@ -23,7 +23,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_deflection',
-    name: 'Deflection',
+    name: 'Angled Guard',
     description: 'Increases armor by {n} per rank.',
     icon: '🛡',
     row: 1, col: 2, maxRanks: 5, requiresPoints: 0,
@@ -31,7 +31,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_improved_rend',
-    name: 'Serrated Blade',
+    name: 'Ragged Edge',
     description: 'Your critical strikes apply a serrated bleed. Increases bleed damage per rank.',
     icon: '🩸',
     row: 1, col: 3, maxRanks: 2, requiresPoints: 0,
@@ -100,7 +100,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
   // ── Row 4 (15 pts) ────────────────────────────────────────────────────────
   {
     id: 'arms_two_handed',
-    name: 'Two-Handed Mastery',
+    name: 'Heavy Steel',
     description: 'Increases all damage by {n}% per rank.',
     icon: '⚔',
     row: 4, col: 1, maxRanks: 5, requiresPoints: 15,
@@ -108,7 +108,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_impale',
-    name: 'Run Through',
+    name: 'Skewer',
     description: 'Increases critical hit damage bonus by {n}% per rank.',
     icon: '🗡',
     row: 4, col: 2, maxRanks: 2, requiresPoints: 15,
@@ -117,20 +117,20 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_war_cry',
-    name: 'War Cry',
+    name: 'Rallying Roar',
     description: 'Battle Cry hits {n}% harder per rank.',
     icon: '📣',
     row: 4, col: 3, maxRanks: 3, requiresPoints: 15,
     effects: [{
       type: 'ability', ability: 'warrior_battle_cry', mod: 'damage', valuePerRank: 0.20,
-      note: 'War Cry: damage increased',
+      note: 'Rallying Roar: damage increased',
     }],
   },
 
   // ── Row 5 (20 pts) ────────────────────────────────────────────────────────
   {
     id: 'arms_axe_spec',
-    name: 'Weapon Mastery',
+    name: 'Weaponwise',
     description: 'Increases crit chance by {n}% per rank.',
     icon: '🪓',
     row: 5, col: 1, maxRanks: 5, requiresPoints: 20,
@@ -156,7 +156,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
   // ── Row 6 (25 pts) ────────────────────────────────────────────────────────
   {
     id: 'arms_executioner',
-    name: 'Executioner',
+    name: 'Headsman',
     description: 'Deal {n}% more damage per rank to enemies below a third of their health.',
     icon: '🪓',
     row: 6, col: 1, maxRanks: 3, requiresPoints: 25,
@@ -188,7 +188,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
   // ── Row 7 (30 pts) ────────────────────────────────────────────────────────
   {
     id: 'arms_juggernaut',
-    name: 'Juggernaut',
+    name: 'Gathering Weight',
     description: 'Increases all damage by a further {n}% per rank.',
     icon: '⚔',
     row: 7, col: 1, maxRanks: 5, requiresPoints: 30,
@@ -196,7 +196,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'arms_bladestorm',
-    name: 'Bladestorm',
+    name: 'The Whirling',
     description: 'Battle Cry becomes a whirlwind — it also bleeds everything it touches.',
     icon: '🌀',
     row: 7, col: 2, maxRanks: 1, requiresPoints: 30,
@@ -205,7 +205,7 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
       { type: 'mechanic', mechanic: 'bleed_on_crit', valuePerRank: 0.25 },
       {
         type: 'ability', ability: 'warrior_battle_cry', mod: 'damage', valuePerRank: 0.50,
-        note: 'Bladestorm: strikes everything around you',
+        note: 'The Whirling: strikes everything around you',
       },
     ],
   },

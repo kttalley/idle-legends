@@ -15,7 +15,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   // ── Row 1 (0 pts) ─────────────────────────────────────────────────────────
   {
     id: 'gut_lightning_reflexes',
-    name: 'Lightning Reflexes',
+    name: 'Quick Off the Mark',
     description: 'Increases agility by {n} per rank.',
     icon: '⚡',
     row: 1, col: 1, maxRanks: 4, requiresPoints: 0,
@@ -23,7 +23,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'gut_dirty_tricks',
-    name: 'Dirty Tricks',
+    name: 'Gutterwise',
     description: 'Each swing has a {n}% chance per rank to land a second time.',
     icon: '🗡',
     row: 1, col: 2, maxRanks: 3, requiresPoints: 0,
@@ -31,7 +31,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'gut_improved_gouge',
-    name: 'Gouge',
+    name: 'Eye-Rake',
     description: 'Enemies you have opened up attack {n}% slower per rank.',
     icon: '💥',
     row: 1, col: 3, maxRanks: 2, requiresPoints: 0,
@@ -41,7 +41,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   // ── Row 2 (5 pts) ─────────────────────────────────────────────────────────
   {
     id: 'gut_riposte',
-    name: 'Riposte',
+    name: 'Turnabout',
     description: 'Returns {n}% of the damage you take straight back down the blade, per rank.',
     icon: '⚔',
     row: 2, col: 1, maxRanks: 3, requiresPoints: 5,
@@ -67,7 +67,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   // ── Row 3 (10 pts) ────────────────────────────────────────────────────────
   {
     id: 'gut_precision',
-    name: 'Precision',
+    name: 'Well-Placed',
     description: 'Increases crit chance by {n}% per rank.',
     icon: '🎯',
     row: 3, col: 1, maxRanks: 4, requiresPoints: 10,
@@ -75,7 +75,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'gut_dual_wield_spec',
-    name: 'Dual Wield Specialization',
+    name: 'Offhand Work',
     description: 'Increases weapon DPS by {n} per rank.',
     icon: '⚔',
     row: 3, col: 2, maxRanks: 3, requiresPoints: 10,
@@ -83,7 +83,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'gut_opportunity',
-    name: 'Opportunity',
+    name: 'Seized Moment',
     description: 'A further {n}% chance per rank that a swing lands twice.',
     icon: '🗡',
     row: 3, col: 3, maxRanks: 3, requiresPoints: 10,
@@ -94,7 +94,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   // ── Row 4 (15 pts) ────────────────────────────────────────────────────────
   {
     id: 'gut_blade_flurry',
-    name: 'Blade Flurry',
+    name: 'Scatterwork',
     description: 'Critical strikes carry through — {n}% chance per rank to strike again at once.',
     icon: '✨',
     row: 4, col: 1, maxRanks: 3, requiresPoints: 15,
@@ -116,7 +116,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'gut_endurance',
-    name: 'Endurance',
+    name: 'Second Lung',
     description: 'Increases stamina by {n} per rank.',
     icon: '💪',
     row: 4, col: 3, maxRanks: 2, requiresPoints: 15,
@@ -126,7 +126,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   // ── Row 5 (20 pts) ────────────────────────────────────────────────────────
   {
     id: 'gut_aggression',
-    name: 'Aggression',
+    name: 'Forward Pressure',
     description: 'Increases all damage by {n}% per rank.',
     icon: '🔪',
     row: 5, col: 1, maxRanks: 4, requiresPoints: 20,
@@ -134,7 +134,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'gut_close_quarters',
-    name: 'Close Quarters',
+    name: 'Inside Reach',
     description: 'Increases critical strike damage bonus by {n}% per rank.',
     icon: '⚔',
     row: 5, col: 2, maxRanks: 3, requiresPoints: 20,
@@ -153,7 +153,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   // ── Row 6 (25 pts) ────────────────────────────────────────────────────────
   {
     id: 'gut_weapon_expertise',
-    name: 'Weapon Expertise',
+    name: 'Trade Skill',
     description: 'Increases weapon DPS by {n} per rank.',
     icon: '⚔',
     row: 6, col: 1, maxRanks: 2, requiresPoints: 25,
@@ -161,7 +161,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'gut_counterattack',
-    name: 'Counterattack',
+    name: 'Answer in Kind',
     description: 'Returns a further {n}% of damage taken, per rank.',
     icon: '⚔',
     row: 6, col: 2, maxRanks: 3, requiresPoints: 25,
@@ -170,7 +170,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'gut_second_wind',
-    name: 'Cheap Shot to the Ribs',
+    name: 'Boot to the Ribs',
     description: 'Below half health you recover {n} HP per second per rank.',
     icon: '💚',
     row: 6, col: 3, maxRanks: 3, requiresPoints: 25,
@@ -180,7 +180,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   // ── Row 7 (30 pts) ────────────────────────────────────────────────────────
   {
     id: 'gut_surprise_attacks',
-    name: 'Surprise Attacks',
+    name: 'No Warning',
     description: 'Attack a further {n}% faster per rank.',
     icon: '⚡',
     row: 7, col: 1, maxRanks: 3, requiresPoints: 30,
@@ -188,7 +188,7 @@ export const GUTTERWORK_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'gut_adrenaline_rush',
-    name: 'Adrenaline Rush',
+    name: 'Full Tilt',
     description: 'Every kill leaves your hands faster for the next one, and nothing you start ends slowly.',
     icon: '⚡',
     row: 7, col: 2, maxRanks: 1, requiresPoints: 30,

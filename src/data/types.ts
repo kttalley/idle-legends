@@ -361,7 +361,7 @@ export interface CombatProcState {
   comboPoints: number
   remorselessActive: boolean
   iceBlockUsed: boolean
-  /** Bulwark's Last Stand fires once per encounter, like Glacial Tomb above it. */
+  /** Bulwark's The Last Yard fires once per encounter, like Glacial Tomb above it. */
   lastStandUsed: boolean
   /** Warbringer's Rampage: stacks carried from recent kills, decaying out of combat. */
   rampageStacks: number

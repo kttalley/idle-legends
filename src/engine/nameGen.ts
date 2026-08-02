@@ -26,7 +26,9 @@ const LIGHT_SUFFIXES = ['Covenant', 'Accord', 'Vigil', 'Conclave', 'Bastion', 'O
 
 // Shadow faction (maps to 'horde') — brutal, primal, tribal
 const SHADOW_PREFIXES = ['Bloodmaw', 'Ashfang', 'Ironjaw', 'Boneclaw', 'Grimtide', 'Scarwar', 'Venomspur', 'Emberscar', 'Duskrend', 'Warspine', 'Skullbreak', 'Darkroar', 'Gorewind', 'Felbrand', 'Crushmarrow']
-const SHADOW_SUFFIXES = ['Clan', 'Warband', 'Legion', 'Pack', 'Host', 'Reavers', 'March', 'Surge', 'Tide', 'Rend', 'Dominion', 'Horde', 'Throng', 'Descent', 'Phalanx']
+// 'Horde' was in this pool, so the generator could mint a faction literally called
+// "The Horde" — a trademark, emitted at runtime into the player's own save.
+const SHADOW_SUFFIXES = ['Clan', 'Warband', 'Legion', 'Pack', 'Host', 'Reavers', 'March', 'Surge', 'Tide', 'Rend', 'Dominion', 'Swarm', 'Throng', 'Descent', 'Phalanx']
 
 // Neutral faction
 const NEUTRAL_PREFIXES = ['Gray', 'Wandering', 'Free', 'Open', 'Crossroads', 'Drifting', 'Between']
@@ -87,7 +89,7 @@ const ZONE_NAME_FALLBACKS: Record<ZoneId, string[]> = {
   the_bloodfields:    ['The Bloodfields', 'Red March', 'Carrion Flats'],
   ironcrag_badlands:  ['Ironcrag Badlands', 'Rustscar Wastes', 'Cragbone Desert'],
   venom_hollows:      ['Venom Hollows', 'Fetid Mire', 'Mirefang Swamp'],
-  warsong_mesa:       ['Warsong Mesa', 'Redstone Plateau', 'Drumcrag Heights'],
+  warsong_mesa:       ['Drumcrag Heights', 'Redstone Plateau', 'Warhorn Mesa'],
   cinderfall_wastes:  ['Cinderfall Wastes', 'Ashfall Ruins', 'Burned Reach'],
   the_maw_eternal:    ['The Maw Eternal', 'Worldedge Abyss', 'Last Chasm'],
 }
@@ -108,7 +110,7 @@ const TOWN_NAME_FALLBACKS: Record<string, string[]> = {
   grimshade_refuge:  ['Grimshade Refuge', 'Hollow Haven', 'Nightrest'],
   crossroads_market: ['Crossroads Market', 'Broken Bridge Bazaar', 'Wartrader Hub'],
   ironcrag_hold:     ['Ironcrag Hold', 'Ashmarch Seat', 'Cragfort'],
-  warsong_bastion:   ['Warsong Bastion', 'Drumcrag Keep', 'Redstone Stronghold'],
+  warsong_bastion:   ['Drumcrag Keep', 'Redstone Stronghold', 'Warhorn Bastion'],
 }
 
 export function generateTownNamesFallback(seed: number): Record<TownId, string> {
@@ -204,7 +206,7 @@ export async function generateNames(playerClass: ClassType, seed: number): Promi
 The player is ${CLASS_FLAVOR[playerClass]}.
 Possible personality traits to draw from: ${CLASS_TRAIT_POOLS[playerClass]}.
 
-This world has two opposing factions at war. The light faction is noble and ordered (humans, dwarves, elves). The shadow faction is primal and brutal (orcs, trolls, goblins). Do NOT use "Alliance" or "Horde" — invent original names that feel like they belong to a living world with history. Each name should be 2-4 words using "The" as a prefix.
+This world has two opposing factions at war. The light faction is noble and ordered (humans, dwarves, elves). The shadow faction is primal and brutal (orcs, trolls, goblins). Do NOT reuse faction names from existing published games — invent original names that feel like they belong to a living world with history. Each name should be 2-4 words using "The" as a prefix.
 
 Generate this exact JSON:
 {

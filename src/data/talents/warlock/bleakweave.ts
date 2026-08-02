@@ -5,7 +5,7 @@ import type { TalentNodeDef } from '../../types'
 //
 // Curses, rot and entropy: damage that was applied some time ago and is only now
 // arriving. The tree buys almost no burst at all — what it buys is DoTs that tick
-// harder (Unbroken Litany, Contagion) and last longer, which makes it the one build
+// harder (Unbroken Litany, Spreading Grief) and last longer, which makes it the one build
 // whose damage is entirely indifferent to whether anybody is watching.
 //
 // The original warlock tree, extended from 40 ranks to 60. Every `aff_` id predates
@@ -141,7 +141,7 @@ export const BLEAKWEAVE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'aff_shadow_mastery',
-    name: 'Shadow Mastery',
+    name: 'Weight of Dusk',
     description: 'Increases all damage by {n}% per rank.',
     icon: '🌑',
     row: 5, col: 3, maxRanks: 5, requiresPoints: 20,
@@ -159,7 +159,7 @@ export const BLEAKWEAVE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'aff_contagion',
-    name: 'Contagion',
+    name: 'Spreading Grief',
     description: 'Every lingering effect ticks a further {n}% harder per rank.',
     icon: '☠',
     row: 6, col: 1, maxRanks: 4, requiresPoints: 25,
@@ -183,7 +183,7 @@ export const BLEAKWEAVE_TALENTS: TalentNodeDef[] = [
   // ── Row 7 (30 pts) ────────────────────────────────────────────────────────
   {
     id: 'aff_everlasting_affliction',
-    name: 'Everlasting Affliction',
+    name: 'Unending Lament',
     description: 'Your rots refuse to lift — a further {n}% damage from every one, per rank.',
     icon: '☠',
     row: 7, col: 1, maxRanks: 4, requiresPoints: 30,
@@ -191,7 +191,7 @@ export const BLEAKWEAVE_TALENTS: TalentNodeDef[] = [
   },
   {
     id: 'aff_unstable_affliction',
-    name: 'Unstable Affliction',
+    name: 'Unquiet Grief',
     description: 'The dark gathers constantly, and Umbral Bolt is never far away.',
     icon: '🌙',
     row: 7, col: 2, maxRanks: 1, requiresPoints: 30,
@@ -199,7 +199,7 @@ export const BLEAKWEAVE_TALENTS: TalentNodeDef[] = [
     effects: [
       { type: 'mechanic', mechanic: 'nightfall', valuePerRank: 0.06 },
       { type: 'ability', ability: 'warlock_shadow_bolt', mod: 'cooldown', valuePerRank: 0.45,
-        note: 'Unstable Affliction: cooldown slashed' },
+        note: 'Unquiet Grief: cooldown slashed' },
     ],
   },
 ]
