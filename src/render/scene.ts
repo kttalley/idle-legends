@@ -40,6 +40,23 @@ export interface Entity {
    *  shadow fill / palette lookup / drawImage. With 100+ entities per zone this is the
    *  bulk of the frame cost. */
   onScreen: boolean
+  /**
+   * Is this slot RELEASED and free for `spawn` to hand out again?
+   *
+   * Split from `active` because the two are not the same claim, and conflating them was
+   * an aliasing bug. `active` means "draw me"; owners clear it all the time to hide a
+   * unit temporarily — an ambient monster waiting out its respawn, a mob off the field.
+   * The pool used to treat any such entity as free, so the next `spawn` (a floating
+   * number, a hit burst) reclaimed an entity its original owner still held a reference
+   * to, then moved it and swapped its sprite underneath them.
+   *
+   * Measured before the split: living, idle ambient monsters toggling `active` every
+   * 0.3–1.5s and teleporting 1–4 tiles, with `alpha` untouched — the thief's `spawn`
+   * resetting a slot the ambient record still pointed at.
+   *
+   * So release is now explicit: only `despawn` frees a slot.
+   */
+  pooled: boolean
 }
 
 export class Scene {
@@ -49,7 +66,10 @@ export class Scene {
   spawn(sprite: IndexedSprite, paletteId: string, tx: number, ty: number): Entity {
     for (let i = 0; i < this.entities.length; i++) {
       const e = this.entities[i]
-      if (!e.active) {
+      // Only an explicitly RELEASED slot may be reused. Hidden-but-owned entities
+      // (`active === false`, `pooled === false`) are left alone — see `Entity.pooled`.
+      if (e.pooled) {
+        e.pooled = false
         e.active = true
         e.tx = tx
         e.ty = ty
@@ -65,6 +85,7 @@ export class Scene {
     }
     const e: Entity = {
       active: true,
+      pooled: false,
       tx,
       ty,
       sprite,
@@ -80,6 +101,16 @@ export class Scene {
     this.entities.push(e)
     this.order.push(this.entities.length - 1)
     return e
+  }
+
+  /**
+   * Hand a slot back to the pool. Call this — not `active = false` — at the point the
+   * owner drops its reference for good. Anything that merely hides a unit it still owns
+   * must keep using `active`.
+   */
+  despawn(e: Entity): void {
+    e.active = false
+    e.pooled = true
   }
 
   update(dt: number): void {

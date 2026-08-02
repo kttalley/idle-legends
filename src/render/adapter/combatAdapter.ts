@@ -403,7 +403,16 @@ interface Ambient {
   /** Monsters only: seconds until this corpse respawns. Without this the zone runs out
    *  of things to fight within a minute and the "busy server" decays into a stroll. */
   respawnT: number
+  /** Monsters only: seconds of fade-IN remaining after a respawn. Deaths already ease out
+   *  (see `dyingMobs`), but respawns used to hard-cut back to full alpha, so the crowd
+   *  dissolved politely and then popped. Measured at 8 flips in 45s on a two-monster
+   *  zone — enough that the world read as flickering rather than repopulating. */
+  spawnFadeT: number
 }
+
+/** How long a respawning monster takes to fade in. Mirrors `DEATH_DURATION` so the world
+ *  breathes symmetrically instead of exhaling slowly and inhaling all at once. */
+const SPAWN_FADE = 0.45
 
 /** Movement vector → dimetric facing (se:+x, sw:+y, nw:−x, ne:−y). */
 /**
@@ -1267,7 +1276,7 @@ export class WorldSceneController {
       disbandParty()
       // Enemies belong to the zone they stood in — their world anchors are meaningless
       // once the ground is rebaked.
-      for (const rec of this.otherMobEnts.values()) rec.e.active = false
+      for (const rec of this.otherMobEnts.values()) this.scene.despawn(rec.e)
       this.otherMobEnts.clear()
       const zm = state.zoneMaps[state.currentZone]
       if (zm) {
@@ -1445,7 +1454,9 @@ export class WorldSceneController {
         this.mob.alpha = 0
       } else if (this.mob.sprite.id !== wantedMobSprite) {
         // Swap sprite when the mob template changes (rare; keeps the pool entity but re-spawns).
-        this.mob.active = false
+        // Released rather than merely hidden, so the `spawn` on the next line reclaims
+        // this very slot — which is what "keeps the pool entity" has always meant.
+        this.scene.despawn(this.mob)
         const sprite = this.spriteCache[wantedMobSprite] ??
           (isMonsterSprite(wantedMobSprite) ? this.rigs.mobBeast : this.rigs.mobHumanoid)
         this.mob = this.scene.spawn(
@@ -1475,7 +1486,7 @@ export class WorldSceneController {
         const dc = fxColors('spell/holy')
         this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 1.7)
       } else {
-        this.mob.active = false
+        this.scene.despawn(this.mob)
       }
       this.mob = null
       this.mobLunge.active = false
@@ -1587,7 +1598,7 @@ export class WorldSceneController {
     }
     for (const [id, rec] of this.otherMobEnts) {
       if (alive.has(id)) continue
-      rec.e.active = false
+      this.scene.despawn(rec.e)
       this.otherMobEnts.delete(id)
       this.arriving.delete(id)
     }
@@ -2161,7 +2172,7 @@ export class WorldSceneController {
     const es = this.scene.entities
     for (let i = 0; i < es.length; i++) {
       const e = es[i]
-      if (e.active && e.sprite === this.burstRig && e.animator.finished) e.active = false
+      if (e.active && e.sprite === this.burstRig && e.animator.finished) this.scene.despawn(e)
     }
 
     // Advance slain-mob death fades (real time, so it continues through hit-stop):
@@ -2171,7 +2182,7 @@ export class WorldSceneController {
         const d = this.dyingMobs[i]
         d.t += realDt / DEATH_DURATION
         if (d.t >= 1) {
-          d.e.active = false
+          this.scene.despawn(d.e)
           d.e.alpha = 1
           d.e.z = 0
           this.dyingMobs.splice(i, 1)
@@ -2393,7 +2404,7 @@ export class WorldSceneController {
   }
 
   private retirePropEntities(): void {
-    for (const pe of this.propEntities) pe.entity.active = false
+    for (const pe of this.propEntities) this.scene.despawn(pe.entity)
     this.propEntities = []
   }
 
@@ -2457,7 +2468,7 @@ export class WorldSceneController {
   }
 
   private retireAmbient(): void {
-    for (const a of this.ambient) a.e.active = false
+    for (const a of this.ambient) this.scene.despawn(a.e)
     this.ambient = []
     this.ambientGroups = []
     // Indices into `ambient` are now meaningless; holding stale ones would point the
@@ -2519,7 +2530,7 @@ export class WorldSceneController {
           name: id.name, level: id.level, faction: id.faction, grp: gi,
           rng: subStream(seed, `beh:${gi}:${k}`), state: tmpl.fight ? 'approach' : 'wander',
           identity: id, bark: null, barkT: 0, barkCd: rnd(s + 12) * BARK_COOLDOWN_SECONDS,
-          fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false, respawnT: 0,
+          fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false, respawnT: 0, spawnFadeT: 0,
           rejoinAfter: false,
         })
       }
@@ -2539,7 +2550,7 @@ export class WorldSceneController {
           name: '', level: 0, faction: 'neutral', grp: gi,
           rng: subStream(seed, `beh:${gi}:m${k}`), state: 'idle',
           identity: null, bark: null, barkT: 0, barkCd: 0,
-          fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false, respawnT: 0,
+          fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false, respawnT: 0, spawnFadeT: 0,
           rejoinAfter: false,
         })
       }
@@ -2695,7 +2706,7 @@ export class WorldSceneController {
   }
 
   private retireTownProps(): void {
-    for (const e of this.townProps) e.active = false
+    for (const e of this.townProps) this.scene.despawn(e)
     this.townProps = []
   }
 
@@ -2703,8 +2714,8 @@ export class WorldSceneController {
     // Clear the open-world population + any lingering combat before the swap.
     this.retireAmbient()
     this.retirePropEntities()
-    if (this.mob) { this.mob.active = false; this.mob = null }
-    for (const rec of this.otherMobEnts.values()) rec.e.active = false
+    if (this.mob) { this.scene.despawn(this.mob); this.mob = null }
+    for (const rec of this.otherMobEnts.values()) this.scene.despawn(rec.e)
     this.otherMobEnts.clear()
     this.manualMode = false
     this.tapMoveActive = false
@@ -2758,9 +2769,9 @@ export class WorldSceneController {
   }
 
   private leaveTownScene(): void {
-    for (const a of this.townCrowd) a.e.active = false
+    for (const a of this.townCrowd) this.scene.despawn(a.e)
     this.townCrowd = []
-    for (const n of this.townNpcs) n.e.active = false
+    for (const n of this.townNpcs) this.scene.despawn(n.e)
     this.townNpcs = []
     this.retireTownProps()
     if (this.nearNpc !== null) { this.nearNpc = null; this.onTownNpcChanged?.(null) }
@@ -3043,6 +3054,15 @@ export class WorldSceneController {
     const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
     const SPEED = 1.3
 
+    // Advance respawn fade-ins. Cheap enough to run unconditionally over the whole crowd;
+    // `spawnFadeT` is 0 for everything that is not currently materialising.
+    for (const a of this.ambient) {
+      if (a.spawnFadeT <= 0) continue
+      a.spawnFadeT = Math.max(0, a.spawnFadeT - dt)
+      const k = 1 - a.spawnFadeT / SPAWN_FADE
+      a.e.alpha = k * k          // ease-in, mirroring the death fade's ease-out
+    }
+
     // Recycle groups that drift beyond the (zoom-aware) visible radius → re-anchor them
     // just past the screen edge, in the forward hemisphere of travel, so a fresh
     // encounter SLIDES into view instead of popping in. The ring scales with the FOV:
@@ -3095,7 +3115,26 @@ export class WorldSceneController {
         a.playIdx = 0
         a.bark = null
         a.barkT = 0
-        if (a.kind === 'mob') { a.state = 'idle'; a.respawnT = 0; a.e.active = true }
+        if (a.kind === 'mob') {
+          a.state = 'idle'
+          // A monster waiting out its respawn STAYS DEAD. Force-reviving it here (and
+          // zeroing its timer) is what made a corpse blink back on within a second of
+          // dying: this recycle fires whenever a group drifts past the ring, which is
+          // constantly while the player is walking. Measured at 0.7s and 0.8s off→on
+          // gaps, one of them reappearing 0.0 tiles from where it fell — a corpse
+          // twitching back to life on the spot, which is nobody's idea of a respawn.
+          //
+          // The timer keeps running instead, and the respawn loop returns it at the
+          // group's NEW anchor — which is where it should come back anyway.
+          //
+          // An ORPHAN is still rescued: inactive with no timer pending means nothing
+          // will ever revive it, and it would sit dead for the rest of the session.
+          if (!a.e.active && a.respawnT <= 0) {
+            a.e.active = true
+            a.e.alpha = 0
+            a.spawnFadeT = SPAWN_FADE
+          }
+        }
         a.e.animator.set('idle')
       }
     }
@@ -3402,7 +3441,12 @@ export class WorldSceneController {
       m.foe = -1
       m.fightLog = null
       m.e.active = true
-      m.e.alpha = 1
+      // Fade in rather than hard-cut. Deaths already ease out over DEATH_DURATION, so a
+      // full-alpha pop was the asymmetry that read as flickering — especially since the
+      // respawn also re-rolls the position ±2.2 tiles off the anchor, so the monster
+      // reappears somewhere it visibly was not.
+      m.e.alpha = 0
+      m.spawnFadeT = SPAWN_FADE
       m.e.animator.set('idle')
     }
 
@@ -3694,7 +3738,7 @@ export class WorldSceneController {
         rng: subStream(this.zoneSeed(), `companion-foe:${companion.name}:${companion.partySlot}`), state: 'idle',
         identity: null, bark: null, barkT: 0, barkCd: 0,
         fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false,
-        respawnT: 0, rejoinAfter: false,
+        respawnT: 0, spawnFadeT: 0, rejoinAfter: false,
       })
       companion.sparFoeIdx = this.ambient.length - 1
     }
