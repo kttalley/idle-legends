@@ -357,6 +357,17 @@ interface Ambient {
   pathGx: number; pathGy: number   // goal the route was built for
   pathCool: number                 // seconds until a repath is allowed
   pathBlocked: boolean             // A* said unreachable (null), not "already there" ([])
+  // ── C4: per-companion state ─────────────────────────────────────────────────
+  // All three of these used to be single module-level values shared by "the" companion,
+  // which is what made the second party member inert: it found the shared spar slot
+  // already taken and the shared cooldown already reset, so it never got a fight.
+  /** Index in the party (0-based) — drives which formation slot it holds. -1 = not in one. */
+  partySlot: number
+  /** Its OWN spar cooldown. The shared one was decremented once per follower inside the
+   *  brain loop, so it also drained N times faster than the interval intends. */
+  sparCd: number
+  /** Index into `ambient` of its OWN sparring partner, or -1. */
+  sparFoeIdx: number
   /** Follow hysteresis latch: true while actively closing the gap to the formation slot.
    *  Without it a companion re-triggers `approach` the instant it drifts one step past
    *  FOLLOW_NEAR, which is the approach/stop chatter C2 exists to remove. */
@@ -412,12 +423,14 @@ const AMBIENT_REPATH_SECONDS = 0.6
  */
 function freshAmbientPath(index: number): Pick<
   Ambient, 'path' | 'pathI' | 'pathGx' | 'pathGy' | 'pathCool' | 'pathBlocked' | 'closing'
+        | 'partySlot' | 'sparCd' | 'sparFoeIdx'
 > {
   return {
     path: [], pathI: 0, pathGx: 0, pathGy: 0,
     pathCool: ((index % 8) / 8) * AMBIENT_REPATH_SECONDS,
     pathBlocked: false,
     closing: false,
+    partySlot: -1, sparCd: 0, sparFoeIdx: -1,
   }
 }
 
@@ -483,11 +496,15 @@ export class WorldSceneController {
   /** Monotonic counter feeding each ambient fight a distinct, reproducible seed. */
   private ambientFightSeq = 0
   /** Index into `ambient` of the current party companion, or -1. */
-  private followerIdx = -1
+  /** Indices into `ambient` of every party member's body, in party order.
+   *  Was a single `followerIdx` assigned unconditionally in a loop, so it held the LAST
+   *  match — at 2+ members the follow speed, rejoin decisions, party frame and attack
+   *  counter all silently described one arbitrary member. */
+  private followerIdxs: number[] = []
   /** Reusable sparring-partner slot for the companion, or -1 before it exists. */
-  private companionFoeIdx = -1
+  // (per-companion spar state now lives on the Ambient record — see partySlot/sparCd/sparFoeIdx)
   /** Seconds until the companion is handed a fresh thing to fight. */
-  private companionSparCd = 0
+
   /** Attack animations the companion has played this session (debug/instrumentation). */
   private companionAttackCount = 0
   /** Group-level stream (recycle placement). Separate from the per-hero streams so
@@ -1246,7 +1263,7 @@ export class WorldSceneController {
       this.retireAmbient()
       // The crowd is regenerated per zone, so a companion's body is about to stop
       // existing. Disband explicitly rather than leaving a member pointing at nothing.
-      this.followerIdx = -1
+      this.followerIdxs = []
       disbandParty()
       // Enemies belong to the zone they stood in — their world anchors are meaningless
       // once the ground is rebaked.
@@ -2445,9 +2462,7 @@ export class WorldSceneController {
     this.ambientGroups = []
     // Indices into `ambient` are now meaningless; holding stale ones would point the
     // companion at whatever happens to land in that slot next.
-    this.followerIdx = -1
-    this.companionFoeIdx = -1
-    this.companionSparCd = 0
+    this.followerIdxs = []
   }
 
   // Place a group anchor a spread's distance from the player's tile, in a seeded
@@ -2939,7 +2954,7 @@ export class WorldSceneController {
 
   /** Index of this companion within the party, for slot assignment. */
   private partySlotOf(a: Ambient): number {
-    return this.ambient[this.followerIdx] === a ? 0 : 0
+    return a.partySlot >= 0 ? a.partySlot : 0
   }
 
   private followAmbient(a: Ambient, goalGx: number, goalGy: number, speed: number, dt: number): boolean {
@@ -3055,7 +3070,7 @@ export class WorldSceneController {
         if (a.grp !== gi) continue
         // The companion's sparring partner belongs to the player, not to a group anchor —
         // recycling it across the map would yank it out of a fight in progress.
-        if (ai === this.companionFoeIdx) continue
+        if (this.isSparFoe(ai)) continue
         a.gx = WorldSceneController.wrapMod(grp.gx + (a.rng() * 2 - 1) * 2.2)
         a.gy = WorldSceneController.wrapMod(grp.gy + (a.rng() * 2 - 1) * 2.2)
         // The ANCHOR was re-anchored onto walkable ground above, but this scatter can
@@ -3199,7 +3214,7 @@ export class WorldSceneController {
         // pushed its average distance from the player from 4.8 to 7.6 tiles, because
         // every extra fight is another excursion. Past the leash it drops the fight and
         // catches up — the player is the reason it is out here.
-        if (this.ambient[this.followerIdx] === a) {
+        if (a.partySlot >= 0) {
           const dP = Math.hypot(
             WorldSceneController.wrapDiff(pgx, a.gx),
             WorldSceneController.wrapDiff(pgy, a.gy))
@@ -3224,7 +3239,7 @@ export class WorldSceneController {
             // A party companion closes at follow speed. It is chasing a target while the
             // player walks away from both of them, so the idle-wander gait left it
             // permanently in transit.
-            const sp = a.state === 'approach' && this.ambient[this.followerIdx] === a ? FOLLOW_SPEED : SPEED
+            const sp = a.state === 'approach' && a.partySlot >= 0 ? FOLLOW_SPEED : SPEED
             this.followAmbient(a, foe.gx, foe.gy, sp, dt)
           }
         }
@@ -3286,9 +3301,11 @@ export class WorldSceneController {
     // brain tick by matching on entity key, so a hero who accepted an invite starts
     // following and one who left goes back to their own business.
     const party = getParty()
-    if (party.length || this.followerIdx >= 0) {
-      const wantKeys = new Set(party.map(m => m.key))
-      let found = -1
+    if (party.length || this.followerIdxs.length) {
+      // Party ORDER, not discovery order: the slot a member holds has to be stable, or
+      // the formation reshuffles every time the crowd array is rebuilt.
+      const slotOf = new Map(party.map((m, idx) => [m.key, idx]))
+      const found: number[] = []
       for (let i = 0; i < this.ambient.length; i++) {
         const a = this.ambient[i]
         if (a.kind !== 'hero' || !a.identity) continue
@@ -3296,8 +3313,10 @@ export class WorldSceneController {
           name: a.name, playerClass: a.identity.playerClass, race: a.identity.race,
           faction: this.factionLabel(a.faction), level: a.level, spec: a.identity.specTitle,
         })
-        if (wantKeys.has(key)) {
-          found = i
+        const slot = slotOf.get(key)
+        if (slot !== undefined) {
+          found[slot] = i
+          a.partySlot = slot
           // Promote into follow ONLY from a free-roaming state.
           //
           // This originally exempted 'fight' and 'loot' but not 'approach', which quietly
@@ -3311,22 +3330,28 @@ export class WorldSceneController {
             a.state = 'follow'
             a.foe = -1
           }
-        } else if (a.state === 'follow') {
+        } else if (a.state === 'follow' || a.state === 'assist') {
           a.state = 'wander'   // they left the party
+          a.partySlot = -1
         }
       }
       // A member whose body no longer exists (recycled with its group, or the zone
       // changed) cannot follow anyone. Disband rather than keep a ghost in the roster.
-      if (party.length && found < 0 && this.followerIdx >= 0) {
+      const live = found.filter(i => i !== undefined)
+      if (party.length && live.length === 0 && this.followerIdxs.length) {
         disbandParty()
       }
-      this.followerIdx = found
+      this.followerIdxs = live
 
       // Publish what the companion is doing, for the party frame. Health comes from the
       // fight they are currently playing back, so the bar moves for real rather than
       // being decorative — and returns to full between fights, because a companion's HP
       // only exists inside a resolved fight.
-      const c = found >= 0 ? this.ambient[found] : null
+      // The party frame shows the FIRST member. C4 makes the roster plural in the
+      // simulation; a multi-member HUD is UI work that belongs with it, and showing
+      // member 0 is strictly better than the previous behaviour of showing whichever
+      // member the reconcile loop happened to touch last.
+      const c = live.length ? this.ambient[live[0]] : null
       if (c && c.identity) {
         const ACTIVITY: Record<string, 'following' | 'moving in' | 'fighting' | 'looting' | 'idle'> = {
           follow: 'following', approach: 'moving in', fight: 'fighting',
@@ -3395,7 +3420,7 @@ export class WorldSceneController {
           // into reach they will break off, fight it, loot it, and then catch back up.
           // That is the whole difference between a party member and a pet. Their fight
           // is entirely their own — it never touches the player's target, HP, XP or loot.
-          this.companionSparCd -= step
+          a.sparCd -= step
           // C3: the player's own fight OUTRANKS the companion's agenda. If you are
           // engaged with a real store mob, your party member joins that fight rather
           // than wandering off to find its own — which is the entire point of having
@@ -3425,11 +3450,11 @@ export class WorldSceneController {
           // claimed by the heroes standing on top of them, so without this a companion
           // simply never fights — which is exactly how it played. Not while trailing:
           // catch up first, then pick a fight.
-          if (foe < 0 && this.companionSparCd <= 0 && !a.closing) foe = this.spawnCompanionFoe(a)
+          if (foe < 0 && a.sparCd <= 0 && !a.closing) foe = this.spawnCompanionFoe(a)
           if (foe >= 0) {
             a.foe = foe
             a.state = 'approach'
-            this.companionSparCd = COMPANION_SPAR_INTERVAL + a.rng() * COMPANION_SPAR_INTERVAL
+            a.sparCd = COMPANION_SPAR_INTERVAL + a.rng() * COMPANION_SPAR_INTERVAL
             speaking += this.tryBark(a, 'engage', speaking)
           } else if (a.rng() < 0.05) {
             // Nothing to kill yet — talk to the player instead. A companion that never
@@ -3497,7 +3522,7 @@ export class WorldSceneController {
               // The monster holds a death pose through the loot beat, then retires.
               foe.e.animator.set('death')
               a.state = 'loot'
-              a.rejoinAfter = i === this.followerIdx
+              a.rejoinAfter = a.partySlot >= 0
               a.t = 1.6 + a.rng() * 1.2
               speaking += this.tryBark(a, 'kill', speaking)
             } else {
@@ -3507,7 +3532,7 @@ export class WorldSceneController {
               foe.state = 'idle'
               foe.foe = -1
               foe.e.animator.set('idle')
-              a.state = i === this.followerIdx ? 'follow' : 'wander'
+              a.state = a.partySlot >= 0 ? 'follow' : 'wander'
               a.foe = -1
               speaking += this.tryBark(a, 'died', speaking)
             }
@@ -3531,12 +3556,12 @@ export class WorldSceneController {
               foe.foe = -1
               // The companion's sparring partner is respawned on the companion's own
               // cadence next to the player, not on the group-anchor respawn timer.
-              foe.respawnT = a.foe === this.companionFoeIdx
+              foe.respawnT = a.foe === a.sparFoeIdx
                 ? 0
                 : AMBIENT_MOB_RESPAWN + a.rng() * AMBIENT_MOB_RESPAWN
             }
             a.foe = -1
-            a.state = a.rejoinAfter || i === this.followerIdx ? 'follow' : 'wander'
+            a.state = a.rejoinAfter || a.partySlot >= 0 ? 'follow' : 'wander'
             a.rejoinAfter = false
             a.t = 0
           }
@@ -3637,11 +3662,21 @@ export class WorldSceneController {
    * numbers. It is never one of the store's real `mobs`, so the player's combat, loot and
    * XP remain untouched.
    */
+  /** Is this ambient index some companion's sparring partner? */
+  private isSparFoe(idx: number): boolean {
+    for (const fi of this.followerIdxs) {
+      if (this.ambient[fi]?.sparFoeIdx === idx) return true
+    }
+    return false
+  }
+
   private spawnCompanionFoe(companion: Ambient): number {
     if (!this.rigs || !this.player) return -1
 
-    // One reusable slot rather than an ever-growing array.
-    if (this.companionFoeIdx < 0 || !this.ambient[this.companionFoeIdx]) {
+    // One reusable slot PER COMPANION rather than one shared between all of them. The
+    // shared slot is why the second party member was inert: it found the slot taken and
+    // never got a fight of its own.
+    if (companion.sparFoeIdx < 0 || !this.ambient[companion.sparFoeIdx]) {
       const rng = companion.rng
       const monsterId = MONSTER_SPRITES[Math.floor(rng() * MONSTER_SPRITES.length)]
       const sprite = this.spriteCache[monsterId] ?? this.rigs.mobBeast
@@ -3653,15 +3688,18 @@ export class WorldSceneController {
         e, kind: 'mob', gx: 0, gy: 0, tgx: 0, tgy: 0, t: 0,
         fightT: 0, atkCd: 0, name: '', level: 0, faction: 'neutral',
         grp: companion.grp,
-        rng: subStream(this.zoneSeed(), 'companion-foe'), state: 'idle',
+        // Keyed to the companion, NOT a literal: two spar monsters sharing the label
+        // 'companion-foe' would share one stream and roll identical placements — the exact
+        // determinism regression per-hero sub-streams exist to prevent.
+        rng: subStream(this.zoneSeed(), `companion-foe:${companion.name}:${companion.partySlot}`), state: 'idle',
         identity: null, bark: null, barkT: 0, barkCd: 0,
         fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false,
         respawnT: 0, rejoinAfter: false,
       })
-      this.companionFoeIdx = this.ambient.length - 1
+      companion.sparFoeIdx = this.ambient.length - 1
     }
 
-    const foe = this.ambient[this.companionFoeIdx]
+    const foe = this.ambient[companion.sparFoeIdx]
     const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
     const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
     // Place it to one side of the player, far enough that the companion visibly walks
@@ -3687,7 +3725,7 @@ export class WorldSceneController {
     foe.e.active = true
     foe.e.alpha = 1
     foe.e.animator.set('idle')
-    return this.companionFoeIdx
+    return companion.sparFoeIdx
   }
 
   /** Nearest living ambient monster within engage radius, or -1. */
@@ -3788,7 +3826,7 @@ export class WorldSceneController {
       case 'flurry':
         attacker.e.animator.set('attack')
         attacker.e.animator.restart()
-        if (attacker === this.ambient[this.followerIdx]) this.companionAttackCount++
+        if (attacker.partySlot >= 0) this.companionAttackCount++
         if (ev.damage > 0) {
           this.spawnFloater(target.e, String(ev.damage), ev.crit, ev.crit ? '#ffcc00' : '#ffffff', false)
         }

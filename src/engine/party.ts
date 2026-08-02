@@ -34,9 +34,20 @@ export interface PartyMember {
   joinedAt: number
 }
 
-/** One companion at a time. A crowd of followers is a different feature (and a perf
- *  problem); one is enough to make the world feel social. */
-export const PARTY_MAX = 1
+/**
+ * How many companions may travel with the player.
+ *
+ * Raised from 1 by C4. The cap was always soft; what actually made a second member inert
+ * was that the companion supply was structurally single — one shared sparring-partner
+ * slot, one shared spar cooldown (decremented once per follower, so it also drained N
+ * times too fast) and one `followerIdx` that held whichever member the reconcile loop
+ * touched last. Those are per-member now.
+ *
+ * Held at 3 rather than opened wide: the party frame stacks vertically in `.hud-tl`, and
+ * beyond three frames that column starts fighting `.hud-bottom` for space on a short
+ * landscape viewport.
+ */
+export const PARTY_MAX: number = 3
 
 let members: PartyMember[] = []
 const listeners = new Set<() => void>()
@@ -97,7 +108,10 @@ export function invitePartyMember(
   const key = entityKey(speaker)
   if (isInParty(key) || pendingInvites.has(key)) return
   if (members.length >= PARTY_MAX) {
-    pushChat({ channel: 'system', from: null, text: `You can only party with ${PARTY_MAX} hero at a time.` })
+    pushChat({
+      channel: 'system', from: null,
+      text: `You can only party with ${PARTY_MAX} ${PARTY_MAX === 1 ? 'hero' : 'heroes'} at a time.`,
+    })
     return
   }
 
@@ -197,7 +211,9 @@ export function leaveParty(key: string, reason?: string): void {
   const m = members.find(x => x.key === key)
   if (!m) return
   members = members.filter(x => x.key !== key)
-  setCompanionStatus(null)
+  // Only blank the status if that was the LAST member. Clearing it unconditionally left
+  // the party frame empty for every surviving member until the next 5Hz adapter tick.
+  if (members.length === 0) setCompanionStatus(null)
   pushChat({
     channel: 'system', from: null,
     text: reason ?? `${m.speaker.name} has left your party.`,
