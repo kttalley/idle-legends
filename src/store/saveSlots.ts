@@ -8,6 +8,10 @@ import type { GameState, ClassType, RaceType, FactionType, ZoneId } from '../dat
 
 export const SAVES_KEY  = 'idle_legends_saves_v1'
 const LEGACY_KEY        = 'idle_legends_save_v2'
+/** Quarantine for a saves file we could not parse. Never written over. */
+const CORRUPT_KEY       = 'idle_legends_saves_corrupt'
+/** Slot the player was last in. Read on boot to resume without a menu round-trip. */
+const LAST_SLOT_KEY     = 'idle_legends_last_slot'
 export const MAX_SLOTS  = 5
 
 // Lightweight card data for the character-select screen — never carries the full
@@ -58,28 +62,80 @@ export function newSlotId(): string {
 export interface SlotStorage {
   list():                            SaveSlotMeta[]
   load(id: string):                  SaveSlot | null
-  save(slot: SaveSlot):              void
+  /** False if the write failed (quota, private mode). Never throws. */
+  save(slot: SaveSlot):              boolean
   delete(id: string):                void
 }
 
 // ── Local (browser) implementation ──────────────────────────────────────────────
+
+/** Set when a write fails (quota, private mode). The UI can surface it; the game loop
+ *  must never take an exception from a failed save — see `writeFile`. */
+export let lastSaveError: string | null = null
+export function clearSaveError(): void { lastSaveError = null }
+
 function readFile(): SavesFile {
   const raw = localStorage.getItem(SAVES_KEY)
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as SavesFile
       if (parsed && Array.isArray(parsed.slots)) return parsed
-    } catch { /* fall through to fresh/migrated file */ }
+    } catch {
+      // A saves file that exists but will not parse is NOT a missing file. This used to
+      // fall through and write `{slots: []}` straight over it, on a path that runs on
+      // every list/load/save — i.e. every autosave — so one bad parse permanently
+      // destroyed every character. Quarantine it instead and return empty WITHOUT
+      // writing: the player sees an empty character select, but the bytes still exist
+      // and are recoverable by hand.
+      try {
+        if (!localStorage.getItem(CORRUPT_KEY)) localStorage.setItem(CORRUPT_KEY, raw)
+      } catch { /* quarantine is best-effort; never let it throw */ }
+      console.error('[saves] saves file did not parse; quarantined under', CORRUPT_KEY)
+      lastSaveError = 'Your save file could not be read. It has been preserved, not overwritten.'
+      return { slots: [] }
+    }
   }
-  // No slots file yet — attempt one-time migration of the legacy single save.
+  // No slots file at all — attempt one-time migration of the legacy single save.
   const migrated = migrateLegacy()
   const file: SavesFile = { slots: migrated ? [migrated] : [] }
   writeFile(file)
   return file
 }
 
-function writeFile(file: SavesFile): void {
-  localStorage.setItem(SAVES_KEY, JSON.stringify(file))
+/**
+ * Guarded write. Returns false rather than throwing.
+ *
+ * `setItem` throws QuotaExceededError when the origin quota is full, and this call sits
+ * on the autosave path: gameLoop → saveGame → save → writeFile. An exception here used
+ * to escape into the rAF callback and kill the frame chain permanently, so a full disk
+ * presented as the whole game freezing.
+ */
+function writeFile(file: SavesFile): boolean {
+  try {
+    localStorage.setItem(SAVES_KEY, JSON.stringify(file))
+    lastSaveError = null
+    return true
+  } catch (e) {
+    const quota = e instanceof DOMException &&
+      (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+    lastSaveError = quota
+      ? 'Out of storage — progress could not be saved.'
+      : `Save failed: ${e instanceof Error ? e.message : String(e)}`
+    console.error('[saves] write failed:', e)
+    return false
+  }
+}
+
+/** The slot the player was last in, or null. Used to resume on boot. */
+export function getLastSlotId(): string | null {
+  try { return localStorage.getItem(LAST_SLOT_KEY) } catch { return null }
+}
+
+export function setLastSlotId(id: string | null): void {
+  try {
+    if (id) localStorage.setItem(LAST_SLOT_KEY, id)
+    else localStorage.removeItem(LAST_SLOT_KEY)
+  } catch { /* non-fatal: worst case the player lands on character select */ }
 }
 
 function migrateLegacy(): SaveSlot | null {
@@ -118,13 +174,14 @@ export const localSlotStorage: SlotStorage = {
     const idx = file.slots.findIndex(s => s.id === slot.id)
     if (idx >= 0) file.slots[idx] = slot
     else file.slots.push(slot)
-    writeFile(file)
+    return writeFile(file)
   },
 
   delete(id) {
     const file = readFile()
     file.slots = file.slots.filter(s => s.id !== id)
     writeFile(file)
+    if (getLastSlotId() === id) setLastSlotId(null)
   },
 }
 

@@ -49,11 +49,17 @@ export function CharacterPanel() {
           <GoldDisplay gold={gold} />
           {/* Was in a floating top bar that spanned the screen for the sake of two
               controls. Gold already lived here; switching hero belongs with the hero. */}
+          {/* Ejects the player out of their run, so it confirms first and is big enough
+              to be aimed at. At 0.55rem/2px it was a ~14px target sitting beside the gold
+              chip — one mis-tap ended the session — while the rest of the social UI was
+              raised to a 44pt minimum in the mobile pass. */}
           <button
             className="rp-button"
-            onClick={returnToMenu}
+            onClick={() => {
+              if (confirm('Return to character select?\n\nYour progress is saved.')) returnToMenu()
+            }}
             title="Save and return to character select"
-            style={{ fontSize: '0.55rem', padding: '2px 7px' }}
+            style={{ fontSize: '0.62rem', padding: '8px 12px', minHeight: 34 }}
           >
             Heroes
           </button>

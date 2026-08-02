@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useGameStore } from './store/gameStore'
 import { startGameLoop, stopGameLoop } from './engine/gameLoop'
 import { CharacterCreate } from './components/game/CharacterCreate'
@@ -14,7 +14,7 @@ import { WhisperWindow } from './components/game/WhisperWindow'
 import { installViewportInsets } from './engine/viewportInsets'
 import { QuestToast } from './components/game/QuestToast'
 import { OfflineReportToast } from './components/game/OfflineReportToast'
-import { slotStorage } from './store/saveSlots'
+import { slotStorage, getLastSlotId, setLastSlotId } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
 import { ZONES, ZONE_ORDER } from './data/zones'
 import { SpriteIcon } from './components/ui/SpriteIcon'
@@ -49,6 +49,30 @@ export default function App() {
   const [slots, setSlots]   = useState<SaveSlotMeta[]>(() => slotStorage.list())
   // Show creation directly when there are no heroes yet; otherwise the select screen.
   const [creating, setCreating] = useState<boolean>(() => slotStorage.list().length === 0)
+
+  // Boot resume — the fix for "the app spontaneously returns to character select".
+  //
+  // It was never a reset; it was a MISSING RESUME. Commit 11966fe (save slots) replaced
+  // loadGame() with loadSlot(id) and deleted the `useEffect(() => loadGame(), [])` that
+  // used to run on mount, without replacing it — leaving loadSlot reachable from exactly
+  // one place in the app, a human clicking Continue. The save on disk was fine the whole
+  // time; nothing ever went back for it. So any re-evaluation of the gameStore module
+  // lands on a fresh defaultState() with no way back: in dev that is Vite's HMR (
+  // gameStore is not a Fast Refresh boundary, so it re-executes in place and the app
+  // blinks to the menu mid-session with nothing in the console), and in a shipped
+  // WKWebView it is a memory-pressure reload dumping the player at the menu mid-run.
+  //
+  // The ref guards against StrictMode's double-mount, which would otherwise run the
+  // offline-progress projection in loadSlot twice.
+  const resumed = useRef(false)
+  useEffect(() => {
+    if (resumed.current) return
+    resumed.current = true
+    const last = getLastSlotId()
+    if (!last) return
+    // A stale pointer (hero deleted on another tab) must not be retried forever.
+    if (!loadSlot(last)) setLastSlotId(null)
+  }, [loadSlot])
 
   const toggle = (p: MobilePanel) => setActivePanel(cur => cur === p ? null : p)
   const close  = () => setActivePanel(null)

@@ -60,7 +60,7 @@ import { isTownHostileToPlayer } from '../engine/zoneProgression'
 import { rollLoot, placeDrop, salvageValue } from '../engine/loot'
 import { generateNames, generateThought, generateFactionNamesFallback, generatePlayerNameFallback } from '../engine/nameGen'
 import type { ThoughtEvent } from '../engine/nameGen'
-import { slotStorage, summarize, newSlotId } from './saveSlots'
+import { slotStorage, summarize, newSlotId, setLastSlotId } from './saveSlots'
 import { emptyRates, accrueRates, projectOfflineProgress } from '../engine/offline'
 import { compileUpgrades, upgradeCost, UPGRADE_BY_ID, type UpgradeId } from '../data/upgrades'
 import type { TownServiceKind } from '../data/townNpcs'
@@ -69,6 +69,9 @@ import type { TownServiceKind } from '../data/townNpcs'
 // while at the character-select menu. Kept out of GameState so it isn't serialized
 // into the save blob itself.
 let activeSlotId: string | null = null
+// Cached alongside it so the 10s autosave doesn't have to re-read and re-parse the whole
+// saves file just to recover the slot's createdAt.
+let activeSlotCreatedAt: number | null = null
 const LOG_MAX  = 150
 // Cast pushback: seconds added to a channel per mob hit, and the per-cast cap.
 const CAST_PUSHBACK_PER_HIT = 0.5
@@ -480,6 +483,13 @@ function toSaveBlob(s: GameState): GameState {
   blob.lastTickTimestamp = Date.now()
   // The strike meter is a live UI object, never a saved one.
   blob.gatherSession = null
+  // zoneMaps is 2.63 MB of pure derived data at full progression (12 zones × a 64×64 grid
+  // whose every tile carries a `charSet: string[]`, plus ~700 props and ~90 scenery each)
+  // — and rehydrateState regenerates all of it from (unlockedZones, worldSeed) on load,
+  // discarding whatever was stored. Persisting it bought nothing and cost ~99% of the
+  // blob: five slots came to 13.15 MB against a ~5 MB origin quota, so the SECOND
+  // fully-progressed character could not be written at all.
+  blob.zoneMaps = {}
   return blob
 }
 
@@ -1463,29 +1473,48 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Mint a fresh save slot for this character and persist it immediately, so the
     // run survives a reload even before the first autosave.
     activeSlotId = newSlotId()
+    activeSlotCreatedAt = Date.now()
+    setLastSlotId(activeSlotId)
     set(s)
     get().saveGame()
     // Fire name generation async — game starts immediately, names trickle in. A
     // creation-chosen name is preserved (never overwritten by the LLM).
+    // `slotAtRequest` pins the slot this generation belongs to. The request resolves
+    // ~30s later, by which time the player may have gone back to the menu and opened a
+    // DIFFERENT hero — and this continuation calls set() + saveGame() unconditionally,
+    // so hero A's generated name, traits and faction names were written over hero B.
+    const slotAtRequest = activeSlotId
     generateNames(playerClass, nameSeed)
-      .then(names => { set({
-        playerName: chosenName || names.playerName,
-        characterTraits: names.traits,
-        generatedZoneNames: names.zoneNames,
-        factionNames: names.factionNames,
-        generatedTownNames: names.townNames ?? {},
-        nameGenStatus: 'done',
-      }); get().saveGame() })  // persist the generated identity into the slot
-      .catch((err) => { console.error('[nameGen] failed:', err); if (!chosenName) set({ nameGenStatus: 'error' }) })
+      .then(names => {
+        if (activeSlotId !== slotAtRequest) return   // player switched heroes; drop it
+        set({
+          playerName: chosenName || names.playerName,
+          characterTraits: names.traits,
+          generatedZoneNames: names.zoneNames,
+          factionNames: names.factionNames,
+          generatedTownNames: names.townNames ?? {},
+          nameGenStatus: 'done',
+        })
+        get().saveGame()   // persist the generated identity into the slot
+      })
+      .catch((err) => {
+        console.error('[nameGen] failed:', err)
+        if (!chosenName && activeSlotId === slotAtRequest) set({ nameGenStatus: 'error' })
+      })
   },
 
   loadSlot: (id) => {
     try {
       const slot = slotStorage.load(id)
-      if (!slot || !slot.state?.initialized) return false
+      if (!slot || !slot.state?.initialized) {
+        console.warn('[saves] slot', id, 'missing or not initialized')
+        return false
+      }
       const saved = rehydrateState(slot.state)
       resetCombatAccumulators()
       activeSlotId = id
+      activeSlotCreatedAt = slot.createdAt
+      setLastSlotId(id)
       // Grant time away BEFORE the state goes live, so the player never sees the
       // pre-offline numbers flash and then jump. `lastTickTimestamp` is stamped by
       // toSaveBlob at write time, which is what makes the elapsed window honest.
@@ -1493,7 +1522,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       set(offline ? { ...saved, ...offline.patch, lastOffline: offline.report } : saved)
       get().saveGame()   // refreshes lastPlayedAt
       return true
-    } catch {
+    } catch (err) {
+      // Was a bare `catch { return false }`, and App.tsx discarded the boolean — so a
+      // failed Continue was a silent no-op indistinguishable from "bounced back".
+      console.error('[saves] loadSlot failed for', id, err)
       return false
     }
   },
@@ -1503,10 +1535,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const s = get()
     if (!s.initialized) return
     const now = Date.now()
-    const existing = slotStorage.load(activeSlotId)
+    // createdAt is cached at load/create time. Reading it back through
+    // slotStorage.load() here meant every autosave parsed the whole multi-megabyte
+    // saves file twice — once for this lookup and once inside save() itself.
     slotStorage.save({
       id:           activeSlotId,
-      createdAt:    existing?.createdAt ?? now,
+      createdAt:    activeSlotCreatedAt ?? now,
       lastPlayedAt: now,
       summary:      summarize(s),
       state:        toSaveBlob(s),
@@ -1518,6 +1552,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   returnToMenu: () => {
     get().saveGame()
     activeSlotId = null
+    activeSlotCreatedAt = null
+    setLastSlotId(null)   // an explicit exit to the menu must not auto-resume on reload
     resetCombatAccumulators()
     set({ ...defaultState(), initialized: false })
   },
@@ -1527,6 +1563,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // not wired to any UI button.
     if (activeSlotId) slotStorage.delete(activeSlotId)
     activeSlotId = null
+    activeSlotCreatedAt = null
+    setLastSlotId(null)
     resetCombatAccumulators()
     set(defaultState())
   },
