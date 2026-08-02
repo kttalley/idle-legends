@@ -1211,6 +1211,7 @@ export class WorldSceneController {
     }
     this.playerBasePalette = heroPaletteId(
       state.playerClass, state.playerRace, state.playerFaction, bestEquipmentRarity(state),
+      state.colorway,
     )
     if (this.playerFlashT <= 0) this.player.paletteId = this.playerBasePalette
 

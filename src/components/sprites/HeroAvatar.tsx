@@ -22,6 +22,7 @@ interface HeroAvatarProps {
   animate?:    boolean     // default true
   facing?:     Facing      // default 'se'
   circle?:     boolean     // default true
+  colorway?:   string      // cosmetic palette override; default = the free standard set
 }
 
 /** A single, self-contained dimetric avatar that renders the actual sprite a hero will
@@ -42,13 +43,14 @@ export function HeroAvatar({
   animate = true,
   facing = 'se',
   circle = true,
+  colorway,
 }: HeroAvatarProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState(false)
 
   const spriteId = heroSpriteId(race, playerClass, name)
-  const paletteId = heroPaletteId(playerClass, race, faction, rarity)
+  const paletteId = heroPaletteId(playerClass, race, faction, rarity, colorway)
 
   // Procedural fallback seed: stable for this hero but distinct across classes.
   const fallbackSeed = hashStr(name) ^ hashStr(playerClass)

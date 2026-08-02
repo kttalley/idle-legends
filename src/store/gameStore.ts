@@ -61,6 +61,8 @@ import { rollLoot, placeDrop, salvageValue } from '../engine/loot'
 import { generateNames, generateThought, generateFactionNamesFallback, generatePlayerNameFallback } from '../engine/nameGen'
 import type { ThoughtEvent } from '../engine/nameGen'
 import { slotStorage, summarize, newSlotId, setLastSlotId } from './saveSlots'
+import { DEFAULT_COLORWAY, isColorwayUnlocked } from '../render/colorways'
+import { getPurchaseState } from '../monetization/purchases'
 import { emptyRates, accrueRates, projectOfflineProgress } from '../engine/offline'
 import { compileUpgrades, upgradeCost, UPGRADE_BY_ID, type UpgradeId } from '../data/upgrades'
 import type { TownServiceKind } from '../data/townNpcs'
@@ -352,6 +354,7 @@ function defaultState(): GameState {
     completedQuestIds: [],
     // Control mode
     controlMode: 'idle',
+    colorway: DEFAULT_COLORWAY,
     manualIdleTimer: 0,
   }
 }
@@ -366,6 +369,9 @@ function rehydrateState(saved: GameState): GameState {
   saved.playerFaction = saved.playerFaction ?? 'alliance'
   saved.factionNames  = saved.factionNames  ?? generateFactionNamesFallback(Date.now())
   saved.controlMode   = saved.controlMode   ?? 'idle'
+  // Saves written before colorways existed, and any save naming a colorway this build
+  // no longer ships, fall back to the default rather than rendering an unknown palette.
+  saved.colorway      = saved.colorway ?? DEFAULT_COLORWAY
   saved.manualIdleTimer = saved.manualIdleTimer ?? 0
   // Recompile stats
   const savedRacialPassive = RACE_DEFINITIONS[saved.playerRace]?.racialPassive ?? {}
@@ -1412,6 +1418,8 @@ interface GameActions {
   cycleZoom: () => void
   setMode: (mode: GameMode) => void
   setControlMode: (mode: 'idle' | 'manual') => void
+  /** Equip a cosmetic colorway. Returns false if it is not unlocked. */
+  setColorway: (id: string) => boolean
   bumpManualInput: () => void
   reportPlayerWorldPos: (x: number, y: number) => void
   startCrafting: (recipeId: RecipeId) => void
@@ -2992,6 +3000,17 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       set({ gameMode: 'crafting', gatherSession: null, mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
       resetCombatAccumulators()
     }
+  },
+
+  setColorway: (id) => {
+    // The gate. Entitlements are read live from RevenueCat's cached CustomerInfo rather
+    // than from the save, so a refund or an expired entitlement takes effect without
+    // needing a migration — and a save carrying a colorway the player no longer owns
+    // simply cannot be re-equipped.
+    if (!isColorwayUnlocked(id, getPurchaseState().active)) return false
+    set({ colorway: id })
+    get().saveGame()
+    return true
   },
 
   setControlMode: (mode) => {

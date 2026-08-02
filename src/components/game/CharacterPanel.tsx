@@ -1,5 +1,6 @@
 import { CollapsiblePanel } from '../ui/CollapsiblePanel'
 import React, { useState } from 'react'
+import { WardrobePanel } from './WardrobePanel'
 import { useGameStore } from '../../store/gameStore'
 import { CLASS_DEFINITIONS } from '../../data/classes'
 import { xpForLevel } from '../../engine/progression'
@@ -10,6 +11,7 @@ import { TalentTree } from './TalentTree'
 type Tab = 'stats' | 'talents'
 
 export function CharacterPanel() {
+  const [wardrobeOpen, setWardrobeOpen] = useState(false)
   const {
     stats, level, xp, playerClass, gold, talentPoints, playerName, nameGenStatus,
     returnToMenu,
@@ -49,6 +51,14 @@ export function CharacterPanel() {
           <GoldDisplay gold={gold} />
           {/* Was in a floating top bar that spanned the screen for the sake of two
               controls. Gold already lived here; switching hero belongs with the hero. */}
+          <button
+            className="rp-button"
+            onClick={() => setWardrobeOpen(true)}
+            title="Wardrobe — cosmetic colourways"
+            style={{ fontSize: '0.62rem', padding: '8px 12px', minHeight: 34 }}
+          >
+            Looks
+          </button>
           {/* Ejects the player out of their run, so it confirms first and is big enough
               to be aimed at. At 0.55rem/2px it was a ~14px target sitting beside the gold
               chip — one mis-tap ended the session — while the rest of the social UI was
@@ -146,6 +156,8 @@ export function CharacterPanel() {
 
         {tab === 'talents' && <TalentTree />}
       </div>
+
+      {wardrobeOpen && <WardrobePanel onClose={() => setWardrobeOpen(false)} />}
     </CollapsiblePanel>
   )
 }

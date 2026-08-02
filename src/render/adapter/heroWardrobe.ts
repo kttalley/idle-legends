@@ -10,6 +10,7 @@
 import type { ClassType, RaceType, FactionType, Rarity } from '../../data/types'
 import { composePalette } from '../palette'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
+import { getColorway, DEFAULT_COLORWAY } from '../colorways'
 
 // Race → skin base palette id. (tauren → hornborn rig palette; Track R rename is
 // display-only, the renderer just needs a palette id that exists.)
@@ -46,14 +47,22 @@ export function heroPaletteId(
   race: RaceType,
   faction: FactionType,
   rarity: Rarity = 'common',
+  colorway: string = DEFAULT_COLORWAY,
 ): string {
-  const id = `hero/${playerClass}/${race}/${faction}/${rarity}`
+  // The colorway is part of the cache key, so an equipped skin is a distinct registered
+  // palette rather than a mutation of the base one — two heroes in the same party can
+  // wear different colorways in the same frame.
+  const cw = getColorway(colorway)
+  const id = `hero/${playerClass}/${race}/${faction}/${rarity}/${cw.id}`
   if (hasPalette(id)) return id
   const base = getPalette(RACE_PALETTE[race] ?? 'race/human')  // skin ramp (1–4)
   const overrides: Partial<Record<number, string>> = {
     ...CLASS_TUNIC[playerClass],
     ...FACTION_TRIM[faction],
     ...(RARITY_ACCENTS[rarity] ?? RARITY_ACCENTS.common),
+    // Last, so a purchased colorway wins over class/faction/rarity — that is the point
+    // of buying it. It deliberately carries no slots 1–4, so race skin always survives.
+    ...cw.overrides,
   }
   registerPaletteRaw(id, composePalette(base, overrides))
   return id

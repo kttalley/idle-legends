@@ -686,6 +686,11 @@ export interface GameState {
   // ── Control mode ───────────────────────────────────────────────────────────
   /** 'idle' = auto-pilot (existing behavior). 'manual' = player-driven movement/abilities. */
   controlMode: 'idle' | 'manual'
+  /** Equipped cosmetic colorway id (src/render/colorways.ts). Purely visual: it maps to
+   *  palette slot overrides and can never affect stats. Premium ids are gated by a
+   *  RevenueCat entitlement at equip time, so a save carrying one the player no longer
+   *  owns simply renders as the default. */
+  colorway: string
   /** Seconds remaining before manual mode falls back to idle. Only counts down in combat. */
   manualIdleTimer: number
 }
