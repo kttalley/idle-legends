@@ -143,7 +143,7 @@ export function zoneMapToTileMap(zm: ZoneMap): TileMapData {
 // (the bake cache lazily produces one sheet per (tileset, biome) pair). Grouped by
 // zone character: greens, jungle, red-rock, charcoal/ember, dust, blood, sickly.
 const BIOME_PALETTE: Record<ZoneId, string> = {
-  sunhollow_meadows:   'biome/meadow',       // default grassland (alias of map080)
+  sunhollow_meadows:   'biome/meadow',       // default grassland
   shattered_crossing:  'biome/forest',       // temperate forest greens
   thornvale_jungle:    'biome/jungle',       // deep saturated jungle
   the_maw_eternal:     'biome/maw',          // corrupted dark swamp

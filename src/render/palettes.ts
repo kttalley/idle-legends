@@ -148,35 +148,43 @@ reg('team/player', composePalette(BASE_UNIT, { 9: '#1c3454', 10: '#284c7c', 11: 
 reg('team/enemy', composePalette(BASE_UNIT, { 9: '#54201c', 10: '#7c2e28', 11: '#a44038', 12: '#c85c50' }))
 
 // ── Biome tile palettes: the map recolors with the same mechanism ────────────
-// biome/map080 is the faithful FFTA map #080 grassland palette, decoded straight
-// from the ROM via the sibling ff-tactics-decomp editor sidecar (/api/map_full?id=80).
-// Bank 0 of that map: deep water blues, teal→yellow-green grass, pale stone/cream
-// highlights — slotted onto the tileset's semantic channels (5-8 veg, 9-12 water,
-// 13-15 stone, 1-4 earth/path). This is the environment's default look.
-reg('biome/map080', paletteFromHex([
+// biome/meadow is the environment's default look and the base every other biome
+// composes over.
+//
+// ORIGINAL RAMP, authored 2026-08-01. It replaces `biome/map080`, which was fifteen
+// values decoded straight out of the FFTA ROM via the decomp editor sidecar. That
+// palette was the single largest remaining piece of scaffold-derived content in the
+// build: aliased as `biome/meadow`, used by sunhollow_meadows — the starting zone, and
+// so the first thing any player or App Store reviewer sees — and shipped in dist/. A
+// term-based IP grep cannot catch it, because the infringing part is the colour values
+// themselves, not a name.
+//
+// Authored to the world bible (docs/art-direction.md §1) rather than resampled: the
+// Lastlight Concord's meadow is a *war-tired* grassland, so the greens are desaturated
+// and slightly olive rather than the source's tropical teal→lime, the earth is warm
+// trodden loam rather than pale sea-stone, and the water is a cold slate blue. Ramps
+// keep an even perceptual step so the tileset's dithering reads cleanly at 32x16.
+reg('biome/meadow', paletteFromHex([
   '',
-  '#7b94a4', '#9cb4b4', '#cdcdbe', '#e6e6cd', // 1-4 earth / path (pale stone→cream)
-  '#184a52', '#187b73', '#399c73', '#accd6a', // 5-8 vegetation (teal→yellow-green)
-  '#294152', '#295a73', '#39738b', '#527b9c', // 9-12 water (deep blue→blue)
-  '#9cb4b4', '#cdcdbe', '#e6e6cd',            // 13-15 stone / cliff faces
+  '#4c4032', '#6b5a44', '#8a7659', '#a89370', // 1-4  earth / path (trodden loam)
+  '#2c4028', '#3e5a34', '#547444', '#719258', // 5-8  vegetation (olive-green)
+  '#22303f', '#2e4356', '#3e5b72', '#54788f', // 9-12 water (cold slate blue)
+  '#565043', '#767060', '#98917e',            // 13-15 stone / cliff faces
 ]))
-// biome/meadow is the default grassland look (alias of map080) — also used by the
-// dev harness, so the id must stay registered.
-reg('biome/meadow', REGISTRY.get('biome/map080')!)
 
-// Per-zone biome variety (environment-plan Phase A): each biome is map080 with its
+// Per-zone biome variety (environment-plan Phase A): each biome is the meadow ramp with its
 // four semantic channels — earth/path (1-4), vegetation (5-8), water (9-12), stone
 // (13-15) — swapped to a coherent character. All palette-indexed, so a biome palette
 // also tints any future props/tiles authored against the same slots. Original art:
 // no FFTA pixels or constants are reused, only the slot convention.
-const M080 = (): Palette => REGISTRY.get('biome/map080')!
+const MEADOW = (): Palette => REGISTRY.get('biome/meadow')!
 function biome(ch: { e: readonly string[]; v: readonly string[]; w: readonly string[]; s: readonly string[] }): Palette {
   const o: Record<number, string> = {}
   ch.e.forEach((h, i) => { o[i + 1] = h })
   ch.v.forEach((h, i) => { o[i + 5] = h })
   ch.w.forEach((h, i) => { o[i + 9] = h })
   ch.s.forEach((h, i) => { o[i + 13] = h })
-  return composePalette(M080(), o)
+  return composePalette(MEADOW(), o)
 }
 
 // Temperate forest — deeper greens and brown loam than the meadow.
