@@ -139,10 +139,12 @@ export function MinimapRadar() {
           onClick={() => setMapOpen(true)}
           title="World map — fast travel"
           style={{
-            position: 'absolute', right: -4, bottom: -4,
-            width: 22, height: 22, borderRadius: '50%',
+            position: 'absolute', right: -6, bottom: -6,
+            width: 28, height: 28, borderRadius: '50%',
+            // .hud-layer is click-through; controls must claim their own touches.
+            pointerEvents: 'auto',
             border: '1px solid #6b5020', background: 'rgba(20,16,8,0.95)',
-            color: '#ffd700', fontSize: 12, cursor: 'pointer', lineHeight: '20px', padding: 0,
+            color: '#ffd700', fontSize: 12, cursor: 'pointer', lineHeight: '26px', padding: 0,
           }}
         >
           <SpriteIcon ui="map" size={15} title="Zone map" />
@@ -152,10 +154,11 @@ export function MinimapRadar() {
           onClick={cycleZoom}
           title={`Zoom: ${ZOOM_LABELS[zoomLevel]} — tap to ${zoomLevel === ZOOM_LABELS.length - 1 ? 'reset to Wide' : 'zoom in'}`}
           style={{
-            position: 'absolute', left: -4, bottom: -4,
-            width: 22, height: 22, borderRadius: '50%',
+            position: 'absolute', left: -6, bottom: -6,
+            width: 28, height: 28, borderRadius: '50%',
+            pointerEvents: 'auto',
             border: '1px solid #6b5020', background: 'rgba(20,16,8,0.95)',
-            color: '#ffd700', fontSize: 12, cursor: 'pointer', lineHeight: '20px', padding: 0,
+            color: '#ffd700', fontSize: 12, cursor: 'pointer', lineHeight: '26px', padding: 0,
           }}
         >
           <SpriteIcon ui="zoom" size={15} title="Zoom" />
@@ -184,6 +187,9 @@ export function MinimapRadar() {
           onClick={() => setMapOpen(false)}
           style={{
             position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)',
+            // Fixed positioning does not escape the click-through layer: without this the
+            // entire world-map / fast-travel modal was unclickable, including its Close.
+            pointerEvents: 'auto',
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
           }}
         >

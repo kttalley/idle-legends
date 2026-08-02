@@ -377,18 +377,27 @@ body {
 
 /* ── HUD rails ─────────────────────────────────────────────────────────────── */
 .hud-layer { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
-.hud-tl { position: absolute; top: 8px; left: var(--rail-l); transition: left 0.28s cubic-bezier(0.4,0,0.2,1); }
-.hud-tr { position: absolute; top: 8px; right: var(--rail-r); transition: right 0.28s cubic-bezier(0.4,0,0.2,1); }
-.hud-bottom { position: absolute; left: var(--rail-l); right: var(--rail-r); bottom: 0;
+/* Every corner insets by the device safe area as well as its rail: without --safe-t the
+   unit frame and minimap sit under the Dynamic Island on a notched iPhone, and in
+   landscape the sensor housing eats one side (hence separate l/r, not one value).
+   All four resolve to 0 in a browser and on non-notched devices. */
+.hud-tl { position: absolute; top: calc(8px + var(--safe-t)); left: calc(var(--rail-l) + var(--safe-l)); transition: left 0.28s cubic-bezier(0.4,0,0.2,1);
+  /* Cap the column so a full party can never stack past the bottom of the screen.
+     Clipped rather than scrollable on purpose: .hud-layer is pointer-events:none so the
+     world beneath stays tappable, and a scroll container here would have to claim those
+     touches back and break tap-to-move across the whole top-left of the map. */
+  max-height: calc(100% - 16px - var(--safe-t)); overflow: hidden; }
+.hud-tr { position: absolute; top: calc(8px + var(--safe-t)); right: calc(var(--rail-r) + var(--safe-r)); transition: right 0.28s cubic-bezier(0.4,0,0.2,1); }
+.hud-bottom { position: absolute; left: calc(var(--rail-l) + var(--safe-l)); right: calc(var(--rail-r) + var(--safe-r)); bottom: 0;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   transition: left 0.28s cubic-bezier(0.4,0,0.2,1), right 0.28s cubic-bezier(0.4,0,0.2,1); }
 @media (max-width: 899px) {
   /* No persistent rails on mobile — the drawers are transient, so the HUD gets
      the full width and tucks above the dock. */
   .app-root { --rail-l: 6px; --rail-r: 6px; }
-  /* Nothing above them any more — the HUD starts at the top of the screen. */
-  .hud-tl { top: 8px; }
-  .hud-tr { top: 8px; }
+  /* Nothing above them any more — the HUD starts at the top of the safe area. */
+  .hud-tl { top: calc(8px + var(--safe-t)); }
+  .hud-tr { top: calc(8px + var(--safe-t)); }
   .hud-bottom { bottom: calc(var(--dock-h) + var(--safe-b)); }
   /* Breathing room under the action bar so it is not welded to the XP strip. */
   .hud-bottom { padding-bottom: 4px; }

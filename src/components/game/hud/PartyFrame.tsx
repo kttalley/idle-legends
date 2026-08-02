@@ -98,8 +98,11 @@ export function PartyFrame() {
         onClick={() => leaveParty(member.key)}
         title={`Remove ${speaker.name} from your party`}
         style={{
-          alignSelf: 'flex-start', background: 'none', border: 'none', padding: '2px 0',
+          // pointerEvents: see UnitFrames — .hud-layer is click-through, so a control
+          // that does not re-enable them is inert. This one never worked.
+          alignSelf: 'flex-start', background: 'none', border: 'none', padding: '4px 8px 4px 0',
           color: '#6b6152', fontSize: 8.5, cursor: 'pointer', textShadow: TEXT_SHADOW,
+          pointerEvents: 'auto',
         }}
       >leave party</button>
     </div>

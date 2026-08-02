@@ -1188,13 +1188,20 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
     name,
     currentHp: Math.round(template.hp * hpMult * circuitMult),
     maxHp:     Math.round(template.hp * hpMult * circuitMult),
-    damage: Math.round(template.damage * circuitMult),
+    // dmgMult belongs on damage, not on the swing interval. It used to be applied to
+    // attackSpeedSeconds, but resolveMobAttack computes a swing as
+    // `damage × attackSpeedSeconds × speedFactor` (combat.ts:463) — so a longer interval
+    // raised per-swing damage by exactly the amount it lowered swing frequency, and the
+    // multiplier cancelled itself. Elites hit 1.8× harder 1.8× less often for identical
+    // DPS, which made them pure health sponges and left ELITE/BOSS_DAMAGE_MULTIPLIER as
+    // dead constants. C6's "make elites hit harder" dial now actually turns something.
+    damage: Math.round(template.damage * circuitMult * dmgMult),
     xpReward: Math.round(template.xpReward * (isBoss ? 3 : isElite ? 2 : 1) * circuitMult),
     goldMin: template.goldMin,
     goldMax: template.goldMax,
     lootTableIds: template.lootTableIds,
     spriteKey: template.spriteKey,
-    attackSpeedSeconds: template.attackSpeedSeconds * dmgMult,
+    attackSpeedSeconds: template.attackSpeedSeconds,
     isElite,
     isBoss,
     ...placeInWorld(state, { name, isBoss }),

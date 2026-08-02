@@ -75,7 +75,11 @@ export function UnitFrames() {
         {!isAlive && (
           <div style={{ fontSize: 10, color: '#ff6a5a', display: 'flex', alignItems: 'center', gap: 6, textShadow: TEXT_SHADOW }}>
             <SpriteIcon emoji="💀" size={11} /> {Math.ceil(respawnTimer)}s
-            <button onClick={respawnNow} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 3, border: '1px solid #6a2c24', background: 'rgba(42,18,16,0.9)', color: '#ffb0a0', cursor: 'pointer' }}>
+            {/* pointerEvents: .hud-layer is click-through so the world stays tappable;
+                each interactive control must claim its own touches back or it is inert.
+                This button never worked — the respawn timer runs out on its own, which
+                is why a skip-the-wait affordance going nowhere was never noticed. */}
+            <button onClick={respawnNow} style={{ fontSize: 9, padding: '4px 10px', borderRadius: 3, border: '1px solid #6a2c24', background: 'rgba(42,18,16,0.9)', color: '#ffb0a0', cursor: 'pointer', pointerEvents: 'auto' }}>
               Respawn
             </button>
           </div>
