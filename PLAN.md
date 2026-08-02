@@ -198,6 +198,45 @@ brief by owner decision, under hard guardrails:
   art comes from gen-AI derivatives first (user has an image-generator endpoint), then
   hand-drawn (every sprite/tile/item, long-term).
 
+## Asset generation pipeline (amended, 2026-08-01)
+
+Full brief and handoff: `tools/spritegen/CLAUDE.md`. Runs on the Windows dual-3090 rig;
+`tools/spritegen/` is committed so it syncs, `local-assets/` still never does.
+
+**Shape of the pipeline.** AI generates the *design* once, at high resolution, in one
+canonical pose. Deterministic code and a human do the pixels and the animation. Stages:
+(A) SDXL + ControlNet concept at 768×1024, conditioned on our own rig; (B) downres +
+quantization into the 15 semantic palette slots, then a ~20–40 min Aseprite pass;
+(C) animation by integer-pixel deformation or direct 3D posing — **never** frame-by-frame
+generation; (D) palettes never baked, all variety stays runtime.
+
+**Why not img2img over the FFTA sheets.** Three technical reasons and one legal one.
+SD works in 8×-downscaled latent space, so 24×32 is a 3×4 latent — there is nothing there;
+13 independently generated frames give 13 different characters, and animation needs pixel
+identity; SD has no concept of "this region is `secondary2`", which breaks the palette-slot
+contract the entire monetization design rests on. And at low denoise the source survives
+into the output as derivative work, which would move the contamination from deletable
+scaffold pixels into shipped art.
+
+**The rig is the load-bearing artifact** — it is both the ControlNet conditioning for every
+unit and the zone map for slot quantization, so an error in it propagates to all 30 units.
+Two procedural attempts were rejected (`tools/scaffold/ffta_mannequin.py`, then
+`tools/spritegen/rig.mjs`); both approximate a dimetric projection with hand-coded geometry
+and look like it. **Decision: the rig comes from Blender** — orthographic camera at the
+dimetric 2:1 angle, flat per-zone materials so the render doubles as the zone map. Correct
+projection instead of an approximated one, original work we own outright, and posing it
+yields every animation frame from one source.
+
+**Measuring proportions from the scaffold was tried and abandoned.** At 16px wide FFTA
+humanoids have no neck constriction — head and shoulders are one continuous mass — so
+silhouette-based segmentation cannot recover "heads tall", the number the rig most needs.
+The metasprites also bundle a full-width ground shadow, capes, and weapons into the
+silhouette. Details in `tools/spritegen/CLAUDE.md` so it isn't retried.
+
+**Gate:** one hero (`hero_vanguard`) must complete rig → concept → quantize →
+`importSprite` → in-game at 3×, reading correctly in motion and recoloring cleanly across
+three palettes, before any batch work.
+
 ## Track M — monetization strategy (post-Phase-4 milestone, pre-launch)
 
 ### Principles

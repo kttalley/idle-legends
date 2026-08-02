@@ -86,18 +86,55 @@ in `src/render/palettes.ts` does all variety at runtime.
 - `refPalette.json` — the 16-slot authoring contract.
 - `config.example.json` — copy to `config.json` and fill in model filenames.
 
-### Rig quality note
+### Rig status — READ BEFORE TOUCHING THE RIG
 
-The previous mannequin (`local-assets/templates/`) was rejected: front elevation instead
-of dimetric 3/4, ~5.5 heads instead of ~3.5, 1px arms fused to the torso, no facing cue.
-The current rig fixes the camera (asymmetric shoulder line, offset head, staggered feet —
-near geometry renders lower), proportions, and limb separation. **It is still procedural
-geometry and deserves a hand pass in Aseprite before it conditions 30 units.** If you
-hand-edit it, edit the PNGs and regenerate `zonemap.json` to match, or update the span
-tables in `rig.mjs` so the two never drift apart.
+Two rig attempts have been rejected. Don't make a third of the same kind.
+
+1. **`local-assets/templates/` (Python, `tools/scaffold/ffta_mannequin.py`)** — rejected:
+   front elevation instead of dimetric 3/4, ~5.5 heads instead of ~3.5, 1px arms fused to
+   the torso, no facing cue. Also unrunnable off the macOS box (needs the decomp repo).
+2. **`rig.mjs` (current)** — fixes the camera (asymmetric shoulder line, offset head,
+   staggered feet, since near geometry renders lower in 2:1), the proportions, and limb
+   separation. Still judged not good enough: it is hand-coded span tables approximating
+   foreshortening, and it looks like it.
+
+**Decision: the rig comes from Blender, not from code.** Pose a 3D mannequin under an
+orthographic camera at the dimetric 2:1 angle and render at 24×32. That gives a *correct*
+projection instead of an approximated one, it is original work you own outright, and it
+solves Stage C at the same time — posing the rig yields all 13 frames and both facings
+from one source. `rig.mjs` stays only as the fallback/zone-map generator until Blender
+output replaces it; whatever replaces it must still emit `zonemap.json` in the same shape,
+because the quantizer depends on it.
+
+### Do not retry: measuring proportions from the FFTA scaffold
+
+Attempted and abandoned — the data does not support it. Recorded so nobody burns another
+session on it:
+
+- The scaffold *is* a real population (172 distinct frame-0 silhouettes across 177 unit
+  sheets), so that wasn't the problem.
+- Frames are **16×40** (a 10-tile, 2×5 metasprite), not 32×40. Larger units use wider packs.
+- Every battle metasprite bundles a **full-width ground-shadow slab** in the bottom ~6 rows.
+  Leaving it in inflates body height and makes "hips" measure wider than shoulders.
+- **The blocker:** at 16px wide there is no neck constriction — head and shoulders are one
+  continuous mass. A representative body profile runs
+  `5,9,11,12,13,12,12,12,11,10,10,12,14,15,15,14,14,11,9,9,8`; the narrowest row in the
+  upper body is the top of the skull, not a neck. Silhouette-only head segmentation is
+  therefore impossible, and "heads tall" — the number the rig most needs — cannot be
+  extracted this way. The metasprites also bundle capes and weapons into the silhouette.
+
+Segmenting by *colour* instead (skin ramp vs cloth) might work, but it needs per-unit
+palette semantics we don't have, and helmets/hair break it. Not worth it now that the rig
+comes from Blender, where proportions are authored directly.
 
 ## What to build next, in order
 
+0. **The Blender rig** — blocks everything else, because it is the conditioning input for
+   every unit and the source of the zone map. Orthographic camera, dimetric 2:1 (~30°
+   elevation, 45° yaw), render at 24×32 with nearest-neighbour, no anti-aliasing, no
+   ambient occlusion — flat material IDs per body zone so the render doubles as the zone
+   map. Export `se` and `ne`; the renderer flips for the other two facings. Feet on the
+   anchor row (`y=30`). Emit `zonemap.json` in the shape `rig.mjs` currently writes.
 1. **`comfy.mjs`** — ComfyUI HTTP client (`POST /prompt`, poll `/history/{id}`, fetch
    `/view`). Round-robin across the two instances in `config.json`.
 2. **`graphs/concept.json`** — the ComfyUI workflow, exported via *Save (API Format)*.
@@ -105,7 +142,8 @@ tables in `rig.mjs` so the two never drift apart.
 3. **`quantizeToSlots.mjs`** — per Stage B. Emit a debug overlay showing cluster→slot
    assignment and support a `--map "0:5,1:6"` manual override; the automatic vote will be
    wrong sometimes and a human needs to correct it cheaply.
-4. **`deform.mjs`** — per Stage C. Shared animation table of per-zone integer offsets.
+4. **`deform.mjs`** — per Stage C. Largely obsolete if the Blender rig can be posed
+   directly for all 13 frames; keep it only for units without a 3D source.
 
 ## Rig setup notes
 
