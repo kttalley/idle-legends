@@ -375,6 +375,16 @@ export interface CombatProcState {
   mobFrozen: boolean
   mobFrozenTimer: number
   iceBarrierHp: number
+  /**
+   * Track P0 — the store's combat proc stream.
+   *
+   * The store's combat path was entirely unseeded, so Nightfall, Creeping Freeze and Echo
+   * rolled off bare `Math.random()`. Carrying the generator state HERE rather than in a
+   * module-level variable means it persists with the save for free and needs no
+   * fast-forward on load: a given character replays its procs identically across reloads.
+   * 0 = not yet seeded; the first draw seeds it from the world.
+   */
+  procRngState: number
 }
 
 // ── Items ─────────────────────────────────────────────────────────────────────

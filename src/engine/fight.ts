@@ -92,6 +92,7 @@ const DEFAULT_MAX_EVENTS = 4096
 /** A fresh proc state. Mirrors the store's own reset, kept local so this file stands alone. */
 function freshProcState(): CombatProcState {
   return {
+    procRngState: 0,   // fight.ts draws off its own seeded stream, not this one
     winterChillStacks: 0, comboPoints: 0, remorselessActive: false, iceBlockUsed: false,
     lastStandUsed: false, rampageStacks: 0, arcaneCharges: 0, timedCritTimer: 0,
     openerUsed: false, mobFrozen: false, mobFrozenTimer: 0, iceBarrierHp: 0,

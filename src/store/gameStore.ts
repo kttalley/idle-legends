@@ -90,9 +90,38 @@ function seededRandLocal(seed: number, n: number): number {
   return x - Math.floor(x)
 }
 
+/**
+ * One deterministic draw off the store's combat proc stream — Track P0.
+ *
+ * The store's combat path is unseeded: `resolvePlayerAttack` is called with no `rng` and
+ * `resolveMobAttack` with no fifth argument, and three talent procs (Nightfall, Creeping
+ * Freeze, Echo) rolled straight off `Math.random()`. That is why the golden fight log
+ * does not cover them, and why PLAN.md C5 insists this is paid down BEFORE any N-sided
+ * work: N targets multiplies the unseeded rolls per tick, so going wide first makes the
+ * debt strictly worse.
+ *
+ * mulberry32 inlined so the generator's whole state is the single number living on
+ * `procState` — it therefore persists with the save for free and needs no fast-forward
+ * on load, where a module-level `Rng` closure would silently reset every reload.
+ *
+ * This is the SEEDABLE half of the debt. It does not by itself put these procs inside
+ * `runFight`; that needs the store/fight.ts fork decision recorded in C5.
+ */
+function procRoll(ps: CombatProcState, worldSeed: number): number {
+  // Lazily seeded from the world so an existing save starts from its own stream rather
+  // than a constant shared by every character. `|| 1` because state 0 is a fixed point.
+  if (ps.procRngState === 0) ps.procRngState = ((worldSeed ^ 0x9E3779B9) | 0) || 1
+  ps.procRngState = (ps.procRngState + 0x6D2B79F5) | 0
+  let t = ps.procRngState
+  t = Math.imul(t ^ (t >>> 15), t | 1)
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+}
+
 // ── Default proc state ────────────────────────────────────────────────────────
 function defaultProcState(): CombatProcState {
   return {
+    procRngState: 0,   // 0 = seed from the world on first draw (Track P0)
     winterChillStacks: 0,
     comboPoints: 0,
     remorselessActive: false,
@@ -372,6 +401,8 @@ function rehydrateState(saved: GameState): GameState {
   // Saves written before colorways existed, and any save naming a colorway this build
   // no longer ships, fall back to the default rather than rendering an unknown palette.
   saved.colorway      = saved.colorway ?? DEFAULT_COLORWAY
+  // Track P0: saves written before the proc stream existed seed themselves on first draw.
+  if (saved.procState) saved.procState.procRngState = saved.procState.procRngState ?? 0
   saved.manualIdleTimer = saved.manualIdleTimer ?? 0
   // Recompile stats
   const savedRacialPassive = RACE_DEFINITIONS[saved.playerRace]?.racialPassive ?? {}
@@ -1982,7 +2013,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         dot.tickAccum -= dot.tickIntervalSeconds
         dot.ticksRemaining--
         dotDamageThisTick.push(dot.tickDamage)
-        if (nightfallChance > 0 && Math.random() < nightfallChance) nightfallProc = true
+        if (nightfallChance > 0 && procRoll(procState, state.worldSeed) < nightfallChance) nightfallProc = true
       }
       return dot.ticksRemaining > 0
     })
@@ -2164,7 +2195,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
 
       // Creeping Freeze proc
-      if (fx.frostbiteChance > 0 && !procState.mobFrozen && Math.random() < fx.frostbiteChance) {
+      if (fx.frostbiteChance > 0 && !procState.mobFrozen && procRoll(procState, state.worldSeed) < fx.frostbiteChance) {
         procState.mobFrozen = true
         procState.mobFrozenTimer = 4 + (talentAllocs['frost_permafrost'] ?? 0)
         newLogs.push(log('proc', `🥶 Creeping Freeze! Enemy frozen!`, '#66ccff'))
@@ -2843,7 +2874,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Echo — the arcane tree's signature. The ability resolves a SECOND time, at full
     // strength, for free. Rolled once here rather than per-effect so a multi-effect
     // ability echoes as one coherent cast instead of partially.
-    const echoed = castFx.echoChance > 0 && Math.random() < castFx.echoChance
+    const echoed = castFx.echoChance > 0 && procRoll(procState, s.worldSeed) < castFx.echoChance
     const scale = mod.damageMult * (echoed ? 2 : 1)
     if (echoed) newLogs.push(log('proc', `✨ Echo! ${ability.name} resolves twice.`, '#c8a0ff'))
 
