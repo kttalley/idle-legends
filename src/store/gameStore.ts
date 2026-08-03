@@ -34,6 +34,7 @@ import {
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
 import { getParty } from '../engine/party'
+import type { Rng } from '../engine/rng'
 import {
   canEnterZone,
   getZoneProgression,
@@ -476,7 +477,16 @@ function rehydrateState(saved: GameState): GameState {
   saved.allies        = []
   saved.lastEngagedMobId = null
   saved.activeBuffs   = []
-  saved.procState     = defaultProcState()
+  // Per-encounter proc state is cleared on load — combo points and frozen timers belong to
+  // a fight that is over. The RNG STREAM is not per-encounter and must survive.
+  //
+  // It did not. Line ~405 backfilled `procRngState` for old saves and then this line threw
+  // the whole object away, reseeding from the world on every load — so the comment on
+  // `procRoll` claiming the stream "persists with the save for free" described an intent
+  // the code did not implement. Carried across explicitly now, which is what makes a
+  // seeded store fight reproducible ACROSS a reload rather than only within one session.
+  const carriedStream = saved.procState?.procRngState ?? 0
+  saved.procState     = { ...defaultProcState(), procRngState: carriedStream }
   saved.castState     = null
   saved.skillCooldowns = {}
   // New fields — default if missing
@@ -2057,6 +2067,20 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
     }
 
+    // ── One seeded stream for the hero's whole combat path ────────────────────
+    // Track P0 seeded three named procs (Nightfall, Creeping Freeze, Echo) and stopped
+    // there, because the resolvers took no `rng` and the fork with `fight.ts` had not been
+    // decided. It has been: the store adopts the shared model, and everything the hero
+    // rolls now draws from THIS, so a fight is a pure function of `procState.procRngState`.
+    //
+    // Deliberately the same generator and the same state word `procRoll` already advances,
+    // rather than a second stream beside it. Two streams would mean two things to persist,
+    // two things to migrate, and an ordering question every time a new roll is added.
+    //
+    // Allies keep their own streams (`allyRoll`), which is the point of them being
+    // separate: adding a party must not perturb what the hero rolls.
+    const combatRng: Rng = () => procRoll(procState, state.worldSeed)
+
     // ── Party members, as combatants ─────────────────────────────────────────
     // `engine/party.ts` owns membership; this reconciles it into combat state. Joiners are
     // compiled here (once — `makeAlly` is not cheap), leavers drop, and an ally whose hero
@@ -2315,7 +2339,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         dot.tickAccum -= dot.tickIntervalSeconds
         dot.ticksRemaining--
         dotDamageThisTick.push(dot.tickDamage)
-        if (nightfallChance > 0 && procRoll(procState, state.worldSeed) < nightfallChance) nightfallProc = true
+        if (nightfallChance > 0 && combatRng() < nightfallChance) nightfallProc = true
       }
       return dot.ticksRemaining > 0
     })
@@ -2412,6 +2436,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           targetBurning: activeDoTs.some(d => d.sourceType === 'burn'),
           isOpener,
           timedCritReady,
+          // Was omitted, so crit / poison / extra-strike / flurry all fell back to the
+          // global `Math.random` inside the resolver (combat.ts:356) while `fight.ts`
+          // passed a seeded stream through the SAME function. Same code, different source
+          // of truth — which is why the golden could never cover the store's path.
+          rng: combatRng,
         },
       )
 
@@ -2502,7 +2531,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
 
       // Creeping Freeze proc
-      if (fx.frostbiteChance > 0 && !procState.mobFrozen && procRoll(procState, state.worldSeed) < fx.frostbiteChance) {
+      if (fx.frostbiteChance > 0 && !procState.mobFrozen && combatRng() < fx.frostbiteChance) {
         procState.mobFrozen = true
         procState.mobFrozenTimer = 4 + (talentAllocs['frost_permafrost'] ?? 0)
         newLogs.push(log('proc', `🥶 Creeping Freeze! Enemy frozen!`, '#66ccff'))
@@ -2587,7 +2616,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         // The roll comes off the player's proc stream so it stays seeded and replayable.
         const standing = allies.filter(a => a.downedFor <= 0)
         const hitsAlly = standing.length > 0
-          && procRoll(procState, state.worldSeed) < ALLY_THREAT_SHARE
+          && combatRng() < ALLY_THREAT_SHARE
         if (hitsAlly) {
           // Round-robin by lowest health, so focus fire is on whoever is already hurt —
           // which is what makes a downed ally feel earned rather than arbitrary.
@@ -2617,7 +2646,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           // may have killed it, so register before falling through.
           registerKill()
         } else {
-        const swing = resolveMobAttack(currentMob, stats.armor, fx.mobAttackSpeedFactor, fx)
+        // Fifth argument was omitted, so the avoidance roll drew off the global too.
+        const swing = resolveMobAttack(currentMob, stats.armor, fx.mobAttackSpeedFactor, fx, combatRng)
         let mobDmg = swing.damage
 
         if (swing.blocked) {
