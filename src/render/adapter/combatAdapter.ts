@@ -1399,8 +1399,22 @@ export class WorldSceneController {
       if (this.mob && this.mobId) {
         const survived = state.mobs.some(m => m.id === this.mobId)
         if (survived) {
-          // Still alive — hand its body to the bystander pool exactly where it stands.
+          // Still alive — hand its body to the bystander pool exactly where it stands, and
+          // let it WALK back to where the simulation thinks it is.
+          //
+          // Two authorities own a mob's position depending on whether it is targeted. While
+          // engaged, this adapter drives the body to a player-relative slot; as a bystander,
+          // `syncOtherMobs` hard-assigns it to the store's authoritative `m.pos` every
+          // frame. Those are different points, so releasing a target used to snap its body
+          // across the gap in one frame — the enemy you just stopped fighting teleporting as
+          // you switched away.
+          //
+          // `arriving` already models exactly this: `syncOtherMobs` keeps the destination
+          // current for anything in it instead of assigning, and `advanceBystanders` walks
+          // it there at BYSTANDER_SPEED, routed and collided like everything else. So the
+          // fix is to reuse it rather than invent a second easing path.
           this.otherMobEnts.set(this.mobId, { e: this.mob, wx: this.mob.tx, wy: this.mob.ty })
+          this.arriving.add(this.mobId)
         } else {
           // It died. With a population, `currentMob` is refilled by auto-select on the
           // same tick, so the old "no mob left" death test never fires any more — the
