@@ -435,6 +435,41 @@ export interface MobTemplate {
   attackSpeedSeconds: number
 }
 
+/**
+ * A party member, as combat sees them.
+ *
+ * Built from the `ChatSpeaker` the party module already stores, which carries the hero's
+ * real class, level and `talentAllocs` — so an ally's numbers come from the same
+ * `compileStats` the player's do, rather than from a made-up DPS figure.
+ *
+ * Deliberately UNGEARED: `compileStats` is called with an empty equipment set. That is
+ * both the honest reading of an ambient hero (they have no inventory) and a natural reason
+ * a companion contributes less than the player without needing a fudge multiplier to
+ * defend. Their power still tracks level and spec, so a party scales with the run.
+ */
+export interface AllyCombatant {
+  /** Party-module key — the join between this and `getParty()`. */
+  key: string
+  name: string
+  playerClass: ClassType
+  level: number
+  talentAllocs: Record<string, number>
+  /** Compiled once on join and on level change, not per tick. */
+  stats: Stats
+  currentHp: number
+  /** Seconds accumulated toward the next swing. Per-ally: a shared clock is what made
+   *  C4's second companion inert, and the same trap applies here. */
+  attackAccum: number
+  /** Seconds until they get back up; 0 means standing. */
+  downedFor: number
+  /** Their own proc state, so Seal Fate combo points and the rest cannot bleed between
+   *  allies or into the player's. */
+  procState: CombatProcState
+  /** Their own seeded stream, carried as a single number for the same reason the player's
+   *  is (see `procRoll`) — no module-level closure that resets on reload. */
+  rngState: number
+}
+
 export interface MobInstance {
   /** Unique per spawned instance — several mobs of the same template coexist. */
   id: string
@@ -619,6 +654,23 @@ export interface GameState {
   /** The mob being fought. Null lets auto-play choose (nearest); set by the player to
    *  commit to a specific enemy. */
   targetMobId: string | null
+  /**
+   * Party members as COMBATANTS.
+   *
+   * `engine/party.ts` owns who is in the party — names, invites, chat. This is the combat
+   * projection of that list: compiled stats, a swing clock, health, and whether they are
+   * down. It lives in `GameState` because a companion now deals real damage to real mobs,
+   * and damage that the store does not own is damage `econSim` cannot measure.
+   *
+   * This reverses Track C3's option 2, which kept companion combat purely cosmetic in the
+   * render adapter precisely so it could not touch the economy. That bought honest
+   * measurement at the cost of a party that visibly swung and changed nothing — and the
+   * swing-with-no-consequence read as the companion being broken. Owner call: allies
+   * fight for real, and the harness grows a partied scenario to keep measuring.
+   *
+   * Session-scoped, like `mobs`: rebuilt from `getParty()` each tick and cleared on load.
+   */
+  allies: AllyCombatant[]
   /**
    * The mob the hero was fighting when manual control dropped the target.
    *
@@ -849,6 +901,11 @@ export interface FloatingNumber {
   isMobDamage: boolean
   isDoT: boolean
   color?: string
+  /** Set when the blow came from a PARTY MEMBER rather than the hero. The world renderer
+   *  keys off this to play the lunge and impact on that companion's body — without it an
+   *  ally's damage appears to come out of the player, which is what made the first cut of
+   *  ally combat read as the player hitting harder rather than the party helping. */
+  allyKey?: string
   x: number
   y: number
   createdAt: number

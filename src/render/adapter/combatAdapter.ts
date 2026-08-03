@@ -372,6 +372,9 @@ interface Ambient {
   // already taken and the shared cooldown already reset, so it never got a fight.
   /** Index in the party (0-based) — drives which formation slot it holds. -1 = not in one. */
   partySlot: number
+  /** Party-module key while this hero is in the party, else null. Cached during party
+   *  sync so an ally's damage event can find its BODY without recomputing the key. */
+  partyKey: string | null
   /** Its OWN spar cooldown. The shared one was decremented once per follower inside the
    *  brain loop, so it also drained N times faster than the interval intends. */
   sparCd: number
@@ -455,14 +458,14 @@ const AMBIENT_REPATH_SECONDS = 0.6
  */
 function freshAmbientPath(index: number): Pick<
   Ambient, 'path' | 'pathI' | 'pathGx' | 'pathGy' | 'pathCool' | 'pathBlocked' | 'closing'
-        | 'partySlot' | 'sparCd' | 'assistMobId'
+        | 'partySlot' | 'sparCd' | 'assistMobId' | 'partyKey'
 > {
   return {
     path: [], pathI: 0, pathGx: 0, pathGy: 0,
     pathCool: ((index % 8) / 8) * AMBIENT_REPATH_SECONDS,
     pathBlocked: false,
     closing: false,
-    partySlot: -1, sparCd: 0, assistMobId: null,
+    partySlot: -1, sparCd: 0, assistMobId: null, partyKey: null,
   }
 }
 
@@ -686,6 +689,14 @@ export class WorldSceneController {
   private autoTy = 0
 
   private playerLunge: Lunge = { active: false, t: 0, homeX: 0, homeY: 0, targetX: 0, targetY: 0 }
+  /** One shared lunge slot for ally strikes. Shared rather than per-ally because a lunge
+   *  is a ~0.3s cosmetic and three companions rarely land on the same frame; a collision
+   *  costs one un-lunged swing, not a stuck entity — `advanceLunge` always returns a body
+   *  to its home position. */
+  private ambientLunge: Lunge = { active: false, t: 0, homeX: 0, homeY: 0, targetX: 0, targetY: 0 }
+  /** Body the ambient lunge is currently attached to, so it can be advanced and returned
+   *  home. Cleared when the lunge finishes. */
+  private ambientLungeEntity: Entity | null = null
   private mobLunge: Lunge = { active: false, t: 0, homeX: 0, homeY: 0, targetX: 0, targetY: 0 }
   private playerFlashT = 0
   private mobFlashT = 0
@@ -1025,6 +1036,11 @@ export class WorldSceneController {
   // only combat signal we get; we branch on its existing flags/color so no game-data
   // changes are needed. DoT ticks no longer trigger a melee lunge (they used to).
   handleFloatingNumber(fn: FloatingNumber): void {
+    // An ally's blow is played on the ALLY's body. Checked first: an ally hit still
+    // carries isMobDamage/isDoT flags describing the blow, and routing on those would
+    // fire the effect out of the hero, which reads as the player hitting harder rather
+    // than the party helping — the exact thing this feature exists to show.
+    if (fn.allyKey) { this.triggerAllyAttack(fn); return }
     if (fn.isMobDamage) { this.triggerMobAttack(fn); return }
     if (fn.isDoT) { this.triggerDotTick(fn); return }
     if (fn.color === SHADOW_BOLT_COLOR) { this.triggerShadowBolt(fn); return }
@@ -1724,6 +1740,65 @@ export class WorldSceneController {
     )
   }
 
+  /**
+   * A party member's blow, played on the party member.
+   *
+   * Mirrors `triggerPlayerAttack` beat for beat — lunge, attack pose, defender flash and
+   * recoil, spark spray, crit burst, screen punch, floater — because the whole point of
+   * reversing C3 is that an ally's hit should feel like the player's, not like a muted
+   * cosmetic. The two differences are deliberate: the effect originates at the COMPANION's
+   * body, and the punch is softened, since three allies swinging on the player's cadence
+   * would otherwise shake the camera continuously.
+   *
+   * A hit whose body cannot be found (the companion is culled, off-screen, or its ambient
+   * record has not reconciled yet) still shows its floater on the target rather than being
+   * dropped — losing the number entirely is how ally damage reads as not happening.
+   */
+  triggerAllyAttack(fn: FloatingNumber): void {
+    const target = this.vfxTarget()
+    if (!target || !this.ground) return
+    const ally = this.ambient.find(a => a.partyKey === fn.allyKey && a.e.active)
+
+    // Damage TAKEN by an ally is a different beat: the mob is the attacker, so flash the
+    // ally rather than the mob and skip the lunge entirely.
+    if (fn.isMobDamage) {
+      if (ally) {
+        ally.e.animator.set('hit')
+        ally.e.animator.restart()
+        const hm = this.worldMid(ally.e)
+        this.emitImpact(hm.x, hm.y, '#ff9c9c', '#c04040', 0.8)
+        this.spawnFloater(ally.e, `${fn.value}`, false, fn.color ?? '#ff9c9c')
+      }
+      return
+    }
+
+    const dying = this.isDying(target)
+    if (ally) {
+      this.ambientLungeEntity = ally.e
+      this.beginLunge(this.ambientLunge, ally.e, target)
+      ally.e.animator.set('attack')
+      ally.e.animator.restart()
+      this.faceToward(ally.e, target.tx, target.ty)
+    }
+    if (!dying) {
+      this.mobFlashT = 0.13
+      target.paletteId = 'fx/hitflash'
+      target.animator.set('hit')
+      target.animator.restart()
+    }
+    if (fn.isCrit) this.spawnBurst(target.tx, target.ty, 'spell/holy')
+    // Softer than the player's: an ally crit should register without the party turning
+    // the camera into a paint mixer.
+    this.punch(fn.isCrit ? 2.0 : 0.7, 0)
+    const mm = this.worldMid(target)
+    const mc = fn.isCrit ? fxColors('spell/holy') : { core: '#dff5e0', glow: '#5fc06a' }
+    this.emitImpact(mm.x, mm.y, mc.core, mc.glow, fn.isCrit ? 1.4 : 0.8)
+    this.spawnFloater(
+      target, `${fn.value}${fn.isCrit ? '!' : ''}`, fn.isCrit,
+      fn.color ?? (fn.isCrit ? '#ffd27a' : '#9fe0a0'),
+    )
+  }
+
   triggerShadowBolt(fn: FloatingNumber): void {
     const target = this.vfxTarget()
     if (!target || !this.ground) return
@@ -1931,6 +2006,10 @@ export class WorldSceneController {
     // Advance lunges (0→1→0 triangle over ~0.31s; contact visually at the apex).
     this.advanceLunge(this.playerLunge, this.player, dt)
     if (this.mob) this.advanceLunge(this.mobLunge, this.mob, dt)
+    if (this.ambientLungeEntity) {
+      this.advanceLunge(this.ambientLunge, this.ambientLungeEntity, dt)
+      if (!this.ambientLunge.active) this.ambientLungeEntity = null
+    }
 
     // Decay hit flashes → restore base palettes.
     if (this.playerFlashT > 0) {
@@ -3389,6 +3468,7 @@ export class WorldSceneController {
           faction: this.factionLabel(a.faction), level: a.level, spec: a.identity.specTitle,
         })
         const slot = slotOf.get(key)
+        a.partyKey = slot !== undefined ? key : null
         if (slot !== undefined) {
           found[slot] = i
           a.partySlot = slot

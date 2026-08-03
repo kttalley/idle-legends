@@ -3,6 +3,7 @@ import type {
   GameState, ClassType, RaceType, FactionType, ZoneId, Item, Slot,
   MobInstance, CombatLogEntry, FloatingNumber,
   Stats, ActiveDoT, ActiveBuff, CombatProcState,
+  AllyCombatant,
   GameMode, RecipeId, MaterialId, WeatherType, TownId, Rarity, MerchantContract,
 } from '../data/types'
 import type { GatherSession, CraftResult, QualityTier } from '../data/types'
@@ -32,6 +33,7 @@ import {
   emptyAbilityMod, RAMPAGE_MAX_STACKS, ARCANE_MAX_CHARGES,
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
+import { getParty } from '../engine/party'
 import {
   canEnterZone,
   getZoneProgression,
@@ -317,6 +319,7 @@ function defaultState(): GameState {
     activeTownNpc: null,
     mobs: [],
     targetMobId: null,
+    allies: [],
     lastEngagedMobId: null,
     currentMob: null,
     persistedBoss: null,
@@ -470,6 +473,7 @@ function rehydrateState(saved: GameState): GameState {
   // The zone repopulates on load; saves predating the population have neither field.
   saved.mobs          = []
   saved.targetMobId   = null
+  saved.allies        = []
   saved.lastEngagedMobId = null
   saved.activeBuffs   = []
   saved.procState     = defaultProcState()
@@ -541,10 +545,15 @@ function log(
   return { id: `${Date.now()}_${Math.random().toString(36).slice(2,6)}`, timestamp: Date.now(), type, message, color }
 }
 
-function fn(value: number, isCrit: boolean, isMobDamage: boolean, isDoT: boolean, color?: string): FloatingNumber {
+function fn(
+  value: number, isCrit: boolean, isMobDamage: boolean, isDoT: boolean, color?: string,
+  /** Party-member key when the blow is an ALLY's — the renderer plays the hit on their
+   *  body rather than the hero's. Absent for the player's own damage. */
+  allyKey?: string,
+): FloatingNumber {
   return {
     id: `fn_${Date.now()}_${Math.random().toString(36).slice(2,5)}`,
-    value, isCrit, isMobDamage, isDoT, color,
+    value, isCrit, isMobDamage, isDoT, color, allyKey,
     x: 45 + (Math.random() - 0.5) * 22,
     y: 40 + (Math.random() - 0.5) * 12,
     createdAt: Date.now(),
@@ -1364,6 +1373,57 @@ function placeInWorld(
  *  be a crowd, and it keeps the climactic encounter reading as one. */
 const MOB_POPULATION = 4
 
+// ── Allies ────────────────────────────────────────────────────────────────────
+/** An ally wears nothing. Frozen so a stray write cannot quietly gear the whole party. */
+const EMPTY_EQUIPMENT: Record<Slot, Item | null> = Object.freeze({
+  weapon: null, helm: null, chest: null, legs: null, boots: null, trinket: null,
+}) as Record<Slot, Item | null>
+
+/** Seconds a downed ally stays down before rejoining the fight. Long enough that losing
+ *  one matters, short enough that a wipe-free fight does not become a solo fight. */
+const ALLY_REVIVE_SECONDS = 12
+/** Share of incoming mob swings that pick an ally rather than the player, when at least
+ *  one ally is standing. Below half on purpose: the player is the one making decisions,
+ *  and a mob that mostly hits someone else turns the fight into a spectator sport. */
+const ALLY_THREAT_SHARE = 0.45
+
+/**
+ * Build the combat projection of one party member.
+ *
+ * Ungeared by design — see `AllyCombatant`. `rngState` is seeded off the world and the
+ * member's key so two allies never walk the same stream, which is the determinism
+ * regression per-hero sub-streams exist to prevent.
+ */
+function makeAlly(m: ReturnType<typeof getParty>[number], worldSeed: number): AllyCombatant {
+  const sp = m.speaker
+  const playerClass = (sp.playerClass as ClassType)
+  const allocs = sp.talentAllocs ?? {}
+  const racial = RACE_DEFINITIONS[sp.race as keyof typeof RACE_DEFINITIONS]?.racialPassive ?? {}
+  const stats = compileStats(playerClass, sp.level, EMPTY_EQUIPMENT, allocs, racial)
+  return {
+    key: m.key, name: sp.name, playerClass, level: sp.level, talentAllocs: allocs,
+    stats, currentHp: stats.maxHp, attackAccum: 0, downedFor: 0,
+    procState: defaultProcState(),
+    rngState: ((worldSeed ^ strHashKey(m.key)) | 0) || 1,
+  }
+}
+
+/** Stable 32-bit hash of a party key, so an ally's stream is reproducible across reloads. */
+function strHashKey(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
+  return h
+}
+
+/** One draw off an ally's own stream. Same generator as `procRoll`, different owner. */
+function allyRoll(a: AllyCombatant): number {
+  a.rngState = (a.rngState + 0x6D2B79F5) | 0
+  let t = a.rngState
+  t = Math.imul(t ^ (t >>> 15), t | 1)
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+}
+
 /** How far the hero may have wandered and still resume the fight manual control dropped.
  *  Beyond this it is not the same encounter any more and "nearest" is the honest answer —
  *  resuming unconditionally would march the hero back across the zone to something they
@@ -1997,6 +2057,43 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
     }
 
+    // ── Party members, as combatants ─────────────────────────────────────────
+    // `engine/party.ts` owns membership; this reconciles it into combat state. Joiners are
+    // compiled here (once — `makeAlly` is not cheap), leavers drop, and an ally whose hero
+    // has since levelled is recompiled. Reading `getParty()` from the store is fine: the
+    // no-import rule is engine-must-not-import-store, and this is the other direction.
+    let allies = state.allies.map(a => ({ ...a, procState: { ...a.procState } }))
+    {
+      const roster = getParty()
+      const byKey = new Map(allies.map(a => [a.key, a]))
+      allies = roster.map(m => {
+        const existing = byKey.get(m.key)
+        if (existing && existing.level === m.speaker.level) return existing
+        // Rebuilt on level change so a companion that dinged actually gets stronger,
+        // carrying HP across as a fraction rather than healing them for free.
+        const fresh = makeAlly(m, state.worldSeed)
+        if (existing) {
+          fresh.currentHp = Math.max(1, Math.round(
+            fresh.stats.maxHp * (existing.currentHp / Math.max(1, existing.stats.maxHp))))
+          fresh.attackAccum = existing.attackAccum
+          fresh.downedFor = existing.downedFor
+          fresh.rngState = existing.rngState
+        }
+        return fresh
+      })
+    }
+
+    // Downed allies get back up on their own clock.
+    for (const a of allies) {
+      if (a.downedFor <= 0) continue
+      a.downedFor = Math.max(0, a.downedFor - deltaSeconds)
+      if (a.downedFor === 0) {
+        a.currentHp = Math.max(1, Math.round(a.stats.maxHp * 0.5))
+        a.procState = defaultProcState()
+        newLogs.push(log('player_respawn', `${a.name} gets back up.`, '#aaffaa'))
+      }
+    }
+
     // Nothing to FIGHT — but the world still turns, and the hero still has a body.
     //
     // This branch used to `set` a handful of combat fields and return, which quietly made
@@ -2012,6 +2109,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if (idle.logs.length) newLogs.push(...idle.logs)
       set({ mobs: idle.mobs, targetMobId: idle.targetMobId, currentMob: null,
             mobMapOffset: idle.mobMapOffset, playerMapPos: idle.playerMapPos,
+            // Allies are reconciled and revived ABOVE this branch, so they must be
+            // written here too — dropping them would mean a downed companion never gets
+            // back up while the hero has nothing targeted, which is most of the time
+            // between fights. This is the same omission that once froze the whole world
+            // tick (see the note on this branch above).
+            allies,
             controlMode, manualIdleTimer,
             persistedBoss, mobRespawnTimer, procState, skillCooldowns, castState,
             totalPlayTime: state.totalPlayTime + deltaSeconds,
@@ -2417,11 +2520,103 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       registerKill()
     }
 
+    // ── Party members attack the mob ─────────────────────────────────────────
+    // Real damage, through the same `resolvePlayerAttack` the player uses — so an ally's
+    // crits, DoTs and talent procs are the genuine article rather than a second damage
+    // model. Every roll comes off the ally's OWN seeded stream, so adding a party does not
+    // perturb the player's rolls and two allies never draw in lockstep.
+    //
+    // Each swing is attributed on the floating number (`allyKey`), which is what lets the
+    // renderer play the hit on that companion's body instead of the hero's.
+    if (mobEngaged && currentMob) {
+      for (const ally of allies) {
+        if (ally.downedFor > 0 || !currentMob) continue
+        ally.attackAccum += deltaSeconds
+        if (ally.attackAccum < ally.stats.attackSpeedSeconds) continue
+        ally.attackAccum -= ally.stats.attackSpeedSeconds
+
+        const res = resolvePlayerAttack(
+          ally.stats, ally.playerClass, ally.talentAllocs, ally.procState, [], undefined,
+          {
+            mobHpFraction: currentMob.currentHp / Math.max(1, currentMob.maxHp),
+            playerHpFraction: ally.currentHp / Math.max(1, ally.stats.maxHp),
+            rampageStacks: ally.procState.rampageStacks,
+            arcaneCharges: ally.procState.arcaneCharges,
+            targetBurning: currentMob.dots.some(d => d.sourceType === 'burn'),
+            isOpener: !ally.procState.openerUsed,
+            rng: () => allyRoll(ally),
+          },
+        )
+        ally.procState.openerUsed = true
+
+        currentMob = { ...currentMob, currentHp: currentMob.currentHp - res.damage }
+        if (state.settings.showDamageNumbers) {
+          newFns.push(fn(res.damage, res.isCrit, false, false,
+                         res.isCrit ? '#ffd27a' : '#9fe0a0', ally.key))
+        }
+        newLogs.push(log(
+          res.isCrit ? 'player_crit' : 'player_attack',
+          `${ally.name} hits ${currentMob.name} for ${res.damage}${res.isCrit ? ' (CRIT!)' : ''}`,
+          res.isCrit ? '#ffd27a' : '#9fe0a0',
+        ))
+        // Allies apply their DoTs to the shared target, deduped by source like the
+        // player's so three warlocks cannot stack nine corruptions.
+        for (const newDot of res.triggeredDoTs) {
+          const i = activeDoTs.findIndex(d => d.sourceType === newDot.sourceType)
+          if (i >= 0) activeDoTs[i] = newDot
+          else activeDoTs.push(newDot)
+        }
+        if (res.lifeDrawn > 0) {
+          ally.currentHp = Math.min(ally.stats.maxHp, ally.currentHp + res.lifeDrawn)
+        }
+        // An ally can land the killing blow. That is the whole reason `registerKill`
+        // exists at tick scope — loot, XP and the drop ladder still credit the player.
+        registerKill()
+      }
+    }
+
     // ── Mob attacks player ───────────────────────────────────────────────────
     if (currentMob && !procState.mobFrozen && mobEngaged) {
       mobAttackAccum += deltaSeconds
       if (mobAttackAccum >= currentMob.attackSpeedSeconds) {
         mobAttackAccum -= currentMob.attackSpeedSeconds
+        // ── Who does it swing at? ──────────────────────────────────────────
+        // With a party standing, some of the incoming damage goes to them. Held below
+        // half (ALLY_THREAT_SHARE) on purpose: the player is the one making decisions,
+        // and a mob that mostly hits someone else turns the fight into a spectator sport.
+        // The roll comes off the player's proc stream so it stays seeded and replayable.
+        const standing = allies.filter(a => a.downedFor <= 0)
+        const hitsAlly = standing.length > 0
+          && procRoll(procState, state.worldSeed) < ALLY_THREAT_SHARE
+        if (hitsAlly) {
+          // Round-robin by lowest health, so focus fire is on whoever is already hurt —
+          // which is what makes a downed ally feel earned rather than arbitrary.
+          const victim = standing.reduce((lo, a) =>
+            a.currentHp / Math.max(1, a.stats.maxHp) < lo.currentHp / Math.max(1, lo.stats.maxHp) ? a : lo)
+          const allyFx = compileTalentEffects(victim.playerClass, victim.talentAllocs)
+          const hit = resolveMobAttack(
+            currentMob, victim.stats.armor, allyFx.mobAttackSpeedFactor, allyFx,
+            () => allyRoll(victim),
+          )
+          if (hit.blocked) {
+            newLogs.push(log('proc', `🛡 ${victim.name} blocks!`, '#88aaff'))
+          } else {
+            victim.currentHp = Math.max(0, victim.currentHp - hit.damage)
+            newFns.push(fn(hit.damage, false, true, false, '#ff9c9c', victim.key))
+            if (hit.thorns > 0) {
+              currentMob = { ...currentMob, currentHp: currentMob.currentHp - hit.thorns }
+              newFns.push(fn(hit.thorns, false, false, false, '#ffaa44', victim.key))
+            }
+            if (victim.currentHp <= 0) {
+              victim.downedFor = ALLY_REVIVE_SECONDS
+              victim.attackAccum = 0
+              newLogs.push(log('player_death', `${victim.name} goes down!`, '#ff4444'))
+            }
+          }
+          // The mob spent its swing on the ally; the hero takes nothing this beat. Thorns
+          // may have killed it, so register before falling through.
+          registerKill()
+        } else {
         const swing = resolveMobAttack(currentMob, stats.armor, fx.mobAttackSpeedFactor, fx)
         let mobDmg = swing.damage
 
@@ -2517,6 +2712,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             resetCombatAccumulators()
           }
         }
+        }   // end: mob swung at the hero rather than an ally
       }
     }
 
@@ -2567,6 +2763,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     set({
       mobs, targetMobId,
+      allies,
       stats, gold, xp, level, currentMob, persistedBoss, isAlive, respawnTimer, mobRespawnTimer,
       inventory, equipment, activeDoTs, activeBuffs, procState, castState, skillCooldowns,
       floatingNumbers: allFns,

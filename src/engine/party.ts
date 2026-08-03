@@ -136,6 +136,19 @@ export function invitePartyMember(
   const settle = (accepted: boolean, line: string) => {
     resolveChat(placeholder.id, line)
     pendingInvites.delete(key)
+    // Re-check the cap HERE, not only at invite time. Acceptance is asynchronous — it
+    // waits on a generated reply — so the guard above passes for every invite sent while
+    // the party is still empty, and they can all then accept. Measured: six invites fired
+    // in quick succession put FIVE members in a party capped at three, which now matters
+    // rather than merely looking untidy, because every member deals real damage.
+    if (accepted && members.length >= PARTY_MAX) {
+      pushChat({
+        channel: 'system', from: null, entityKey: key,
+        text: `${speaker.name} would have joined, but your party is full.`,
+      })
+      emit()
+      return
+    }
     if (accepted) {
       const m: PartyMember = { key, speaker, joinedAt: Date.now() }
       members = [...members, m]
