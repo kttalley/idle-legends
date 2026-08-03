@@ -6,17 +6,22 @@
 // The conversation was writing cheques the simulation couldn't cash, and that gap is
 // exactly where the illusion snaps.
 //
-// ── What a companion does, and deliberately does not do ───────────────────────
-// A companion follows you, talks to you, reacts to what you are doing, and fights the
-// monsters IT finds along the way — resolved by the same `runFight` every other ambient
-// hero uses, with its own numbers.
+// ── What a companion does ─────────────────────────────────────────────────────
+// A companion follows you, talks to you, reacts to what you are doing, and FIGHTS WITH
+// YOU — real damage to your target, resolved by the same `resolvePlayerAttack` you use,
+// off their own compiled stats and their own seeded stream. They can be hit, and they can
+// go down.
 //
-// It never touches YOUR fight. No damage to your target, no XP, no loot, no gold. That is
-// the standing rule for every ambient hero and a party member is the first thing that
-// really tests it, so it is worth being explicit: a companion that added free DPS would
-// raise your kills per minute, which makes it an economy change — something `econSim`
-// would have to model and the whole balance pass would have to absorb. A companion is
-// company, not a damage buff.
+// This paragraph used to say the opposite, and the reasoning is worth keeping rather than
+// deleting: a companion that adds free DPS raises your kills per minute, which makes it an
+// economy change that `econSim` has to model. That was true, and it is still true — the
+// call the owner made is that a party member who visibly swings and changes nothing reads
+// as broken, and a measurable economy shift is the better problem to have. The harness
+// grows a partied scenario; the feature does not get gutted to keep the harness simple.
+//
+// Combat state for a member lives in `GameState.allies`, not here. This module owns
+// MEMBERSHIP — who is in the party, invites, chat, and the live behaviour status the HUD
+// reads. Damage that the store does not own is damage `econSim` cannot see.
 //
 // ── Membership lifetime ───────────────────────────────────────────────────────
 // A party lives within a zone. Travelling disbands it, with a line in chat, because the
@@ -226,7 +231,7 @@ export function leaveParty(key: string, reason?: string): void {
   members = members.filter(x => x.key !== key)
   // Only blank the status if that was the LAST member. Clearing it unconditionally left
   // the party frame empty for every surviving member until the next 5Hz adapter tick.
-  if (members.length === 0) setCompanionStatus(null)
+  if (members.length === 0) setCompanionStatuses({})
   pushChat({
     channel: 'system', from: null,
     text: reason ?? `${m.speaker.name} has left your party.`,
@@ -245,26 +250,49 @@ export interface CompanionStatus {
   name: string
   /** What they're up to, in words the party frame can show. */
   activity: 'following' | 'moving in' | 'fighting' | 'looting' | 'idle'
-  /** Health fraction 0–1 while they're in a fight; 1 the rest of the time. */
-  hpFrac: number
   /** True on the frames right after they swing, for a little frame flash. */
   attacking: boolean
 }
 
-let companion: CompanionStatus | null = null
+/**
+ * Status for EVERY companion, keyed by party key.
+ *
+ * Was a single `CompanionStatus`, which dated from a one-member party: the adapter
+ * published member 0 and the frame rendered member 0, so members 1 and 2 were invisible
+ * in the HUD even though C4 had made the roster plural in the simulation.
+ *
+ * `hpFrac` is gone from this type on purpose. It used to be scraped out of the ambient
+ * fight-log playback, because a companion's health only existed inside a simulated fight.
+ * Party members now carry real health in `GameState.allies`, so the frame reads it from
+ * there and this channel is left to describe BEHAVIOUR only — which is the half the store
+ * genuinely cannot see.
+ */
+export type CompanionStatusMap = Record<string, CompanionStatus>
+
+const EMPTY_STATUSES: CompanionStatusMap = {}
+let companions: CompanionStatusMap = EMPTY_STATUSES
 const statusListeners = new Set<() => void>()
 
-export function getCompanionStatus(): CompanionStatus | null {
-  return companion
+export function getCompanionStatuses(): CompanionStatusMap {
+  return companions
 }
 
-export function setCompanionStatus(s: CompanionStatus | null): void {
-  // Cheap equality guard: this is called at the behaviour tick rate, and a new object
-  // identity every tick would re-render the party frame 5× a second for nothing.
-  if (s === null && companion === null) return
-  if (s && companion && s.name === companion.name && s.activity === companion.activity
-      && Math.abs(s.hpFrac - companion.hpFrac) < 0.01 && s.attacking === companion.attacking) return
-  companion = s
+/**
+ * Publish the whole map at once.
+ *
+ * The identity guard matters more than it looks: this is called at the behaviour tick
+ * rate and `useSyncExternalStore` re-renders on every changed snapshot identity, so
+ * returning a fresh object each tick would re-render the party frame ~5× a second
+ * forever — and, worse, a getter that allocates would make the store's own equality
+ * check fail on every read and loop.
+ */
+export function setCompanionStatuses(next: CompanionStatusMap): void {
+  const a = Object.keys(companions), b = Object.keys(next)
+  if (a.length === b.length && b.every(k => {
+    const x = companions[k], y = next[k]
+    return x && y && x.name === y.name && x.activity === y.activity && x.attacking === y.attacking
+  })) return
+  companions = b.length ? next : EMPTY_STATUSES
   for (const l of statusListeners) l()
 }
 
@@ -275,7 +303,7 @@ export function subscribeCompanionStatus(fn: () => void): () => void {
 
 /** Disband everything — called on zone change, since the crowd is regenerated. */
 export function disbandParty(reason?: string): void {
-  setCompanionStatus(null)
+  setCompanionStatuses({})
   if (!members.length) { pendingInvites.clear(); return }
   const names = members.map(m => m.speaker.name).join(', ')
   members = []

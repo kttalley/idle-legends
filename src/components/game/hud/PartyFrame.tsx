@@ -1,21 +1,27 @@
 import React, { useSyncExternalStore } from 'react'
 import {
-  getCompanionStatus, getParty, leaveParty, subscribeCompanionStatus, subscribeParty,
+  getCompanionStatuses, getParty, leaveParty, subscribeCompanionStatus, subscribeParty,
 } from '../../../engine/party'
 import { useGameStore } from '../../../store/gameStore'
 
-// The party frame — your companion, read out beneath your own unit frame, exactly where
+// The party frame — your companions, read out beneath your own unit frame, exactly where
 // an MMO puts it.
 //
-// Two sources, deliberately: `getParty()` for WHO (stable membership) and
-// `getCompanionStatus()` for WHAT THEY'RE DOING (published by the render adapter each
-// behaviour tick). Membership lives in the party module and the body lives in the scene,
-// so neither alone can render this.
+// THREE sources, and each owns something the others cannot see:
+//   • `getParty()`            — WHO is in the party. Membership, stable, party order.
+//   • `GameState.allies`      — their real HEALTH and whether they are down. Party members
+//                               deal and take real damage, so this is authoritative.
+//   • `getCompanionStatuses()`— WHAT THEY ARE DOING, published by the render adapter each
+//                               behaviour tick. The store has no idea whether a body is
+//                               walking, closing or swinging.
 //
-// The health bar is real: while the companion is playing back a fight, it reflects the
-// remaining health from that simulated fight. Between fights it sits full, because a
-// companion's HP only exists inside a resolved fight — they are not carrying a persistent
-// health pool around the world.
+// The health bar used to come from the adapter too, scraped out of the ambient fight log
+// a companion was playing back — because back then a companion's HP only existed inside a
+// simulated fight and sat full the rest of the time. That is no longer true, and reading
+// it from the store is what makes the bar mean something: when it empties, they go down.
+//
+// Renders every member. It previously rendered `party[0]` only, so the second and third
+// members were invisible even after C4 made the roster plural.
 
 const TEXT_SHADOW = '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 1px 3px rgba(0,0,0,0.9)'
 
@@ -27,84 +33,127 @@ const ACTIVITY_COLOR: Record<string, string> = {
   idle: '#8a8070',
 }
 
+function hpGradient(frac: number): string {
+  if (frac > 0.5) return 'linear-gradient(180deg, #6fd06f, #2f8a2f)'
+  if (frac > 0.25) return 'linear-gradient(180deg, #e8c860, #a88820)'
+  return 'linear-gradient(180deg, #e86060, #a02020)'
+}
+
 export function PartyFrame() {
   const party = useSyncExternalStore(subscribeParty, getParty)
-  const status = useSyncExternalStore(subscribeCompanionStatus, getCompanionStatus)
+  const statuses = useSyncExternalStore(subscribeCompanionStatus, getCompanionStatuses)
+  const allies = useGameStore(s => s.allies)
   const factionNames = useGameStore(s => s.factionNames)
   const playerFactionKey = useGameStore(s => s.playerFaction)
   const playerFaction = factionNames?.[playerFactionKey] ?? ''
 
   if (!party.length) return null
-  const member = party[0]
-  const speaker = member.speaker
-  // Generated faction names differ per run, so compare against the player's actual one.
-  const hostile = speaker.faction.trim().toLowerCase() !== playerFaction.trim().toLowerCase()
-  const hp = status?.hpFrac ?? 1
-  const activity = status?.activity ?? 'following'
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', gap: 2,
+      display: 'flex', flexDirection: 'column', gap: 5,
       // A hairline above separates the party from your own frame without a second card.
       borderTop: '1px solid rgba(200,161,0,0.18)', paddingTop: 5, marginTop: 1,
     }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        fontSize: 10, textShadow: TEXT_SHADOW, gap: 4,
-      }}>
-        <span style={{
-          fontWeight: 700, color: hostile ? '#ff8a7a' : '#8ac0ff',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {speaker.name}
-        </span>
-        <span style={{ color: '#9a8f7a', fontSize: 9, flex: '0 0 auto' }}>Lv {speaker.level}</span>
-      </div>
+      {party.map(member => {
+        const speaker = member.speaker
+        const status = statuses[member.key]
+        // Combat state is keyed by the same party key the store joins on.
+        const ally = allies.find(a => a.key === member.key)
+        const downed = !!ally && ally.downedFor > 0
+        // No ally record yet means the tick has not reconciled them — full rather than
+        // empty, so a just-joined member does not flash up as a corpse.
+        const hp = ally ? Math.max(0, Math.min(1, ally.currentHp / Math.max(1, ally.stats.maxHp))) : 1
+        // Generated faction names differ per run, so compare against the player's actual one.
+        const hostile = speaker.faction.trim().toLowerCase() !== playerFaction.trim().toLowerCase()
+        const activity = downed ? 'down' : (status?.activity ?? 'following')
 
-      {/* Health. Flashes brighter on the frames right after they swing, so the frame
-          reacts to their fight the way your own frame reacts to yours. */}
-      <div style={{
-        position: 'relative', height: 7, borderRadius: 2, overflow: 'hidden',
-        background: 'rgba(8,6,14,0.7)',
-        boxShadow: status?.attacking ? '0 0 4px rgba(255,200,90,0.7)' : 'none',
-      }}>
-        <div style={{
-          height: '100%', width: `${Math.max(0, Math.min(1, hp)) * 100}%`,
-          background: hp > 0.5
-            ? 'linear-gradient(180deg, #6fd06f, #2f8a2f)'
-            : hp > 0.25
-              ? 'linear-gradient(180deg, #e8c860, #a88820)'
-              : 'linear-gradient(180deg, #e86060, #a02020)',
-          transition: 'width 0.25s linear',
-        }} />
-      </div>
+        return (
+          <div key={member.key} style={{
+            display: 'flex', flexDirection: 'column', gap: 2,
+            // The whole frame dims while they are down — one read for "this one is out"
+            // that does not depend on noticing an empty bar.
+            opacity: downed ? 0.45 : 1,
+            filter: downed ? 'saturate(0.35)' : 'none',
+            transition: 'opacity 0.2s linear',
+          }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+              fontSize: 10, textShadow: TEXT_SHADOW, gap: 4,
+            }}>
+              <span style={{
+                fontWeight: 700, color: hostile ? '#ff8a7a' : '#8ac0ff',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {speaker.name}
+              </span>
+              <span style={{ color: '#9a8f7a', fontSize: 9, flex: '0 0 auto' }}>Lv {speaker.level}</span>
+              {/* Dismiss sits ON the name row rather than as its own "leave party" line.
+                  With one member that row cost nothing; at PARTY_MAX it cost ~17px × 3,
+                  and measurement put the third frame 39px INTO `.hud-bottom` on a 360px-tall
+                  landscape phone. `.hud-tl` is capped and clipped, so that collision would
+                  not have clipped — it would just have drawn over the action bar. */}
+              <button
+                onClick={() => leaveParty(member.key)}
+                title={`Remove ${speaker.name} from your party`}
+                aria-label={`Remove ${speaker.name} from your party`}
+                style={{
+                  // pointerEvents: see UnitFrames — .hud-layer is click-through, so a
+                  // control that does not re-enable them is inert. This one never worked.
+                  background: 'none', border: 'none', padding: '0 0 0 4px', margin: 0,
+                  color: '#6b6152', fontSize: 11, lineHeight: 1, cursor: 'pointer',
+                  textShadow: TEXT_SHADOW, pointerEvents: 'auto', flex: '0 0 auto',
+                }}
+              >×</button>
+            </div>
 
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        fontSize: 9, textShadow: TEXT_SHADOW, gap: 4,
-      }}>
-        <span style={{
-          color: '#c8a86a', fontStyle: 'italic',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {speaker.spec ?? speaker.playerClass}
-        </span>
-        <span style={{ color: ACTIVITY_COLOR[activity] ?? '#8a8070', flex: '0 0 auto' }}>
-          {activity}
-        </span>
-      </div>
+            {/* Health. Real, from the store. Flashes on the frames right after they swing,
+                so the frame reacts to their fight the way your own reacts to yours. */}
+            <div style={{
+              position: 'relative', height: 7, borderRadius: 2, overflow: 'hidden',
+              background: 'rgba(8,6,14,0.7)',
+              boxShadow: status?.attacking && !downed ? '0 0 4px rgba(255,200,90,0.7)' : 'none',
+            }}>
+              <div style={{
+                height: '100%', width: `${hp * 100}%`,
+                background: hpGradient(hp),
+                transition: 'width 0.25s linear',
+              }} />
+              {downed && (
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                  fontSize: 7.5, letterSpacing: 0.5, color: '#ffb0b0',
+                  textShadow: TEXT_SHADOW, pointerEvents: 'none',
+                }}>
+                  {/* Counting up to the rejoin is the difference between "they are dead"
+                      and "they are coming back" — the second is what is actually true. */}
+                  {`▲ ${Math.ceil(ally!.downedFor)}s`}
+                </div>
+              )}
+            </div>
 
-      <button
-        onClick={() => leaveParty(member.key)}
-        title={`Remove ${speaker.name} from your party`}
-        style={{
-          // pointerEvents: see UnitFrames — .hud-layer is click-through, so a control
-          // that does not re-enable them is inert. This one never worked.
-          alignSelf: 'flex-start', background: 'none', border: 'none', padding: '4px 8px 4px 0',
-          color: '#6b6152', fontSize: 8.5, cursor: 'pointer', textShadow: TEXT_SHADOW,
-          pointerEvents: 'auto',
-        }}
-      >leave party</button>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+              fontSize: 9, textShadow: TEXT_SHADOW, gap: 4,
+            }}>
+              <span style={{
+                color: '#c8a86a', fontStyle: 'italic',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {speaker.spec ?? speaker.playerClass}
+              </span>
+              <span style={{
+                color: downed ? '#e08080' : (ACTIVITY_COLOR[activity] ?? '#8a8070'),
+                flex: '0 0 auto',
+              }}>
+                {activity}
+              </span>
+            </div>
+
+          </div>
+        )
+      })}
     </div>
   )
 }

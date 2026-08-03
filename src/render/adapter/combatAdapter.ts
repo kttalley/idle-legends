@@ -35,7 +35,8 @@ import {
   takeChatLine, requestLiveBark, pumpChatPools, type ChatContext, type ChatSpeaker,
 } from '../../engine/chatGen'
 import { pushChat, resolveChat } from '../../engine/chatLog'
-import { getParty, disbandParty, setCompanionStatus } from '../../engine/party'
+import { getParty, disbandParty, setCompanionStatuses } from '../../engine/party'
+import type { CompanionStatusMap } from '../../engine/party'
 import { entityKey } from '../../engine/whisper'
 import { ZONES } from '../../data/zones'
 import type { Facing, IndexedSprite } from '../types'
@@ -3498,38 +3499,33 @@ export class WorldSceneController {
       }
       this.followerIdxs = live
 
-      // Publish what the companion is doing, for the party frame. Health comes from the
-      // fight they are currently playing back, so the bar moves for real rather than
-      // being decorative — and returns to full between fights, because a companion's HP
-      // only exists inside a resolved fight.
-      // The party frame shows the FIRST member. C4 makes the roster plural in the
-      // simulation; a multi-member HUD is UI work that belongs with it, and showing
-      // member 0 is strictly better than the previous behaviour of showing whichever
-      // member the reconcile loop happened to touch last.
-      const c = live.length ? this.ambient[live[0]] : null
-      if (c && c.identity) {
-        const ACTIVITY: Record<string, 'following' | 'moving in' | 'fighting' | 'looting' | 'idle'> = {
-          follow: 'following', approach: 'moving in', fight: 'fighting',
-          loot: 'looting', wander: 'idle', idle: 'idle',
-        }
-        let hpFrac = 1
-        if (c.state === 'fight' && c.fightLog) {
-          // Side 1 acted → the companion (side 0) took the hit; that event carries their
-          // remaining and maximum health.
-          for (let k = c.playIdx - 1; k >= 0; k--) {
-            const e = c.fightLog[k]
-            if (e.side === 1 && e.targetMaxHp > 0) { hpFrac = Math.max(0, e.targetHp / e.targetMaxHp); break }
-          }
-        }
-        setCompanionStatus({
+      // Publish what EVERY companion is doing, keyed by party key, for the party frame.
+      // This used to publish member 0 only — a leftover from a one-member party — so the
+      // second and third members were invisible in the HUD even though C4 had made the
+      // roster plural in the simulation.
+      //
+      // Behaviour ONLY. Health used to be scraped out of the fight log being played back,
+      // because a companion's HP existed nowhere else. Party members now carry real health
+      // in `GameState.allies` and the frame reads it from there; publishing a second,
+      // cosmetic HP here would give one bar two sources that disagree.
+      const ACTIVITY: Record<string, 'following' | 'moving in' | 'fighting' | 'looting' | 'idle'> = {
+        follow: 'following', approach: 'moving in', fight: 'fighting',
+        loot: 'looting', wander: 'idle', idle: 'idle',
+        // `assist` is the companion fighting alongside YOU rather than off on its own —
+        // the common case now, and it read as 'idle' while this map had no entry for it.
+        assist: 'fighting',
+      }
+      const statuses: CompanionStatusMap = {}
+      for (const idx of live) {
+        const c = this.ambient[idx]
+        if (!c || !c.identity || !c.partyKey) continue
+        statuses[c.partyKey] = {
           name: c.name,
           activity: ACTIVITY[c.state] ?? 'idle',
-          hpFrac,
-          attacking: c.state === 'fight' && !c.e.animator.finished,
-        })
-      } else {
-        setCompanionStatus(null)
+          attacking: (c.state === 'fight' || c.state === 'assist') && !c.e.animator.finished,
+        }
       }
+      setCompanionStatuses(statuses)
     }
 
     // Top up the generated-chat pools. Throttled hard and off the render path: the
