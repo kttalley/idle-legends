@@ -2019,6 +2019,188 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       return
     }
 
+    // ── Registering a kill ──────────────────────────────────────────────────
+    // Lifted out of the player-swing block, where it used to live. That placement made
+    // the player's weapon the ONLY thing that could register a death: a mob finished off
+    // by a DoT tick, a summoned minion, thorns or an Umbral Bolt sat at <=0 HP until the
+    // hero happened to swing again — and if the hero walked out of engagement range,
+    // indefinitely. Party members made that untenable rather than merely untidy, since an
+    // ally landing the killing blow is now routine.
+    //
+    // Everything below is the original handler, moved verbatim: loot, XP, levelling, zone
+    // unlocks, quest completion, boss bookkeeping and the drop ladder all still run in the
+    // store, exactly once, wherever the blow came from.
+    const registerKill = (): boolean => {
+      if (!currentMob || currentMob.currentHp > 0) return false
+      const deadMob = currentMob!
+      const loot = rollLoot(deadMob, level, stats.goldFindBonus, upg)
+      gold += loot.gold
+      killGoldThisTick += loot.gold
+
+      newLogs.push(log('mob_death', `${deadMob.name} dies!`, '#ff4444'))
+      newLogs.push(log('loot_gold',  `+${loot.gold} gold`,   '#ffd700'))
+
+      // Rampage — each kill compounds into the next. Capped, and cleared whenever the
+      // hero stops fighting (see `resetCombatAccumulators`), so it rewards an
+      // uninterrupted streak rather than sitting at max forever.
+      if (fx.rampageChance > 0 && procState.rampageStacks < RAMPAGE_MAX_STACKS) {
+        procState.rampageStacks++
+        newLogs.push(log('proc', `🔥 Rampage! ${procState.rampageStacks}/${RAMPAGE_MAX_STACKS}`, '#ff8800'))
+      }
+      rampageDecayAccum = 0
+      // A new fight is a new chance to refuse to die, a fresh opener, and a fresh
+      // stack of charges. Rampage is the deliberate exception: it is the ONE thing
+      // meant to carry across kills, which is the whole shape of the talent.
+      procState.lastStandUsed = false
+      procState.openerUsed = false
+      procState.arcaneCharges = 0
+
+      // Thought: boss kill, elite kill, or regular kill (10% chance to avoid spam)
+      if (deadMob.isBoss) {
+        get().triggerThought('boss_kill', deadMob.name)
+      } else if (deadMob.isElite) {
+        get().triggerThought('elite_kill', deadMob.name)
+      } else if (Math.random() < 0.15) {
+        get().triggerThought('mob_kill')
+      }
+
+      xp += deadMob.xpReward
+      killsThisTick++
+      xpThisTick += deadMob.xpReward
+      while (xp >= xpForLevel(level)) {
+        xp -= xpForLevel(level)
+        level++
+        const newStats = compileStats(state.playerClass, level, equipment, talentAllocs, racialPassive)
+        stats = { ...newStats, currentHp: Math.min(newStats.maxHp, stats.currentHp + 20) }
+        newLogs.push(log('level_up', `★ Level Up! Now level ${level}!`, '#ffd700'))
+        // Gain a talent point — but only while the hero is still under the lifetime
+        // cap. Points used to accrue forever against a tree that could hold ~48 of
+        // them; past that every level-up handed out a token with nowhere to spend it.
+        // Levels beyond the cap still raise stats, they just stop paying talents.
+        set(s => {
+          if (s.talentPoints + totalSpent(s.talentAllocs) >= TALENT_POINT_MAX) return {}
+          return { talentPoints: s.talentPoints + 1 }
+        })
+        // An ability slot opening is worth saying out loud — it is the only moment in
+        // levelling where the action bar itself changes.
+        for (const ab of getClassAbilities(state.playerClass)) {
+          if (ab.unlockLevel === level) {
+            newLogs.push(log('ability_use', `✦ ${ab.name} unlocked!`, '#ffd700'))
+          }
+        }
+        get().triggerThought('level_up', `level ${level}`)
+        // Level-based unlock: only zones whose prerequisite boss is already down.
+        for (const rawId of ZONE_ORDER) {
+          const zoneId = rawId as ZoneId
+          if (unlockedZones.includes(zoneId)) continue
+          if (canEnterZone(zoneId, level, bossesDefeated)) {
+            unlockedZones.push(zoneId)
+            newLogs.push(log('zone_change', `New zone unlocked: ${ZONES[zoneId].name}!`, '#00ff88'))
+            if (!state.zoneMaps[zoneId]) {
+              set(s => ({ zoneMaps: { ...s.zoneMaps, [zoneId]: generateZoneMap(zoneId, mapSeed(s)) } }))
+            }
+          }
+        }
+      }
+
+      const killKey = `${currentZone}:${deadMob.templateId}`
+      zoneKillCounts[killKey] = (zoneKillCounts[killKey] ?? 0) + 1
+      totalZoneKills[currentZone] = (totalZoneKills[currentZone] ?? 0) + 1
+
+      if (deadMob.isBoss && !bossesDefeated.includes(currentZone)) {
+        bossesDefeated.push(currentZone)
+        const zone = ZONES[currentZone]
+        const nextZoneId = zone.nextZone
+
+        // Update the active quest for this zone to completed.
+        let activeQuest: ZoneQuest | null = state.activeQuest
+        if (activeQuest?.zoneId === currentZone) {
+          activeQuest = { ...activeQuest, completed: true }
+        }
+
+        if (nextZoneId) {
+          const canEnterNext = canEnterZone(nextZoneId, level, bossesDefeated)
+          if (canEnterNext && !unlockedZones.includes(nextZoneId)) {
+            unlockedZones.push(nextZoneId)
+            newLogs.push(log('zone_change', `★ Boss slain! ${ZONES[nextZoneId].name} unlocked!`, '#ff8000'))
+            if (!state.zoneMaps[nextZoneId]) {
+              set(s => ({ zoneMaps: { ...s.zoneMaps, [nextZoneId]: generateZoneMap(nextZoneId, mapSeed(s)) } }))
+            }
+          } else if (!canEnterNext) {
+            newLogs.push(log('zone_change', `${ZONES[nextZoneId].name} will unlock at level ${ZONES[nextZoneId].levelRange[0]}`, '#ff8800'))
+          }
+        } else {
+          // Final zone (the_maw_eternal) — circuit increment, loop back to start.
+          // Drop the cached maps: mapSeed folds in the circuit, so the next lap through
+          // the world is generated fresh instead of replaying the same geography.
+          set(s => ({ zoneCircuit: s.zoneCircuit + 1, zoneMaps: {} }))
+          bossesDefeated.length = 0  // reset all boss kills for the new circuit
+          currentZone = 'sunhollow_meadows'
+          activeQuest = makeZoneQuest('sunhollow_meadows', state.playerFaction)
+          newLogs.push(log('zone_change', `The world resets. Stronger now. Circuit ${(state.zoneCircuit ?? 0) + 1} begins.`, '#cc88ff'))
+        }
+
+        // Apply the completed quest to the local copy so it is persisted in the tick set().
+        state.activeQuest = activeQuest
+      }
+
+      // ── Where the drop goes ───────────────────────────────────────────────
+      // One ladder, in this order: WEAR it, then sell it, then bag it, then salvage it.
+      //
+      // Equipping first is not a preference, it is the safety property. It means an
+      // upgrade can never be sold or scrapped no matter how the merchant threshold is
+      // set, because by the time anything else looks at the drop it is already on the
+      // hero and what's being disposed of is the OLD piece. The displaced item then
+      // takes the bag pressure instead of the good one.
+      if (loot.item) {
+        // One ladder — wear, sell, bag, salvage — shared verbatim with the offline
+        // projection (engine/loot.ts). Two copies of "what happens to a drop" would
+        // drift, and offline progress matching online is the entire promise.
+        const placed = placeDrop(loot.item, equipment, inventory, {
+          playerClass: state.playerClass, level, talentAllocs, racialPassive,
+          autoEquip: state.settings.autoEquip !== false,
+          contract: state.merchantContract, salvageBonus: upg.salvageRate,
+        })
+        if (placed.equipment !== equipment) {
+          equipment = placed.equipment
+          const rescored = compileStats(state.playerClass, level, equipment, talentAllocs, racialPassive)
+          // Recompiling resets currentHp to full; carry the hero's real HP across, and
+          // let a stamina gain raise the ceiling without healing them for free.
+          rescored.currentHp = Math.min(rescored.maxHp, stats.currentHp)
+          stats = rescored
+          newLogs.push(log('loot_item', `Equipped ${loot.item.name}`, rarityColor(loot.item.rarity)))
+        }
+        inventory = placed.inventory
+        gold += placed.sold + placed.salvaged
+        autoSold += placed.sold
+        salvaged += placed.salvaged
+        if (placed.sold > 0 && placed.disposed) {
+          newLogs.push(log('loot_item',
+            `Factor bought ${placed.disposed.name} — ${placed.sold}g`, '#88ccaa'))
+        } else if (placed.salvaged > 0 && placed.disposed) {
+          newLogs.push(log('loot_item',
+            `Bag full — salvaged ${placed.disposed.name} for ${placed.salvaged}g`, '#c8a100'))
+        } else if (placed.outcome === 'bagged') {
+          newLogs.push(log('loot_item', `Looted: ${loot.item.name}`, rarityColor(loot.item.rarity)))
+        }
+      }
+
+      if (fx.remorselessEnabled) procState.remorselessActive = true
+      procState.winterChillStacks = 0
+      procState.mobFrozen = false
+      procState.iceBarrierHp = 0
+      // Drop the corpse out of the population and release the player's commitment —
+      // "until the enemy is killed" ends here. The next tick auto-picks the nearest
+      // survivor unless the player names another.
+      mobs = mobs.filter(m => m.id !== currentMob!.id)
+      targetMobId = null
+      currentMob = null
+      activeDoTs  = []
+      mobRespawnTimer = MOB_RESPAWN_SECONDS
+      resetCombatAccumulators()
+      return true
+    }
+
     // ── Process active DoTs ─────────────────────────────────────────────────
     const dotDamageThisTick: number[] = []
     const nightfallChance = fx.nightfallProcChance
@@ -2042,6 +2224,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         newFns.push(fn(totalDotDmg, false, false, true, '#aa88ff'))
       }
       newLogs.push(log('dot_tick', `Affliction deals ${totalDotDmg} damage`, '#aa88ff'))
+      // A DoT that finishes the job now finishes it. This was the largest of the
+      // unregistered-kill cases: an Affliction build does most of its damage here.
+      registerKill()
     }
 
     // Gathering Dark Umbral Bolt proc
@@ -2050,6 +2235,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       currentMob = { ...currentMob, currentHp: currentMob.currentHp - boltDmg }
       newFns.push(fn(boltDmg, true, false, false, '#cc44ff'))
       newLogs.push(log('proc', `⚡ Gathering Dark! Umbral Bolt hits for ${boltDmg}`, '#cc44ff'))
+      registerKill()
     }
 
     // ── Timed crit ───────────────────────────────────────────────────────────
@@ -2070,6 +2256,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         const dmg = Math.max(1, Math.round(fx.minionDps * MINION_TICK_SECONDS))
         currentMob = { ...currentMob, currentHp: currentMob.currentHp - dmg }
         newFns.push(fn(dmg, false, false, false, '#b060d0'))
+        registerKill()
       }
     }
 
@@ -2227,174 +2414,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       procState.remorselessActive = false
 
       // ── Mob dies ────────────────────────────────────────────────────────────
-      if (currentMob!.currentHp <= 0) {
-        const deadMob = currentMob!
-        const loot = rollLoot(deadMob, level, stats.goldFindBonus, upg)
-        gold += loot.gold
-        killGoldThisTick += loot.gold
-
-        newLogs.push(log('mob_death', `${deadMob.name} dies!`, '#ff4444'))
-        newLogs.push(log('loot_gold',  `+${loot.gold} gold`,   '#ffd700'))
-
-        // Rampage — each kill compounds into the next. Capped, and cleared whenever the
-        // hero stops fighting (see `resetCombatAccumulators`), so it rewards an
-        // uninterrupted streak rather than sitting at max forever.
-        if (fx.rampageChance > 0 && procState.rampageStacks < RAMPAGE_MAX_STACKS) {
-          procState.rampageStacks++
-          newLogs.push(log('proc', `🔥 Rampage! ${procState.rampageStacks}/${RAMPAGE_MAX_STACKS}`, '#ff8800'))
-        }
-        rampageDecayAccum = 0
-        // A new fight is a new chance to refuse to die, a fresh opener, and a fresh
-        // stack of charges. Rampage is the deliberate exception: it is the ONE thing
-        // meant to carry across kills, which is the whole shape of the talent.
-        procState.lastStandUsed = false
-        procState.openerUsed = false
-        procState.arcaneCharges = 0
-
-        // Thought: boss kill, elite kill, or regular kill (10% chance to avoid spam)
-        if (deadMob.isBoss) {
-          get().triggerThought('boss_kill', deadMob.name)
-        } else if (deadMob.isElite) {
-          get().triggerThought('elite_kill', deadMob.name)
-        } else if (Math.random() < 0.15) {
-          get().triggerThought('mob_kill')
-        }
-
-        xp += deadMob.xpReward
-        killsThisTick++
-        xpThisTick += deadMob.xpReward
-        while (xp >= xpForLevel(level)) {
-          xp -= xpForLevel(level)
-          level++
-          const newStats = compileStats(state.playerClass, level, equipment, talentAllocs, racialPassive)
-          stats = { ...newStats, currentHp: Math.min(newStats.maxHp, stats.currentHp + 20) }
-          newLogs.push(log('level_up', `★ Level Up! Now level ${level}!`, '#ffd700'))
-          // Gain a talent point — but only while the hero is still under the lifetime
-          // cap. Points used to accrue forever against a tree that could hold ~48 of
-          // them; past that every level-up handed out a token with nowhere to spend it.
-          // Levels beyond the cap still raise stats, they just stop paying talents.
-          set(s => {
-            if (s.talentPoints + totalSpent(s.talentAllocs) >= TALENT_POINT_MAX) return {}
-            return { talentPoints: s.talentPoints + 1 }
-          })
-          // An ability slot opening is worth saying out loud — it is the only moment in
-          // levelling where the action bar itself changes.
-          for (const ab of getClassAbilities(state.playerClass)) {
-            if (ab.unlockLevel === level) {
-              newLogs.push(log('ability_use', `✦ ${ab.name} unlocked!`, '#ffd700'))
-            }
-          }
-          get().triggerThought('level_up', `level ${level}`)
-          // Level-based unlock: only zones whose prerequisite boss is already down.
-          for (const rawId of ZONE_ORDER) {
-            const zoneId = rawId as ZoneId
-            if (unlockedZones.includes(zoneId)) continue
-            if (canEnterZone(zoneId, level, bossesDefeated)) {
-              unlockedZones.push(zoneId)
-              newLogs.push(log('zone_change', `New zone unlocked: ${ZONES[zoneId].name}!`, '#00ff88'))
-              if (!state.zoneMaps[zoneId]) {
-                set(s => ({ zoneMaps: { ...s.zoneMaps, [zoneId]: generateZoneMap(zoneId, mapSeed(s)) } }))
-              }
-            }
-          }
-        }
-
-        const killKey = `${currentZone}:${deadMob.templateId}`
-        zoneKillCounts[killKey] = (zoneKillCounts[killKey] ?? 0) + 1
-        totalZoneKills[currentZone] = (totalZoneKills[currentZone] ?? 0) + 1
-
-        if (deadMob.isBoss && !bossesDefeated.includes(currentZone)) {
-          bossesDefeated.push(currentZone)
-          const zone = ZONES[currentZone]
-          const nextZoneId = zone.nextZone
-
-          // Update the active quest for this zone to completed.
-          let activeQuest: ZoneQuest | null = state.activeQuest
-          if (activeQuest?.zoneId === currentZone) {
-            activeQuest = { ...activeQuest, completed: true }
-          }
-
-          if (nextZoneId) {
-            const canEnterNext = canEnterZone(nextZoneId, level, bossesDefeated)
-            if (canEnterNext && !unlockedZones.includes(nextZoneId)) {
-              unlockedZones.push(nextZoneId)
-              newLogs.push(log('zone_change', `★ Boss slain! ${ZONES[nextZoneId].name} unlocked!`, '#ff8000'))
-              if (!state.zoneMaps[nextZoneId]) {
-                set(s => ({ zoneMaps: { ...s.zoneMaps, [nextZoneId]: generateZoneMap(nextZoneId, mapSeed(s)) } }))
-              }
-            } else if (!canEnterNext) {
-              newLogs.push(log('zone_change', `${ZONES[nextZoneId].name} will unlock at level ${ZONES[nextZoneId].levelRange[0]}`, '#ff8800'))
-            }
-          } else {
-            // Final zone (the_maw_eternal) — circuit increment, loop back to start.
-            // Drop the cached maps: mapSeed folds in the circuit, so the next lap through
-            // the world is generated fresh instead of replaying the same geography.
-            set(s => ({ zoneCircuit: s.zoneCircuit + 1, zoneMaps: {} }))
-            bossesDefeated.length = 0  // reset all boss kills for the new circuit
-            currentZone = 'sunhollow_meadows'
-            activeQuest = makeZoneQuest('sunhollow_meadows', state.playerFaction)
-            newLogs.push(log('zone_change', `The world resets. Stronger now. Circuit ${(state.zoneCircuit ?? 0) + 1} begins.`, '#cc88ff'))
-          }
-
-          // Apply the completed quest to the local copy so it is persisted in the tick set().
-          state.activeQuest = activeQuest
-        }
-
-        // ── Where the drop goes ───────────────────────────────────────────────
-        // One ladder, in this order: WEAR it, then sell it, then bag it, then salvage it.
-        //
-        // Equipping first is not a preference, it is the safety property. It means an
-        // upgrade can never be sold or scrapped no matter how the merchant threshold is
-        // set, because by the time anything else looks at the drop it is already on the
-        // hero and what's being disposed of is the OLD piece. The displaced item then
-        // takes the bag pressure instead of the good one.
-        if (loot.item) {
-          // One ladder — wear, sell, bag, salvage — shared verbatim with the offline
-          // projection (engine/loot.ts). Two copies of "what happens to a drop" would
-          // drift, and offline progress matching online is the entire promise.
-          const placed = placeDrop(loot.item, equipment, inventory, {
-            playerClass: state.playerClass, level, talentAllocs, racialPassive,
-            autoEquip: state.settings.autoEquip !== false,
-            contract: state.merchantContract, salvageBonus: upg.salvageRate,
-          })
-          if (placed.equipment !== equipment) {
-            equipment = placed.equipment
-            const rescored = compileStats(state.playerClass, level, equipment, talentAllocs, racialPassive)
-            // Recompiling resets currentHp to full; carry the hero's real HP across, and
-            // let a stamina gain raise the ceiling without healing them for free.
-            rescored.currentHp = Math.min(rescored.maxHp, stats.currentHp)
-            stats = rescored
-            newLogs.push(log('loot_item', `Equipped ${loot.item.name}`, rarityColor(loot.item.rarity)))
-          }
-          inventory = placed.inventory
-          gold += placed.sold + placed.salvaged
-          autoSold += placed.sold
-          salvaged += placed.salvaged
-          if (placed.sold > 0 && placed.disposed) {
-            newLogs.push(log('loot_item',
-              `Factor bought ${placed.disposed.name} — ${placed.sold}g`, '#88ccaa'))
-          } else if (placed.salvaged > 0 && placed.disposed) {
-            newLogs.push(log('loot_item',
-              `Bag full — salvaged ${placed.disposed.name} for ${placed.salvaged}g`, '#c8a100'))
-          } else if (placed.outcome === 'bagged') {
-            newLogs.push(log('loot_item', `Looted: ${loot.item.name}`, rarityColor(loot.item.rarity)))
-          }
-        }
-
-        if (fx.remorselessEnabled) procState.remorselessActive = true
-        procState.winterChillStacks = 0
-        procState.mobFrozen = false
-        procState.iceBarrierHp = 0
-        // Drop the corpse out of the population and release the player's commitment —
-        // "until the enemy is killed" ends here. The next tick auto-picks the nearest
-        // survivor unless the player names another.
-        mobs = mobs.filter(m => m.id !== currentMob!.id)
-        targetMobId = null
-        currentMob = null
-        activeDoTs  = []
-        mobRespawnTimer = MOB_RESPAWN_SECONDS
-        resetCombatAccumulators()
-      }
+      registerKill()
     }
 
     // ── Mob attacks player ───────────────────────────────────────────────────
@@ -2415,6 +2435,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         if (swing.thorns > 0) {
           currentMob = { ...currentMob, currentHp: currentMob.currentHp - swing.thorns }
           newFns.push(fn(swing.thorns, false, false, false, '#ffaa44'))
+          // NOT registered here. `registerKill` nulls `currentMob`, and the rest of this
+          // exchange still reads it (the hit log at `${currentMob.name}` below). The mob's
+          // blow has already been resolved by this point anyway, so the death is registered
+          // once the exchange finishes — see after this block.
         }
 
         // Winterward absorb
@@ -2495,6 +2519,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         }
       }
     }
+
+    // Retaliation's kill, registered once the exchange above has fully resolved — the
+    // block reads `currentMob` throughout and `registerKill` nulls it. A no-op unless
+    // thorns actually took the mob to zero.
+    registerKill()
 
     // ── Auto-gather: if drifting near a resource node with no active combat ──
     let nextGameMode: GameMode = state.gameMode as GameMode
