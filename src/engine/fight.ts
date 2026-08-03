@@ -219,7 +219,14 @@ export function runFight(
 
       if (me.kind === 'hero' && me.hero) {
         const { combatant, stats } = me.hero
-        const swing = (kind: 'swing' | 'extra' | 'flurry'): boolean => {
+        // 'none'      — the exchange continues
+        // 'target'    — the defender died on this blow
+        // 'attacker'  — RETALIATION killed the swinger. Distinct because the caller
+        //               credits the winner, and a boolean cannot tell it who won: a
+        //               thorns kill returning `true` would have been read as "target
+        //               died" and handed the victory to the corpse.
+        type SwingOutcome = 'none' | 'target' | 'attacker'
+        const swing = (kind: 'swing' | 'extra' | 'flurry'): SwingOutcome => {
           const res = resolvePlayerAttack(
             stats, combatant.playerClass, combatant.talentAllocs, me.procState, me.buffs,
             // Proc hits re-resolve at a reduced magnitude rather than at full strength.
@@ -239,11 +246,53 @@ export function runFight(
           )
           me.opener = false
 
-          // A hero defender mitigates with armour; a mob has none, matching the store,
-          // where mob HP absorbs the raw swing.
-          const dealt = foe.kind === 'hero' ? mitigate(res.damage, foe.armor) : res.damage
+          // A hero defender mitigates with armour AND with the defensive talents they
+          // actually paid for; a mob has neither, matching the store, where mob HP absorbs
+          // the raw swing.
+          //
+          // Only armour applied before, via a local `mitigate`. So in a duel — the one
+          // shape where a DEFENDER's talents can matter at all, since mobs have none — a
+          // Bulwark warrior's avoidance, damage reduction and Retaliation were all inert,
+          // and the whole defensive half of the tree was decorative in PvP.
+          let dealt = res.damage
+          let blockedHit = false
+          let reflected = 0
+          if (foe.kind === 'hero' && foe.hero) {
+            const dfx = compileTalentEffects(foe.hero.combatant.playerClass, foe.hero.combatant.talentAllocs)
+            blockedHit = dfx.avoidChance > 0 && rng() < dfx.avoidChance
+            if (blockedHit) dealt = 0
+            else {
+              dealt = Math.max(1, Math.round(
+                mitigate(res.damage, foe.armor) * (1 - dfx.damageReduction)))
+              reflected = dfx.thornsPct > 0 ? Math.round(dealt * dfx.thornsPct) : 0
+            }
+          }
+          if (blockedHit) {
+            emit({ t, side: (1 - s) as 0 | 1, kind: 'block', damage: 0, crit: false,
+                   targetHp: foe.hp, targetMaxHp: foe.maxHp })
+            // A blocked blow lands nothing, but the swing is spent — no DoTs, no lifesteal,
+            // no death check. Fall through to the proc chain exactly as a miss would.
+            if (kind === 'swing') {
+              const e = res.extraHit ? swing('extra') : 'none'
+              if (e !== 'none') return e
+              const f = res.flurryHit ? swing('flurry') : 'none'
+              if (f !== 'none') return f
+            }
+            return 'none'
+          }
           const dead = damage(foe, dealt)
           emit({ t, side: s, kind, damage: dealt, crit: res.isCrit, targetHp: foe.hp, targetMaxHp: foe.maxHp })
+          // Retaliation, measured against damage actually dealt — the same rule the store
+          // applies, so a defender's thorns work in a duel too.
+          if (reflected > 0 && !dead) {
+            const attackerDead = damage(me, reflected)
+            emit({ t, side: (1 - s) as 0 | 1, kind: 'thorns', damage: reflected, crit: false,
+                   targetHp: me.hp, targetMaxHp: me.maxHp })
+            if (attackerDead) {
+              emit({ t, side: s, kind: 'death', damage: 0, crit: false, targetHp: 0, targetMaxHp: me.maxHp })
+              return 'attacker'
+            }
+          }
           // Refresh by source, do not accumulate. This used to `push(...)` blindly, which
           // is fine for a crit-gated bleed and catastrophic for the UNCONDITIONAL DoTs:
           // Corruption and Curse of Agony trigger on EVERY swing (combat.ts:409, :412), so
@@ -267,21 +316,30 @@ export function runFight(
             } else foe.dots.push(dot)
           }
           if (res.lifeDrawn > 0) me.hp = Math.min(me.maxHp, me.hp + res.lifeDrawn)
-          if (dead) return true
+          if (dead) return 'target'
 
           // A proc hit cannot proc again. Gated on the KIND rather than on a depth
           // counter because the property wanted is "procs are consulted once, on the
           // primary swing" — a depth number would still permit a chain if some future
           // caller passed the wrong value.
           if (kind === 'swing') {
-            if (res.extraHit && swing('extra')) return true
-            if (res.flurryHit && swing('flurry')) return true
+            const e = res.extraHit ? swing('extra') : 'none'
+            if (e !== 'none') return e
+            const f = res.flurryHit ? swing('flurry') : 'none'
+            if (f !== 'none') return f
           }
-          return false
+          return 'none'
         }
-        if (swing('swing')) {
+        const outcome = swing('swing')
+        if (outcome === 'target') {
           winner = s
           emit({ t, side: (1 - s) as 0 | 1, kind: 'death', damage: 0, crit: false, targetHp: 0, targetMaxHp: foe.maxHp })
+          break outer
+        }
+        if (outcome === 'attacker') {
+          // Retaliation killed the swinger; the death event was already emitted where it
+          // happened, so only the verdict is left to record.
+          winner = (1 - s) as 0 | 1
           break outer
         }
       } else if (me.kind === 'mob' && me.mob && foe.kind === 'hero' && foe.hero) {
