@@ -34,6 +34,7 @@ import type {
 import {
   compileStats, compileTalentEffects, resolveMobAttack, resolvePlayerAttack, resetDotIds,
   EXTRA_HIT_MULT, FLURRY_MULT,
+  resolveHeroTurn,
 } from './combat'
 import { mulberry32, type Rng } from './rng'
 
@@ -220,118 +221,79 @@ export function runFight(
 
       if (me.kind === 'hero' && me.hero) {
         const { combatant, stats } = me.hero
-        // 'none'      — the exchange continues
-        // 'target'    — the defender died on this blow
-        // 'attacker'  — RETALIATION killed the swinger. Distinct because the caller
-        //               credits the winner, and a boolean cannot tell it who won: a
-        //               thorns kill returning `true` would have been read as "target
-        //               died" and handed the victory to the corpse.
-        type SwingOutcome = 'none' | 'target' | 'attacker'
-        const swing = (kind: 'swing' | 'extra' | 'flurry'): SwingOutcome => {
-          const res = resolvePlayerAttack(
-            stats, combatant.playerClass, combatant.talentAllocs, me.procState, me.buffs,
-            // Proc hits re-resolve at a reduced magnitude rather than at full strength.
-            // This loop used to re-resolve them at 1.0 while the store paid a flat 0.7/0.5,
-            // so an extra strike was worth up to 3x more here than in the player's own
-            // game. Same constants both sides now (combat.ts), so the two cannot drift.
-            kind === 'extra' ? EXTRA_HIT_MULT : kind === 'flurry' ? FLURRY_MULT : undefined,
-            {
-              mobHpFraction: foe.hp / foe.maxHp,
-              playerHpFraction: me.hp / me.maxHp,
-              rampageStacks: me.procState.rampageStacks,
-              arcaneCharges: me.procState.arcaneCharges,
-              targetBurning: foe.dots.some(d => d.sourceType === 'burn'),
-              isOpener: me.opener,
-              rng,
-            },
-          )
-          me.opener = false
+        // The swing/extra/flurry SEQUENCE now lives in `combat.ts` (`resolveHeroTurn`),
+        // shared with the store. It is the part that drifted: order, magnitudes, the rule
+        // that procs are consulted once, and stopping the moment a side falls. What stays
+        // here is what is genuinely this loop's own — mitigation against a hero defender,
+        // Retaliation, the event log, and what a death means.
+        const outcome = resolveHeroTurn(
+          {
+            stats,
+            playerClass: combatant.playerClass,
+            talentAllocs: combatant.talentAllocs,
+            procState: me.procState,
+            activeBuffs: me.buffs,
+            targetHpFraction: foe.hp / foe.maxHp,
+            playerHpFraction: me.hp / me.maxHp,
+            targetBurning: foe.dots.some(d => d.sourceType === 'burn'),
+            isOpener: me.opener,
+            rampageStacks: me.procState.rampageStacks,
+            arcaneCharges: me.procState.arcaneCharges,
+            rng,
+          },
+          (hit) => {
+            me.opener = false
 
-          // A hero defender mitigates with armour AND with the defensive talents they
-          // actually paid for; a mob has neither, matching the store, where mob HP absorbs
-          // the raw swing.
-          //
-          // Only armour applied before, via a local `mitigate`. So in a duel — the one
-          // shape where a DEFENDER's talents can matter at all, since mobs have none — a
-          // Bulwark warrior's avoidance, damage reduction and Retaliation were all inert,
-          // and the whole defensive half of the tree was decorative in PvP.
-          let dealt = res.damage
-          let blockedHit = false
-          let reflected = 0
-          if (foe.kind === 'hero' && foe.hero) {
-            const dfx = compileTalentEffects(foe.hero.combatant.playerClass, foe.hero.combatant.talentAllocs)
-            blockedHit = dfx.avoidChance > 0 && rng() < dfx.avoidChance
-            if (blockedHit) dealt = 0
-            else {
-              dealt = Math.max(1, Math.round(
-                mitigate(res.damage, foe.armor) * (1 - dfx.damageReduction)))
-              reflected = dfx.thornsPct > 0 ? Math.round(dealt * dfx.thornsPct) : 0
+            // A hero defender mitigates with armour AND the defensive talents they paid
+            // for; a mob has neither, matching the store, where mob HP absorbs the raw
+            // swing.
+            let dealt = hit.damage
+            let blockedHit = false
+            let reflected = 0
+            if (foe.kind === 'hero' && foe.hero) {
+              const dfx = compileTalentEffects(foe.hero.combatant.playerClass, foe.hero.combatant.talentAllocs)
+              blockedHit = dfx.avoidChance > 0 && rng() < dfx.avoidChance
+              if (blockedHit) dealt = 0
+              else {
+                dealt = Math.max(1, Math.round(
+                  mitigate(hit.damage, foe.armor) * (1 - dfx.damageReduction)))
+                reflected = dfx.thornsPct > 0 ? Math.round(dealt * dfx.thornsPct) : 0
+              }
             }
-          }
-          if (blockedHit) {
-            emit({ t, side: (1 - s) as 0 | 1, kind: 'block', damage: 0, crit: false,
+
+            if (blockedHit) {
+              emit({ t, side: (1 - s) as 0 | 1, kind: 'block', damage: 0, crit: false,
+                     targetHp: foe.hp, targetMaxHp: foe.maxHp })
+              // Nothing landed, so no DoTs and no lifesteal — but the swing was spent and
+              // the proc chain continues, exactly as a miss would.
+              return { targetDied: false, targetHpFraction: foe.hp / foe.maxHp }
+            }
+
+            const dead = damage(foe, dealt)
+            emit({ t, side: s, kind: hit.kind, damage: dealt, crit: hit.crit,
                    targetHp: foe.hp, targetMaxHp: foe.maxHp })
-            // A blocked blow lands nothing, but the swing is spent — no DoTs, no lifesteal,
-            // no death check. Fall through to the proc chain exactly as a miss would.
-            if (kind === 'swing') {
-              const e = res.extraHit ? swing('extra') : 'none'
-              if (e !== 'none') return e
-              const f = res.flurryHit ? swing('flurry') : 'none'
-              if (f !== 'none') return f
+            // Refresh by source, do not accumulate — and carry the TICK CLOCK across, or a
+            // DoT re-applied faster than its own interval never reaches a tick. See the
+            // matching note in gameStore.
+            for (const dot of hit.triggeredDoTs) {
+              const i = foe.dots.findIndex(d => d.sourceType === dot.sourceType)
+              if (i >= 0) { dot.tickAccum = foe.dots[i].tickAccum; foe.dots[i] = dot }
+              else foe.dots.push(dot)
             }
-            return 'none'
-          }
-          const dead = damage(foe, dealt)
-          emit({ t, side: s, kind, damage: dealt, crit: res.isCrit, targetHp: foe.hp, targetMaxHp: foe.maxHp })
-          // Retaliation, measured against damage actually dealt — the same rule the store
-          // applies, so a defender's thorns work in a duel too.
-          if (reflected > 0 && !dead) {
-            const attackerDead = damage(me, reflected)
-            emit({ t, side: (1 - s) as 0 | 1, kind: 'thorns', damage: reflected, crit: false,
-                   targetHp: me.hp, targetMaxHp: me.maxHp })
-            if (attackerDead) {
-              emit({ t, side: s, kind: 'death', damage: 0, crit: false, targetHp: 0, targetMaxHp: me.maxHp })
-              return 'attacker'
-            }
-          }
-          // Refresh by source, do not accumulate. This used to `push(...)` blindly, which
-          // is fine for a crit-gated bleed and catastrophic for the UNCONDITIONAL DoTs:
-          // Corruption and Curse of Agony trigger on EVERY swing (combat.ts:409, :412), so
-          // a warlock stacked one fresh 6-tick corruption per swing and reached a steady
-          // state of roughly ceil(18 / attackSeconds) running at once — around 9x the
-          // store's throughput, which refreshes a single DoT per `sourceType`.
-          //
-          // The store's merge is the correct one and is what every tooltip describes, so
-          // this loop adopts it rather than the other way round.
-          for (const dot of res.triggeredDoTs) {
-            const i = foe.dots.findIndex(d => d.sourceType === dot.sourceType)
-            if (i >= 0) {
-              // Refresh DURATION, keep the TICK CLOCK. Carrying `tickAccum` across is not
-              // a detail: Corruption and Curse of Agony tick every 3s (combat.ts:518, :524)
-              // and are re-applied on EVERY swing, and every class swings faster than that
-              // (1.5–2.5s base). Installing a fresh DoT resets the clock, so it never
-              // reaches its first tick and deals literally zero damage. The golden caught
-              // exactly that: warlock dot events went to 0 and the fights got LONGER.
-              dot.tickAccum = foe.dots[i].tickAccum
-              foe.dots[i] = dot
-            } else foe.dots.push(dot)
-          }
-          if (res.lifeDrawn > 0) me.hp = Math.min(me.maxHp, me.hp + res.lifeDrawn)
-          if (dead) return 'target'
+            if (hit.lifeDrawn > 0) me.hp = Math.min(me.maxHp, me.hp + hit.lifeDrawn)
 
-          // A proc hit cannot proc again. Gated on the KIND rather than on a depth
-          // counter because the property wanted is "procs are consulted once, on the
-          // primary swing" — a depth number would still permit a chain if some future
-          // caller passed the wrong value.
-          if (kind === 'swing') {
-            const e = res.extraHit ? swing('extra') : 'none'
-            if (e !== 'none') return e
-            const f = res.flurryHit ? swing('flurry') : 'none'
-            if (f !== 'none') return f
-          }
-          return 'none'
-        }
-        const outcome = swing('swing')
+            if (!dead && reflected > 0) {
+              const attackerDead = damage(me, reflected)
+              emit({ t, side: (1 - s) as 0 | 1, kind: 'thorns', damage: reflected, crit: false,
+                     targetHp: me.hp, targetMaxHp: me.maxHp })
+              if (attackerDead) {
+                emit({ t, side: s, kind: 'death', damage: 0, crit: false, targetHp: 0, targetMaxHp: me.maxHp })
+                return { targetDied: false, attackerDied: true, targetHpFraction: foe.hp / foe.maxHp }
+              }
+            }
+            return { targetDied: dead, targetHpFraction: foe.hp / foe.maxHp }
+          },
+        )
         if (outcome === 'target') {
           winner = s
           emit({ t, side: (1 - s) as 0 | 1, kind: 'death', damage: 0, crit: false, targetHp: 0, targetMaxHp: foe.maxHp })

@@ -438,6 +438,122 @@ export function resolvePlayerAttack(
   }
 }
 
+// ── One hero's turn ───────────────────────────────────────────────────────────
+/**
+ * A single landed blow within a turn: the primary swing, or a proc riding on it.
+ *
+ * `resolvePlayerAttack` resolves a SWING. It has never described a TURN — the sequence of
+ * swing, then Turning Steel, then Flurry, each with its own magnitude, each stopping if the
+ * target falls. That sequence lived twice: once in `gameStore.tick` and once in
+ * `fight.ts`, and the two disagreed about almost every part of it. The store paid a flat
+ * fraction that never entered the resolver, so proc hits could not crit; `fight.ts`
+ * re-resolved at full strength, making the same proc worth up to 3x more there.
+ */
+export interface HeroHit {
+  kind: 'swing' | 'extra' | 'flurry'
+  damage: number
+  crit: boolean
+  triggeredDoTs: ActiveDoT[]
+  lifeDrawn: number
+  sealFatePoint: boolean
+  enraged: boolean
+}
+
+/** What happened when a caller applied a hit, so the sequence knows whether to continue. */
+export interface HitOutcome {
+  targetDied: boolean
+  /** Retaliation can kill the swinger. Distinct from `targetDied` because the caller has to
+   *  credit a winner, and "someone died" is not enough to say who. */
+  attackerDied?: boolean
+  /** The target's health AFTER the blow — Executioner reads it for the next hit in the
+   *  sequence, so a stale value silently misprices every proc that follows. */
+  targetHpFraction: number
+}
+
+export type TurnOutcome = 'none' | 'target' | 'attacker'
+
+/** Fight context for a whole turn. Mirrors `AttackContext`, minus the per-hit fields the
+ *  sequence maintains itself (`mobHpFraction`, `isOpener`). */
+export interface HeroTurnContext {
+  stats: Stats
+  playerClass: ClassType
+  talentAllocs: Record<string, number>
+  procState: CombatProcState
+  activeBuffs: ActiveBuff[]
+  targetHpFraction: number
+  playerHpFraction: number
+  targetBurning: boolean
+  isOpener: boolean
+  timedCritReady?: boolean
+  rampageStacks?: number
+  arcaneCharges?: number
+  rng?: Rng
+}
+
+/**
+ * Resolve one hero's turn, handing each landed blow to the caller in order.
+ *
+ * Inverted rather than returning a list, because the hits are SEQUENTIAL and
+ * state-dependent: Executioner reads the target's health, so a proc hit has to be priced
+ * against the health left after the swing before it. Computing them up front would misprice
+ * every one and would happily swing at a corpse.
+ *
+ * What the caller keeps: applying damage, storing DoTs, logging, and deciding what a death
+ * means. Those genuinely differ — the store owns loot and XP, `fight.ts` owns an event log —
+ * and forcing them together is what would turn a shared helper back into a second combat
+ * model.
+ *
+ * What this owns, because it is what drifted: the order, the magnitudes, the rule that
+ * procs are consulted ONCE on the primary swing, and stopping the moment either side falls.
+ */
+export function resolveHeroTurn(
+  ctx: HeroTurnContext,
+  applyHit: (hit: HeroHit) => HitOutcome,
+): TurnOutcome {
+  let targetHpFraction = ctx.targetHpFraction
+
+  const strike = (kind: HeroHit['kind']): TurnOutcome => {
+    const res = resolvePlayerAttack(
+      ctx.stats, ctx.playerClass, ctx.talentAllocs, ctx.procState, ctx.activeBuffs,
+      kind === 'extra' ? EXTRA_HIT_MULT : kind === 'flurry' ? FLURRY_MULT : undefined,
+      {
+        mobHpFraction: targetHpFraction,
+        playerHpFraction: ctx.playerHpFraction,
+        rampageStacks: ctx.rampageStacks,
+        arcaneCharges: ctx.arcaneCharges,
+        targetBurning: ctx.targetBurning,
+        // Only the primary swing can be an opener. A proc riding on it is not.
+        isOpener: kind === 'swing' && ctx.isOpener,
+        timedCritReady: kind === 'swing' ? ctx.timedCritReady : false,
+        rng: ctx.rng,
+      },
+    )
+    const outcome = applyHit({
+      kind,
+      damage: res.damage,
+      crit: res.isCrit,
+      triggeredDoTs: res.triggeredDoTs,
+      lifeDrawn: res.lifeDrawn,
+      sealFatePoint: res.sealFatePoint,
+      enraged: res.enraged,
+    })
+    targetHpFraction = outcome.targetHpFraction
+    if (outcome.attackerDied) return 'attacker'
+    if (outcome.targetDied) return 'target'
+
+    // Procs are consulted once, on the primary swing. Gated on the KIND rather than a depth
+    // counter: the property wanted is "a proc hit cannot proc again", and a number can be
+    // passed wrongly by a future caller in a way a kind cannot.
+    if (kind === 'swing') {
+      if (res.extraHit) { const e = strike('extra'); if (e !== 'none') return e }
+      if (res.flurryHit) { const f = strike('flurry'); if (f !== 'none') return f }
+    }
+    return 'none'
+  }
+
+  return strike('swing')
+}
+
 export interface MobAttackResult {
   /** Damage that actually lands on the hero, after armour, block and reduction. */
   damage: number

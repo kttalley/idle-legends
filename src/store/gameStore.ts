@@ -30,7 +30,7 @@ import {
   compileStats, compileTalentEffects,
   resolvePlayerAttack, resolveMobAttack,
   makeShadowBoltHit, makeAbilityBuff, isGearUpgrade,
-  emptyAbilityMod, RAMPAGE_MAX_STACKS, ARCANE_MAX_CHARGES, EXTRA_HIT_MULT, FLURRY_MULT,
+  emptyAbilityMod, RAMPAGE_MAX_STACKS, ARCANE_MAX_CHARGES, resolveHeroTurn,
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
 import { getParty } from '../engine/party'
@@ -2517,98 +2517,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       const timedCritReady = fx.timedCritSeconds > 0 && procState.timedCritTimer <= 0
       const isOpener = !procState.openerUsed
 
-      const result = resolvePlayerAttack(
-        stats, state.playerClass, talentAllocs, procState, activeBuffs, undefined,
-        {
-          mobHpFraction: currentMob!.currentHp / Math.max(1, currentMob!.maxHp),
-          playerHpFraction: stats.currentHp / Math.max(1, stats.maxHp),
-          rampageStacks: procState.rampageStacks,
-          arcaneCharges: procState.arcaneCharges,
-          targetBurning: activeDoTs.some(d => d.sourceType === 'burn'),
-          isOpener,
-          timedCritReady,
-          // Was omitted, so crit / poison / extra-strike / flurry all fell back to the
-          // global `Math.random` inside the resolver (combat.ts:356) while `fight.ts`
-          // passed a seeded stream through the SAME function. Same code, different source
-          // of truth — which is why the golden could never cover the store's path.
-          rng: combatRng,
-        },
-      )
-
-      if (timedCritReady) {
-        procState.timedCritTimer = fx.timedCritSeconds
-        newLogs.push(log('proc', '⚡ A moment of perfect stillness — guaranteed crit!', '#ffcc00'))
-      }
-      if (isOpener) {
-        procState.openerUsed = true
-        if (fx.openerBurstPct > 0) {
-          newLogs.push(log('proc', `🗡 Opening strike! +${Math.round(fx.openerBurstPct * 100)}% damage`, '#c8a0ff'))
-        }
-      }
-      // Arcane charges build on every landed swing and reset with the target.
-      if (fx.arcaneChargePct > 0 && procState.arcaneCharges < ARCANE_MAX_CHARGES) {
-        procState.arcaneCharges++
-      }
-
-      // Consume crit guarantee stack
-      const cgBuff = activeBuffs.find(b => b.type === 'crit_guarantee' && (b.stacks ?? 0) > 0)
-      if (cgBuff && result.isCrit) cgBuff.stacks = (cgBuff.stacks ?? 1) - 1
-
-      // Consume next-hit multiplier
-      const nhBuff = activeBuffs.find(b => b.type === 'next_hit_multiplier' && (b.stacks ?? 0) > 0)
-      if (nhBuff) nhBuff.stacks = (nhBuff.stacks ?? 1) - 1
-
-      // Consume lifesteal buff
-      const lsBuff = activeBuffs.find(b => b.type === 'lifesteal_buff' && result.isCrit)
-      if (lsBuff && (lsBuff.stacks ?? 0) > 0) {
-        lsBuff.stacks = (lsBuff.stacks ?? 1) - 1
-        stats.currentHp = Math.min(stats.maxHp, stats.currentHp + Math.round(result.damage * lsBuff.value))
-      }
-
-      currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - result.damage }
-
-      if (state.settings.showDamageNumbers) {
-        newFns.push(fn(result.damage, result.isCrit, false, false, result.isCrit ? '#ffcc00' : '#88aaff'))
-      }
-      newLogs.push(log(
-        result.isCrit ? 'player_crit' : 'player_attack',
-        `You hit ${currentMob!.name} for ${result.damage}${result.isCrit ? ' (CRIT!)' : ''}`,
-        result.isCrit ? '#ffcc00' : '#88aaff',
-      ))
-
-      // Apply new DoTs (deduplicate by sourceType — refresh existing)
-      for (const newDot of result.triggeredDoTs) {
-        const existing = activeDoTs.findIndex(d => d.sourceType === newDot.sourceType)
-        if (existing >= 0) {
-          // Refresh DURATION, keep the TICK CLOCK — see the matching note in fight.ts.
-          // Replacing outright reset `tickAccum` to 0, and since Corruption and Curse of
-          // Agony are applied on every swing (3s tick interval against a 1.5–2.5s swing)
-          // neither ever reached its first tick. The whole Bleakweave tree's signature
-          // damage has been doing nothing.
-          newDot.tickAccum = activeDoTs[existing].tickAccum
-          activeDoTs[existing] = newDot
-        } else activeDoTs.push(newDot)
-      }
-
-      // ── Proc hits: a real strike, at a reduced magnitude ────────────────────
-      //
-      // These were flat formulas — `weaponDps * attackSpeedSeconds * 0.7` and `* 0.5` —
-      // that never entered the resolver at all. So an extra strike could not crit, could
-      // not apply a bleed or a poison, ignored Executioner, Enrage, Rampage and Arcane
-      // Charges, and fed neither Bloodthirst nor Seal Fate. Both talents say "strike
-      // again"; what they did was deal a fraction of a swing.
-      //
-      // They now re-resolve a genuine attack and pass the old 0.7 / 0.5 through the
-      // resolver's `multiplierOverride`, so the MAGNITUDE the game was tuned around is
-      // preserved while the hit becomes a hit. `fight.ts` already re-resolved but at full
-      // strength; it takes the same overrides, so the two loops finally agree.
-      //
-      // Not recursive, deliberately: a proc hit cannot proc again. `fight.ts` enforced the
-      // same thing with a `kind === 'swing'` guard, which is one careless edit away from
-      // an unbounded chain — here the procs simply are not consulted.
-      // Bank a Seal Fate point and fire Sever at five. Shared by the primary swing and by
-      // proc hits, so the cap is enforced in one place — incrementing in two would let
-      // `comboPoints` run past five and skip the finisher entirely.
+      // Bank a Seal Fate point and fire Sever at five. One place, so the cap holds:
+      // incrementing in two would let `comboPoints` run past five and skip the finisher.
       const awardComboPoint = (): void => {
         procState.comboPoints++
         if (procState.comboPoints < 5) return
@@ -2620,57 +2530,109 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         newLogs.push(log('proc', `🎴 Sever! ${finisherDmg} damage!`, '#ff8800'))
       }
 
-      const procHit = (mult: number, label: string, color: string): void => {
-        // Nothing swings at a corpse. The mob can already be at or below zero from the
-        // primary hit, and continuing to beat it inflated proc uptime and log noise.
-        if (!currentMob || currentMob.currentHp <= 0) return
-        const r = resolvePlayerAttack(
-          stats, state.playerClass, talentAllocs, procState, activeBuffs, mult,
-          {
-            mobHpFraction: currentMob.currentHp / Math.max(1, currentMob.maxHp),
-            playerHpFraction: stats.currentHp / Math.max(1, stats.maxHp),
-            rampageStacks: procState.rampageStacks,
-            arcaneCharges: procState.arcaneCharges,
-            targetBurning: activeDoTs.some(d => d.sourceType === 'burn'),
-            // The opener is the OPENING strike. A proc riding on it is not.
-            isOpener: false,
-            rng: combatRng,
-          },
-        )
-        currentMob = { ...currentMob, currentHp: currentMob.currentHp - r.damage }
-        if (state.settings.showDamageNumbers) {
-          newFns.push(fn(r.damage, r.isCrit, false, false, color))
-        }
-        newLogs.push(log('proc', `${label} ${r.damage}${r.isCrit ? ' (CRIT!)' : ''}`, color))
-        for (const newDot of r.triggeredDoTs) {
-          const i = activeDoTs.findIndex(d => d.sourceType === newDot.sourceType)
-          if (i >= 0) { newDot.tickAccum = activeDoTs[i].tickAccum; activeDoTs[i] = newDot }
-          else activeDoTs.push(newDot)
-        }
-        if (r.lifeDrawn > 0 && stats.currentHp < stats.maxHp) {
-          stats.currentHp = Math.min(stats.maxHp, stats.currentHp + r.lifeDrawn)
-        }
-        if (r.sealFatePoint) awardComboPoint()
-      }
+      // The swing/extra/flurry SEQUENCE lives in `combat.ts` now (`resolveHeroTurn`),
+      // shared with `fight.ts`. It owns the part that drifted between the two loops: the
+      // order, the proc magnitudes, the rule that procs are consulted once on the primary
+      // swing, and stopping the moment the target falls.
+      //
+      // What stays here is what is genuinely the store's: loot and XP through
+      // `registerKill`, the combat log, floating numbers, and the buffs an action bar can
+      // grant — none of which `fight.ts` has any concept of.
+      resolveHeroTurn(
+        {
+          stats,
+          playerClass: state.playerClass,
+          talentAllocs,
+          procState,
+          activeBuffs,
+          targetHpFraction: currentMob!.currentHp / Math.max(1, currentMob!.maxHp),
+          playerHpFraction: stats.currentHp / Math.max(1, stats.maxHp),
+          targetBurning: activeDoTs.some(d => d.sourceType === 'burn'),
+          isOpener,
+          timedCritReady,
+          rampageStacks: procState.rampageStacks,
+          arcaneCharges: procState.arcaneCharges,
+          rng: combatRng,
+        },
+        (hit) => {
+          // ── Once per turn, on the primary swing only ──
+          if (hit.kind === 'swing') {
+            if (timedCritReady) {
+              procState.timedCritTimer = fx.timedCritSeconds
+              newLogs.push(log('proc', '⚡ A moment of perfect stillness — guaranteed crit!', '#ffcc00'))
+            }
+            if (isOpener) {
+              procState.openerUsed = true
+              if (fx.openerBurstPct > 0) {
+                newLogs.push(log('proc', `🗡 Opening strike! +${Math.round(fx.openerBurstPct * 100)}% damage`, '#c8a0ff'))
+              }
+            }
+            // Arcane charges build on every landed swing and reset with the target.
+            if (fx.arcaneChargePct > 0 && procState.arcaneCharges < ARCANE_MAX_CHARGES) {
+              procState.arcaneCharges++
+            }
+            // Ability-granted buffs are spent by the swing that used them.
+            const cgBuff = activeBuffs.find(b => b.type === 'crit_guarantee' && (b.stacks ?? 0) > 0)
+            if (cgBuff && hit.crit) cgBuff.stacks = (cgBuff.stacks ?? 1) - 1
+            const nhBuff = activeBuffs.find(b => b.type === 'next_hit_multiplier' && (b.stacks ?? 0) > 0)
+            if (nhBuff) nhBuff.stacks = (nhBuff.stacks ?? 1) - 1
+            const lsBuff = activeBuffs.find(b => b.type === 'lifesteal_buff' && hit.crit)
+            if (lsBuff && (lsBuff.stacks ?? 0) > 0) {
+              lsBuff.stacks = (lsBuff.stacks ?? 1) - 1
+              stats.currentHp = Math.min(stats.maxHp, stats.currentHp + Math.round(hit.damage * lsBuff.value))
+            }
+          }
 
-      if (result.extraHit) procHit(EXTRA_HIT_MULT, '⚡ Turning Steel! Extra strike for', '#aabbff')
-      // Flurry — Warbringer's crit chain. Deliberately weaker per hit than Turning
-      // Steel and gated on a crit rather than on every swing, so the two stack into a
-      // fast-hands build without either one alone carrying it.
-      if (result.flurryHit) procHit(FLURRY_MULT, '⚡ Flurry!', '#ffaa44')
+          // ── Every hit ──
+          currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - hit.damage }
 
-      // Bloodthirst — health drawn back out of damage dealt. Warbringer's only
-      // sustain, and the reason it can afford to have no mitigation at all.
-      if (result.lifeDrawn > 0 && stats.currentHp < stats.maxHp) {
-        const healed = Math.min(result.lifeDrawn, stats.maxHp - stats.currentHp)
-        stats.currentHp += healed
-        if (healed > 0) newFns.push(fn(healed, false, false, false, '#44ff88'))
-      }
+          if (hit.kind === 'swing') {
+            if (state.settings.showDamageNumbers) {
+              newFns.push(fn(hit.damage, hit.crit, false, false, hit.crit ? '#ffcc00' : '#88aaff'))
+            }
+            newLogs.push(log(
+              hit.crit ? 'player_crit' : 'player_attack',
+              `You hit ${currentMob!.name} for ${hit.damage}${hit.crit ? ' (CRIT!)' : ''}`,
+              hit.crit ? '#ffcc00' : '#88aaff',
+            ))
+          } else {
+            const label = hit.kind === 'extra' ? '⚡ Turning Steel! Extra strike for' : '⚡ Flurry!'
+            const color = hit.kind === 'extra' ? '#aabbff' : '#ffaa44'
+            if (state.settings.showDamageNumbers) {
+              newFns.push(fn(hit.damage, hit.crit, false, false, color))
+            }
+            newLogs.push(log('proc', `${label} ${hit.damage}${hit.crit ? ' (CRIT!)' : ''}`, color))
+          }
 
-      // Written in Blood combo points. Banked by `awardComboPoint` above so a proc hit's
-      // crit feeds the finisher too — it is a real strike now, and a rogue whose extra
-      // strikes did not build combo points was being taxed for taking the talent.
-      if (result.sealFatePoint) awardComboPoint()
+          // Refresh by source, carrying the TICK CLOCK — a DoT re-applied faster than its
+          // own interval otherwise never reaches a tick at all.
+          for (const newDot of hit.triggeredDoTs) {
+            const existing = activeDoTs.findIndex(d => d.sourceType === newDot.sourceType)
+            if (existing >= 0) {
+              newDot.tickAccum = activeDoTs[existing].tickAccum
+              activeDoTs[existing] = newDot
+            } else activeDoTs.push(newDot)
+          }
+
+          // Bloodthirst. The primary swing shows a heal floater and a proc hit does not —
+          // preserved from the code this replaced rather than tidied, because three green
+          // numbers per swing is a visual change and belongs in its own commit.
+          if (hit.lifeDrawn > 0 && stats.currentHp < stats.maxHp) {
+            const healed = Math.min(hit.lifeDrawn, stats.maxHp - stats.currentHp)
+            stats.currentHp += healed
+            if (healed > 0 && hit.kind === 'swing') {
+              newFns.push(fn(healed, false, false, false, '#44ff88'))
+            }
+          }
+
+          if (hit.sealFatePoint) awardComboPoint()
+
+          return {
+            targetDied: !currentMob || currentMob.currentHp <= 0,
+            targetHpFraction: currentMob ? currentMob.currentHp / Math.max(1, currentMob.maxHp) : 0,
+          }
+        },
+      )
 
       // Creeping Freeze proc
       if (fx.frostbiteChance > 0 && !procState.mobFrozen && combatRng() < fx.frostbiteChance) {
@@ -2683,6 +2645,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if (fx.winterChillEnabled) {
         procState.winterChillStacks = Math.min(5, procState.winterChillStacks + 1)
       }
+
 
       // Reset remorseless
       procState.remorselessActive = false
