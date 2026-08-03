@@ -3,7 +3,7 @@ import type {
   GameState, ClassType, RaceType, FactionType, ZoneId, Item, Slot,
   MobInstance, CombatLogEntry, FloatingNumber,
   Stats, ActiveDoT, ActiveBuff, CombatProcState,
-  AllyCombatant,
+  AllyCombatant, CombatAccumulators,
   GameMode, RecipeId, MaterialId, WeatherType, TownId, Rarity, MerchantContract,
 } from '../data/types'
 import type { GatherSession, CraftResult, QualityTier } from '../data/types'
@@ -321,6 +321,7 @@ function defaultState(): GameState {
     mobs: [],
     targetMobId: null,
     allies: [],
+    combatAccum: freshCombatAccum(),
     lastEngagedMobId: null,
     currentMob: null,
     persistedBoss: null,
@@ -475,6 +476,7 @@ function rehydrateState(saved: GameState): GameState {
   saved.mobs          = []
   saved.targetMobId   = null
   saved.allies        = []
+  saved.combatAccum   = freshCombatAccum()
   saved.lastEngagedMobId = null
   saved.activeBuffs   = []
   // Per-encounter proc state is cleared on load — combo points and frozen timers belong to
@@ -1488,13 +1490,11 @@ function nearestMob(mobs: MobInstance[]): MobInstance | null {
 }
 
 let mobInstanceSeq = 0
-let playerAttackAccum = 0
-let mobAttackAccum    = 0
-let siphonLifeAccum   = 0
-/** Time since the last kill, for shedding Rampage stacks. */
-let rampageDecayAccum = 0
-/** A summoned minion swings on its own clock, not the hero's. */
-let minionAccum = 0
+/** A fresh set of combat clocks. See `CombatAccumulators` for why these are no longer
+ *  module-level `let`s. */
+function freshCombatAccum(): CombatAccumulators {
+  return { player: 0, mob: 0, siphon: 0, rampageDecay: 0, minion: 0 }
+}
 const MINION_TICK_SECONDS = 2
 
 /** Seconds of inactivity before manual control falls back to idle. */
@@ -1508,12 +1508,17 @@ const MANUAL_IDLE_TIMEOUT_SECONDS = 15
  */
 const TALENT_SCHEMA_VERSION = 2
 
+/**
+ * Reset the hero's combat clocks and cached route.
+ *
+ * Writes through the store, since the clocks are state now. INSIDE `tick` this name is
+ * deliberately SHADOWED by a local that resets the tick's working copy instead — a
+ * `setState` from within the tick would be overwritten by the tick's own `set` a few lines
+ * later, which is exactly the class of silent loss the no-target branch was once famous
+ * for.
+ */
 export function resetCombatAccumulators() {
-  playerAttackAccum = 0
-  mobAttackAccum    = 0
-  siphonLifeAccum   = 0
-  rampageDecayAccum = 0
-  minionAccum       = 0
+  useGameStore.setState({ combatAccum: freshCombatAccum() })
   playerPath.path   = null
   playerPath.pathCool = 0
   playerPath.failed = false
@@ -1727,6 +1732,18 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (upkeep) set(upkeep)
 
     const state = get()
+    // The hero's combat clocks, as a working copy written back with the rest of the tick.
+    // `resetCombatAccumulators` is SHADOWED below for the duration of this function: the
+    // module version writes straight to the store, and from in here that write would be
+    // clobbered by this tick's own `set` a few hundred lines later. Shadowing means the
+    // ~10 in-tick call sites need no edit and cannot accidentally take the wrong one.
+    let accum: CombatAccumulators = { ...state.combatAccum }
+    const resetCombatAccumulators = () => {
+      accum = freshCombatAccum()
+      playerPath.path = null
+      playerPath.pathCool = 0
+      playerPath.failed = false
+    }
 
     // ── Weather tick (always runs) ────────────────────────────────────────────
     {
@@ -1774,6 +1791,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           : state.activeQuest
         resetCombatAccumulators()
         set({
+          // Combat clocks ride out with every branch that RETURNS. Omitting them here would
+          // discard this tick's working copy and silently reset the hero's swing timer every
+          // frame — the same shape of omission that once froze the whole world tick.
+          combatAccum: accum,
           currentZone: dest, mobs: [], targetMobId: null, currentMob: null, mobRespawnTimer: 0,
           activeDoTs: [], gameMode: 'combat', travelTarget: null, travelProgress: 0,
           playerMapPos: { x: 32, y: 32 },
@@ -1833,6 +1854,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
       if (harvested === 0) {
         set({
+          // Combat clocks ride out with every branch that RETURNS. Omitting them here would
+          // discard this tick's working copy and silently reset the hero's swing timer every
+          // frame — the same shape of omission that once froze the whole world tick.
+          combatAccum: accum,
           gatheringTimer: timer, playerMapPos: gatherMapPos, gatherSession: session,
           totalPlayTime: state.totalPlayTime + deltaSeconds,
         })
@@ -1855,6 +1880,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
 
       set({
+        // Combat clocks ride out with every branch that RETURNS. Omitting them here would
+        // discard this tick's working copy and silently reset the hero's swing timer every
+        // frame — the same shape of omission that once froze the whole world tick.
+        combatAccum: accum,
         gatheringTimer: timer,
         materials: mats,
         materialPurity: purity,
@@ -1940,6 +1969,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Hoisted: both the level-up recompile and the auto-equip recompile need it.
     const racialPassive = RACE_DEFINITIONS[state.playerRace]?.racialPassive ?? {}
     const upg = compileUpgrades(state.upgradeRanks)
+
 
     // ── Resolve the engaged target out of the population ─────────────────────
     // `mobs` is the source of truth; currentMob/mobMapOffset/activeDoTs are projections
@@ -2033,6 +2063,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         resetCombatAccumulators()
       }
       set({ stats, isAlive, respawnTimer, skillCooldowns, castState: null,
+        // Combat clocks ride out with every branch that RETURNS. Omitting them here would
+        // discard this tick's working copy and silently reset the hero's swing timer every
+        // frame — the same shape of omission that once froze the whole world tick.
+        combatAccum: accum,
             combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX) })
       return
     }
@@ -2160,6 +2194,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       const idle = tickWorld(state, controlMode, mobs, null, targetMobId, deltaSeconds)
       if (idle.logs.length) newLogs.push(...idle.logs)
       set({ mobs: idle.mobs, targetMobId: idle.targetMobId, currentMob: null,
+        // Combat clocks ride out with every branch that RETURNS. Omitting them here would
+        // discard this tick's working copy and silently reset the hero's swing timer every
+        // frame — the same shape of omission that once froze the whole world tick.
+        combatAccum: accum,
             mobMapOffset: idle.mobMapOffset, playerMapPos: idle.playerMapPos,
             // Allies are reconciled and revived ABOVE this branch, so they must be
             // written here too — dropping them would mean a downed companion never gets
@@ -2202,7 +2240,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         procState.rampageStacks++
         newLogs.push(log('proc', `🔥 Rampage! ${procState.rampageStacks}/${RAMPAGE_MAX_STACKS}`, '#ff8800'))
       }
-      rampageDecayAccum = 0
+      accum.rampageDecay = 0
       // A new fight is a new chance to refuse to die, a fresh opener, and a fresh
       // stack of charges. Rampage is the deliberate exception: it is the ONE thing
       // meant to carry across kills, which is the whole shape of the talent.
@@ -2405,9 +2443,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // damage does not stop the moment they stop pressing anything — which is the
     // fantasy, and happens to be exactly what an idle game wants.
     if (fx.minionDps > 0 && mobEngaged && currentMob) {
-      minionAccum += deltaSeconds
-      while (currentMob && minionAccum >= MINION_TICK_SECONDS) {
-        minionAccum -= MINION_TICK_SECONDS
+      accum.minion += deltaSeconds
+      while (currentMob && accum.minion >= MINION_TICK_SECONDS) {
+        accum.minion -= MINION_TICK_SECONDS
         const dmg = Math.max(1, Math.round(fx.minionDps * MINION_TICK_SECONDS))
         currentMob = { ...currentMob, currentHp: currentMob.currentHp - dmg }
         newFns.push(fn(dmg, false, false, false, '#b060d0'))
@@ -2420,9 +2458,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // target dies — between two kills in a streak `currentMob` is briefly null, and
     // clearing on that would wipe the streak the talent exists to reward.
     if (procState.rampageStacks > 0) {
-      rampageDecayAccum += deltaSeconds
-      while (rampageDecayAccum >= RAMPAGE_DECAY_SECONDS && procState.rampageStacks > 0) {
-        rampageDecayAccum -= RAMPAGE_DECAY_SECONDS
+      accum.rampageDecay += deltaSeconds
+      while (accum.rampageDecay >= RAMPAGE_DECAY_SECONDS && procState.rampageStacks > 0) {
+        accum.rampageDecay -= RAMPAGE_DECAY_SECONDS
         procState.rampageStacks--
       }
     }
@@ -2437,16 +2475,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     // ── Tithe of Wounds ──────────────────────────────────────────────────────
     if (fx.siphonLifeHpPerTick > 0) {
-      siphonLifeAccum += deltaSeconds
-      while (siphonLifeAccum >= 3) {
-        siphonLifeAccum -= 3
+      accum.siphon += deltaSeconds
+      while (accum.siphon >= 3) {
+        accum.siphon -= 3
         stats.currentHp = Math.min(stats.maxHp, stats.currentHp + fx.siphonLifeHpPerTick)
       }
     }
 
     // ── Player attacks mob ───────────────────────────────────────────────────
-    if (mobEngaged) playerAttackAccum += deltaSeconds
-    else playerAttackAccum = 0  // reset during approach so first strike lands on arrival
+    if (mobEngaged) accum.player += deltaSeconds
+    else accum.player = 0  // reset during approach so first strike lands on arrival
     // WHILE, not IF. `gameLoop` caps a frame delta at 5 seconds (gameLoop.ts:17), and
     // resolving at most one swing per tick meant a backgrounded tab coming back — or any
     // stalled frame — silently dropped every swing but one, while the accumulated time was
@@ -2456,9 +2494,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     //
     // Bounded by CATCHUP_MAX_SWINGS so a pathological delta cannot spin the tick.
     let catchup = 0
-    while (mobEngaged && currentMob && playerAttackAccum >= stats.attackSpeedSeconds
+    while (mobEngaged && currentMob && accum.player >= stats.attackSpeedSeconds
            && catchup++ < CATCHUP_MAX_SWINGS) {
-      playerAttackAccum -= stats.attackSpeedSeconds
+      accum.player -= stats.attackSpeedSeconds
 
       // A banked free crit is spent on THIS swing; the timer restarts from full.
       const timedCritReady = fx.timedCritSeconds > 0 && procState.timedCritTimer <= 0
@@ -2698,11 +2736,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     // ── Mob attacks player ───────────────────────────────────────────────────
     if (currentMob && !procState.mobFrozen && mobEngaged) {
-      mobAttackAccum += deltaSeconds
+      accum.mob += deltaSeconds
       let mobCatchup = 0
-      while (currentMob && mobAttackAccum >= currentMob.attackSpeedSeconds
+      while (currentMob && accum.mob >= currentMob.attackSpeedSeconds
              && mobCatchup++ < CATCHUP_MAX_SWINGS) {
-        mobAttackAccum -= currentMob.attackSpeedSeconds
+        accum.mob -= currentMob.attackSpeedSeconds
         // ── Who does it swing at? ──────────────────────────────────────────
         // With a party standing, some of the incoming damage goes to them. Held below
         // half (ALLY_THREAT_SHARE) on purpose: the player is the one making decisions,
@@ -2886,6 +2924,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const allFns = [...floatingNumbers.filter(f => now - f.createdAt < 1400), ...newFns]
 
     set({
+      // Combat clocks ride out with every branch that RETURNS. Omitting them here would
+      // discard this tick's working copy and silently reset the hero's swing timer every
+      // frame — the same shape of omission that once froze the whole world tick.
+      combatAccum: accum,
       mobs, targetMobId,
       allies,
       stats, gold, xp, level, currentMob, persistedBoss, isAlive, respawnTimer, mobRespawnTimer,

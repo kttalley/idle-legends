@@ -447,6 +447,35 @@ export interface MobTemplate {
  * a companion contributes less than the player without needing a fudge multiplier to
  * defend. Their power still tracks level and spec, so a party scales with the run.
  */
+/**
+ * The hero's combat clocks.
+ *
+ * These were five module-level `let`s in gameStore.ts. Module state is per-BUNDLE, not
+ * per-character, so two heroes in the same save slot shared one set: switching characters
+ * carried the other's half-charged swing timer, Rampage decay and minion clock into the
+ * new fight. Nothing crashed, which is why it survived — it just quietly started your
+ * second character mid-swing.
+ *
+ * They live on the state now, which also puts them where N-sided combat needs them: the
+ * player is one combatant among several, and every other combatant already carries its own
+ * `attackAccum` (see `AllyCombatant`).
+ *
+ * Not persisted — cleared on load like `mobs`. A swing timer belongs to a fight, and a
+ * fight does not survive a reload.
+ */
+export interface CombatAccumulators {
+  /** Seconds banked toward the hero's next swing. */
+  player: number
+  /** Seconds banked toward the engaged mob's next swing. */
+  mob: number
+  /** Seconds toward the next Tithe of Wounds tick. */
+  siphon: number
+  /** Seconds since the last kill, for shedding Rampage stacks. */
+  rampageDecay: number
+  /** A summoned minion swings on its own clock, not the hero's. */
+  minion: number
+}
+
 export interface AllyCombatant {
   /** Party-module key — the join between this and `getParty()`. */
   key: string
@@ -684,6 +713,8 @@ export interface GameState {
    * Session-scoped, like `mobs`: rebuilt from `getParty()` each tick and cleared on load.
    */
   allies: AllyCombatant[]
+  /** The hero's swing/minion/decay clocks. Session state, cleared on load. */
+  combatAccum: CombatAccumulators
   /**
    * The mob the hero was fighting when manual control dropped the target.
    *
