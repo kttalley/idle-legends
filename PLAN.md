@@ -1095,12 +1095,45 @@ building this, and fix the `pointer-events` bug above first or the leave button 
 >    invites sent to an empty party all passed the guard — measured five members in a
 >    party capped at three.
 >
-> **Still open:** stage 3 (extract `stepCombat` + the ONE batched save migration: per-target
-> proc state and the five module-global accumulators), then 4 (lift the store-only effects),
-> 5 (dead fields, ability layer), 6 (N-sided proper), 7 (C6). Stage 2(f) — dropping
-> `procState.openerUsed` in favour of a Side-local flag — was deliberately deferred INTO
-> stage 3: the store has no per-combatant state until stage 3 creates it, so doing it early
-> means inventing a temporary home and undoing it.
+> **Stage 3 — mostly done, and CHEAPER THAN THIS PLAN CLAIMED.** The staging called it the
+> highest-risk stage because of a "one-way save migration". **That migration does not
+> exist.** `rehydrateState` already rebuilds `procState` wholesale, keeping only
+> `procRngState` (`gameStore.ts:489`), so its shape is free to change; and the combat clocks
+> are session state cleared on load like `mobs`. Nothing in stage 3 touches a persisted
+> shape. Delivered:
+>
+> - **Driver semantics.** The store resolved AT MOST ONE SWING PER TICK against a 5s frame
+>   cap (`gameLoop.ts:17`), so a stalled frame or a backgrounded tab spent the time and got
+>   one swing from it. Now bounded catch-up loops — the property `fight.ts` always had.
+>   Exact no-op at the 0.25s step the game and harness run at; it only bites where swings
+>   were being dropped.
+> - **Combat clocks on the state** (`GameState.combatAccum`). They were five module-level
+>   `let`s — per-bundle, not per-character — so two heroes in one save slot shared a swing
+>   timer, Rampage decay and minion clock. Migrated by deleting the globals and letting the
+>   compiler find all 19 uses.
+> - **Target-scoped proc state clears on a target SWITCH**, not only on a kill. Carrying
+>   `mobFrozen` to a freshly tapped enemy left it unable to swing back at all, since the
+>   mob-attack branch is gated on it.
+>
+> **Still open in 3:** the code motion itself — lifting the combat body into a store-free
+> `stepCombat` the two loops share. Everything that made that risky is now done; what is
+> left is the lift.
+>
+> **Deliberately NOT done, with reasons, so neither reads as an oversight:**
+> - *Per-target proc MAP.* One enemy is engaged at a time, so `Record<mobId, …>` would be a
+>   dictionary with one entry and nothing exercising the keying — structure with no
+>   coverage, the same trap the golden was in before stage 0. It becomes a map at stage 6,
+>   when a second simultaneous target exists. `TARGET_SCOPED_PROC_FIELDS` marks the seam.
+> - *Stage 2(f), dropping `procState.openerUsed`.* Belongs with the `stepCombat` lift; doing
+>   it before there is a per-combatant home means inventing a temporary one and undoing it.
+>
+> **Then:** 4 (lift the store-only effects), 5 (dead fields, ability layer), 6 (N-sided
+> proper), 7 (C6).
+>
+> **A standing measurement caveat.** econSim reports "unchanged" for things it cannot reach.
+> Its hero kills whatever it engages and never switches targets, so the target-switch fix
+> above reads as a flat number there. A flat number from this harness is evidence only when
+> the scenario actually exercises the change — check that before concluding anything.
 >
 > **econSim caveat that outlived the work:** the economy harness never spent talent points,
 > so it had the identical blind spot. `spendTalents` fixes it (`talented` /
