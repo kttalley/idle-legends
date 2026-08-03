@@ -620,6 +620,19 @@ export interface GameState {
    *  commit to a specific enemy. */
   targetMobId: string | null
   /**
+   * The mob the hero was fighting when manual control dropped the target.
+   *
+   * Taking the wheel clears `targetMobId` on purpose — that is what "override" means, and
+   * it is what stopped manual mode auto-attacking. But handing the wheel BACK then ran
+   * `nearestMob`, which after any amount of walking is usually a different enemy, and the
+   * renderer rebinding to it read as the monster teleporting across the screen (measured
+   * at 13–19 tiles in a single frame). Remembering the last commitment lets idle resume
+   * the fight the player was actually in rather than pick a stranger.
+   *
+   * Session-scoped: mobs are not persisted, so this is cleared on load like `targetMobId`.
+   */
+  lastEngagedMobId: string | null
+  /**
    * PROJECTION of the targeted mob, not a second source of truth — the tick derives it
    * from `mobs`/`targetMobId` each pass and writes changes back. It exists so the whole
    * combat resolution, HUD and renderer keep reading a single engaged enemy exactly as

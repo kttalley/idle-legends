@@ -317,6 +317,7 @@ function defaultState(): GameState {
     activeTownNpc: null,
     mobs: [],
     targetMobId: null,
+    lastEngagedMobId: null,
     currentMob: null,
     persistedBoss: null,
     combatLog: [],
@@ -469,6 +470,7 @@ function rehydrateState(saved: GameState): GameState {
   // The zone repopulates on load; saves predating the population have neither field.
   saved.mobs          = []
   saved.targetMobId   = null
+  saved.lastEngagedMobId = null
   saved.activeBuffs   = []
   saved.procState     = defaultProcState()
   saved.castState     = null
@@ -1362,6 +1364,12 @@ function placeInWorld(
  *  be a crowd, and it keeps the climactic encounter reading as one. */
 const MOB_POPULATION = 4
 
+/** How far the hero may have wandered and still resume the fight manual control dropped.
+ *  Beyond this it is not the same encounter any more and "nearest" is the honest answer —
+ *  resuming unconditionally would march the hero back across the zone to something they
+ *  deliberately walked away from. */
+const RESUME_TARGET_RADIUS = 12
+
 function isBossPresent(mobs: MobInstance[]): boolean {
   return mobs.some(m => m.isBoss)
 }
@@ -1844,7 +1852,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // wins while it lives; this only fills the vacuum. In manual mode the hero does not
       // auto-acquire a target so the player can move freely.
       if (controlMode === 'idle') {
-        target = nearestMob(mobs)
+        // Resume the fight manual control interrupted, before falling back to "nearest".
+        // Only while it is still alive and close enough to plausibly still be the same
+        // encounter — otherwise this would drag the hero back across the zone to something
+        // it walked away from.
+        const resumed = state.lastEngagedMobId
+          ? mobs.find(m => m.id === state.lastEngagedMobId) ?? null
+          : null
+        target = resumed && torusDistance(resumed.pos, state.playerMapPos) <= RESUME_TARGET_RADIUS
+          ? resumed
+          : nearestMob(mobs)
         targetMobId = target?.id ?? null
       }
     }
@@ -3086,13 +3103,18 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Dropping the target is what "override" has to mean. Anything with aggro on you
     // still chases and can still hit you — you are simply no longer swinging at something
     // you did not choose. Re-target deliberately by tapping it.
-    set({
+    set(s => ({
       controlMode: 'manual',
       manualIdleTimer: MANUAL_IDLE_TIMEOUT_SECONDS,
+      // Remembered, not just discarded. Handing control back used to re-acquire via
+      // `nearestMob`, which after any walking is usually a DIFFERENT enemy — and the
+      // renderer rebinding to it looked like the monster teleporting (measured at 13–19
+      // tiles in one frame). Keep the commitment so idle can resume the same fight.
+      lastEngagedMobId: s.targetMobId ?? s.lastEngagedMobId,
       targetMobId: null,
       currentMob: null,
       activeDoTs: [],
-    })
+    }))
     resetCombatAccumulators()
   },
 

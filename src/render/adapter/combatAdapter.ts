@@ -80,6 +80,15 @@ const WALK_BOB_PX = 2
 const MOB_CLOSE_K = 5          // approach rate while closing (1/s)
 const MOB_ENGAGE_K = 14        // faster once engaged, so the fighting gap settles quickly
 const MOB_MIN_CLOSE = 1.2      // tiles/sec floor
+/** Ceiling on how fast the engagement ease may drag a mob, in tiles/sec.
+ *
+ *  The ease is exponential (`md * (1 - e^(-k·dt))`), so at MOB_ENGAGE_K = 14 it closes
+ *  roughly half the remaining gap every 50 ms. That is fine for the small corrections it
+ *  was written for and very wrong when the gap suddenly becomes large — which is exactly
+ *  what a target change does. Measured at 0.72–1.70 tiles in a single 50 ms sample, i.e.
+ *  14–34 tiles/sec, which reads as the monster rubber-banding into place. Clamped, a mob
+ *  that has to cover ground is seen covering it. */
+const MOB_MAX_CLOSE = 6.0
 const BYSTANDER_SPEED = 3.4    // tiles/sec for an enemy walking in to take up station
 const MOB_SPAWN_FADE = 0.4     // seconds
 const MELEE_GAP_TILES = 2
@@ -2121,7 +2130,11 @@ export class WorldSceneController {
         mobMoved = false
         if (md > 0.001) {
           const k = this.mobEngaged ? MOB_ENGAGE_K : MOB_CLOSE_K
-          const step = Math.min(md, Math.max(md * (1 - Math.exp(-k * dt)), MOB_MIN_CLOSE * dt))
+          const step = Math.min(
+            md,
+            MOB_MAX_CLOSE * dt,
+            Math.max(md * (1 - Math.exp(-k * dt)), MOB_MIN_CLOSE * dt),
+          )
           // Routed and collided, like everything else that walks. This used to assign
           // tx/ty outright with no ground check at all — which is why a mob would sail
           // straight across a lake the instant the store declared the fight joined.
@@ -3212,13 +3225,19 @@ export class WorldSceneController {
           const d = Math.hypot(
             WorldSceneController.wrapDiff(slotGx, a.gx),
             WorldSceneController.wrapDiff(slotGy, a.gy))
+          // The swing timer runs whether or not the companion is in reach. It used to tick
+          // only inside the in-reach branch, and against a mob that patrols and chases,
+          // measurement put the companion out of reach 37% of the time (median gap 1.37
+          // tiles against ASSIST_REACH 0.9) — so it swung about once every 6–10s instead
+          // of the 1.5–2.1s the cadence intends, and read as not attacking at all. Running
+          // the timer regardless means arriving is enough to strike.
+          a.atkCd -= dt
           if (d > ASSIST_REACH) {
             this.followAmbient(a, slotGx, slotGy, FOLLOW_SPEED, dt)
           } else {
             a.e.animator.face(faceFromVec(
               WorldSceneController.wrapDiff(mgx, a.gx),
               WorldSceneController.wrapDiff(mgy, a.gy)))
-            a.atkCd -= dt
             if (a.atkCd <= 0) {
               a.e.animator.set('attack')
               a.atkCd = ASSIST_SWING + a.rng() * 0.6
