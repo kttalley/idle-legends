@@ -98,14 +98,12 @@ const TALENT_BUILDS: { label: string; cls: ClassType; allocs: Record<string, num
   {
     // block/avoid (Shield Spec) — the only path that exercises `resolveMobAttack`'s
     // avoidance roll, and therefore the only way a `block` event ever reaches the log.
-    // block/avoid (Shield Spec) — the only path that exercises `resolveMobAttack`'s
-    // avoidance roll, and therefore the only way a `block` event ever reaches the log.
     // Retaliation and damage reduction ride along so the HERO-DEFENDER path is covered
     // too: those only matter hero-vs-hero (a mob has no talents), so without them in a
     // duel the defensive half of Bulwark is untested no matter how many cases run.
     label: 'warrior defence',
     cls: 'warrior',
-    allocs: { bul_shield_spec: 3, bul_anticipation: 3, bul_retaliation: 2 },
+    allocs: { bul_shield_spec: 3, bul_anticipation: 3, bul_retaliation: 2, bul_second_wind: 3 },
   },
   {
     // poison (a rolled DoT) + extra strike + flurry on the rogue's own trees.

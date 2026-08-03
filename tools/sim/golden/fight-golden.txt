@@ -592,7 +592,7 @@ seed=1000 winner=0 duration=9 hp=2128,0
 9.00 s1 death dmg=0 crit=0 hp=0
 
 ## talented duel (procs vs defence) | seed=1000
-seed=1000 winner=0 duration=25 hp=1531,0
+seed=1000 winner=0 duration=27.5 hp=1422,0
 2.50 s0 swing dmg=113 crit=0 hp=1737
 2.50 s1 thorns dmg=14 crit=0 hp=2316
 2.50 s1 swing dmg=47 crit=0 hp=2269
@@ -613,26 +613,31 @@ seed=1000 winner=0 duration=25 hp=1531,0
 12.50 s0 flurry dmg=56 crit=0 hp=830
 12.50 s1 thorns dmg=7 crit=0 hp=1978
 12.50 s1 swing dmg=95 crit=1 hp=1883
-13.50 s0 dot dmg=30 crit=0 hp=800 id=dot_0_5
-15.00 s0 swing dmg=113 crit=0 hp=687
+13.50 s0 dot dmg=30 crit=0 hp=806 id=dot_0_5
+15.00 s0 swing dmg=113 crit=0 hp=702
 15.00 s1 thorns dmg=14 crit=0 hp=1869
 15.00 s1 swing dmg=47 crit=0 hp=1822
-15.50 s0 dot dmg=30 crit=0 hp=657 id=dot_0_5
-17.50 s0 dot dmg=30 crit=0 hp=627 id=dot_0_5
-17.50 s0 swing dmg=226 crit=1 hp=401
+15.50 s0 dot dmg=30 crit=0 hp=675 id=dot_0_5
+17.50 s0 dot dmg=30 crit=0 hp=657 id=dot_0_5
+17.50 s0 swing dmg=226 crit=1 hp=431
 17.50 s1 thorns dmg=27 crit=0 hp=1795
 17.50 s1 swing dmg=95 crit=1 hp=1700
-19.50 s0 dot dmg=30 crit=0 hp=371 id=dot_0_6
-20.00 s0 swing dmg=226 crit=1 hp=145
+19.50 s0 dot dmg=30 crit=0 hp=413 id=dot_0_6
+20.00 s0 swing dmg=226 crit=1 hp=190
 20.00 s1 thorns dmg=27 crit=0 hp=1673
-20.00 s1 block dmg=0 crit=0 hp=145
+20.00 s1 block dmg=0 crit=0 hp=190
 20.00 s1 swing dmg=47 crit=0 hp=1626
-21.50 s0 dot dmg=30 crit=0 hp=115 id=dot_0_7
-22.50 s1 block dmg=0 crit=0 hp=115
+21.50 s0 dot dmg=30 crit=0 hp=169 id=dot_0_7
+22.50 s1 block dmg=0 crit=0 hp=175
 22.50 s1 swing dmg=95 crit=1 hp=1531
-23.50 s0 dot dmg=30 crit=0 hp=85 id=dot_0_7
-25.00 s0 swing dmg=113 crit=0 hp=0
-25.00 s1 death dmg=0 crit=0 hp=0
+23.50 s0 dot dmg=30 crit=0 hp=151 id=dot_0_7
+25.00 s0 swing dmg=113 crit=0 hp=47
+25.00 s1 thorns dmg=14 crit=0 hp=1517
+25.00 s1 swing dmg=95 crit=1 hp=1422
+25.50 s0 dot dmg=30 crit=0 hp=20 id=dot_0_7
+27.50 s0 dot dmg=30 crit=0 hp=2 id=dot_0_7
+27.50 s0 swing dmg=226 crit=1 hp=0
+27.50 s1 death dmg=0 crit=0 hp=0
 
 ## warrior procs vs mob | seed=8717
 seed=8717 winner=0 duration=20 hp=1405,0
@@ -815,7 +820,7 @@ seed=8717 winner=0 duration=17.25 hp=1304,0
 17.25 s1 death dmg=0 crit=0 hp=0
 
 ## talented duel (procs vs defence) | seed=8717
-seed=8717 winner=1 duration=22.5 hp=0,1293
+seed=8717 winner=1 duration=22.5 hp=0,1308
 2.50 s0 swing dmg=94 crit=0 hp=2906
 2.50 s1 thorns dmg=11 crit=0 hp=2819
 2.50 s1 swing dmg=347 crit=1 hp=2472
@@ -852,8 +857,8 @@ seed=8717 winner=1 duration=22.5 hp=0,1293
 20.00 s0 flurry dmg=47 crit=0 hp=1332
 20.00 s1 thorns dmg=6 crit=0 hp=410
 20.00 s1 swing dmg=347 crit=1 hp=63
-21.00 s0 dot dmg=39 crit=0 hp=1293 id=dot_0_8
-22.50 s1 block dmg=0 crit=0 hp=1293
+21.00 s0 dot dmg=39 crit=0 hp=1299 id=dot_0_8
+22.50 s1 block dmg=0 crit=0 hp=1308
 22.50 s1 swing dmg=347 crit=1 hp=0
 22.50 s0 death dmg=0 crit=0 hp=0
 
@@ -1008,7 +1013,7 @@ seed=16434 winner=0 duration=14.25 hp=1232,0
 14.25 s1 death dmg=0 crit=0 hp=0
 
 ## talented duel (procs vs defence) | seed=16434
-seed=16434 winner=1 duration=25 hp=0,1256
+seed=16434 winner=1 duration=25 hp=0,1271
 2.50 s0 swing dmg=92 crit=0 hp=3088
 2.50 s1 thorns dmg=11 crit=0 hp=1669
 2.50 s1 swing dmg=210 crit=1 hp=1459
@@ -1046,11 +1051,11 @@ seed=16434 winner=1 duration=25 hp=0,1256
 22.50 s0 flurry dmg=46 crit=0 hp=1558
 22.50 s1 thorns dmg=6 crit=0 hp=155
 22.50 s1 swing dmg=105 crit=0 hp=50
-23.00 s0 dot dmg=36 crit=0 hp=1522 id=dot_0_8
-25.00 s0 dot dmg=36 crit=0 hp=1486 id=dot_0_8
-25.00 s0 swing dmg=184 crit=1 hp=1302
+23.00 s0 dot dmg=36 crit=0 hp=1525 id=dot_0_8
+25.00 s0 dot dmg=36 crit=0 hp=1501 id=dot_0_8
+25.00 s0 swing dmg=184 crit=1 hp=1317
 25.00 s1 thorns dmg=22 crit=0 hp=28
-25.00 s0 flurry dmg=46 crit=0 hp=1256
+25.00 s0 flurry dmg=46 crit=0 hp=1271
 25.00 s1 thorns dmg=6 crit=0 hp=22
 25.00 s1 swing dmg=105 crit=0 hp=0
 25.00 s0 death dmg=0 crit=0 hp=0
@@ -1129,7 +1134,7 @@ seed=24151 winner=0 duration=6.75 hp=2063,0
 6.75 s1 death dmg=0 crit=0 hp=0
 
 ## talented duel (procs vs defence) | seed=24151
-seed=24151 winner=0 duration=35 hp=1137,0
+seed=24151 winner=0 duration=35 hp=1115,0
 2.50 s0 swing dmg=180 crit=1 hp=2730
 2.50 s1 thorns dmg=22 crit=0 hp=2988
 2.50 s1 swing dmg=139 crit=1 hp=2849
@@ -1164,35 +1169,37 @@ seed=24151 winner=0 duration=35 hp=1137,0
 20.00 s0 swing dmg=180 crit=1 hp=1398
 20.00 s1 thorns dmg=22 crit=0 hp=2021
 20.00 s1 swing dmg=139 crit=1 hp=1882
-20.50 s0 dot dmg=32 crit=0 hp=1366 id=dot_0_6
-22.50 s0 dot dmg=32 crit=0 hp=1334 id=dot_0_6
-22.50 s0 swing dmg=180 crit=1 hp=1154
+20.50 s0 dot dmg=32 crit=0 hp=1369 id=dot_0_6
+22.50 s0 dot dmg=32 crit=0 hp=1349 id=dot_0_6
+22.50 s0 swing dmg=180 crit=1 hp=1169
 22.50 s1 thorns dmg=22 crit=0 hp=1860
 22.50 s1 swing dmg=139 crit=1 hp=1721
-24.50 s0 dot dmg=32 crit=0 hp=1122 id=dot_0_7
-25.00 s0 swing dmg=180 crit=1 hp=942
+24.50 s0 dot dmg=32 crit=0 hp=1149 id=dot_0_7
+25.00 s0 swing dmg=180 crit=1 hp=972
 25.00 s1 thorns dmg=22 crit=0 hp=1699
-25.00 s0 flurry dmg=89 crit=1 hp=853
+25.00 s0 flurry dmg=89 crit=1 hp=883
 25.00 s1 thorns dmg=11 crit=0 hp=1688
 25.00 s1 swing dmg=70 crit=0 hp=1618
-26.50 s0 dot dmg=32 crit=0 hp=821 id=dot_0_9
-27.50 s0 swing dmg=180 crit=1 hp=641
+26.50 s0 dot dmg=32 crit=0 hp=860 id=dot_0_9
+27.50 s0 swing dmg=180 crit=1 hp=686
 27.50 s1 thorns dmg=22 crit=0 hp=1596
 27.50 s1 swing dmg=139 crit=1 hp=1457
-28.50 s0 dot dmg=32 crit=0 hp=609 id=dot_0_10
-30.00 s1 block dmg=0 crit=0 hp=609
-30.00 s0 extra dmg=126 crit=1 hp=483
+28.50 s0 dot dmg=32 crit=0 hp=660 id=dot_0_10
+30.00 s1 block dmg=0 crit=0 hp=669
+30.00 s0 extra dmg=126 crit=1 hp=543
 30.00 s1 thorns dmg=15 crit=0 hp=1442
-30.00 s0 flurry dmg=45 crit=0 hp=438
+30.00 s0 flurry dmg=45 crit=0 hp=498
 30.00 s1 thorns dmg=5 crit=0 hp=1437
 30.00 s1 swing dmg=139 crit=1 hp=1298
-30.50 s0 dot dmg=32 crit=0 hp=406 id=dot_0_12
-32.50 s0 dot dmg=32 crit=0 hp=374 id=dot_0_12
-32.50 s0 swing dmg=180 crit=1 hp=194
+30.50 s0 dot dmg=32 crit=0 hp=469 id=dot_0_12
+32.50 s0 dot dmg=32 crit=0 hp=449 id=dot_0_12
+32.50 s0 swing dmg=180 crit=1 hp=269
 32.50 s1 thorns dmg=22 crit=0 hp=1276
 32.50 s1 swing dmg=139 crit=1 hp=1137
-34.50 s0 dot dmg=32 crit=0 hp=162 id=dot_0_13
-35.00 s0 swing dmg=180 crit=1 hp=0
+34.50 s0 dot dmg=32 crit=0 hp=249 id=dot_0_13
+35.00 s0 swing dmg=180 crit=1 hp=72
+35.00 s1 thorns dmg=22 crit=0 hp=1115
+35.00 s0 extra dmg=126 crit=1 hp=0
 35.00 s1 death dmg=0 crit=0 hp=0
 
 ## warrior procs vs mob | seed=31868

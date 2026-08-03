@@ -34,7 +34,7 @@ import type {
 import {
   compileStats, compileTalentEffects, resolveMobAttack, resolvePlayerAttack, resetDotIds,
   EXTRA_HIT_MULT, FLURRY_MULT,
-  resolveHeroTurn,
+  resolveHeroTurn, advanceHeroUpkeep,
 } from './combat'
 import { mulberry32, type Rng } from './rng'
 
@@ -190,6 +190,21 @@ export function runFight(
   outer:
   while (t < maxSeconds) {
     t = +(t + step).toFixed(4)
+
+    // ── Per-step upkeep, before anything resolves. Shared with the store, so a frozen
+    // timer, a banked free crit and Second Wind now exist here too — they used to be
+    // store-only, which meant an ambient hero or a duellist simply did not have them. ──
+    for (let s2 = 0 as 0 | 1; s2 < 2; s2 = (s2 + 1) as 0 | 1) {
+      const side = sides[s2]
+      if (side.kind !== 'hero' || !side.hero) continue
+      const hp = { currentHp: side.hp, maxHp: side.maxHp }
+      advanceHeroUpkeep(
+        side.procState,
+        compileTalentEffects(side.hero.combatant.playerClass, side.hero.combatant.talentAllocs),
+        hp, step,
+      )
+      side.hp = hp.currentHp
+    }
 
     // ── DoT ticks. Resolved before swings so a DoT that kills does so cleanly. ──
     for (let s = 0 as 0 | 1; s < 2; s = (s + 1) as 0 | 1) {

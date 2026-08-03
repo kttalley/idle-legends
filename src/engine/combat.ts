@@ -438,6 +438,53 @@ export function resolvePlayerAttack(
   }
 }
 
+// ── Per-step upkeep ───────────────────────────────────────────────────────────
+/**
+ * Advance the clocks a hero carries between swings, and pay out the regen that rides on
+ * them. Called once per simulation step by whoever is driving the fight.
+ *
+ * These lived only in `gameStore.tick`, so an ambient hero or a PvP duellist had no frozen
+ * timer, no banked free crit and no Second Wind at all — three talents that simply did not
+ * exist outside the player's own game. Everything here reads and writes `CombatProcState`
+ * and health, which both loops already have, so it is the cheapest group of Track C5's
+ * store-only effects to make shared.
+ *
+ * Deliberately NOT here: Siphon Life and Rampage decay. Both need an accumulator that is
+ * neither on `CombatProcState` nor derivable from it, and inventing a home for two more
+ * fields is a change to make when the rest of the upkeep follows them, not before.
+ */
+export function advanceHeroUpkeep(
+  procState: CombatProcState,
+  fx: Pick<CompiledTalentEffects, 'timedCritSeconds' | 'secondWindHpPerTick'>,
+  hp: { currentHp: number; maxHp: number },
+  dt: number,
+): { healed: number } {
+  // Frozen wears off on its own clock, whoever applied it.
+  if (procState.mobFrozen) {
+    procState.mobFrozenTimer -= dt
+    if (procState.mobFrozenTimer <= 0) {
+      procState.mobFrozen = false
+      procState.mobFrozenTimer = 0
+    }
+  }
+
+  // The free crit ticks down whether or not the hero is swinging, so it is a rhythm the
+  // fight sits inside rather than a counter that has to be fed.
+  if (fx.timedCritSeconds > 0 && procState.timedCritTimer > 0) {
+    procState.timedCritTimer = Math.max(0, procState.timedCritTimer - dt)
+  }
+
+  // Second Wind. Below half health only — which is what stops it being a flat regen aura
+  // and makes it a comeback rather than a cushion.
+  let healed = 0
+  if (fx.secondWindHpPerTick > 0 && hp.currentHp > 0 && hp.currentHp < hp.maxHp * 0.5) {
+    const before = hp.currentHp
+    hp.currentHp = Math.min(hp.maxHp, hp.currentHp + fx.secondWindHpPerTick * dt)
+    healed = hp.currentHp - before
+  }
+  return { healed }
+}
+
 // ── One hero's turn ───────────────────────────────────────────────────────────
 /**
  * A single landed blow within a turn: the primary swing, or a proc riding on it.

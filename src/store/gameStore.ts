@@ -30,7 +30,7 @@ import {
   compileStats, compileTalentEffects,
   resolvePlayerAttack, resolveMobAttack,
   makeShadowBoltHit, makeAbilityBuff, isGearUpgrade,
-  emptyAbilityMod, RAMPAGE_MAX_STACKS, ARCANE_MAX_CHARGES, resolveHeroTurn,
+  emptyAbilityMod, RAMPAGE_MAX_STACKS, ARCANE_MAX_CHARGES, resolveHeroTurn, advanceHeroUpkeep,
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
 import { getParty } from '../engine/party'
@@ -2031,11 +2031,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       return b.durationRemaining > 0
     })
 
-    // ── Tick down frozen state ──────────────────────────────────────────────
-    if (procState.mobFrozen) {
-      procState.mobFrozenTimer -= deltaSeconds
-      if (procState.mobFrozenTimer <= 0) procState.mobFrozen = false
-    }
+    // ── Per-step upkeep ─────────────────────────────────────────────────────
+    // Frozen timer, the banked free crit and Second Wind, all shared with `fight.ts` now
+    // (`advanceHeroUpkeep`). They were store-only, so an ambient hero or a duellist had
+    // none of the three.
+    advanceHeroUpkeep(procState, fx, stats, deltaSeconds)
 
     // ── Manual-mode idle fallback ─────────────────────────────────────────────
     // Only counts down in active combat; menus/travel/gathering/town are not "manual"
@@ -2446,13 +2446,6 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       registerKill()
     }
 
-    // ── Timed crit ───────────────────────────────────────────────────────────
-    // Ticks down whether or not the hero is swinging, so the free crit is a rhythm the
-    // fight sits inside rather than a counter the player has to feed.
-    if (fx.timedCritSeconds > 0 && procState.timedCritTimer > 0) {
-      procState.timedCritTimer = Math.max(0, procState.timedCritTimer - deltaSeconds)
-    }
-
     // ── Summoned minion ──────────────────────────────────────────────────────
     // Attacks on its own schedule alongside the hero. It exists so a Binding warlock's
     // damage does not stop the moment they stop pressing anything — which is the
@@ -2478,14 +2471,6 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         accum.rampageDecay -= RAMPAGE_DECAY_SECONDS
         procState.rampageStacks--
       }
-    }
-
-    // ── Second Wind ──────────────────────────────────────────────────────────
-    // Bulwark's mid-fight recovery. Only below half health, which is what stops it
-    // being a flat regen aura and makes it a comeback rather than a cushion.
-    if (fx.secondWindHpPerTick > 0 && isAlive && stats.currentHp > 0
-        && stats.currentHp < stats.maxHp * 0.5) {
-      stats.currentHp = Math.min(stats.maxHp, stats.currentHp + fx.secondWindHpPerTick * deltaSeconds)
     }
 
     // ── Tithe of Wounds ──────────────────────────────────────────────────────
