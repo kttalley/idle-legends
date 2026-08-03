@@ -36,6 +36,7 @@ const opts: ScenarioOpts = {
   disableAutoEquip: process.argv.includes('--noautoequip'),
   disableAutoAdvance: process.argv.includes('--noroam'),
   seed: process.argv.includes('--seed') ? argNum('--seed', 1) : null,
+  spendTalents: process.argv.includes('--talents'),
 }
 
 const sweepCount = process.argv.includes('--sweep') ? argNum('--sweep', 20) : 0
@@ -64,6 +65,10 @@ if (process.argv.includes('--parity')) {
     // this is where it shows.
     { name: 'full party',          o: { partySize: 3 } },
     { name: 'full party+advance',  o: { partySize: 3, advanceZones: true, sellCommons: true } },
+    // A TALENTED hero. Without this every talent-effect change lands green here, for the
+    // same reason the fight golden was blind before C5 stage 0: no talent is ever taken.
+    { name: 'talented',            o: { spendTalents: true } },
+    { name: 'talented+party',      o: { spendTalents: true, partySize: 3 } },
   ]
   let failed = 0
   for (const shape of shapes) {

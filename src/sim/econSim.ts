@@ -43,6 +43,34 @@ export const EXPECTED_VALUE_MULT = (() => {
   return acc   // ≈ 4.15 gold per item level
 })()
 
+/**
+ * Spend whatever talent points the hero is holding, following one spec.
+ *
+ * Uses `allocateSpec` — the same chooser ambient heroes use — so the build is a plausible
+ * one rather than a pile of whatever came first, and re-derives from the run's seed so it
+ * stays reproducible. Called at each sample; a no-op when nothing is banked.
+ */
+function spendTalentPoints(store: typeof useGameStore, want: Record<string, number>): void {
+  if (store.getState().talentPoints <= 0) return
+  // Repeat passes until one achieves nothing. `allocateTalent` enforces `talentGate`,
+  // which gates a row on points already spent in that tree, so a single pass in map order
+  // silently drops every talent whose row is not yet open — the points stay banked and the
+  // hero stays untalented while the harness reports success.
+  for (;;) {
+    let progressed = false
+    for (const [id, ranks] of Object.entries(want)) {
+      while ((store.getState().talentAllocs[id] ?? 0) < ranks) {
+        if (store.getState().talentPoints <= 0) return
+        const before = store.getState().talentPoints
+        store.getState().allocateTalent(id)
+        if (store.getState().talentPoints === before) break   // gated; try again next pass
+        progressed = true
+      }
+    }
+    if (!progressed) return
+  }
+}
+
 /** Classes the harness recruits from, so a partied run covers more than one ally shape. */
 const COMPANION_CLASSES: ClassType[] = ['warrior', 'mage', 'rogue', 'warlock']
 
@@ -159,6 +187,19 @@ export interface ScenarioOpts {
    * useless for a measurement.
    */
   partySize?: number
+  /**
+   * Spend the hero's talent points as they level, instead of banking them forever.
+   *
+   * The harness never spent them, so its hero was UNTALENTED for the whole run — which is
+   * the same blind spot the fight golden had before C5 stage 0, and it has the same
+   * consequence: every talent-effect change lands green here because no talent is ever
+   * taken. DoT stacking, extra/flurry, crit riders, thorns, avoidance — none of it was
+   * reachable by any measurement this file produced.
+   *
+   * Off by default so the existing baselines keep their meaning; the untalented run is
+   * still the conservative floor.
+   */
+  spendTalents?: boolean
 }
 
 /** Installed by tools/sim/run.mjs. Null restores the real `Math.random`. */
@@ -228,6 +269,7 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     disableAutoAdvance: false,
     seed: null,
     partySize: 0,
+    spendTalents: false,
     ...opts,
   }
 
@@ -235,6 +277,15 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
 
   const store = useGameStore
   store.getState().initGame(o.playerClass, o.playerRace)
+
+  // The talent build is chosen ONCE for the run, at the full 40-point budget, and the
+  // hero fills it in as points arrive. Re-deriving it per sample off a level-varying seed
+  // picked a DIFFERENT spec every level, so allocation chased a moving target, every gate
+  // failed, and the "talented" hero ended up with all its points banked and no talents at
+  // all — reporting the same level as the untalented run, which is what gave it away.
+  const talentGoal = o.spendTalents
+    ? allocateSpec(mulberry32(((o.seed ?? 0) * 7919 + 13) | 0), o.playerClass, 41)
+    : {}
 
   // ── Party ─────────────────────────────────────────────────────────────────
   // Always disband first: the party module is MODULE state and this harness runs many
@@ -312,6 +363,7 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
           store.getState().selectZone(next)
         }
       }
+      if (o.spendTalents) spendTalentPoints(store, talentGoal)
       if (o.autoEquip) equipUpgrades(store)
       if (o.sellCommons) store.getState().sellAllCommon()
 
@@ -408,7 +460,7 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
     playerClass: 'warrior', playerRace: 'human', stepSeconds: 0.25,
     sampleEveryMinutes: 5, advanceZones: false, sellCommons: false,
     buyBagSlots: false, buyContract: false, buyUpgrades: false, autoEquip: false,
-    disableAutoEquip: false, disableAutoAdvance: false, seed: null, partySize: 0, ...opts,
+    disableAutoEquip: false, disableAutoAdvance: false, seed: null, partySize: 0, spendTalents: false, ...opts,
   }
   if (typeof __setSeed === 'function') __setSeed(o.seed)
 
