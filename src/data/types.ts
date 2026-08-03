@@ -356,7 +356,30 @@ export interface CastState {
   pushback: number   // accumulated pushback seconds this cast (capped)
 }
 
+/**
+ * Fields below that describe THE ENEMY rather than the hero. Cleared whenever the engaged
+ * target changes, not only when one dies — see `clearTargetProcState`.
+ *
+ * This list is the seed of the per-target map N-sided combat will need (PLAN.md C5 stage
+ * 6). It is deliberately still a single set rather than a `Record<mobId, …>`: only one
+ * enemy is engaged at a time today, so a map would be a dictionary with one entry that
+ * nothing exercises — structure with no coverage, which is the same trap the golden log
+ * was in before stage 0. It becomes a map when a second target exists to put in it.
+ */
+export const TARGET_SCOPED_PROC_FIELDS = [
+  'mobFrozen', 'mobFrozenTimer', 'winterChillStacks', 'comboPoints', 'arcaneCharges',
+] as const
+
 export interface CombatProcState {
+  /**
+   * Which mob the target-scoped fields above currently describe.
+   *
+   * Without it those fields were cleared only on a KILL, so switching targets carried them
+   * to the new enemy: arcane charges and Winter Chill stacks built on one mob paid out on
+   * another, and — worst — `mobFrozen` carried, so a freshly-tapped enemy was treated as
+   * frozen and could not swing back at all, since the mob-attack branch is gated on it.
+   */
+  procTargetId: string | null
   winterChillStacks: number
   comboPoints: number
   remorselessActive: boolean

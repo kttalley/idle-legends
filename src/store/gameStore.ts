@@ -125,6 +125,7 @@ function procRoll(ps: CombatProcState, worldSeed: number): number {
 function defaultProcState(): CombatProcState {
   return {
     procRngState: 0,   // 0 = seed from the world on first draw (Track P0)
+    procTargetId: null,
     winterChillStacks: 0,
     comboPoints: 0,
     remorselessActive: false,
@@ -1998,6 +1999,20 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
     }
     currentMob = target
+    // Target-scoped proc state belongs to the mob it was built against. These were cleared
+    // only inside `registerKill`, i.e. on a KILL — so switching targets (tapping another
+    // enemy, or auto-pilot re-acquiring after manual control) carried them across. Arcane
+    // charges and Winter Chill stacks paid out on a mob that never earned them, and a
+    // frozen flag carried to a fresh enemy left it unable to swing back, because the
+    // mob-attack branch is gated on `!procState.mobFrozen`.
+    if (procState.procTargetId !== (target?.id ?? null)) {
+      procState.procTargetId = target?.id ?? null
+      procState.mobFrozen = false
+      procState.mobFrozenTimer = 0
+      procState.winterChillStacks = 0
+      procState.comboPoints = 0
+      procState.arcaneCharges = 0
+    }
     activeDoTs = target ? target.dots : []
     const mobOffset = target ? target.offset : { dx: 0, dy: 0 }
 

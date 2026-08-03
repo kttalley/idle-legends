@@ -94,6 +94,7 @@ const DEFAULT_MAX_EVENTS = 4096
 function freshProcState(): CombatProcState {
   return {
     procRngState: 0,   // fight.ts draws off its own seeded stream, not this one
+    procTargetId: null,  // one opponent for the whole fight; nothing to re-scope
     winterChillStacks: 0, comboPoints: 0, remorselessActive: false, iceBlockUsed: false,
     lastStandUsed: false, rampageStacks: 0, arcaneCharges: 0, timedCritTimer: 0,
     openerUsed: false, mobFrozen: false, mobFrozenTimer: 0, iceBarrierHp: 0,
