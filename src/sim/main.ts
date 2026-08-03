@@ -115,6 +115,50 @@ if (process.argv.includes('--parity')) {
     for (const v of migration) process.stdout.write(`          [${v.rule}] ${v.detail}\n`)
   }
   process.stdout.write(failed === 0 ? '\nall invariants hold\n' : `\n${failed} shape(s) violated invariants\n`)
+} else if (process.argv.includes('--combat-trace')) {
+  // The STORE's golden. `fight.mjs` gates `engine/fight.ts` byte-for-byte; the store's own
+  // combat path had no equivalent, so the only check on a refactor there was whether
+  // aggregate gold looked about right — which cannot distinguish a faithful extraction from
+  // one that quietly changed a formula. Prints an ordered combat log for fixed seeds;
+  // `tools/sim/combat.mjs` diffs it against the committed baseline.
+  //
+  // Deliberately covers a TALENTED hero and a PARTY, because an untalented solo run
+  // exercises one damage path and none of the procs — the trap the fight golden was in
+  // before C5 stage 0.
+  // Class variety matters more than duration here. A long warrior run produces thousands
+  // of near-identical swing lines and still never fires a DoT tick, Creeping Freeze or
+  // Seal Fate — the store-specific procs that stage 4 will lift are exactly what a golden
+  // needs to hold still. One case per class, kept short, covers far more per line.
+  const cases: { label: string; o: Partial<ScenarioOpts> }[] = [
+    { label: 'warrior untalented', o: { playerClass: 'warrior' } },
+    // Pinned builds, each chosen to fire a STORE-side proc that `fight.ts` does not have
+    // and that stage 4 is going to lift. A levelling hero never reaches these in a short
+    // trace — they sit at requiresPoints 20.
+    { label: 'warrior procs',      o: { playerClass: 'warrior',
+        forceTalents: { arms_sword_spec: 5, wbr_flurry: 3, arms_improved_rend: 2 } } },
+    { label: 'warlock dots',       o: { playerClass: 'warlock',
+        forceTalents: { aff_imp_corruption: 5, aff_imp_agony: 2, aff_nightfall: 2, bind_imp: 5 } } },
+    { label: 'mage frost',         o: { playerClass: 'mage',
+        forceTalents: { frost_frostbite: 3, frost_permafrost: 3 } } },
+    { label: 'rogue seal fate',    o: { playerClass: 'rogue',
+        forceTalents: { ass_seal_fate: 5, ass_vile_poisons: 4 } } },
+    { label: 'warrior + party',    o: { playerClass: 'warrior', spendTalents: true, partySize: 3 } },
+  ]
+  const out: string[] = [
+    '# Idle Legends — STORE combat golden',
+    '# Regenerate with: node tools/sim/combat.mjs --update',
+    '# A diff here is a COMBAT BEHAVIOUR CHANGE in the store path. Read it before accepting.',
+    '',
+  ]
+  for (const seed of [1, 2]) {
+    for (const c of cases) {
+      const r = runScenario({ ...opts, minutes: 10, seed, captureCombatTrace: true, ...c.o })
+      out.push(`## ${c.label} | seed=${seed}`)
+      out.push(...(r.combatTrace ?? []))
+      out.push('')
+    }
+  }
+  process.stdout.write(out.join('\n') + '\n')
 } else if (process.argv.includes('--party-delta')) {
   // What a party is actually worth, in economy terms.
   //

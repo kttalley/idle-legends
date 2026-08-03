@@ -26,6 +26,8 @@ import { itemPower } from '../data/items'
 import { joinParty, disbandParty } from '../engine/party'
 import { allocateSpec } from '../engine/ambient'
 import { mulberry32 } from '../engine/rng'
+import { compileStats } from '../engine/combat'
+import { RACE_DEFINITIONS } from '../data/races'
 
 // ── Expected value of a destroyed drop ────────────────────────────────────────
 // The bag-full branch logs a name, not a price, so a lost item's worth has to be
@@ -200,6 +202,21 @@ export interface ScenarioOpts {
    * still the conservative floor.
    */
   spendTalents?: boolean
+  /** Record every combat log line, in order, for the store's byte-level golden. */
+  captureCombatTrace?: boolean
+  /**
+   * Pin a talent build outright, bypassing the points economy.
+   *
+   * `spendTalents` models a real player and is right for economy runs, but it cannot reach
+   * the interesting talents in a short trace: they sit at `requiresPoints` 20 and a
+   * ten-minute hero has earned about six points. The store-specific procs — Creeping
+   * Freeze, Nightfall, Seal Fate, the minion — are exactly what the store combat golden
+   * needs to hold still, and exactly what a levelling run never fires.
+   *
+   * Hand-pinned for the same reason `fightSim`'s builds are: a generated build is chosen
+   * for plausibility, not coverage, and can silently stop exercising a mechanic.
+   */
+  forceTalents?: Record<string, number>
 }
 
 declare const process: { argv?: string[]; stdout: { write(s: string): void } }
@@ -211,6 +228,8 @@ export interface ScenarioResult {
   opts: Required<ScenarioOpts>
   samples: Sample[]
   final: Sample
+  /** Ordered combat log, when `captureCombatTrace` was set. The store's golden. */
+  combatTrace: string[] | null
   /** Simulated minute at which the bag first hit capacity, or null. */
   firstFullAtMinute: number | null
   /** Wall-clock milliseconds the simulation took. */
@@ -244,16 +263,30 @@ function equipUpgrades(store: typeof useGameStore): void {
 /** Log ids already accounted for, so each combat-log line is counted once. */
 function makeLogReader() {
   const seen = new Set<string>()
-  return (entries: { id: string; message: string }[]) => {
-    const fresh: string[] = []
+  return (entries: { id: string; message: string; type: string }[]) => {
+    const fresh: { message: string; type: string }[] = []
     for (const e of entries) {
       if (seen.has(e.id)) continue
       seen.add(e.id)
-      fresh.push(e.message)
+      fresh.push({ message: e.message, type: e.type })
     }
     return fresh
   }
 }
+
+/**
+ * Log types that describe COMBAT, as opposed to loot, zones or crafting.
+ *
+ * The combat trace is the store's answer to the fight golden. `tools/sim/fight.mjs` gates
+ * `fight.ts` byte-for-byte; nothing gated the STORE's combat path at all, so a refactor
+ * there could only ever be checked against aggregate gold — which cannot tell a faithful
+ * extraction from one that quietly changed a formula. Filtered by type rather than by
+ * matching message text, so a reworded log line does not silently drop a whole category.
+ */
+const COMBAT_LOG_TYPES = new Set([
+  'player_attack', 'player_crit', 'mob_attack', 'mob_death', 'proc', 'dot_tick',
+  'player_death', 'player_respawn', 'level_up',
+])
 
 export function runScenario(opts: ScenarioOpts): ScenarioResult {
   const o: Required<ScenarioOpts> = {
@@ -272,6 +305,8 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     seed: null,
     partySize: 0,
     spendTalents: false,
+    captureCombatTrace: false,
+    forceTalents: {},
     ...opts,
   }
 
@@ -288,6 +323,18 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
   const talentGoal = o.spendTalents
     ? allocateSpec(mulberry32(((o.seed ?? 0) * 7919 + 13) | 0), o.playerClass, 41)
     : {}
+
+  if (Object.keys(o.forceTalents).length) {
+    // Straight onto the state: `allocateTalent` gates on points spent per tree, which is
+    // the whole thing being bypassed here.
+    const st = store.getState()
+    useGameStore.setState({
+      talentAllocs: { ...o.forceTalents },
+      stats: { ...compileStats(st.playerClass, st.level, st.equipment, o.forceTalents,
+                               RACE_DEFINITIONS[st.playerRace]?.racialPassive ?? {}),
+               currentHp: st.stats.currentHp },
+    })
+  }
 
   // ── Party ─────────────────────────────────────────────────────────────────
   // Always disband first: the party module is MODULE state and this harness runs many
@@ -321,6 +368,9 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
   }
 
   const readNewLogs = makeLogReader()
+  // Only allocated when asked for: a 30-minute run produces thousands of lines and every
+  // other scenario would pay for a list nobody reads.
+  const combatTrace: string[] | null = o.captureCombatTrace ? [] : null
   const samples: Sample[] = []
   let itemsLooted = 0
   let itemsLost = 0
@@ -336,7 +386,11 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     store.getState().tick(o.stepSeconds)
     const s = store.getState()
 
-    for (const msg of readNewLogs(s.combatLog)) {
+    for (const entry of readNewLogs(s.combatLog)) {
+      const msg = entry.message
+      if (combatTrace && COMBAT_LOG_TYPES.has(entry.type)) {
+        combatTrace.push(`${(t * o.stepSeconds).toFixed(2)} ${entry.type} ${msg}`)
+      }
       if (msg.startsWith('Looted:')) itemsLooted++
       // Overflow, under either regime: the old destroy branch and the salvage that
       // replaced it, so a before/after comparison counts the same events.
@@ -441,6 +495,7 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     opts: o,
     samples,
     final: samples[samples.length - 1],
+    combatTrace,
     firstFullAtMinute,
     wallMs: Date.now() - started,
   }
@@ -470,7 +525,7 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
     playerClass: 'warrior', playerRace: 'human', stepSeconds: 0.25,
     sampleEveryMinutes: 5, advanceZones: false, sellCommons: false,
     buyBagSlots: false, buyContract: false, buyUpgrades: false, autoEquip: false,
-    disableAutoEquip: false, disableAutoAdvance: false, seed: null, partySize: 0, spendTalents: false, ...opts,
+    disableAutoEquip: false, disableAutoAdvance: false, seed: null, partySize: 0, spendTalents: false, captureCombatTrace: false, forceTalents: {}, ...opts,
   }
   if (typeof __setSeed === 'function') __setSeed(o.seed)
 
@@ -478,6 +533,9 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
   store.getState().initGame(o.playerClass, o.playerRace)
 
   const readNewLogs = makeLogReader()
+  // Only allocated when asked for: a 30-minute run produces thousands of lines and every
+  // other scenario would pay for a list nobody reads.
+  const combatTrace: string[] | null = o.captureCombatTrace ? [] : null
   const violations: Violation[] = []
   const totalTicks = Math.round((o.minutes * 60) / o.stepSeconds)
   const ticksPerSample = Math.round((o.sampleEveryMinutes * 60) / o.stepSeconds)
@@ -496,7 +554,11 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
     store.getState().tick(o.stepSeconds)
     const s = store.getState()
 
-    for (const msg of readNewLogs(s.combatLog)) {
+    for (const entry of readNewLogs(s.combatLog)) {
+      const msg = entry.message
+      if (combatTrace && COMBAT_LOG_TYPES.has(entry.type)) {
+        combatTrace.push(`${(t * o.stepSeconds).toFixed(2)} ${entry.type} ${msg}`)
+      }
       for (const pattern of DESTROY_PATTERNS) {
         if (msg.includes(pattern)) fail(t, 'loot is never destroyed', `log said: "${msg}"`)
       }
