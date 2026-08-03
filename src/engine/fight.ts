@@ -256,7 +256,16 @@ export function runFight(
         }
       } else if (me.kind === 'mob' && me.mob && foe.kind === 'hero' && foe.hero) {
         const fx = compileTalentEffects(foe.hero.combatant.playerClass, foe.hero.combatant.talentAllocs)
-        const res = resolveMobAttack(me.mob, foe.armor, 1, fx, rng)
+        // The literal `1` here made `enemy_slow` inert in this loop while the store passed
+        // the real factor (gameStore's `resolveMobAttack(..., fx.mobAttackSpeedFactor, fx)`),
+        // so a Glacial Rite mage mitigated incoming damage in the player's fight and not at
+        // all in an ambient one or a duel. Same talent, same resolver, two answers.
+        //
+        // Note what this does NOT fix, in either loop: the factor only shrinks per-swing
+        // DAMAGE. Neither cadence is slowed — this loop's `me.accum < me.attackSeconds`
+        // and the store's `mobAttackAccum >= currentMob.attackSpeedSeconds` both threshold
+        // the unmodified interval. "Enemy slow" is a damage reduction wearing a speed name.
+        const res = resolveMobAttack(me.mob, foe.armor, fx.mobAttackSpeedFactor, fx, rng)
         if (res.blocked) {
           emit({ t, side: s, kind: 'block', damage: 0, crit: false, targetHp: foe.hp, targetMaxHp: foe.maxHp })
         } else {

@@ -555,15 +555,15 @@ seed=1000 winner=0 duration=9.25 hp=2074,0
 9.25 s1 death dmg=0 crit=0 hp=0
 
 ## mage frost vs mob | seed=1000
-seed=1000 winner=0 duration=9.25 hp=2074,0
+seed=1000 winner=0 duration=9.25 hp=2094,0
 2.00 s0 swing dmg=100 crit=0 hp=534
-2.00 s1 swing dmg=39 crit=0 hp=2191
+2.00 s1 swing dmg=34 crit=0 hp=2196
 3.75 s0 swing dmg=100 crit=0 hp=434
-4.00 s1 swing dmg=39 crit=0 hp=2152
+4.00 s1 swing dmg=34 crit=0 hp=2162
 5.50 s0 swing dmg=199 crit=1 hp=235
-6.00 s1 swing dmg=39 crit=0 hp=2113
+6.00 s1 swing dmg=34 crit=0 hp=2128
 7.25 s0 swing dmg=100 crit=0 hp=135
-8.00 s1 swing dmg=39 crit=0 hp=2074
+8.00 s1 swing dmg=34 crit=0 hp=2094
 9.25 s0 swing dmg=199 crit=1 hp=0
 9.25 s1 death dmg=0 crit=0 hp=0
 
@@ -741,30 +741,30 @@ seed=8717 winner=0 duration=14.75 hp=1309,0
 14.75 s1 death dmg=0 crit=0 hp=0
 
 ## mage frost vs mob | seed=8717
-seed=8717 winner=0 duration=23.5 hp=1057,0
+seed=8717 winner=0 duration=23.5 hp=1145,0
 2.00 s0 swing dmg=38 crit=0 hp=751
-2.00 s1 swing dmg=63 crit=0 hp=1687
+2.00 s1 swing dmg=55 crit=0 hp=1695
 3.75 s0 swing dmg=77 crit=1 hp=674
-4.00 s1 swing dmg=63 crit=0 hp=1624
+4.00 s1 swing dmg=55 crit=0 hp=1640
 5.50 s0 swing dmg=77 crit=1 hp=597
-6.00 s1 swing dmg=63 crit=0 hp=1561
+6.00 s1 swing dmg=55 crit=0 hp=1585
 7.25 s0 swing dmg=77 crit=1 hp=520
-8.00 s1 swing dmg=63 crit=0 hp=1498
+8.00 s1 swing dmg=55 crit=0 hp=1530
 9.25 s0 swing dmg=38 crit=0 hp=482
-10.00 s1 swing dmg=63 crit=0 hp=1435
+10.00 s1 swing dmg=55 crit=0 hp=1475
 11.00 s0 swing dmg=77 crit=1 hp=405
-12.00 s1 swing dmg=63 crit=0 hp=1372
+12.00 s1 swing dmg=55 crit=0 hp=1420
 12.75 s0 swing dmg=77 crit=1 hp=328
-14.00 s1 swing dmg=63 crit=0 hp=1309
+14.00 s1 swing dmg=55 crit=0 hp=1365
 14.50 s0 swing dmg=38 crit=0 hp=290
-16.00 s1 swing dmg=63 crit=0 hp=1246
+16.00 s1 swing dmg=55 crit=0 hp=1310
 16.25 s0 swing dmg=77 crit=1 hp=213
-18.00 s1 swing dmg=63 crit=0 hp=1183
+18.00 s1 swing dmg=55 crit=0 hp=1255
 18.25 s0 swing dmg=38 crit=0 hp=175
 20.00 s0 swing dmg=77 crit=1 hp=98
-20.00 s1 swing dmg=63 crit=0 hp=1120
+20.00 s1 swing dmg=55 crit=0 hp=1200
 21.75 s0 swing dmg=77 crit=1 hp=21
-22.00 s1 swing dmg=63 crit=0 hp=1057
+22.00 s1 swing dmg=55 crit=0 hp=1145
 23.50 s0 swing dmg=77 crit=1 hp=0
 23.50 s1 death dmg=0 crit=0 hp=0
 
@@ -939,25 +939,25 @@ seed=16434 winner=0 duration=12.75 hp=1240,0
 12.75 s1 death dmg=0 crit=0 hp=0
 
 ## mage frost vs mob | seed=16434
-seed=16434 winner=0 duration=18.25 hp=1045,0
+seed=16434 winner=0 duration=18.25 hp=1117,0
 2.00 s0 swing dmg=51 crit=0 hp=731
-2.00 s1 swing dmg=65 crit=0 hp=1565
+2.00 s1 swing dmg=57 crit=0 hp=1573
 3.75 s0 swing dmg=103 crit=1 hp=628
-4.00 s1 swing dmg=65 crit=0 hp=1500
+4.00 s1 swing dmg=57 crit=0 hp=1516
 5.50 s0 swing dmg=51 crit=0 hp=577
-6.00 s1 swing dmg=65 crit=0 hp=1435
+6.00 s1 swing dmg=57 crit=0 hp=1459
 7.25 s0 swing dmg=103 crit=1 hp=474
-8.00 s1 swing dmg=65 crit=0 hp=1370
+8.00 s1 swing dmg=57 crit=0 hp=1402
 9.25 s0 swing dmg=103 crit=1 hp=371
-10.00 s1 swing dmg=65 crit=0 hp=1305
+10.00 s1 swing dmg=57 crit=0 hp=1345
 11.00 s0 swing dmg=103 crit=1 hp=268
-12.00 s1 swing dmg=65 crit=0 hp=1240
+12.00 s1 swing dmg=57 crit=0 hp=1288
 12.75 s0 swing dmg=103 crit=1 hp=165
-14.00 s1 swing dmg=65 crit=0 hp=1175
+14.00 s1 swing dmg=57 crit=0 hp=1231
 14.50 s0 swing dmg=51 crit=0 hp=114
-16.00 s1 swing dmg=65 crit=0 hp=1110
+16.00 s1 swing dmg=57 crit=0 hp=1174
 16.25 s0 swing dmg=51 crit=0 hp=63
-18.00 s1 swing dmg=65 crit=0 hp=1045
+18.00 s1 swing dmg=57 crit=0 hp=1117
 18.25 s0 swing dmg=103 crit=1 hp=0
 18.25 s1 death dmg=0 crit=0 hp=0
 
@@ -1090,13 +1090,13 @@ seed=24151 winner=0 duration=5.75 hp=2052,0
 5.75 s1 death dmg=0 crit=0 hp=0
 
 ## mage frost vs mob | seed=24151
-seed=24151 winner=0 duration=7.25 hp=2013,0
+seed=24151 winner=0 duration=7.25 hp=2025,0
 2.00 s0 swing dmg=251 crit=1 hp=592
-2.00 s1 swing dmg=39 crit=0 hp=2091
+2.00 s1 swing dmg=35 crit=0 hp=2095
 3.75 s0 swing dmg=251 crit=1 hp=341
-4.00 s1 swing dmg=39 crit=0 hp=2052
+4.00 s1 swing dmg=35 crit=0 hp=2060
 5.50 s0 swing dmg=251 crit=1 hp=90
-6.00 s1 swing dmg=39 crit=0 hp=2013
+6.00 s1 swing dmg=35 crit=0 hp=2025
 7.25 s0 swing dmg=251 crit=1 hp=0
 7.25 s1 death dmg=0 crit=0 hp=0
 
@@ -1212,13 +1212,13 @@ seed=31868 winner=0 duration=6 hp=1606,0
 6.00 s1 death dmg=0 crit=0 hp=0
 
 ## mage frost vs mob | seed=31868
-seed=31868 winner=0 duration=7.25 hp=1559,0
+seed=31868 winner=0 duration=7.25 hp=1574,0
 2.00 s0 swing dmg=259 crit=1 hp=391
-2.00 s1 swing dmg=47 crit=0 hp=1653
+2.00 s1 swing dmg=42 crit=0 hp=1658
 3.75 s0 swing dmg=129 crit=0 hp=262
-4.00 s1 swing dmg=47 crit=0 hp=1606
+4.00 s1 swing dmg=42 crit=0 hp=1616
 5.50 s0 swing dmg=129 crit=0 hp=133
-6.00 s1 swing dmg=47 crit=0 hp=1559
+6.00 s1 swing dmg=42 crit=0 hp=1574
 7.25 s0 swing dmg=259 crit=1 hp=0
 7.25 s1 death dmg=0 crit=0 hp=0
 
@@ -1370,13 +1370,13 @@ seed=39585 winner=0 duration=5.5 hp=1786,0
 5.50 s1 death dmg=0 crit=0 hp=0
 
 ## mage frost vs mob | seed=39585
-seed=39585 winner=0 duration=7.25 hp=1734,0
+seed=39585 winner=0 duration=7.25 hp=1752,0
 2.00 s0 swing dmg=273 crit=1 hp=579
-2.00 s1 swing dmg=52 crit=0 hp=1838
+2.00 s1 swing dmg=46 crit=0 hp=1844
 3.75 s0 swing dmg=273 crit=1 hp=306
-4.00 s1 swing dmg=52 crit=0 hp=1786
+4.00 s1 swing dmg=46 crit=0 hp=1798
 5.50 s0 swing dmg=273 crit=1 hp=33
-6.00 s1 swing dmg=52 crit=0 hp=1734
+6.00 s1 swing dmg=46 crit=0 hp=1752
 7.25 s0 swing dmg=273 crit=1 hp=0
 7.25 s1 death dmg=0 crit=0 hp=0
 
