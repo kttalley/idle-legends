@@ -944,6 +944,40 @@ already says what to measure: state histogram over 60s, target `approach` well u
 
 ### C3 — engaging the party member's target: **THE ISOLATION DECISION**
 
+> **DECIDED TWICE, 2026-08-02. Option 2 was taken, shipped, and then REVERSED by the owner.
+> The section below describes the world before both.**
+>
+> Option 2 (companion combat purely cosmetic, zero store damage) shipped and its isolation
+> held exactly as designed. It was reversed because of what it felt like, not what it broke:
+> a party member who visibly swings and changes nothing reads as broken, and no amount of
+> animation fixes a swing with no consequence. The isolation argument below is still
+> correct — this IS an economy change — but the owner's call is that a measurable economy
+> shift is the better problem, and the harness grows to see it rather than the feature
+> being gutted to keep the harness simple.
+>
+> **What shipped instead:** party members are combatants in `GameState.allies`, compiled
+> from their real class/level/`talentAllocs` via the same `compileStats` and swinging
+> through the same `resolvePlayerAttack` the player uses. Deliberately UNGEARED — an
+> honest reading of an ambient hero, and a reason they contribute less than you that needs
+> no fudge multiplier. Mobs choose between the player and standing allies; an ally at zero
+> goes down and rejoins. `FloatingNumber.allyKey` routes the hit's VFX to that companion's
+> body.
+>
+> **Measured (8 seeds × 30 min, identical seeds, `run.mjs --party-delta`):**
+> gold **+63%**, level +16%, deaths **−88%**. The death figure is the one to weigh — it is a
+> difficulty change of a different order to the gold curve, and `ALLY_THREAT_SHARE` is a
+> smaller lever than retuning income.
+>
+> **Known gap, not a bug to patch quietly:** allies never level. `makeAlly` only recompiles
+> when `speaker.level` changes and that is fixed at invite time, so a companion recruited
+> at level 1 is still level 1 when you reach 9. Whether companions grow with you is a
+> balance decision; it is now measurable either way.
+>
+> The sparring-partner machinery described below is **deleted** — `spawnCompanionFoe`,
+> `isSparFoe` and `sparFoeIdx` are gone. Companions pick a real mob out of the zone
+> population, which is also what made them targetable: the enemy your party fights is now
+> the same object you can tap.
+
 This is the item that actually costs something, and it must be decided before C4.
 
 Today a companion fights a **sparring partner** — a synthetic ambient monster
@@ -1028,6 +1062,50 @@ with nothing reporting it. Check the vertical budget at the mobile breakpoint **
 building this, and fix the `pointer-events` bug above first or the leave button stays dead.
 
 ### C5 — N-sided combat
+
+> **STATUS 2026-08-02 — stages 0, 1 and 2 are DONE. Read this box before the section
+> below it, which is now partly historical.**
+>
+> The owner decided to UNIFY (the section's open question), and the work was re-staged
+> against a verified inventory. Stages shipped:
+>
+> - **Stage 0 — widen the determinism baseline.** The claim below that "the harness has no
+>   golden file" is **STALE**: one has existed at `tools/sim/golden/fight-golden.txt` since
+>   `9c81e34`. The real problem was worse and the opposite shape — every roster was built
+>   with `allocs = {}`, so every talent-gated roll short-circuited before reaching `rng()`
+>   and the whole baseline exercised ONE draw site. Measured event mix was 382 `swing`,
+>   30 `death`, and zero `dot`/`block`/`thorns`/`extra`/`flurry`. Six talented builds now
+>   run alongside: `dot` 0→312+, `thorns` 0→117, `flurry` 0→20, `block` 0→18, `extra` 0→5.
+> - **Stage 1 — seed the store's combat path.** `resolvePlayerAttack` got no `rng` and
+>   `resolveMobAttack` no fifth arg, so the store drew off the global while `fight.ts` drew
+>   off a seed *through the same functions*. One `combatRng` now, off `procState.procRngState`
+>   — which also did not survive a load, despite its comment saying it did.
+> - **Stage 2 — reconcile the semantic divergences.** `enemy_slow` was inert in `runFight`;
+>   DoTs stacked there and refreshed in the store; extra/flurry were a flat fraction in the
+>   store and a full-strength re-resolve in `fight.ts` (up to 3× apart); a hero DEFENDER got
+>   no defensive talents at all in a duel.
+>
+> **Two bugs found by doing it, both shipped and neither visible before stage 0:**
+> 1. **Corruption and Curse of Agony never ticked.** Both are re-applied every swing and
+>    tick every 3s; every class swings in 1.5–2.5s. Refreshing installed a DoT with
+>    `tickAccum: 0`, so the clock reset before it could ever fire. The whole Bleakweave
+>    tree's signature damage did nothing. Refresh now renews duration and carries the tick
+>    clock.
+> 2. **`PARTY_MAX` was enforced on invite, never on accept.** Acceptance is async, so six
+>    invites sent to an empty party all passed the guard — measured five members in a
+>    party capped at three.
+>
+> **Still open:** stage 3 (extract `stepCombat` + the ONE batched save migration: per-target
+> proc state and the five module-global accumulators), then 4 (lift the store-only effects),
+> 5 (dead fields, ability layer), 6 (N-sided proper), 7 (C6). Stage 2(f) — dropping
+> `procState.openerUsed` in favour of a Side-local flag — was deliberately deferred INTO
+> stage 3: the store has no per-combatant state until stage 3 creates it, so doing it early
+> means inventing a temporary home and undoing it.
+>
+> **econSim caveat that outlived the work:** the economy harness never spent talent points,
+> so it had the identical blind spot. `spendTalents` fixes it (`talented` /
+> `talented+party` shapes). Its older baselines are UNTALENTED and remain the conservative
+> floor, not a description of a real build.
 
 `runFight` is `[Side, Side]` with `side: 0 | 1`, `winner: 0 | 1 | null` and
 `hp: [number, number]` (`engine/fight.ts:150-284`). N-sided means `sides: Side[]`, a team
