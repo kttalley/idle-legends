@@ -454,6 +454,19 @@ export interface AllyCombatant {
   playerClass: ClassType
   level: number
   talentAllocs: Record<string, number>
+  /**
+   * Their level as a SHARE of the player's, captured when they joined.
+   *
+   * Ambient heroes are generated at `playerLevel × U(0.8, 1.2)` (ambient.ts:124), so a
+   * ratio is the honest way to keep growing them: a companion recruited as a near-peer
+   * stays a near-peer, and one who was already behind stays proportionally behind.
+   *
+   * Before this they simply never levelled — `makeAlly` recompiled only when
+   * `speaker.level` changed, and that is fixed at invite time and never mutated. A
+   * companion recruited at level 1 was still level 1 when the hero reached 9, so their
+   * contribution decayed across a run and a long-standing party quietly became scenery.
+   */
+  levelRatio: number
   /** Compiled once on join and on level change, not per tick. */
   stats: Stats
   currentHp: number

@@ -202,6 +202,8 @@ export interface ScenarioOpts {
   spendTalents?: boolean
 }
 
+declare const process: { argv?: string[]; stdout: { write(s: string): void } }
+
 /** Installed by tools/sim/run.mjs. Null restores the real `Math.random`. */
 declare const __setSeed: undefined | ((seed: number | null) => void)
 
@@ -427,6 +429,14 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     }
   }
 
+  // Escape hatch for verifying ally state from a driver script — the harness has no other
+  // way to look INSIDE a finished run, and inferring 'allies levelled' from a gold delta
+  // is exactly the kind of reasoning that has been wrong three times on this branch.
+  if (typeof process !== 'undefined' && process.argv && process.argv.includes('--dump-allies')) {
+    const st = store.getState()
+    process.stdout.write('  allies @ playerLvl ' + st.level + ': ' +
+      JSON.stringify(st.allies.map(a => ({ lvl: a.level, ratio: +a.levelRatio.toFixed(2), maxHp: a.stats.maxHp }))) + '\n')
+  }
   return {
     opts: o,
     samples,

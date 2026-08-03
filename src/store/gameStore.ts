@@ -1404,7 +1404,9 @@ const ALLY_THREAT_SHARE = 0.45
  * member's key so two allies never walk the same stream, which is the determinism
  * regression per-hero sub-streams exist to prevent.
  */
-function makeAlly(m: ReturnType<typeof getParty>[number], worldSeed: number): AllyCombatant {
+function makeAlly(
+  m: ReturnType<typeof getParty>[number], worldSeed: number, playerLevel: number,
+): AllyCombatant {
   const sp = m.speaker
   const playerClass = (sp.playerClass as ClassType)
   const allocs = sp.talentAllocs ?? {}
@@ -1412,9 +1414,34 @@ function makeAlly(m: ReturnType<typeof getParty>[number], worldSeed: number): Al
   const stats = compileStats(playerClass, sp.level, EMPTY_EQUIPMENT, allocs, racial)
   return {
     key: m.key, name: sp.name, playerClass, level: sp.level, talentAllocs: allocs,
+    levelRatio: sp.level / Math.max(1, playerLevel),
     stats, currentHp: stats.maxHp, attackAccum: 0, downedFor: 0,
     procState: defaultProcState(),
     rngState: ((worldSeed ^ strHashKey(m.key)) | 0) || 1,
+  }
+}
+
+/**
+ * Recompile an ally at a new level, carrying their fight across.
+ *
+ * Their TALENT BUILD does not change. It is the build the hero visibly has — the same one
+ * their character card and spec title show — and re-rolling it as they level would make a
+ * companion a different person every few minutes. Levelling raises their stats, exactly as
+ * it would for a player who has not respecced.
+ *
+ * Health carries as a FRACTION rather than a flat value, so a stamina gain raises the
+ * ceiling without healing them for free mid-fight.
+ */
+function relevelAlly(a: AllyCombatant, level: number): AllyCombatant {
+  const racial = {}
+  const stats = compileStats(a.playerClass, level, EMPTY_EQUIPMENT, a.talentAllocs, racial)
+  return {
+    ...a,
+    level,
+    stats,
+    currentHp: a.downedFor > 0
+      ? 0
+      : Math.max(1, Math.round(stats.maxHp * (a.currentHp / Math.max(1, a.stats.maxHp)))),
   }
 }
 
@@ -2092,18 +2119,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       const byKey = new Map(allies.map(a => [a.key, a]))
       allies = roster.map(m => {
         const existing = byKey.get(m.key)
-        if (existing && existing.level === m.speaker.level) return existing
-        // Rebuilt on level change so a companion that dinged actually gets stronger,
-        // carrying HP across as a fraction rather than healing them for free.
-        const fresh = makeAlly(m, state.worldSeed)
-        if (existing) {
-          fresh.currentHp = Math.max(1, Math.round(
-            fresh.stats.maxHp * (existing.currentHp / Math.max(1, existing.stats.maxHp))))
-          fresh.attackAccum = existing.attackAccum
-          fresh.downedFor = existing.downedFor
-          fresh.rngState = existing.rngState
-        }
-        return fresh
+        if (!existing) return makeAlly(m, state.worldSeed, level)
+        // Companions grow WITH the hero, holding the share of your level they were
+        // recruited at. They used to be frozen at their invite level forever, so a party
+        // kept for any length of time decayed into scenery — the measured +63% gold from a
+        // full party was a fading number, largest right after recruiting and shrinking
+        // every time you dinged.
+        const want = Math.max(1, Math.round(level * existing.levelRatio))
+        return want === existing.level ? existing : relevelAlly(existing, want)
       })
     }
 
