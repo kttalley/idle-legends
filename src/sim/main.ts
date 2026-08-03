@@ -59,6 +59,11 @@ if (process.argv.includes('--parity')) {
     { name: 'contract+equip+all',  o: { advanceZones: true, buyBagSlots: true, buyContract: true, autoEquip: true } },
     { name: 'no-auto-equip',       o: { disableAutoEquip: true } },
     { name: 'buys-everything',     o: { buyBagSlots: true, buyContract: true, buyUpgrades: true, disableAutoAdvance: true } },
+    // Party members deal real damage, so a partied hero is a different economy. Held to
+    // the same invariants as a solo one — if a party can break loot, gold or levelling,
+    // this is where it shows.
+    { name: 'full party',          o: { partySize: 3 } },
+    { name: 'full party+advance',  o: { partySize: 3, advanceZones: true, sellCommons: true } },
   ]
   let failed = 0
   for (const shape of shapes) {
@@ -105,6 +110,36 @@ if (process.argv.includes('--parity')) {
     for (const v of migration) process.stdout.write(`          [${v.rule}] ${v.detail}\n`)
   }
   process.stdout.write(failed === 0 ? '\nall invariants hold\n' : `\n${failed} shape(s) violated invariants\n`)
+} else if (process.argv.includes('--party-delta')) {
+  // What a party is actually worth, in economy terms.
+  //
+  // Track C3's reversal made companions deal real damage, which raises kills per minute —
+  // and until this mode existed the harness drove a solo hero only, so it reported "no
+  // change" for a change it structurally could not see. That is the worst kind of green.
+  // Same seeds on both sides so the comparison is like-for-like.
+  const seeds = Array.from({ length: sweepCount || 8 }, (_, i) => i + 1)
+  const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length)
+  const run = (partySize: number) => {
+    const gold: number[] = [], level: number[] = [], deaths: number[] = []
+    for (const seed of seeds) {
+      const r = runScenario({ ...opts, seed, partySize })
+      gold.push(r.final.gold); level.push(r.final.level); deaths.push(r.final.deaths)
+    }
+    return { gold: mean(gold), level: mean(level), deaths: mean(deaths) }
+  }
+  const solo = run(0)
+  const party = run(3)
+  const pct = (a: number, b: number) =>
+    `${b >= a ? '+' : ''}${(((b - a) / Math.max(1e-9, a)) * 100).toFixed(1)}%`
+  const fmt = (n: number) => n.toFixed(n >= 100 ? 0 : 2).padStart(9)
+  process.stdout.write(
+    `── Party economy delta ───────────────────────────────────────────\n` +
+    `${seeds.length} seeds × ${opts.minutes} min, identical seeds both sides\n\n` +
+    `              solo    party(3)     delta\n` +
+    `gold     ${fmt(solo.gold)}  ${fmt(party.gold)}   ${pct(solo.gold, party.gold)}\n` +
+    `level    ${fmt(solo.level)}  ${fmt(party.level)}   ${pct(solo.level, party.level)}\n` +
+    `deaths   ${fmt(solo.deaths)}  ${fmt(party.deaths)}   ${pct(solo.deaths, party.deaths)}\n`,
+  )
 } else if (sweepCount > 0) {
   const seeds = Array.from({ length: sweepCount }, (_, i) => i + 1)
   process.stdout.write(formatSweep(runSweep(opts, seeds), opts.minutes) + '\n')

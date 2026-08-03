@@ -23,6 +23,9 @@ import { UPGRADES, upgradeCost } from '../data/upgrades'
 import { slotStorage } from '../store/saveSlots'
 import { projectOfflineProgress } from '../engine/offline'
 import { itemPower } from '../data/items'
+import { joinParty, disbandParty } from '../engine/party'
+import { allocateSpec } from '../engine/ambient'
+import { mulberry32 } from '../engine/rng'
 
 // ── Expected value of a destroyed drop ────────────────────────────────────────
 // The bag-full branch logs a name, not a price, so a lost item's worth has to be
@@ -39,6 +42,9 @@ export const EXPECTED_VALUE_MULT = (() => {
   }
   return acc   // ≈ 4.15 gold per item level
 })()
+
+/** Classes the harness recruits from, so a partied run covers more than one ally shape. */
+const COMPANION_CLASSES: ClassType[] = ['warrior', 'mage', 'rogue', 'warlock']
 
 export interface Sample {
   /** Simulated minutes since the run started. */
@@ -139,6 +145,20 @@ export interface ScenarioOpts {
   disableAutoAdvance?: boolean
   /** Seed for the harness's `Math.random` swap — makes a run reproducible. */
   seed?: number | null
+  /**
+   * Recruit this many party members before the run starts.
+   *
+   * Party members deal REAL damage now (Track C3, reversed), so a solo run no longer
+   * describes a partied player's economy — and the harness had no way to see the
+   * difference, which made "the numbers did not move" an artefact of the harness rather
+   * than evidence about the game. Companions are built from the run's own seed, so a
+   * partied scenario is as reproducible as a solo one.
+   *
+   * They join through `joinParty`, bypassing the invite flow: real invites resolve from a
+   * generated reply seconds later and can be declined, which is right for a player and
+   * useless for a measurement.
+   */
+  partySize?: number
 }
 
 /** Installed by tools/sim/run.mjs. Null restores the real `Math.random`. */
@@ -207,6 +227,7 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     disableAutoEquip: false,
     disableAutoAdvance: false,
     seed: null,
+    partySize: 0,
     ...opts,
   }
 
@@ -214,6 +235,29 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
 
   const store = useGameStore
   store.getState().initGame(o.playerClass, o.playerRace)
+
+  // ── Party ─────────────────────────────────────────────────────────────────
+  // Always disband first: the party module is MODULE state and this harness runs many
+  // scenarios in one process, so a party left standing by the previous run would silently
+  // inflate the next one — and a solo baseline contaminated by the partied run before it
+  // is worse than no baseline at all.
+  disbandParty()
+  for (let i = 0; i < o.partySize; i++) {
+    const rng = mulberry32(((o.seed ?? 0) * 977 + i * 31 + 7) | 0)
+    const cls = COMPANION_CLASSES[Math.floor(rng() * COMPANION_CLASSES.length)]
+    joinParty({
+      name: `SimAlly${i}`,
+      playerClass: cls,
+      race: 'human',
+      faction: 'sim',
+      level: store.getState().level,
+      spec: null,
+      // Real allocations off the same generator ambient heroes use, so a companion in the
+      // harness is talented the way one in the game is — an untalented ally would measure
+      // a strictly weaker party than the feature actually ships.
+      talentAllocs: allocateSpec(rng, cls, store.getState().level),
+    })
+  }
   if (o.disableAutoEquip || o.disableAutoAdvance) {
     const st = store.getState()
     useGameStore.setState({ settings: {
@@ -364,7 +408,7 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
     playerClass: 'warrior', playerRace: 'human', stepSeconds: 0.25,
     sampleEveryMinutes: 5, advanceZones: false, sellCommons: false,
     buyBagSlots: false, buyContract: false, buyUpgrades: false, autoEquip: false,
-    disableAutoEquip: false, disableAutoAdvance: false, seed: null, ...opts,
+    disableAutoEquip: false, disableAutoAdvance: false, seed: null, partySize: 0, ...opts,
   }
   if (typeof __setSeed === 'function') __setSeed(o.seed)
 

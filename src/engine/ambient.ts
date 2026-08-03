@@ -82,7 +82,7 @@ const RARITIES: { r: Rarity; w: number }[] = [
  * more often than a Bulwark one. Points go into a single tree because a hero who spread
  * them evenly would have no spec at all, and "no spec" is not a character.
  */
-function allocateSpec(rng: Rng, playerClass: ClassType, level: number): Record<string, number> {
+export function allocateSpec(rng: Rng, playerClass: ClassType, level: number): Record<string, number> {
   const specs = CLASS_DEFINITIONS[playerClass].specs
   if (!specs.length) return {}
   const spec = specs[int(rng, specs.length)]

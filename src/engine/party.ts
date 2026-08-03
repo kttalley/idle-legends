@@ -81,6 +81,25 @@ export function isInvitePending(key: string): boolean {
   return pendingInvites.has(key)
 }
 
+/**
+ * Add a hero to the party, synchronously, honouring the cap.
+ *
+ * Extracted from the invite flow's `settle` so the two cannot drift, and exported because
+ * the headless economy harness needs a party WITHOUT an LLM round-trip — invites resolve
+ * from a generated reply seconds later and can be declined, which is correct for a player
+ * and useless for a measurement that has to be reproducible.
+ *
+ * Returns null when the party is full or they are already in it.
+ */
+export function joinParty(speaker: ChatSpeaker): PartyMember | null {
+  const key = entityKey(speaker)
+  if (isInParty(key) || members.length >= PARTY_MAX) return null
+  const m: PartyMember = { key, speaker, joinedAt: Date.now() }
+  members = [...members, m]
+  emit()
+  return m
+}
+
 /** Rules floor for the accept decision — also the fallback when the model is unavailable
  *  or answers in a shape we cannot read. Same faction says yes; the other side mostly
  *  does not, which is the whole point of having factions. */
@@ -155,10 +174,11 @@ export function invitePartyMember(
       return
     }
     if (accepted) {
-      const m: PartyMember = { key, speaker, joinedAt: Date.now() }
-      members = [...members, m]
-      pushChat({ channel: 'system', from: null, entityKey: key, text: `${speaker.name} joins your party.` })
-      onAccepted?.(m)
+      const m = joinParty(speaker)
+      if (m) {
+        pushChat({ channel: 'system', from: null, entityKey: key, text: `${speaker.name} joins your party.` })
+        onAccepted?.(m)
+      }
     } else {
       pushChat({ channel: 'system', from: null, entityKey: key, text: `${speaker.name} declines.` })
     }
