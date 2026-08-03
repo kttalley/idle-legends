@@ -2488,8 +2488,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // Apply new DoTs (deduplicate by sourceType — refresh existing)
       for (const newDot of result.triggeredDoTs) {
         const existing = activeDoTs.findIndex(d => d.sourceType === newDot.sourceType)
-        if (existing >= 0) activeDoTs[existing] = newDot
-        else activeDoTs.push(newDot)
+        if (existing >= 0) {
+          // Refresh DURATION, keep the TICK CLOCK — see the matching note in fight.ts.
+          // Replacing outright reset `tickAccum` to 0, and since Corruption and Curse of
+          // Agony are applied on every swing (3s tick interval against a 1.5–2.5s swing)
+          // neither ever reached its first tick. The whole Bleakweave tree's signature
+          // damage has been doing nothing.
+          newDot.tickAccum = activeDoTs[existing].tickAccum
+          activeDoTs[existing] = newDot
+        } else activeDoTs.push(newDot)
       }
 
       // Extra hit from sword spec

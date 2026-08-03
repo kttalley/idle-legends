@@ -239,7 +239,28 @@ export function runFight(
           const dealt = foe.kind === 'hero' ? mitigate(res.damage, foe.armor) : res.damage
           const dead = damage(foe, dealt)
           emit({ t, side: s, kind, damage: dealt, crit: res.isCrit, targetHp: foe.hp, targetMaxHp: foe.maxHp })
-          if (res.triggeredDoTs.length) foe.dots.push(...res.triggeredDoTs)
+          // Refresh by source, do not accumulate. This used to `push(...)` blindly, which
+          // is fine for a crit-gated bleed and catastrophic for the UNCONDITIONAL DoTs:
+          // Corruption and Curse of Agony trigger on EVERY swing (combat.ts:409, :412), so
+          // a warlock stacked one fresh 6-tick corruption per swing and reached a steady
+          // state of roughly ceil(18 / attackSeconds) running at once — around 9x the
+          // store's throughput, which refreshes a single DoT per `sourceType`.
+          //
+          // The store's merge is the correct one and is what every tooltip describes, so
+          // this loop adopts it rather than the other way round.
+          for (const dot of res.triggeredDoTs) {
+            const i = foe.dots.findIndex(d => d.sourceType === dot.sourceType)
+            if (i >= 0) {
+              // Refresh DURATION, keep the TICK CLOCK. Carrying `tickAccum` across is not
+              // a detail: Corruption and Curse of Agony tick every 3s (combat.ts:518, :524)
+              // and are re-applied on EVERY swing, and every class swings faster than that
+              // (1.5–2.5s base). Installing a fresh DoT resets the clock, so it never
+              // reaches its first tick and deals literally zero damage. The golden caught
+              // exactly that: warlock dot events went to 0 and the fights got LONGER.
+              dot.tickAccum = foe.dots[i].tickAccum
+              foe.dots[i] = dot
+            } else foe.dots.push(dot)
+          }
           if (res.lifeDrawn > 0) me.hp = Math.min(me.maxHp, me.hp + res.lifeDrawn)
           if (dead) return true
 
