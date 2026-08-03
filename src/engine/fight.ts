@@ -33,6 +33,7 @@ import type {
 } from '../data/types'
 import {
   compileStats, compileTalentEffects, resolveMobAttack, resolvePlayerAttack, resetDotIds,
+  EXTRA_HIT_MULT, FLURRY_MULT,
 } from './combat'
 import { mulberry32, type Rng } from './rng'
 
@@ -221,7 +222,11 @@ export function runFight(
         const swing = (kind: 'swing' | 'extra' | 'flurry'): boolean => {
           const res = resolvePlayerAttack(
             stats, combatant.playerClass, combatant.talentAllocs, me.procState, me.buffs,
-            undefined,
+            // Proc hits re-resolve at a reduced magnitude rather than at full strength.
+            // This loop used to re-resolve them at 1.0 while the store paid a flat 0.7/0.5,
+            // so an extra strike was worth up to 3x more here than in the player's own
+            // game. Same constants both sides now (combat.ts), so the two cannot drift.
+            kind === 'extra' ? EXTRA_HIT_MULT : kind === 'flurry' ? FLURRY_MULT : undefined,
             {
               mobHpFraction: foe.hp / foe.maxHp,
               playerHpFraction: me.hp / me.maxHp,
@@ -264,6 +269,10 @@ export function runFight(
           if (res.lifeDrawn > 0) me.hp = Math.min(me.maxHp, me.hp + res.lifeDrawn)
           if (dead) return true
 
+          // A proc hit cannot proc again. Gated on the KIND rather than on a depth
+          // counter because the property wanted is "procs are consulted once, on the
+          // primary swing" — a depth number would still permit a chain if some future
+          // caller passed the wrong value.
           if (kind === 'swing') {
             if (res.extraHit && swing('extra')) return true
             if (res.flurryHit && swing('flurry')) return true

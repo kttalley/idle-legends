@@ -30,7 +30,7 @@ import {
   compileStats, compileTalentEffects,
   resolvePlayerAttack, resolveMobAttack,
   makeShadowBoltHit, makeAbilityBuff, isGearUpgrade,
-  emptyAbilityMod, RAMPAGE_MAX_STACKS, ARCANE_MAX_CHARGES,
+  emptyAbilityMod, RAMPAGE_MAX_STACKS, ARCANE_MAX_CHARGES, EXTRA_HIT_MULT, FLURRY_MULT,
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
 import { getParty } from '../engine/party'
@@ -2499,23 +2499,74 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         } else activeDoTs.push(newDot)
       }
 
-      // Extra hit from sword spec
-      if (result.extraHit) {
-        const xtraHit = Math.round(stats.weaponDps * stats.attackSpeedSeconds * 0.7)
-        currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - xtraHit }
-        newFns.push(fn(xtraHit, false, false, false, '#aabbff'))
-        newLogs.push(log('proc', `⚡ Turning Steel! Extra strike for ${xtraHit}`, '#aabbff'))
+      // ── Proc hits: a real strike, at a reduced magnitude ────────────────────
+      //
+      // These were flat formulas — `weaponDps * attackSpeedSeconds * 0.7` and `* 0.5` —
+      // that never entered the resolver at all. So an extra strike could not crit, could
+      // not apply a bleed or a poison, ignored Executioner, Enrage, Rampage and Arcane
+      // Charges, and fed neither Bloodthirst nor Seal Fate. Both talents say "strike
+      // again"; what they did was deal a fraction of a swing.
+      //
+      // They now re-resolve a genuine attack and pass the old 0.7 / 0.5 through the
+      // resolver's `multiplierOverride`, so the MAGNITUDE the game was tuned around is
+      // preserved while the hit becomes a hit. `fight.ts` already re-resolved but at full
+      // strength; it takes the same overrides, so the two loops finally agree.
+      //
+      // Not recursive, deliberately: a proc hit cannot proc again. `fight.ts` enforced the
+      // same thing with a `kind === 'swing'` guard, which is one careless edit away from
+      // an unbounded chain — here the procs simply are not consulted.
+      // Bank a Seal Fate point and fire Sever at five. Shared by the primary swing and by
+      // proc hits, so the cap is enforced in one place — incrementing in two would let
+      // `comboPoints` run past five and skip the finisher entirely.
+      const awardComboPoint = (): void => {
+        procState.comboPoints++
+        if (procState.comboPoints < 5) return
+        procState.comboPoints = 0
+        if (!currentMob || currentMob.currentHp <= 0) return
+        const finisherDmg = Math.round(stats.weaponDps * stats.attackSpeedSeconds * 3)
+        currentMob = { ...currentMob, currentHp: currentMob.currentHp - finisherDmg }
+        newFns.push(fn(finisherDmg, true, false, false, '#ff8800'))
+        newLogs.push(log('proc', `🎴 Sever! ${finisherDmg} damage!`, '#ff8800'))
       }
 
+      const procHit = (mult: number, label: string, color: string): void => {
+        // Nothing swings at a corpse. The mob can already be at or below zero from the
+        // primary hit, and continuing to beat it inflated proc uptime and log noise.
+        if (!currentMob || currentMob.currentHp <= 0) return
+        const r = resolvePlayerAttack(
+          stats, state.playerClass, talentAllocs, procState, activeBuffs, mult,
+          {
+            mobHpFraction: currentMob.currentHp / Math.max(1, currentMob.maxHp),
+            playerHpFraction: stats.currentHp / Math.max(1, stats.maxHp),
+            rampageStacks: procState.rampageStacks,
+            arcaneCharges: procState.arcaneCharges,
+            targetBurning: activeDoTs.some(d => d.sourceType === 'burn'),
+            // The opener is the OPENING strike. A proc riding on it is not.
+            isOpener: false,
+            rng: combatRng,
+          },
+        )
+        currentMob = { ...currentMob, currentHp: currentMob.currentHp - r.damage }
+        if (state.settings.showDamageNumbers) {
+          newFns.push(fn(r.damage, r.isCrit, false, false, color))
+        }
+        newLogs.push(log('proc', `${label} ${r.damage}${r.isCrit ? ' (CRIT!)' : ''}`, color))
+        for (const newDot of r.triggeredDoTs) {
+          const i = activeDoTs.findIndex(d => d.sourceType === newDot.sourceType)
+          if (i >= 0) { newDot.tickAccum = activeDoTs[i].tickAccum; activeDoTs[i] = newDot }
+          else activeDoTs.push(newDot)
+        }
+        if (r.lifeDrawn > 0 && stats.currentHp < stats.maxHp) {
+          stats.currentHp = Math.min(stats.maxHp, stats.currentHp + r.lifeDrawn)
+        }
+        if (r.sealFatePoint) awardComboPoint()
+      }
+
+      if (result.extraHit) procHit(EXTRA_HIT_MULT, '⚡ Turning Steel! Extra strike for', '#aabbff')
       // Flurry — Warbringer's crit chain. Deliberately weaker per hit than Turning
       // Steel and gated on a crit rather than on every swing, so the two stack into a
       // fast-hands build without either one alone carrying it.
-      if (result.flurryHit) {
-        const flurry = Math.round(stats.weaponDps * stats.attackSpeedSeconds * 0.5)
-        currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - flurry }
-        newFns.push(fn(flurry, false, false, false, '#ffaa44'))
-        newLogs.push(log('proc', `⚡ Flurry! ${flurry} damage`, '#ffaa44'))
-      }
+      if (result.flurryHit) procHit(FLURRY_MULT, '⚡ Flurry!', '#ffaa44')
 
       // Bloodthirst — health drawn back out of damage dealt. Warbringer's only
       // sustain, and the reason it can afford to have no mitigation at all.
@@ -2525,17 +2576,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         if (healed > 0) newFns.push(fn(healed, false, false, false, '#44ff88'))
       }
 
-      // Written in Blood combo points
-      if (result.sealFatePoint) {
-        procState.comboPoints++
-        if (procState.comboPoints >= 5) {
-          procState.comboPoints = 0
-          const finisherDmg = Math.round(stats.weaponDps * stats.attackSpeedSeconds * 3)
-          currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - finisherDmg }
-          newFns.push(fn(finisherDmg, true, false, false, '#ff8800'))
-          newLogs.push(log('proc', `🎴 Sever! ${finisherDmg} damage!`, '#ff8800'))
-        }
-      }
+      // Written in Blood combo points. Banked by `awardComboPoint` above so a proc hit's
+      // crit feeds the finisher too — it is a real strike now, and a rogue whose extra
+      // strikes did not build combo points was being taxed for taking the talent.
+      if (result.sealFatePoint) awardComboPoint()
 
       // Creeping Freeze proc
       if (fx.frostbiteChance > 0 && !procState.mobFrozen && combatRng() < fx.frostbiteChance) {

@@ -338,6 +338,19 @@ const EXECUTE_THRESHOLD = 1 / 3
 /** Damage each Rampage stack adds, and the ceiling on them. */
 export const RAMPAGE_PER_STACK = 0.04
 export const RAMPAGE_MAX_STACKS = 5
+/**
+ * Magnitude of a proc hit, as a share of a normal swing.
+ *
+ * Extra strike (Turning Steel) and Flurry (Rain of Blows) both say "strike again", and
+ * both used to deal a flat fraction that never entered the resolver — no crit, no riders,
+ * no situational multipliers. They now RE-RESOLVE a real attack and carry these through
+ * `multiplierOverride`, which keeps the tuned magnitude while making the hit a hit.
+ *
+ * Shared by both loops so the store and `runFight` cannot drift apart on them again.
+ */
+export const EXTRA_HIT_MULT = 0.7
+export const FLURRY_MULT = 0.5
+
 /** Ceiling on arcane charges. Uncapped, a long fight would end in one swing. */
 export const ARCANE_MAX_CHARGES = 8
 
