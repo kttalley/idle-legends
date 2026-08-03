@@ -1467,6 +1467,11 @@ function allyRoll(a: AllyCombatant): number {
  *  deliberately walked away from. */
 const RESUME_TARGET_RADIUS = 12
 
+/** Ceiling on swings resolved in one tick while catching up on elapsed time. Generous
+ *  against the 5s frame cap (gameLoop.ts:17) — a 0.5s attack interval needs ten — and low
+ *  enough that no delta can turn one tick into an unbounded loop. */
+const CATCHUP_MAX_SWINGS = 16
+
 function isBossPresent(mobs: MobInstance[]): boolean {
   return mobs.some(m => m.isBoss)
 }
@@ -2401,7 +2406,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // fantasy, and happens to be exactly what an idle game wants.
     if (fx.minionDps > 0 && mobEngaged && currentMob) {
       minionAccum += deltaSeconds
-      if (minionAccum >= MINION_TICK_SECONDS) {
+      while (currentMob && minionAccum >= MINION_TICK_SECONDS) {
         minionAccum -= MINION_TICK_SECONDS
         const dmg = Math.max(1, Math.round(fx.minionDps * MINION_TICK_SECONDS))
         currentMob = { ...currentMob, currentHp: currentMob.currentHp - dmg }
@@ -2433,7 +2438,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // ── Tithe of Wounds ──────────────────────────────────────────────────────
     if (fx.siphonLifeHpPerTick > 0) {
       siphonLifeAccum += deltaSeconds
-      if (siphonLifeAccum >= 3) {
+      while (siphonLifeAccum >= 3) {
         siphonLifeAccum -= 3
         stats.currentHp = Math.min(stats.maxHp, stats.currentHp + fx.siphonLifeHpPerTick)
       }
@@ -2442,7 +2447,17 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // ── Player attacks mob ───────────────────────────────────────────────────
     if (mobEngaged) playerAttackAccum += deltaSeconds
     else playerAttackAccum = 0  // reset during approach so first strike lands on arrival
-    if (mobEngaged && playerAttackAccum >= stats.attackSpeedSeconds) {
+    // WHILE, not IF. `gameLoop` caps a frame delta at 5 seconds (gameLoop.ts:17), and
+    // resolving at most one swing per tick meant a backgrounded tab coming back — or any
+    // stalled frame — silently dropped every swing but one, while the accumulated time was
+    // spent all the same. `fight.ts` has never had this problem: it steps at a fixed 0.25s
+    // and resolves every swing the elapsed time paid for. This is that same property,
+    // brought to the store ahead of the loop extraction that will share the code outright.
+    //
+    // Bounded by CATCHUP_MAX_SWINGS so a pathological delta cannot spin the tick.
+    let catchup = 0
+    while (mobEngaged && currentMob && playerAttackAccum >= stats.attackSpeedSeconds
+           && catchup++ < CATCHUP_MAX_SWINGS) {
       playerAttackAccum -= stats.attackSpeedSeconds
 
       // A banked free crit is spent on THIS swing; the timer restarts from full.
@@ -2635,7 +2650,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       for (const ally of allies) {
         if (ally.downedFor > 0 || !currentMob) continue
         ally.attackAccum += deltaSeconds
-        if (ally.attackAccum < ally.stats.attackSpeedSeconds) continue
+        let allyCatchup = 0
+        while (currentMob && ally.attackAccum >= ally.stats.attackSpeedSeconds
+               && allyCatchup++ < CATCHUP_MAX_SWINGS) {
         ally.attackAccum -= ally.stats.attackSpeedSeconds
 
         const res = resolvePlayerAttack(
@@ -2675,13 +2692,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         // An ally can land the killing blow. That is the whole reason `registerKill`
         // exists at tick scope — loot, XP and the drop ladder still credit the player.
         registerKill()
+        }   // end catch-up swings for this ally
       }
     }
 
     // ── Mob attacks player ───────────────────────────────────────────────────
     if (currentMob && !procState.mobFrozen && mobEngaged) {
       mobAttackAccum += deltaSeconds
-      if (mobAttackAccum >= currentMob.attackSpeedSeconds) {
+      let mobCatchup = 0
+      while (currentMob && mobAttackAccum >= currentMob.attackSpeedSeconds
+             && mobCatchup++ < CATCHUP_MAX_SWINGS) {
         mobAttackAccum -= currentMob.attackSpeedSeconds
         // ── Who does it swing at? ──────────────────────────────────────────
         // With a party standing, some of the incoming damage goes to them. Held below
