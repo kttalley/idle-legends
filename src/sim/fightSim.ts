@@ -115,6 +115,17 @@ const TALENT_BUILDS: { label: string; cls: ClassType; allocs: Record<string, num
     allocs: { emb_ignite: 3, emb_immolation: 2 },
   },
   {
+    // enemy_slow, which shrinks the damage of every incoming mob swing. Added because
+    // `fight.ts` hardcodes `resolveMobAttack`'s speed factor to 1 while the store passes
+    // the real one, and with no build taking this talent that divergence would have been
+    // reconciled against a golden that could not see it — a lift producing no diff means
+    // the case does not cover it, not that the change was safe.
+    // `frost_permafrost` doubles as the talent the store reads RAW for freeze duration.
+    label: 'mage frost',
+    cls: 'mage',
+    allocs: { frost_permafrost: 3 },
+  },
+  {
     // corruption + agony: DoTs applied UNCONDITIONALLY every swing. This is the case that
     // makes fight.ts's blind `dots.push(...)` visible against the store's refresh-by-source
     // merge — the single largest divergence in the C5 inventory.
