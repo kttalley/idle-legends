@@ -1160,12 +1160,35 @@ building this, and fix the `pointer-events` bug above first or the leave button 
 >   output per second **alive** while the projection replays it against wall-clock. Deaths
 >   were rare enough to hide it inside the band. Folding dead ticks in at zero output moved
 >   settled parity from 6.4% → **2.2%**.
-> - *Open, and PRE-EXISTING — not caused by stage 6.* One seed in eight produces **0 gold
->   and 0 kills across a 60-minute settled window** on `main` today (seed 6 at
->   `--parity --settled --minutes 60 --warmup 120`). The hero is alive and the run is simply
->   over. `--assert` passes anyway because it means the seeds together, so a total soft-lock
->   in 12% of runs is currently invisible to the gate. Worth its own investigation; the
->   failing seed number moves whenever RNG draw order changes, so chase the shape, not the 6.
+> - *FIXED (`9d9b0e2`).* One seed in eight produced **0 gold and 0 kills across a 60-minute
+>   settled window**: the hero froze at minute ~120 with a target 6.8 tiles away and stood
+>   on the same coordinates for an hour, alive throughout. `routeToward` decided whether to
+>   re-run A* with `stale = !path || !path.length` — is the path *empty* — and never asked
+>   whether it was *working*, so a cached route whose waypoint could not be reached by
+>   sliding survived forever with `failed` left false. `failed` is the signal the caller
+>   escalates on, so the marooned-mob retire written for exactly this case could never fire.
+>   Closed by refusing to call a zero-length step a success, in both the waypoint branch and
+>   the line-of-walk shortcut. Seed 6: 0 → 3,570 gold. Both goldens stayed byte-identical,
+>   which is the useful part — no healthy path was wedging.
+>
+> **Stage 5 — partly done (`f69ccef`).** The dead field is dead no longer: `sweeping_strikes`
+> compiled to `sweepingStrikesEnabled`, read by nothing, while the talent's tooltip promised
+> "Every 30s your next 5 attacks deal double damage". It now does that, ticked in
+> `advanceHeroUpkeep` and spent in `resolveHeroTurn` so both loops consume it identically.
+>
+> **And it exposed that stage 0's fix was incomplete.** No build in *either* harness
+> allocated `arms_sweeping_strikes`, so both goldens matched byte-for-byte across a change
+> that took a talent from inert to doubling five attacks a minute. Both now carry a build
+> that reaches row 5 through 20 real points. **Before trusting a green golden on any
+> talent-gated change, check that some build actually allocates the talent.**
+>
+> **The pack still has no answer, and it is a design question.** Reaping Arc is single-target
+> burst despite the mechanic id, and `arms_bladestorm` (The Whirling) spends its "strikes
+> everything around you" entirely on flavour text over a `warrior_battle_cry` damage mod.
+> **There is no cleave in the game to wire up.** So `MAX_MELEE_ATTACKERS` cannot rise until
+> someone designs the offensive half — and it has to be class-agnostic, because a
+> warrior-only answer still leaves mages, rogues and warlocks facing doubled incoming
+> damage with unchanged outgoing.
 >
 > **Then:** 5 (dead fields, ability layer), 6b (cleave + raise the ceiling), 7 (C6). Note
 > that **stage 6 is the same work as Track C2 in `.planning/world-systems-plan.md`**
