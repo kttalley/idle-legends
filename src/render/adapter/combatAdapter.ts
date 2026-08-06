@@ -50,6 +50,17 @@ export const CSS_SCALE = 2
 // FN color → spell school, for VFX classification (game-free; the store already
 // tags Umbral Bolt hits with this exact color).
 const SHADOW_BOLT_COLOR = '#cc44ff'
+/** Seconds one whirlwind burst suppresses the next. Comfortably under the fastest swing
+ *  so consecutive splashes each get their own, but over a frame so one burst is one. */
+const SPLASH_RING_COOLDOWN = 0.25
+/** How far the burst's reaction reaches, in tiles. Mirrors the store's `SPLASH_RADIUS`
+ *  with a little slack, so a body the sim caught is never left un-flashed on screen. */
+const SPLASH_FX_RADIUS = 4
+/** Splash damage floaters carry this, matching the store's `SPLASH_RADIUS` emission.
+ *  Same discriminator trick the shadow bolt already uses: the floating-number feed is
+ *  the only channel combat events reach the renderer through, so the colour IS the
+ *  event type. Keep in step with `gameStore.ts`'s splash branch. */
+const SPLASH_COLOR = '#ff9944'
 
 // ── Tuning ────────────────────────────────────────────────────────────────────
 const MANUAL_SPEED = 4.2      // tiles/sec while WASD is held
@@ -631,6 +642,9 @@ export class WorldSceneController {
   // fade); these just stand in the world, depth-sorted and clickable, so the player has a
   // visible choice. World-anchored on spawn so they hold their ground as the hero moves.
   private otherMobEnts = new Map<string, { e: Entity; wx: number; wy: number }>()
+  /** Debounce so one splashed BURST plays one whirlwind, not one per enemy caught.
+   *  Three rings and three screen shakes on a single frame read as a fault, not as force. */
+  private splashRingCool = 0
   // Bystanders still walking in from beyond the horizon → their station (wx,wy above).
   private arriving = new Set<string>()
   /** Which mob `this.mob` currently represents. Identity, not sprite — see the handoff. */
@@ -955,6 +969,34 @@ export class WorldSceneController {
     this.push(x, y, 0, 0, 1, 5.5, 10 * scale, glow, glow, P_FLASH)
   }
 
+  /**
+   * The blow carrying outward: two expanding rings and a spiral of sparks thrown
+   * TANGENTIALLY rather than radially, which is what separates a whirlwind from an
+   * explosion — the sparks orbit as they fly out instead of fleeing in straight lines.
+   *
+   * Centred on the hero, because splash is "everything near YOU", not a hit on any one
+   * body. Emitted once per burst rather than once per victim; see `splashRingCool`.
+   */
+  private emitWhirlwind(x: number, y: number, color: string, glow: string): void {
+    const n = 22
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2
+      const sp = 130 + Math.random() * 90
+      // Tangent, not radius: rotate the outward bearing a quarter turn and blend.
+      const tx = Math.cos(a + Math.PI / 2), ty = Math.sin(a + Math.PI / 2)
+      this.push(
+        x + Math.cos(a) * 6, y + Math.sin(a) * 6,
+        (Math.cos(a) * 0.55 + tx * 0.85) * sp,
+        (Math.sin(a) * 0.55 + ty * 0.85) * sp * 0.55 - 18,
+        1, 1.9 + Math.random() * 1.1, 1.5 + Math.random() * 1.7, color, glow, P_SPARK,
+      )
+    }
+    // Two rings at different rates read as one shock travelling outward.
+    this.push(x, y, 0, 0, 1, 1.7, 7, color, glow, P_RING)
+    this.push(x, y, 0, 0, 1, 2.9, 4, glow, glow, P_RING)
+    this.push(x, y, 0, 0, 1, 4.5, 13, glow, glow, P_FLASH)
+  }
+
   /** Charge-up: sparks converging toward the cast point. */
   private emitCharge(x: number, y: number, color: string, glow: string): void {
     for (let i = 0; i < 8; i++) {
@@ -1045,6 +1087,7 @@ export class WorldSceneController {
     if (fn.isMobDamage) { this.triggerMobAttack(fn); return }
     if (fn.isDoT) { this.triggerDotTick(fn); return }
     if (fn.color === SHADOW_BOLT_COLOR) { this.triggerShadowBolt(fn); return }
+    if (fn.color === SPLASH_COLOR) { this.triggerSplash(fn); return }
     this.triggerPlayerAttack(fn)
   }
 
@@ -1814,6 +1857,47 @@ export class WorldSceneController {
     )
   }
 
+  /**
+   * A splashed victim. One of these arrives per enemy caught, so the per-victim parts
+   * (flash, floater) run every time while the ring and the shake run ONCE per burst —
+   * three stacked whirlwinds on the same frame would read as a rendering fault, and
+   * three screen shakes on the same frame is just noise.
+   */
+  triggerSplash(fn: FloatingNumber): void {
+    if (!this.ground) return
+    // One floater arrives per enemy caught, but a floater cannot say WHICH: `fn.x/y` are
+    // jitter for the legacy DOM layout, not world coordinates. That turns out not to
+    // matter — splash catches everything inside its radius by definition, so reacting on
+    // every bystander in reach is the accurate picture rather than a stand-in for one.
+    //
+    // The burst therefore runs once and covers the whole crowd; only the floater is
+    // per-victim, so the numbers still count up one per enemy.
+    if (this.splashRingCool <= 0) {
+      this.splashRingCool = SPLASH_RING_COOLDOWN
+      const pm = this.worldMid(this.player)
+      this.emitWhirlwind(pm.x, pm.y, '#ffd9a0', SPLASH_COLOR)
+      this.punch(2.4, 0)
+      this.player.animator.set('attack')
+      this.player.animator.restart()
+      for (const rec of this.otherMobEnts.values()) {
+        const e = rec.e
+        if (!e.active || this.isDying(e)) continue
+        if (Math.hypot(e.tx - this.player.tx, e.ty - this.player.ty) > SPLASH_FX_RADIUS) continue
+        // No restore timer needed: `syncOtherMobs` reassigns every bystander's palette
+        // from `mobPaletteId` on the next store tick (0.25s), so the flash expires on
+        // its own within one tick. That is also why the burst debounce is 0.25s — the
+        // two are the same beat, and a longer flash would need real bookkeeping.
+        e.paletteId = 'fx/hitflash'
+        e.animator.set('hit')
+        e.animator.restart()
+        const em = this.worldMid(e)
+        this.emitImpact(em.x, em.y, '#ffd9a0', SPLASH_COLOR, 0.7)
+      }
+    }
+    const victim = this.vfxTarget()
+    if (victim) this.spawnFloater(victim, `${fn.value}`, false, fn.color ?? SPLASH_COLOR)
+  }
+
   triggerShadowBolt(fn: FloatingNumber): void {
     const target = this.vfxTarget()
     if (!target || !this.ground) return
@@ -2035,6 +2119,7 @@ export class WorldSceneController {
       this.mobFlashT -= dt
       if (this.mobFlashT <= 0 && this.mob) this.mob.paletteId = this.mobBasePalette
     }
+    if (this.splashRingCool > 0) this.splashRingCool -= dt
 
     // ── Player movement (manual WASD, else tap-target, else auto-follow) + jump ──
     // Engagement / death cancels any pending tap target (don't resume walking to a
