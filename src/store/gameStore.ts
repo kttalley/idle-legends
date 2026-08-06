@@ -1054,8 +1054,13 @@ function routeToward(
   const direct = torusDistance(from, goal)
   if (direct < 1.5 || hasLineOfWalk(mask, from.x, from.y, goal.x, goal.y)) {
     holder.path = null
-    holder.failed = false
-    return slideToward(mask, from, goal, speed, dt)
+    const next = slideToward(mask, from, goal, speed, dt)
+    // Only a step that actually MOVED may clear the unreachable verdict. Clearing it
+    // unconditionally is how a wedged body kept insisting its goal was fine: the caller
+    // reads `failed` to decide whether a goal is hopeless, so a stuck hero that reports
+    // success every tick can never be rescued. `direct < 1.5` is arrival, not a stall.
+    holder.failed = direct > 1.5 && torusDistance(next, from) <= 1e-4
+    return next
   }
 
   const stale = !holder.path || !holder.path.length
@@ -1072,7 +1077,25 @@ function routeToward(
   if (!wp) return slideToward(mask, from, goal, speed, dt)
 
   const next = slideToward(mask, from, wp, speed, dt)
-  if (torusDistance(next, wp) < 0.35) holder.path!.shift()
+  if (torusDistance(next, wp) < 0.35) {
+    holder.path!.shift()
+    holder.failed = false
+  } else if (torusDistance(next, from) <= 1e-4) {
+    // Wedged against a cached route. `stale` above only ever asks whether the path is
+    // EMPTY, so a route whose next waypoint cannot be reached by sliding was followed
+    // forever: the same waypoint every tick, no movement, and `failed` left false — which
+    // meant `unreachableFor` never counted and the marooned-mob retire never fired.
+    //
+    // That was a hard soft-lock, not a stutter. Measured on seed 6: the hero froze at
+    // minute ~120 with a target 6.8 tiles away and stood on the same coordinates for the
+    // next 60 simulated minutes, taking 0 kills and 0 gold, alive the whole time.
+    //
+    // Dropping the route forces a fresh search, and reporting the stall lets the caller's
+    // existing escalation run — 3s to stop picking this goal, longer to retire the mob
+    // outright. Both thresholds are long enough that a momentary wedge is not punished.
+    holder.path = null
+    holder.failed = true
+  }
   return next
 }
 
