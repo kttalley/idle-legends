@@ -1618,7 +1618,20 @@ export class WorldSceneController {
   private syncOtherMobs(state: GameState): void {
     const targetId = state.currentMob?.id
     const alive = new Set<string>()
-    if (state.gameMode === 'combat' && state.isAlive && !this.townMode) {
+    // ── Which modes keep the crowd on screen ──────────────────────────────────
+    // This used to be `gameMode === 'combat'` alone, which quietly meant the entire
+    // population was despawned the moment the hero started gathering and respawned when
+    // they stopped. An idle hero auto-gathers constantly, so the world blinked out and
+    // back several times a minute — bodies popping in and out with no death and no fade,
+    // which is the other half of the phasing that got reported.
+    //
+    // `gathering` and `crafting` are places the hero STANDS IN THE ZONE; the mobs are
+    // still in `state.mobs` throughout, and nothing about swinging a pickaxe should make
+    // the wildlife cease to exist. `traveling` and `in_town` genuinely leave the field
+    // (the store empties `mobs` for both), so they stay out.
+    const inWorld = state.gameMode === 'combat'
+      || state.gameMode === 'gathering' || state.gameMode === 'crafting'
+    if (inWorld && state.isAlive && !this.townMode) {
       for (const m of state.mobs) {
         if (m.id === targetId) continue
         alive.add(m.id)
@@ -1692,9 +1705,39 @@ export class WorldSceneController {
         rec.e.paletteId = mobPaletteId(m)
       }
     }
+    // ── Eviction, and why it now has two paths ────────────────────────────────
+    // A bystander that left `state.mobs` while the scene is still in live combat DIED.
+    // It used to be despawned outright — correct while only the engaged target could
+    // ever die, since every real bystander eviction was a scene teardown (leaving
+    // combat, entering a town, changing zone) where an instant cut is right.
+    //
+    // Splash broke that assumption. AoE and Retaliation kill bystanders routinely now,
+    // and every one of those kills popped a body out of existence mid-fight with no
+    // death, no burst, no fade — which is exactly the "enemy phasing out of view" this
+    // fixes. Give it the same send-off the target gets; `dyingMobs` already owns the
+    // animation, the fade and the eventual despawn.
+    const liveCombat = inWorld && state.isAlive && !this.townMode
     for (const [id, rec] of this.otherMobEnts) {
       if (alive.has(id)) continue
-      this.scene.despawn(rec.e)
+      if (liveCombat && rec.e.active && !this.isDying(rec.e)) {
+        const e = rec.e
+        // Palette deliberately left as-is. The target's death restores `mobBasePalette`,
+        // but a bystander's base is never tracked on its record — and a body killed by
+        // splash was flashed white a beat earlier, so it fades out bright, which reads as
+        // "the whirlwind got that one" rather than as a lost palette.
+        e.animator.set('death')
+        e.animator.restart()
+        this.dyingMobs.push({ e, t: 0 })
+        this.spawnBurst(e.tx, e.ty, 'spell/holy')
+        const dm = this.worldMid(e)
+        const dc = fxColors('spell/holy')
+        // Lighter than the target's send-off on purpose: a splash that catches three
+        // must not fire three full kill-punches on one frame. No `punch` here at all —
+        // the whirlwind burst already shook the screen once for the whole sweep.
+        this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 1.0)
+      } else {
+        this.scene.despawn(rec.e)
+      }
       this.otherMobEnts.delete(id)
       this.arriving.delete(id)
     }
@@ -3293,6 +3336,19 @@ export class WorldSceneController {
       for (let ai = 0; ai < this.ambient.length; ai++) {
         const a = this.ambient[ai]
         if (a.grp !== gi) continue
+        // A COMPANION belongs to the player, not to the anchor it was recruited from.
+        //
+        // Recycling fires on the GROUP's anchor drifting past the ring — and a companion
+        // has walked away from that anchor to follow the hero, so its origin group ages
+        // out while the companion itself is standing right beside you. Without this it
+        // was teleported to the far side of the screen and reset to `wander` mid-follow,
+        // which is a party member vanishing from your side for no reason the player can
+        // see. Rare before, because the hero did not cover much ground; ordinary now that
+        // packs and social aggro drag the fight around the zone.
+        //
+        // Left un-anchored on purpose: the moment it leaves the party (`partySlot = -1`)
+        // it becomes an ordinary member again and the next pass re-anchors it normally.
+        if (a.partySlot >= 0) continue
         a.gx = WorldSceneController.wrapMod(grp.gx + (a.rng() * 2 - 1) * 2.2)
         a.gy = WorldSceneController.wrapMod(grp.gy + (a.rng() * 2 - 1) * 2.2)
         // The ANCHOR was re-anchored onto walkable ground above, but this scatter can
