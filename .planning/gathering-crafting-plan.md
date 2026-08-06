@@ -1,5 +1,8 @@
 # Gathering & Crafting — "Work the Vein" / "The Forge Moment"
 
+**Status: SHIPPED (`4a7cfec`). Status line added 2026-08-05 — this doc carried none at all,
+so it read as an open plan for weeks after it was built.**
+
 Implements Track G of `.planning/world-systems-plan.md`, with two deliberate departures
 from that document (argued in §7).
 

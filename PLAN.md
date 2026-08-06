@@ -1063,7 +1063,7 @@ building this, and fix the `pointer-events` bug above first or the leave button 
 
 ### C5 — N-sided combat
 
-> **STATUS 2026-08-02 — stages 0, 1 and 2 are DONE. Read this box before the section
+> **STATUS 2026-08-05 — stages 0 through 4 are DONE. Read this box before the section
 > below it, which is now partly historical.**
 >
 > The owner decided to UNIFY (the section's open question), and the work was re-staged
@@ -1115,9 +1115,17 @@ building this, and fix the `pointer-events` bug above first or the leave button 
 >   `mobFrozen` to a freshly tapped enemy left it unable to swing back at all, since the
 >   mob-attack branch is gated on it.
 >
-> **Still open in 3:** the code motion itself — lifting the combat body into a store-free
-> `stepCombat` the two loops share. Everything that made that risky is now done; what is
-> left is the lift.
+> **Stage 3's outstanding lift — DONE (`768a2f5`), under a different name.** It landed as
+> `resolveHeroTurn` in `combat.ts` rather than a `stepCombat`, and the shared unit is the
+> **turn**, not the tick: swing, then Turning Steel, then Flurry, procs consulted once on
+> the primary swing, stopping the moment either side dies. Both loops call it. Inverted
+> (the caller reports what happened and the sequence decides whether to continue) rather
+> than returning a list of hits, because the hits are sequential and state-dependent —
+> Executioner prices each blow against the health the previous one left, so computing them
+> up front would misprice every proc and would swing at a corpse.
+>
+> **Stage 4 — DONE (`8d9583e`).** Frozen, timed crit and Second Wind now resolve outside
+> the store, so the store-only effects no longer make the two loops diverge.
 >
 > **Deliberately NOT done, with reasons, so neither reads as an oversight:**
 > - *Per-target proc MAP.* One enemy is engaged at a time, so `Record<mobId, …>` would be a
@@ -1127,8 +1135,9 @@ building this, and fix the `pointer-events` bug above first or the leave button 
 > - *Stage 2(f), dropping `procState.openerUsed`.* Belongs with the `stepCombat` lift; doing
 >   it before there is a per-combatant home means inventing a temporary one and undoing it.
 >
-> **Then:** 4 (lift the store-only effects), 5 (dead fields, ability layer), 6 (N-sided
-> proper), 7 (C6).
+> **Then:** 5 (dead fields, ability layer), 6 (N-sided proper), 7 (C6). Note that **stage 6
+> is the same work as Track C2 in `.planning/world-systems-plan.md`** ("multiple concurrent
+> enemies") — one job described in two documents. Whichever one is executed, update both.
 >
 > **A standing measurement caveat.** econSim reports "unchanged" for things it cannot reach.
 > Its hero kills whatever it engages and never switches targets, so the target-switch fix

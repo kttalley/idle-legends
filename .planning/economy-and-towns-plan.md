@@ -1,6 +1,7 @@
 # Plan — The Economy: Gold, Inventory, Towns & Merchants
 
-**Status: T1, T2 and the four idle-loop holes BUILT (2026-07-25). T3 open, T4 blocked, T5 open.**
+**Status (corrected 2026-08-05): T1, T2, T5 and the four idle-loop holes BUILT. T3 open,
+T4 blocked. Auto-equip — §0.4's "biggest remaining hole" — has since SHIPPED.**
 **BLOCKER FOUND: half the zones have no town — see §0.5. Now escalated to a traversal
 hard-block by Track F; see the note there.**
 **Written as a cold-start brief:** a fresh session can execute this without prior conversation.
@@ -23,7 +24,7 @@ Everything §1 claimed was confirmed; several things this plan assumed were not.
 | **`repair`** | **Dropped** from `TownServiceType` — owner decision, §4.1. |
 | **T3 — vendor stock** | Open. Price it against §0.2, not against the early curve. |
 | **T4 — trainer respec** | **Blocked — see §0.3.** Its premise is false. |
-| **T5 — town NPCs** | Open. |
+| **T5 — town NPCs** | **Done** (corrected 2026-08-05; this row read "Open" long after it shipped). `data/townNpcs.ts` gives each service a body at a town anchor — innkeeper, outfitter, factor, quartermaster — and `TownView.tsx` opens only the panel of whoever you walked up to. Track F2 adds a fifth, the flight master. |
 
 ### 0.05 The four game-breaking holes — all now closed
 
@@ -124,7 +125,29 @@ If the trainer should exist, it needs something *additive* to sell. Talent **loa
 a real sink, purely additive, and idle-friendly since a build can be swapped per zone.
 **Owner call — not taken here.**
 
-### 0.4 The biggest remaining hole: nothing ever equips itself
+### 0.4 The biggest remaining hole: nothing ever equips itself — CLOSED
+
+> **SHIPPED (corrected 2026-08-05) — and §0.05 above already said so.** This section is the
+> document contradicting itself: §0.05's first row records "nothing auto-equipped" as one of
+> the four closed holes, with the after-numbers to prove it (level 25 in 8h idle, 4.5× gold,
+> 10× fewer deaths), while this section four screens down still opens by declaring the
+> feature absent and calls it the biggest thing left. Believe §0.05.
+>
+> In the code: `settings.autoEquip` (`gameStore.ts:360`, defaulting true on rehydrate at
+> `:451`), applied in `loot.ts:136` the moment loot drops — strict upgrades only, displaced
+> item falls through to the bag/contract ladder — honoured by offline progression
+> (`offline.ts:202`), with a player toggle in `InventoryPanel.tsx`.
+>
+> **So the measurements below are the BEFORE column, not live behaviour.** They describe a
+> hero who never equips, which is no longer the default hero. §0.05 holds the after-numbers.
+> The relative finding (equipping strict upgrades is worth roughly level ~20 → level 89) is
+> still why this mattered; the absolute idle figures are not.
+>
+> The parenthetical at the end of this section — that an idle hero never changes zone — was
+> likewise fixed by auto-advance, and is likewise already recorded as closed in §0.05.
+>
+> **The lesson worth keeping:** a status line at the top of a doc and a claim buried in §0.4
+> drift apart silently. When a hole closes, grep the whole document for it.
 
 **There is no auto-equip anywhere in this codebase.** Gear reaches the hero only when a
 player clicks an item in the bag. So a hero nobody touches fights **naked forever**, and
