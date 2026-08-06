@@ -1492,6 +1492,21 @@ const SPLASH_RADIUS = 3.5
  *  `SPLASH_RADIUS` so a pack that gathers is a pack an AoE can actually catch. */
 const SOCIAL_AGGRO_RADIUS = 7
 
+/**
+ * Consume one stack of a `splash` buff and report the damage it carries.
+ *
+ * Shared by the swing path (in `tick`) and the direct-damage ability path (in
+ * `finishCast`), because "your next attack" means different things to a warrior and a
+ * warlock and the talent should not care which one is asking.
+ */
+function spendSplash(buffs: ActiveBuff[], hitDamage: number): number {
+  if (hitDamage <= 0) return 0
+  const b = buffs.find(x => x.type === 'splash' && (x.stacks ?? 0) > 0)
+  if (!b) return 0
+  b.stacks = (b.stacks ?? 1) - 1
+  return Math.max(1, Math.round(hitDamage * b.value))
+}
+
 // ── Allies ────────────────────────────────────────────────────────────────────
 /** An ally wears nothing. Frozen so a stray write cannot quietly gear the whole party. */
 const EMPTY_EQUIPMENT: Record<Slot, Item | null> = Object.freeze({
@@ -1844,6 +1859,22 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // module version writes straight to the store, and from in here that write would be
     // clobbered by this tick's own `set` a few hundred lines later. Shadowing means the
     // ~10 in-tick call sites need no edit and cannot accidentally take the wrong one.
+    /**
+     * This tick folded into the offline record as time that EARNED NOTHING.
+     *
+     * `tick` has six branches that `return` early — travelling, gathering, the
+     * gather→craft handoff, crafting, having no target, and being dead — and not one of
+     * them accrued. So `offlineRates` measured gold per second of *combat* time while
+     * `projectOfflineProgress` multiplies it by WALL-CLOCK seconds, and the projection
+     * over-paid by whatever share of the hour the hero spent not fighting.
+     *
+     * It scaled with the hero's power, which is what made it surface: a stronger hero
+     * kills faster, so a LARGER fraction of their time is spent gathering, crafting and
+     * walking to the next target. Making the action bar fire pushed settled parity from
+     * 6.6% to 10.8% and out of its band — the rotation was not the bug, it just moved
+     * more of the hour into the branches that were not counting.
+     */
+    const idleAccrual = accrueRates(state.offlineRates, deltaSeconds, 0, 0, 0)
     let accum: CombatAccumulators = { ...state.combatAccum }
     const resetCombatAccumulators = () => {
       accum = freshCombatAccum()
@@ -1906,10 +1937,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           activeDoTs: [], gameMode: 'combat', travelTarget: null, travelProgress: 0,
           playerMapPos: { x: 32, y: 32 },
           zoneMaps: { ...state.zoneMaps, [dest]: destMap },
-          activeQuest,
+          activeQuest, offlineRates: idleAccrual,
         })
       } else {
-        set({ travelProgress: newProgress, playerMapPos: { x: newX, y: state.playerMapPos.y } })
+        set({ travelProgress: newProgress, playerMapPos: { x: newX, y: state.playerMapPos.y }, offlineRates: idleAccrual })
       }
       return
     }
@@ -1966,6 +1997,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           // frame — the same shape of omission that once froze the whole world tick.
           combatAccum: accum,
           gatheringTimer: timer, playerMapPos: gatherMapPos, gatherSession: session,
+          offlineRates: idleAccrual,
           totalPlayTime: state.totalPlayTime + deltaSeconds,
         })
         return
@@ -2001,6 +2033,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         activeRecipe: autoRecipe,
         craftQuality: autoQuality,
         craftingTimer: autoRecipe ? (RECIPES.find(r => r.id === autoRecipe)?.craftTime ?? 0) : 0,
+        offlineRates: idleAccrual,
       })
       return
     }
@@ -2020,7 +2053,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           set({ activeRecipe: null, craftingTimer: 0, craftQuality: null })
         }
       } else {
-        set({ craftingTimer: newTimer })
+        set({ craftingTimer: newTimer, offlineRates: idleAccrual })
       }
       return
     }
@@ -2179,23 +2212,34 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // premise is progress while you are away, the entire action bar was decoration, and
     // both harnesses were blind to it because neither taps buttons either.
     //
-    // Slot order, first one ready. Slot 1 is the class's bread-and-butter strike and the
-    // later slots are the situational ones, so "lowest ready slot" is a reasonable rotation
-    // without inventing a priority language. Deliberately no RNG: an idle rotation that
-    // rolled dice would be one more unseeded draw per tick (Track P0) for no benefit.
+    // LONGEST COOLDOWN FIRST among the ready ones, ties broken by slot so the order is
+    // deterministic. Deliberately no RNG: an idle rotation that rolled dice would be one
+    // more unseeded draw per tick (Track P0) for no benefit.
+    //
+    // The first cut was "lowest ready slot", which was wrong in a way the goldens caught
+    // only because a talent depended on it: slot 1 is a short-cooldown filler and is
+    // therefore ready almost every tick, so slots 2 and 3 never fired at all. Two of the
+    // three AoE capstones ride slot-2/3 abilities and never once splashed — the action bar
+    // was still decoration, just one button deeper.
+    //
+    // Longest-first is the standard priority for a reason: the expensive button goes on
+    // cooldown the moment it is available and the filler covers the gaps, so everything
+    // gets used and nothing is starved.
     //
     // Manual control keeps the bar to itself — a player holding the wheel is choosing when
     // to spend cooldowns, and spending them for them is exactly the "auto gameplay
     // overrides what I wanted" complaint Track C exists to answer.
     if (isAlive && !castState && !castCompletedId && controlMode === 'idle'
         && currentMob && state.gameMode === 'combat') {
-      const ready = ACTIVE_ABILITIES.find(a =>
-        a.classes.includes(state.playerClass)
-        && level >= a.unlockLevel
-        && (skillCooldowns[a.id] ?? 0) <= 0
-        // Self-target abilities are the only ones castable with nothing engaged; the
-        // guard above already requires a target, so this only filters heals-when-full.
-        && !(a.effects.some(e => e.type === 'hot') && stats.currentHp >= stats.maxHp))
+      const ready = ACTIVE_ABILITIES
+        .filter(a =>
+          a.classes.includes(state.playerClass)
+          && level >= a.unlockLevel
+          && (skillCooldowns[a.id] ?? 0) <= 0
+          // Self-target abilities are the only ones castable with nothing engaged; the
+          // guard above already requires a target, so this only filters heals-when-full.
+          && !(a.effects.some(e => e.type === 'hot') && stats.currentHp >= stats.maxHp))
+        .sort((a, b) => (b.cooldownSeconds - a.cooldownSeconds) || (a.slot - b.slot))[0]
       if (ready) {
         const castTime = (ready.castTimeSeconds ?? 0) * (fx.abilityMods[ready.id]?.castTimeMult ?? 1)
         if (castTime > 0) {
@@ -2374,6 +2418,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             allies,
             controlMode, manualIdleTimer,
             persistedBoss, mobRespawnTimer, procState, skillCooldowns, castState,
+            offlineRates: idleAccrual,
             totalPlayTime: state.totalPlayTime + deltaSeconds,
             combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX) })
       return
@@ -2728,10 +2773,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             // The capstones that grant this have always SAID so ("Battle Cry becomes a
             // whirlwind — it also bleeds everything it touches") and always been flavour
             // text over a damage mod. This is the sentence, executed.
-            const spBuff = activeBuffs.find(b => b.type === 'splash' && (b.stacks ?? 0) > 0)
-            if (spBuff && hit.damage > 0) {
-              spBuff.stacks = (spBuff.stacks ?? 1) - 1
-              const splashDmg = Math.max(1, Math.round(hit.damage * spBuff.value))
+            const splashDmg = spendSplash(activeBuffs, hit.damage)
+            if (splashDmg > 0) {
               let struck = 0
               for (let i = 0; i < mobs.length; i++) {
                 const m = mobs[i]
@@ -3511,6 +3554,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // does come back sooner rather than merely claiming to in a tooltip.
     const castFx = compileTalentEffects(s.playerClass, s.talentAllocs)
     const mod = castFx.abilityMods[abilityId] ?? emptyAbilityMod()
+    /** Splash carried by a direct-damage ability, applied to the crowd at the end. */
+    let boltSplash = 0
 
     // Echo — the arcane tree's signature. The ability resolves a SECOND time, at full
     // strength, for free. Rolled once here rather than per-effect so a multi-effect
@@ -3531,6 +3576,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             currentMob.currentHp -= dmg
             newFns.push(fn(dmg, true, false, false, '#cc44ff'))
             newLogs.push(log('ability_use', `☠ Umbral Bolt strikes for ${dmg}!`, '#cc44ff'))
+            // A caster's "attack" is the bolt, not a swing — and splash is spent by
+            // whatever lands next. Without this the warlock's own AoE capstone was
+            // unreachable in practice: measured, the hero killed every mob with Umbral
+            // Bolt and never swung at all, so the buff Bleak Bargain granted sat there
+            // until it expired. Cinderpact's "everything burns" would have shipped as a
+            // talent that reads well and does nothing for the class that owns it.
+            boltSplash = spendSplash(newBuffs, dmg)
           }
           break
         case 'hot':
@@ -3541,6 +3593,25 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         default:
           newBuffs.push(makeAbilityBuff(abilityId, { ...effect, value: effect.value * scale }, ability.name, ability.icon))
           newLogs.push(log('ability_use', `✨ ${ability.name} activated!`, '#ffd700'))
+      }
+    }
+
+    // Who the bolt's splash actually caught. Resolved here rather than inside the `set`
+    // so it can be announced — an AoE that fires silently is indistinguishable from one
+    // that does not fire, which is exactly how the warlock's capstone read.
+    const splashIds = new Set<string>()
+    if (boltSplash > 0 && currentMob) {
+      for (const m of s.mobs) {
+        if (m.id === currentMob.id) continue
+        if (Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) > SPLASH_RADIUS) continue
+        splashIds.add(m.id)
+      }
+      if (splashIds.size) {
+        newLogs.push(log('proc',
+          `🌀 The blow carries — ${splashIds.size} more caught for ${boltSplash}`, '#ff9944'))
+        for (let i = 0; i < splashIds.size; i++) {
+          newFns.push(fn(boltSplash, false, false, false, '#ff9944'))
+        }
       }
     }
 
@@ -3573,8 +3644,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     set(prev => ({
       // Fold the damage back into the population, else the next tick re-projects from
-      // `mobs` and the hit is silently undone.
-      mobs: currentMob ? prev.mobs.map(m => (m.id === currentMob!.id ? currentMob! : m)) : prev.mobs,
+      // `mobs` and the hit is silently undone. Bolt splash rides along here; anything it
+      // takes to zero is paid out by the corpse sweep on the next tick, which is exactly
+      // why that sweep is a sweep and not a splash-specific branch.
+      mobs: prev.mobs.map(m => {
+        const base = currentMob && m.id === currentMob.id ? currentMob : m
+        if (!splashIds.has(m.id)) return base
+        return { ...base, currentHp: base.currentHp - boltSplash, aggro: true }
+      }),
       currentMob,
       procState,
       skillCooldowns,

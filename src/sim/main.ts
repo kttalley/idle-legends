@@ -151,11 +151,31 @@ if (process.argv.includes('--parity')) {
     // The Whirling — Battle Cry's blow carrying to everything nearby. 30 points of
     // Ironcleave first, because that is what row 7 costs and a capstone allocated alone
     // is a build no player can hold.
-    { label: 'warrior whirling', o: { playerClass: 'warrior',
+    { label: 'warrior whirling', o: { playerClass: 'warrior', forceLevel: 20,
         forceTalents: { arms_heroic_strike: 3, arms_deflection: 5, arms_tactical_mastery: 5,
                         arms_deep_wounds: 3, arms_two_handed: 5, arms_impale: 2,
                         arms_sweeping_strikes: 1, arms_executioner: 3, arms_hamstring: 3,
                         arms_bladestorm: 1 } } },
+    // The other three classes' AoE capstones. Added with the talents themselves: nothing
+    // here reached row 7 in any tree, so this golden matched byte-identically across a
+    // change that gave three classes a splash they did not have. Every build is legal —
+    // 30 points in its own tree, and each capstone's `requires` node MAXED — because a
+    // capstone allocated alone is a build no player can hold.
+    { label: 'mage walking pyre', o: { playerClass: 'mage', forceLevel: 20,
+        forceTalents: { emb_kindling: 5, emb_incineration: 2, emb_flame_throwing: 3,
+                        emb_wildfire: 5, emb_master_of_flame: 3, emb_conflagrate: 3,
+                        emb_cinderburst_mastery: 3, emb_immolation: 2, emb_searing_touch: 2,
+                        emb_combustion: 2, emb_living_bomb: 3 } } },
+    { label: 'warlock cinderpact', o: { playerClass: 'warlock', forceLevel: 20,
+        forceTalents: { cin_improved_shadow_bolt: 4, cin_bane: 3, cin_devastation: 4,
+                        cin_intensity: 3, cin_conflagrate: 5, cin_ruin: 3,
+                        cin_bargain_mastery: 3, cin_emberstorm: 4, cin_soul_leech: 1,
+                        cin_cinderpact: 1 } } },
+    { label: 'rogue twin fangs', o: { playerClass: 'rogue', forceLevel: 20,
+        forceTalents: { ass_improved_eviscerate: 3, ass_malice: 5, ass_ruthlessness: 3,
+                        ass_slice_dice: 3, ass_expose_armor: 2, ass_improved_poisons: 4,
+                        ass_cold_blood: 1, ass_venomous_wounds: 4, ass_seal_fate: 5,
+                        ass_cruel_stroke_mastery: 3, ass_mutilate: 1 } } },
     { label: 'warrior + party',    o: { playerClass: 'warrior', spendTalents: true, partySize: 3 } },
   ]
   const out: string[] = [

@@ -2733,482 +2733,1673 @@
 ## warrior whirling | seed=1
 0.25 mob_death Rampaging Boar appears!
 1.75 mob_death Grey Wolf appears!
-3.25 mob_death Kobold Miner appears!
-4.75 mob_death Rampaging Boar appears!
+3.25 mob_death Grey Wolf appears!
+4.75 mob_death Grey Wolf appears!
 6.00 mob_attack Rampaging Boar hits you for 9
-6.50 player_attack You hit Rampaging Boar for 330
+6.50 player_attack You hit Rampaging Boar for 348
 6.50 mob_death Rampaging Boar dies!
-7.00 mob_attack Grey Wolf joins the fight!
 8.00 mob_death Rampaging Boar appears!
-11.25 mob_attack Kobold Miner hits you for 9
-11.50 proc 🌀 The blow carries — 1 more caught for 297
-11.50 player_attack You hit Kobold Miner for 330
-11.50 mob_death Kobold Miner dies!
-11.50 mob_death Grey Wolf dies!
-13.00 mob_death Grey Wolf appears!
-14.50 mob_death Grey Wolf appears!
-17.75 mob_attack Rampaging Boar hits you for 9
-18.25 player_attack You hit Rampaging Boar for 330
-18.25 mob_death Rampaging Boar dies!
-19.75 mob_death Grey Wolf appears!
-22.75 mob_attack Grey Wolf hits you for 6
-23.25 player_attack You hit Grey Wolf for 330
+10.00 mob_attack Grey Wolf hits you for 6
+10.50 player_attack You hit Grey Wolf for 740
+10.50 mob_death Grey Wolf dies!
+12.00 mob_death Grey Wolf appears!
+15.50 mob_attack Grey Wolf hits you for 6
+16.00 player_attack You hit Grey Wolf for 740
+16.00 mob_death Grey Wolf dies!
+17.50 mob_death Rampaging Boar appears!
+19.50 mob_attack Grey Wolf hits you for 6
+20.00 player_attack You hit Grey Wolf for 740
+20.00 mob_death Grey Wolf dies!
+21.50 mob_death ★ Elite: ★ Kobold Miner appears!
+24.25 mob_attack Rampaging Boar hits you for 9
+24.75 player_attack You hit Rampaging Boar for 740
+24.75 mob_death Rampaging Boar dies!
+26.25 mob_death Kobold Miner appears!
+30.75 mob_attack ★ Kobold Miner hits you for 16
+31.00 player_attack You hit ★ Kobold Miner for 740
+31.00 mob_death ★ Kobold Miner dies!
+32.50 mob_death Kobold Miner appears!
+34.75 mob_attack Kobold Miner hits you for 9
+35.00 player_attack You hit Kobold Miner for 740
+35.00 mob_death Kobold Miner dies!
+36.50 mob_death Kobold Miner appears!
+39.50 mob_attack Kobold Miner hits you for 8
+39.75 player_attack You hit Kobold Miner for 740
+39.75 mob_death Kobold Miner dies!
+41.25 mob_death Rampaging Boar appears!
+43.75 mob_attack Kobold Miner hits you for 8
+44.00 player_attack You hit Kobold Miner for 740
+44.00 mob_death Kobold Miner dies!
+45.50 mob_death Kobold Miner appears!
+50.00 mob_attack Rampaging Boar hits you for 8
+50.50 player_crit You hit Rampaging Boar for 2272 (CRIT!)
+50.50 mob_death Rampaging Boar dies!
+52.00 mob_death Grey Wolf appears!
+55.50 mob_attack Kobold Miner hits you for 8
+55.75 player_attack You hit Kobold Miner for 473
+55.75 mob_death Kobold Miner dies!
+57.25 mob_death Kobold Miner appears!
+61.25 mob_attack Grey Wolf hits you for 5
+61.75 player_attack You hit Grey Wolf for 946
+61.75 mob_death Grey Wolf dies!
+63.25 mob_death Rampaging Boar appears!
+63.25 mob_attack Rampaging Boar joins the fight!
+67.75 mob_attack Rampaging Boar hits you for 8
+68.25 proc 🌀 The blow carries — 1 more caught for 851
+68.25 player_attack You hit Rampaging Boar for 946
+68.25 mob_death Rampaging Boar dies!
+68.25 mob_attack Rampaging Boar hits you for 8
+68.25 mob_death Rampaging Boar dies!
+69.75 mob_death Kobold Miner appears!
+71.25 mob_death Kobold Miner appears!
+77.25 mob_attack Kobold Miner hits you for 8
+77.50 player_attack You hit Kobold Miner for 946
+77.50 mob_death Kobold Miner dies!
+79.00 mob_death Rampaging Boar appears!
+85.00 mob_attack Grey Wolf hits you for 5
+85.50 player_attack You hit Grey Wolf for 946
+85.50 mob_death Grey Wolf dies!
+87.00 mob_death Kobold Miner appears!
+92.25 mob_attack Kobold Miner hits you for 8
+92.50 player_attack You hit Kobold Miner for 946
+92.50 mob_death Kobold Miner dies!
+94.00 mob_death Kobold Miner appears!
+97.75 mob_attack Kobold Miner hits you for 8
+98.00 player_attack You hit Kobold Miner for 946
+98.00 mob_death Kobold Miner dies!
+99.50 mob_death ★ Elite: ★ Rampaging Boar appears!
+103.50 mob_attack Kobold Miner hits you for 8
+103.75 player_attack You hit Kobold Miner for 946
+103.75 mob_death Kobold Miner dies!
+105.25 mob_death Kobold Miner appears!
+109.75 mob_attack Kobold Miner hits you for 8
+110.00 player_attack You hit Kobold Miner for 946
+110.00 mob_death Kobold Miner dies!
+111.50 mob_death Kobold Miner appears!
+114.75 mob_attack Kobold Miner hits you for 8
+115.00 player_crit You hit Kobold Miner for 2272 (CRIT!)
+115.00 mob_death Kobold Miner dies!
+116.50 mob_death Rampaging Boar appears!
+121.00 mob_attack Kobold Miner hits you for 8
+121.25 player_crit You hit Kobold Miner for 2272 (CRIT!)
+121.25 mob_death Kobold Miner dies!
+122.75 mob_death Kobold Miner appears!
+128.00 mob_attack Rampaging Boar hits you for 8
+128.50 player_attack You hit Rampaging Boar for 946
+128.50 mob_death Rampaging Boar dies!
+130.00 mob_death Grey Wolf appears!
+132.00 mob_attack Kobold Miner hits you for 8
+132.25 player_attack You hit Kobold Miner for 946
+132.25 mob_death Kobold Miner dies!
+132.75 mob_attack Rampaging Boar joins the fight!
+133.75 mob_death Grey Wolf appears!
+138.25 mob_attack Grey Wolf hits you for 5
+138.75 proc 🌀 The blow carries — 1 more caught for 851
+138.75 player_attack You hit Grey Wolf for 946
+138.75 mob_death Grey Wolf dies!
+138.75 mob_attack Rampaging Boar hits you for 8
+138.75 mob_death Rampaging Boar dies!
+140.25 mob_death Grey Wolf appears!
+141.75 mob_death Kobold Miner appears!
+143.25 mob_attack Grey Wolf hits you for 5
+143.75 player_crit You hit Grey Wolf for 2792 (CRIT!)
+143.75 mob_death Grey Wolf dies!
+150.25 mob_death Kobold Miner appears!
+154.25 mob_attack Grey Wolf hits you for 5
+154.75 player_attack You hit Grey Wolf for 1164
+154.75 mob_death Grey Wolf dies!
+156.25 mob_death Rampaging Boar appears!
+159.25 mob_attack Kobold Miner hits you for 8
+159.50 player_crit You hit Kobold Miner for 2792 (CRIT!)
+159.50 mob_death Kobold Miner dies!
+161.00 mob_death ★ Elite: ★ Grey Wolf appears!
+164.25 mob_attack ★ Rampaging Boar hits you for 15
+164.75 player_attack You hit ★ Rampaging Boar for 1348
+164.75 mob_death ★ Rampaging Boar dies!
+166.25 mob_death Rampaging Boar appears!
+170.00 mob_attack Rampaging Boar hits you for 8
+170.50 player_attack You hit Rampaging Boar for 1348
+170.50 mob_death Rampaging Boar dies!
+172.00 mob_death Rampaging Boar appears!
+174.75 mob_attack Rampaging Boar hits you for 8
+175.25 player_attack You hit Rampaging Boar for 1348
+175.25 mob_death Rampaging Boar dies!
+198.25 proc ⚔️ Crafted Coarse Crude Weapon Oil!
+198.75 mob_attack ★ Grey Wolf joins the fight!
+199.75 mob_death Grey Wolf appears!
+203.50 mob_attack Rampaging Boar hits you for 8
+204.00 proc 🌀 The blow carries — 1 more caught for 1213
+204.00 player_attack You hit Rampaging Boar for 1348
+204.00 mob_death Rampaging Boar dies!
+204.00 mob_death ★ Grey Wolf dies!
+205.50 mob_death ★ Elite: ★ Grey Wolf appears!
+207.00 mob_death Kobold Miner appears!
+207.50 mob_attack Grey Wolf hits you for 5
+208.00 player_attack You hit Grey Wolf for 674
+208.00 mob_death Grey Wolf dies!
+209.50 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+216.50 player_attack You hit [BOSS] Elder Meadow Beast for 1348
+216.50 mob_death [BOSS] Elder Meadow Beast dies!
+224.75 mob_death Harrowfield Golem appears!
+226.25 mob_death Harrowfield Golem appears!
+227.75 mob_death ★ Elite: ★ Harrowfield Golem appears!
+229.25 mob_death Plains Vulture appears!
+230.25 player_attack You hit Harrowfield Golem for 1348
+230.25 mob_death Harrowfield Golem dies!
+231.75 mob_death Harrowfield Golem appears!
+235.25 player_crit You hit ★ Harrowfield Golem for 3238 (CRIT!)
+235.25 mob_death ★ Harrowfield Golem dies!
+236.75 mob_death Plains Vulture appears!
+239.25 mob_attack Plains Vulture hits you for 12
+240.25 player_attack You hit Plains Vulture for 1348
+240.25 mob_death Plains Vulture dies!
+241.75 mob_death Harrowfield Golem appears!
+244.50 mob_attack Plains Vulture hits you for 12
+245.50 player_attack You hit Plains Vulture for 1348
+245.50 mob_death Plains Vulture dies!
+247.00 mob_death Harrowfield Golem appears!
+251.75 player_crit You hit Harrowfield Golem for 3238 (CRIT!)
+251.75 mob_death Harrowfield Golem dies!
+253.25 mob_death Dustwind Thug appears!
+257.25 player_crit You hit Harrowfield Golem for 3238 (CRIT!)
+257.25 mob_death Harrowfield Golem dies!
+258.75 mob_death Harrowfield Golem appears!
+258.75 mob_attack Harrowfield Golem joins the fight!
+262.25 mob_attack Dustwind Thug hits you for 18
+262.75 proc 🌀 The blow carries — 1 more caught for 2914
+262.75 player_crit You hit Dustwind Thug for 3238 (CRIT!)
+262.75 mob_death Dustwind Thug dies!
+262.75 mob_death Harrowfield Golem dies!
+264.25 mob_death Dustwind Thug appears!
+265.75 mob_death Plains Vulture appears!
+268.75 player_attack You hit Harrowfield Golem for 1348
+268.75 mob_death Harrowfield Golem dies!
+270.25 mob_death Plains Vulture appears!
+272.75 mob_attack Plains Vulture hits you for 14
+273.75 player_attack You hit Plains Vulture for 1348
+273.75 mob_death Plains Vulture dies!
+275.25 mob_death Plains Vulture appears!
+278.50 player_attack You hit Harrowfield Golem for 674
+278.50 mob_death Harrowfield Golem dies!
+280.00 mob_death Plains Vulture appears!
+283.25 mob_attack Plains Vulture hits you for 14
+284.25 player_attack You hit Plains Vulture for 1348
+284.25 mob_death Plains Vulture dies!
+285.75 mob_death Harrowfield Golem appears!
+287.25 mob_attack Plains Vulture hits you for 14
+288.25 player_attack You hit Plains Vulture for 1348
+288.25 mob_death Plains Vulture dies!
+289.75 mob_death Dustwind Thug appears!
+292.00 mob_attack Plains Vulture hits you for 14
+293.00 player_crit You hit Plains Vulture for 3238 (CRIT!)
+293.00 mob_death Plains Vulture dies!
+294.50 mob_death Harrowfield Golem appears!
+298.00 mob_attack Dustwind Thug hits you for 20
+298.50 player_attack You hit Dustwind Thug for 1348
+298.50 mob_death Dustwind Thug dies!
+300.00 mob_death Harrowfield Golem appears!
+303.00 mob_attack Dustwind Thug hits you for 20
+303.50 player_attack You hit Dustwind Thug for 1348
+303.50 mob_death Dustwind Thug dies!
+305.00 mob_death Dustwind Thug appears!
+307.50 player_attack You hit Harrowfield Golem for 674
+307.50 mob_death Harrowfield Golem dies!
+309.00 mob_death Harrowfield Golem appears!
+312.00 player_attack You hit Harrowfield Golem for 1348
+312.00 mob_death Harrowfield Golem dies!
+318.50 mob_death Harrowfield Golem appears!
+321.25 mob_attack Dustwind Thug hits you for 20
+321.75 player_attack You hit Dustwind Thug for 1348
+321.75 mob_death Dustwind Thug dies!
+323.25 mob_death Plains Vulture appears!
+327.75 player_crit You hit Harrowfield Golem for 3312 (CRIT!)
+327.75 mob_death Harrowfield Golem dies!
+329.25 mob_death Harrowfield Golem appears!
+333.00 player_attack You hit Harrowfield Golem for 1380
+333.00 mob_death Harrowfield Golem dies!
+334.50 mob_death Plains Vulture appears!
+336.75 mob_attack Plains Vulture hits you for 14
+337.75 player_attack You hit Plains Vulture for 1380
+337.75 mob_death Plains Vulture dies!
+338.25 mob_attack Plains Vulture joins the fight!
+339.25 mob_death Dustwind Thug appears!
+342.00 mob_attack Plains Vulture hits you for 14
+342.75 proc 🌀 The blow carries — 1 more caught for 621
+342.75 player_attack You hit Harrowfield Golem for 690
+342.75 mob_death Harrowfield Golem dies!
+342.75 mob_death Plains Vulture dies!
+344.25 mob_death Plains Vulture appears!
+345.75 mob_death Harrowfield Golem appears!
+347.50 mob_attack Dustwind Thug hits you for 20
+348.00 player_crit You hit Dustwind Thug for 3312 (CRIT!)
+348.00 mob_death Dustwind Thug dies!
+348.50 mob_attack Harrowfield Golem joins the fight!
+349.50 mob_death Harrowfield Golem appears!
+351.75 mob_attack Plains Vulture hits you for 13
+352.75 proc 🌀 The blow carries — 1 more caught for 1242
+352.75 player_attack You hit Plains Vulture for 1380
+352.75 mob_death Plains Vulture dies!
+352.75 mob_death Harrowfield Golem dies!
+354.25 mob_death Plains Vulture appears!
+355.75 mob_death Dustwind Thug appears!
+358.50 player_attack You hit Harrowfield Golem for 1380
+358.50 mob_death Harrowfield Golem dies!
+365.00 mob_death Plains Vulture appears!
+367.25 mob_attack Plains Vulture hits you for 13
+368.25 player_attack You hit Plains Vulture for 1380
+368.25 mob_death Plains Vulture dies!
+369.75 mob_death Dustwind Thug appears!
+373.00 mob_attack Dustwind Thug hits you for 19
+373.50 player_attack You hit Dustwind Thug for 1380
+373.50 mob_death Dustwind Thug dies!
+375.00 mob_death Harrowfield Golem appears!
+378.25 player_crit You hit Harrowfield Golem for 1656 (CRIT!)
+378.25 mob_death Harrowfield Golem dies!
+378.75 mob_attack Harrowfield Golem joins the fight!
+379.75 mob_death Plains Vulture appears!
+382.00 mob_attack Plains Vulture hits you for 13
+383.00 proc 🌀 The blow carries — 1 more caught for 1242
+383.00 player_attack You hit Plains Vulture for 1380
+383.00 mob_death Plains Vulture dies!
+383.00 mob_death Harrowfield Golem dies!
+408.00 proc 🛡️ Crafted Coarse Tin Shield Plate!
+409.50 mob_death Harrowfield Golem appears!
+411.00 mob_death Plains Vulture appears!
+414.00 mob_attack Plains Vulture hits you for 13
+415.00 player_attack You hit Plains Vulture for 1380
+415.00 mob_death Plains Vulture dies!
+416.50 mob_death Plains Vulture appears!
+419.75 mob_attack Plains Vulture hits you for 13
+420.75 player_crit You hit Plains Vulture for 3312 (CRIT!)
+420.75 mob_death Plains Vulture dies!
+422.25 mob_death Harrowfield Golem appears!
+425.75 mob_attack Plains Vulture hits you for 13
+426.75 player_attack You hit Plains Vulture for 1380
+426.75 mob_death Plains Vulture dies!
+428.25 mob_death Harrowfield Golem appears!
+432.25 player_crit You hit Harrowfield Golem for 3312 (CRIT!)
+432.25 mob_death Harrowfield Golem dies!
+433.75 mob_death Harrowfield Golem appears!
+434.75 mob_attack Harrowfield Golem joins the fight!
+437.50 mob_attack Dustwind Thug hits you for 19
+438.00 proc 🌀 The blow carries — 1 more caught for 1242
+438.00 player_attack You hit Dustwind Thug for 1380
+438.00 mob_death Dustwind Thug dies!
+438.00 mob_death Harrowfield Golem dies!
+439.50 mob_death Plains Vulture appears!
+439.50 mob_attack Plains Vulture joins the fight!
+441.00 mob_death Dustwind Thug appears!
+443.00 mob_attack Plains Vulture hits you for 13
+444.50 mob_attack Plains Vulture hits you for 13
+444.75 proc 🌀 The blow carries — 1 more caught for 1242
+444.75 player_attack You hit Harrowfield Golem for 1380
+444.75 mob_death Harrowfield Golem dies!
+444.75 mob_death Plains Vulture dies!
+446.25 mob_death Harrowfield Golem appears!
+447.75 mob_death Harrowfield Golem appears!
+450.00 mob_attack Dustwind Thug hits you for 19
+450.50 player_crit You hit Dustwind Thug for 3312 (CRIT!)
+450.50 mob_death Dustwind Thug dies!
+452.00 mob_death ★ Elite: ★ Dustwind Thug appears!
+456.00 player_crit You hit Harrowfield Golem for 3312 (CRIT!)
+456.00 mob_death Harrowfield Golem dies!
+457.50 mob_death Dustwind Thug appears!
+459.50 mob_attack ★ Dustwind Thug hits you for 34
+460.00 player_attack You hit ★ Dustwind Thug for 1380
+460.00 mob_death ★ Dustwind Thug dies!
+461.50 mob_death Dustwind Thug appears!
+464.75 mob_attack Dustwind Thug hits you for 17
+465.25 player_crit You hit Dustwind Thug for 3396 (CRIT!)
+465.25 mob_death Dustwind Thug dies!
+466.75 mob_death Dustwind Thug appears!
+469.75 mob_attack Dustwind Thug hits you for 14
+470.25 player_attack You hit Dustwind Thug for 1434
+470.25 mob_death Dustwind Thug dies!
+471.75 mob_death ★ Elite: ★ Harrowfield Golem appears!
+471.75 mob_attack ★ Harrowfield Golem joins the fight!
+476.25 mob_attack Dustwind Thug hits you for 14
+476.75 proc 🌀 The blow carries — 1 more caught for 1291
+476.75 player_attack You hit Dustwind Thug for 1434
+476.75 mob_death Dustwind Thug dies!
+476.75 mob_death ★ Harrowfield Golem dies!
+478.25 mob_death Plains Vulture appears!
+479.75 mob_death Plains Vulture appears!
+483.00 player_attack You hit Harrowfield Golem for 1434
+483.00 mob_death Harrowfield Golem dies!
+483.50 mob_attack Plains Vulture joins the fight!
+484.50 mob_death Dustwind Thug appears!
+486.75 mob_attack Plains Vulture hits you for 9
+487.75 proc 🌀 The blow carries — 1 more caught for 1291
+487.75 player_attack You hit Plains Vulture for 1434
+487.75 mob_death Plains Vulture dies!
+487.75 mob_death Plains Vulture dies!
+489.25 mob_death Harrowfield Golem appears!
+490.75 mob_death Harrowfield Golem appears!
+493.25 mob_attack Dustwind Thug hits you for 14
+493.75 player_crit You hit Dustwind Thug for 3440 (CRIT!)
+493.75 mob_death Dustwind Thug dies!
+495.25 mob_death ⚠ BOSS: [BOSS] Bandit Warlord Grak appears!
+503.25 player_attack You hit [BOSS] Bandit Warlord Grak for 1434
+503.25 mob_death [BOSS] Bandit Warlord Grak dies!
+503.25 level_up ★ Level Up! Now level 21!
+511.50 mob_death Grimshade Wolfkin appears!
+513.00 mob_death Rotting Shambler appears!
+513.50 mob_attack Grimshade Wolfkin hits you for 22
+514.00 player_crit You hit Grimshade Wolfkin for 3712 (CRIT!)
+514.00 mob_death Grimshade Wolfkin dies!
+515.50 mob_death Rotting Shambler appears!
+517.00 mob_death Grimshade Wolfkin appears!
+518.50 mob_death Grimshade Wolfkin appears!
+518.50 player_crit You hit Rotting Shambler for 3712 (CRIT!)
+518.50 mob_death Rotting Shambler dies!
+520.00 mob_death ★ Elite: ★ Skeletal Archer appears!
+525.25 player_crit You hit Rotting Shambler for 3712 (CRIT!)
+525.25 mob_death Rotting Shambler dies!
+526.75 mob_death Skeletal Archer appears!
+529.25 mob_attack ★ Skeletal Archer hits you for 30
+530.25 player_attack You hit ★ Skeletal Archer for 773
+530.25 mob_death ★ Skeletal Archer dies!
+531.75 mob_death Skeletal Archer appears!
+534.75 mob_attack Skeletal Archer hits you for 17
+535.75 player_attack You hit Skeletal Archer for 1546
+535.75 mob_death Skeletal Archer dies!
+537.25 mob_death Grimshade Wolfkin appears!
+541.50 mob_attack Skeletal Archer hits you for 17
+542.50 player_crit You hit Skeletal Archer for 3712 (CRIT!)
+542.50 mob_death Skeletal Archer dies!
+544.00 mob_death Skeletal Archer appears!
+546.00 mob_attack Grimshade Wolfkin hits you for 22
+546.50 player_attack You hit Grimshade Wolfkin for 1546
+546.50 mob_death Grimshade Wolfkin dies!
+548.00 mob_death Skeletal Archer appears!
+553.00 mob_attack Skeletal Archer hits you for 17
+554.00 player_attack You hit Skeletal Archer for 1546
+554.00 mob_death Skeletal Archer dies!
+555.50 mob_death Grimshade Wolfkin appears!
+559.75 mob_attack Skeletal Archer hits you for 17
+560.75 player_crit You hit Skeletal Archer for 3712 (CRIT!)
+560.75 mob_death Skeletal Archer dies!
+562.25 mob_death Rotting Shambler appears!
+568.50 mob_attack Grimshade Wolfkin hits you for 22
+569.00 player_attack You hit Grimshade Wolfkin for 1546
+569.00 mob_death Grimshade Wolfkin dies!
+570.50 mob_death Rotting Shambler appears!
+574.00 mob_attack Grimshade Wolfkin hits you for 22
+574.50 player_crit You hit Grimshade Wolfkin for 3712 (CRIT!)
+574.50 mob_death Grimshade Wolfkin dies!
+576.00 mob_death Grimshade Wolfkin appears!
+579.00 mob_attack Grimshade Wolfkin hits you for 22
+579.50 player_attack You hit Grimshade Wolfkin for 1546
+579.50 mob_death Grimshade Wolfkin dies!
+581.00 mob_death Skeletal Archer appears!
+584.50 mob_attack Grimshade Wolfkin hits you for 22
+585.00 player_crit You hit Grimshade Wolfkin for 3712 (CRIT!)
+585.00 mob_death Grimshade Wolfkin dies!
+586.50 mob_death Rotting Shambler appears!
+590.00 mob_attack Rotting Shambler joins the fight!
+591.50 proc 🌀 The blow carries — 1 more caught for 1391
+591.50 player_attack You hit Rotting Shambler for 1546
+591.50 mob_death Rotting Shambler dies!
+591.50 mob_death Rotting Shambler dies!
+593.00 mob_death ★ Elite: ★ Skeletal Archer appears!
+594.50 mob_death ★ Elite: ★ Rotting Shambler appears!
+597.75 player_attack You hit Rotting Shambler for 1546
+597.75 mob_death Rotting Shambler dies!
+599.25 mob_death Rotting Shambler appears!
+
+## mage walking pyre | seed=1
+0.25 mob_death Rampaging Boar appears!
+1.75 mob_death Kobold Miner appears!
+3.25 mob_death Kobold Miner appears!
+4.75 mob_death Kobold Miner appears!
+6.00 player_crit You hit Rampaging Boar for 117 (CRIT!)
+6.00 mob_death Rampaging Boar dies!
+7.50 mob_death Rampaging Boar appears!
+10.25 player_crit You hit Kobold Miner for 117 (CRIT!)
+10.25 mob_death Kobold Miner dies!
+11.75 mob_death Grey Wolf appears!
+14.00 player_crit You hit Kobold Miner for 117 (CRIT!)
+14.00 mob_death Kobold Miner dies!
+15.50 mob_death Kobold Miner appears!
+19.50 player_crit You hit Grey Wolf for 117 (CRIT!)
+19.50 mob_death Grey Wolf dies!
+21.00 mob_death Rampaging Boar appears!
+24.50 mob_attack Rampaging Boar spots you and charges!
+26.00 player_crit You hit Rampaging Boar for 117 (CRIT!)
+26.00 mob_death Rampaging Boar dies!
+27.50 mob_death Grey Wolf appears!
+28.50 player_crit You hit Rampaging Boar for 117 (CRIT!)
+28.50 mob_death Rampaging Boar dies!
+30.00 mob_death Rampaging Boar appears!
+32.50 player_crit You hit Grey Wolf for 117 (CRIT!)
+32.50 mob_death Grey Wolf dies!
+34.00 mob_death ★ Elite: ★ Kobold Miner appears!
+36.75 player_crit You hit Rampaging Boar for 117 (CRIT!)
+36.75 mob_death Rampaging Boar dies!
+38.25 mob_death Kobold Miner appears!
+42.50 player_crit You hit ★ Kobold Miner for 117 (CRIT!)
+44.25 player_crit You hit ★ Kobold Miner for 72 (CRIT!)
+44.25 mob_death ★ Kobold Miner dies!
+45.75 mob_death Grey Wolf appears!
+48.50 player_crit You hit Kobold Miner for 117 (CRIT!)
+48.50 mob_death Kobold Miner dies!
+49.00 mob_attack Kobold Miner joins the fight!
+50.00 mob_death Rampaging Boar appears!
+52.75 player_crit You hit Kobold Miner for 117 (CRIT!)
+52.75 mob_death Kobold Miner dies!
+54.25 mob_death ★ Elite: ★ Rampaging Boar appears!
+54.75 player_crit You hit Kobold Miner for 117 (CRIT!)
+54.75 mob_death Kobold Miner dies!
+56.25 mob_death Rampaging Boar appears!
+59.00 player_crit You hit ★ Rampaging Boar for 117 (CRIT!)
+60.75 player_crit You hit ★ Rampaging Boar for 58 (CRIT!)
+62.50 player_crit You hit ★ Rampaging Boar for 72 (CRIT!)
+62.50 mob_death ★ Rampaging Boar dies!
+64.00 mob_death Grey Wolf appears!
+67.75 player_crit You hit Rampaging Boar for 117 (CRIT!)
+67.75 mob_death Rampaging Boar dies!
+69.25 mob_death Grey Wolf appears!
+74.25 player_crit You hit Rampaging Boar for 117 (CRIT!)
+74.25 mob_death Rampaging Boar dies!
+80.75 mob_death Rampaging Boar appears!
+80.75 mob_attack Rampaging Boar joins the fight!
+85.50 mob_attack Rampaging Boar hits you for 15
+86.50 proc 🌀 The blow carries — 1 more caught for 103
+86.50 player_crit You hit Grey Wolf for 117 (CRIT!)
+86.50 mob_death Grey Wolf dies!
+86.50 mob_death Rampaging Boar dies!
+88.00 mob_death Kobold Miner appears!
+89.50 mob_death Rampaging Boar appears!
+91.75 player_crit You hit Grey Wolf for 117 (CRIT!)
+91.75 mob_death Grey Wolf dies!
+93.25 mob_death Grey Wolf appears!
+97.50 player_crit You hit Kobold Miner for 117 (CRIT!)
+97.50 mob_death Kobold Miner dies!
+99.00 mob_death Grey Wolf appears!
+104.00 player_crit You hit Grey Wolf for 117 (CRIT!)
+104.00 mob_death Grey Wolf dies!
+105.50 mob_death Rampaging Boar appears!
+111.00 player_crit You hit Grey Wolf for 117 (CRIT!)
+111.00 mob_death Grey Wolf dies!
+112.50 mob_death Kobold Miner appears!
+117.25 player_crit You hit Rampaging Boar for 117 (CRIT!)
+117.25 mob_death Rampaging Boar dies!
+118.75 mob_death Kobold Miner appears!
+121.50 player_crit You hit Kobold Miner for 117 (CRIT!)
+121.50 mob_death Kobold Miner dies!
+123.00 mob_death Rampaging Boar appears!
+127.25 player_crit You hit Grey Wolf for 117 (CRIT!)
+127.25 mob_death Grey Wolf dies!
+128.75 mob_death Grey Wolf appears!
+128.75 mob_attack Grey Wolf joins the fight!
+132.75 proc 🌀 The blow carries — 1 more caught for 103
+132.75 player_crit You hit Rampaging Boar for 117 (CRIT!)
+132.75 mob_death Rampaging Boar dies!
+132.75 mob_death Grey Wolf dies!
+134.25 mob_death Grey Wolf appears!
+135.75 mob_death Kobold Miner appears!
+137.75 player_crit You hit Kobold Miner for 117 (CRIT!)
+137.75 mob_death Kobold Miner dies!
+139.25 mob_death Rampaging Boar appears!
+142.75 player_crit You hit Kobold Miner for 117 (CRIT!)
+142.75 mob_death Kobold Miner dies!
+144.25 mob_death Rampaging Boar appears!
+147.75 player_crit You hit Grey Wolf for 117 (CRIT!)
+147.75 mob_death Grey Wolf dies!
+149.25 mob_death Kobold Miner appears!
+151.50 player_crit You hit Rampaging Boar for 117 (CRIT!)
+151.50 mob_death Rampaging Boar dies!
+153.00 mob_death Rampaging Boar appears!
+157.75 player_crit You hit Rampaging Boar for 256 (CRIT!)
+157.75 mob_death Rampaging Boar dies!
+159.25 mob_death Rampaging Boar appears!
+162.25 player_crit You hit Kobold Miner for 256 (CRIT!)
+162.25 mob_death Kobold Miner dies!
+163.75 mob_death Grey Wolf appears!
+167.75 mob_attack Grey Wolf spots you and charges!
+168.00 player_crit You hit Rampaging Boar for 256 (CRIT!)
+168.00 mob_death Rampaging Boar dies!
+169.50 mob_death Rampaging Boar appears!
+171.00 player_crit You hit Grey Wolf for 256 (CRIT!)
+171.00 mob_death Grey Wolf dies!
+171.50 mob_attack Rampaging Boar joins the fight!
+172.50 mob_death Grey Wolf appears!
+176.25 proc 🌀 The blow carries — 1 more caught for 225
+176.25 player_crit You hit Rampaging Boar for 256 (CRIT!)
+176.25 mob_death Rampaging Boar dies!
+176.25 mob_death Rampaging Boar dies!
+177.75 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+184.50 player_crit You hit [BOSS] Elder Meadow Beast for 256 (CRIT!)
+186.25 player_crit You hit [BOSS] Elder Meadow Beast for 256 (CRIT!)
+186.25 mob_death [BOSS] Elder Meadow Beast dies!
+194.50 mob_death Dustwind Thug appears!
+196.00 mob_death Dustwind Thug appears!
+197.50 mob_death Dustwind Thug appears!
+199.00 mob_death Plains Vulture appears!
+200.00 player_crit You hit Dustwind Thug for 256 (CRIT!)
+200.00 mob_death Dustwind Thug dies!
+201.50 mob_death Harrowfield Golem appears!
+204.25 player_crit You hit Plains Vulture for 256 (CRIT!)
+204.25 mob_death Plains Vulture dies!
+205.75 mob_death Harrowfield Golem appears!
+208.50 player_crit You hit Harrowfield Golem for 256 (CRIT!)
+208.50 mob_death Harrowfield Golem dies!
+210.00 mob_death Harrowfield Golem appears!
+213.50 player_crit You hit Harrowfield Golem for 256 (CRIT!)
+213.50 mob_death Harrowfield Golem dies!
+215.00 mob_death Harrowfield Golem appears!
+217.25 player_crit You hit Dustwind Thug for 256 (CRIT!)
+217.25 mob_death Dustwind Thug dies!
+217.75 mob_attack Harrowfield Golem joins the fight!
+218.75 mob_death Harrowfield Golem appears!
+221.75 proc 🌀 The blow carries — 1 more caught for 225
+221.75 player_crit You hit Harrowfield Golem for 256 (CRIT!)
+221.75 mob_death Harrowfield Golem dies!
+221.75 mob_death Harrowfield Golem dies!
+222.25 mob_attack Dustwind Thug joins the fight!
+223.25 mob_death Plains Vulture appears!
+224.75 mob_death Harrowfield Golem appears!
+226.25 player_crit You hit Harrowfield Golem for 256 (CRIT!)
+226.25 mob_death Harrowfield Golem dies!
+227.75 mob_death Harrowfield Golem appears!
+228.25 player_crit You hit Dustwind Thug for 128 (CRIT!)
+228.25 mob_death Dustwind Thug dies!
+229.75 mob_death Plains Vulture appears!
+233.25 player_crit You hit Harrowfield Golem for 256 (CRIT!)
+233.25 mob_death Harrowfield Golem dies!
+234.75 mob_death Harrowfield Golem appears!
+236.75 player_crit You hit Plains Vulture for 256 (CRIT!)
+236.75 mob_death Plains Vulture dies!
+238.25 mob_death Dustwind Thug appears!
+242.50 player_crit You hit Harrowfield Golem for 256 (CRIT!)
+242.50 mob_death Harrowfield Golem dies!
+244.00 mob_death Dustwind Thug appears!
+247.00 player_crit You hit Plains Vulture for 256 (CRIT!)
+247.00 mob_death Plains Vulture dies!
+248.50 mob_death ★ Elite: ★ Plains Vulture appears!
+251.75 player_crit You hit Harrowfield Golem for 256 (CRIT!)
+251.75 mob_death Harrowfield Golem dies!
+252.25 mob_attack ★ Plains Vulture joins the fight!
+253.25 mob_death Plains Vulture appears!
+258.25 player_crit You hit Dustwind Thug for 256 (CRIT!)
+258.25 mob_death Dustwind Thug dies!
+258.25 mob_attack ★ Plains Vulture hits you for 19
+259.75 mob_death Plains Vulture appears!
+259.75 mob_attack ★ Plains Vulture hits you for 19
+260.25 player_crit You hit ★ Plains Vulture for 256 (CRIT!)
+261.25 mob_attack ★ Plains Vulture hits you for 19
+262.00 player_crit You hit ★ Plains Vulture for 159 (CRIT!)
+262.00 mob_death ★ Plains Vulture dies!
+263.50 mob_death Dustwind Thug appears!
+267.25 player_crit You hit Plains Vulture for 256 (CRIT!)
+267.25 mob_death Plains Vulture dies!
+268.75 mob_death Harrowfield Golem appears!
+271.75 player_crit You hit Dustwind Thug for 256 (CRIT!)
+271.75 mob_death Dustwind Thug dies!
+273.25 mob_death ★ Elite: ★ Plains Vulture appears!
+273.25 mob_attack ★ Plains Vulture joins the fight!
+277.25 proc 🌀 The blow carries — 1 more caught for 225
+277.25 player_crit You hit Harrowfield Golem for 256 (CRIT!)
+277.25 mob_death Harrowfield Golem dies!
+278.75 mob_death ★ Elite: ★ Dustwind Thug appears!
+278.75 mob_attack ★ Plains Vulture hits you for 18
+279.25 player_crit You hit ★ Plains Vulture for 318 (CRIT!)
+279.25 mob_death ★ Plains Vulture dies!
+280.75 mob_death Plains Vulture appears!
+283.75 player_crit You hit ★ Dustwind Thug for 256 (CRIT!)
+285.50 player_crit You hit ★ Dustwind Thug for 159 (CRIT!)
+285.50 mob_death ★ Dustwind Thug dies!
+287.00 mob_death Dustwind Thug appears!
+291.50 player_crit You hit Plains Vulture for 256 (CRIT!)
+291.50 mob_death Plains Vulture dies!
+293.00 mob_death Dustwind Thug appears!
+295.50 player_crit You hit Dustwind Thug for 256 (CRIT!)
+295.50 mob_death Dustwind Thug dies!
+297.00 mob_death Dustwind Thug appears!
+299.75 player_crit You hit Dustwind Thug for 256 (CRIT!)
+299.75 mob_death Dustwind Thug dies!
+301.25 mob_death Dustwind Thug appears!
+306.25 player_crit You hit Dustwind Thug for 256 (CRIT!)
+306.25 mob_death Dustwind Thug dies!
+307.75 mob_death Harrowfield Golem appears!
+311.50 player_crit You hit Dustwind Thug for 256 (CRIT!)
+311.50 mob_death Dustwind Thug dies!
+313.00 mob_death Plains Vulture appears!
+316.50 player_crit You hit Harrowfield Golem for 256 (CRIT!)
+316.50 mob_death Harrowfield Golem dies!
+318.00 mob_death Dustwind Thug appears!
+321.25 player_crit You hit Plains Vulture for 256 (CRIT!)
+321.25 mob_death Plains Vulture dies!
+322.75 mob_death Dustwind Thug appears!
+326.00 player_crit You hit Dustwind Thug for 256 (CRIT!)
+326.00 mob_death Dustwind Thug dies!
+327.50 mob_death Dustwind Thug appears!
+330.75 player_crit You hit Dustwind Thug for 256 (CRIT!)
+330.75 mob_death Dustwind Thug dies!
+332.25 mob_death Harrowfield Golem appears!
+335.75 player_crit You hit Dustwind Thug for 256 (CRIT!)
+335.75 mob_death Dustwind Thug dies!
+337.25 mob_death Dustwind Thug appears!
+341.50 player_crit You hit Harrowfield Golem for 256 (CRIT!)
+341.50 mob_death Harrowfield Golem dies!
+343.00 mob_death Dustwind Thug appears!
+347.50 player_crit You hit Dustwind Thug for 256 (CRIT!)
+347.50 mob_death Dustwind Thug dies!
+349.00 mob_death Plains Vulture appears!
+354.00 player_crit You hit Dustwind Thug for 256 (CRIT!)
+354.00 mob_death Dustwind Thug dies!
+355.50 mob_death Harrowfield Golem appears!
+355.50 mob_attack Harrowfield Golem joins the fight!
+360.00 proc 🌀 The blow carries — 1 more caught for 225
+360.00 player_crit You hit Plains Vulture for 256 (CRIT!)
+360.00 mob_death Plains Vulture dies!
+360.00 mob_death Harrowfield Golem dies!
+361.50 mob_death Dustwind Thug appears!
+363.00 mob_death Harrowfield Golem appears!
+366.50 player_crit You hit Dustwind Thug for 288 (CRIT!)
+366.50 mob_death Dustwind Thug dies!
+368.00 mob_death Plains Vulture appears!
+373.25 player_crit You hit Harrowfield Golem for 296 (CRIT!)
+373.25 mob_death Harrowfield Golem dies!
+374.75 mob_death Harrowfield Golem appears!
+376.75 mob_attack Plains Vulture hits you for 10
+377.25 player_crit You hit Plains Vulture for 296 (CRIT!)
+377.25 mob_death Plains Vulture dies!
+405.25 proc 🔮 Crafted Coarse Wool Mana Wrap!
+406.75 mob_death Dustwind Thug appears!
+409.50 player_crit You hit Harrowfield Golem for 296 (CRIT!)
+409.50 mob_death Harrowfield Golem dies!
+411.00 mob_death Harrowfield Golem appears!
+414.50 player_crit You hit Dustwind Thug for 296 (CRIT!)
+414.50 mob_death Dustwind Thug dies!
+421.00 mob_death Harrowfield Golem appears!
+425.75 player_crit You hit Harrowfield Golem for 296 (CRIT!)
+425.75 mob_death Harrowfield Golem dies!
+427.25 mob_death Harrowfield Golem appears!
+429.50 player_crit You hit Harrowfield Golem for 296 (CRIT!)
+429.50 mob_death Harrowfield Golem dies!
+431.00 mob_death Dustwind Thug appears!
+435.75 player_crit You hit Harrowfield Golem for 296 (CRIT!)
+435.75 mob_death Harrowfield Golem dies!
+437.25 mob_death Plains Vulture appears!
+442.25 player_crit You hit Dustwind Thug for 296 (CRIT!)
+442.25 mob_death Dustwind Thug dies!
+443.75 mob_death Harrowfield Golem appears!
+448.75 player_crit You hit Plains Vulture for 296 (CRIT!)
+448.75 mob_death Plains Vulture dies!
+450.25 mob_death Harrowfield Golem appears!
+453.50 player_crit You hit Dustwind Thug for 296 (CRIT!)
+453.50 mob_death Dustwind Thug dies!
+455.00 mob_death Harrowfield Golem appears!
+457.50 player_crit You hit Harrowfield Golem for 296 (CRIT!)
+457.50 mob_death Harrowfield Golem dies!
+459.00 mob_death Plains Vulture appears!
+461.25 player_crit You hit Harrowfield Golem for 296 (CRIT!)
+461.25 mob_death Harrowfield Golem dies!
+462.75 mob_death Plains Vulture appears!
+465.75 player_crit You hit Plains Vulture for 296 (CRIT!)
+465.75 mob_death Plains Vulture dies!
+467.25 mob_death Dustwind Thug appears!
+469.75 player_crit You hit Plains Vulture for 296 (CRIT!)
+469.75 mob_death Plains Vulture dies!
+471.25 mob_death Harrowfield Golem appears!
+473.75 player_crit You hit Dustwind Thug for 296 (CRIT!)
+473.75 mob_death Dustwind Thug dies!
+475.25 mob_death ⚠ BOSS: [BOSS] Bandit Warlord Grak appears!
+483.25 player_crit You hit [BOSS] Bandit Warlord Grak for 296 (CRIT!)
+485.00 player_crit You hit [BOSS] Bandit Warlord Grak for 296 (CRIT!)
+486.75 player_crit You hit [BOSS] Bandit Warlord Grak for 296 (CRIT!)
+488.50 player_crit You hit [BOSS] Bandit Warlord Grak for 183 (CRIT!)
+490.50 player_crit You hit [BOSS] Bandit Warlord Grak for 183 (CRIT!)
+490.50 mob_death [BOSS] Bandit Warlord Grak dies!
+490.50 level_up ★ Level Up! Now level 21!
+498.75 mob_death Skeletal Archer appears!
+500.25 mob_death Skeletal Archer appears!
+501.50 mob_attack Skeletal Archer hits you for 23
+501.75 mob_death Grimshade Wolfkin appears!
+502.00 player_crit You hit Skeletal Archer for 149 (CRIT!)
+503.00 mob_attack Skeletal Archer hits you for 23
+503.25 mob_death Skeletal Archer appears!
+503.75 player_crit You hit Skeletal Archer for 184 (CRIT!)
+503.75 mob_death Skeletal Archer dies!
+505.25 mob_death Skeletal Archer appears!
+507.25 mob_attack Skeletal Archer hits you for 23
+507.75 player_crit You hit Skeletal Archer for 297 (CRIT!)
+507.75 mob_death Skeletal Archer dies!
+509.25 mob_death Skeletal Archer appears!
+511.25 player_crit You hit Skeletal Archer for 297 (CRIT!)
+511.25 mob_death Skeletal Archer dies!
+511.75 mob_attack Skeletal Archer joins the fight!
+512.75 mob_death Skeletal Archer appears!
+517.25 proc 🌀 The blow carries — 1 more caught for 261
+517.25 player_crit You hit Skeletal Archer for 297 (CRIT!)
+517.25 mob_death Skeletal Archer dies!
+517.25 mob_death Skeletal Archer dies!
+518.75 mob_death Grimshade Wolfkin appears!
+520.25 mob_death Grimshade Wolfkin appears!
+521.25 player_crit You hit Skeletal Archer for 297 (CRIT!)
+521.25 mob_death Skeletal Archer dies!
+521.75 mob_attack Grimshade Wolfkin joins the fight!
+522.75 mob_death Grimshade Wolfkin appears!
+525.00 proc 🌀 The blow carries — 1 more caught for 261
+525.00 player_crit You hit Grimshade Wolfkin for 297 (CRIT!)
+526.25 mob_attack Grimshade Wolfkin hits you for 31
+526.75 player_crit You hit Grimshade Wolfkin for 184 (CRIT!)
+526.75 mob_death Grimshade Wolfkin dies!
+528.25 mob_death Rotting Shambler appears!
+528.75 player_crit You hit Grimshade Wolfkin for 368 (CRIT!)
+528.75 mob_death Grimshade Wolfkin dies!
+530.25 mob_death Grimshade Wolfkin appears!
+534.50 player_crit You hit Rotting Shambler for 297 (CRIT!)
+534.50 mob_death Rotting Shambler dies!
+534.50 mob_attack Grimshade Wolfkin spots you and charges!
+536.00 mob_death Rotting Shambler appears!
+537.75 player_crit You hit Grimshade Wolfkin for 297 (CRIT!)
+539.50 player_crit You hit Grimshade Wolfkin for 184 (CRIT!)
+539.50 mob_death Grimshade Wolfkin dies!
+541.00 mob_death Grimshade Wolfkin appears!
+544.00 player_crit You hit Rotting Shambler for 297 (CRIT!)
+544.00 mob_death Rotting Shambler dies!
+545.50 mob_death Skeletal Archer appears!
+552.75 player_crit You hit Grimshade Wolfkin for 297 (CRIT!)
+554.50 player_crit You hit Grimshade Wolfkin for 368 (CRIT!)
+554.50 mob_death Grimshade Wolfkin dies!
+556.00 mob_death Skeletal Archer appears!
+559.75 player_crit You hit Grimshade Wolfkin for 297 (CRIT!)
+561.50 player_crit You hit Grimshade Wolfkin for 368 (CRIT!)
+561.50 mob_death Grimshade Wolfkin dies!
+563.00 mob_death Rotting Shambler appears!
+569.25 player_crit You hit Skeletal Archer for 297 (CRIT!)
+569.25 mob_death Skeletal Archer dies!
+570.75 mob_death Skeletal Archer appears!
+574.50 player_crit You hit Rotting Shambler for 297 (CRIT!)
+574.50 mob_death Rotting Shambler dies!
+576.00 mob_death Rotting Shambler appears!
+579.00 player_crit You hit Skeletal Archer for 297 (CRIT!)
+579.00 mob_death Skeletal Archer dies!
+580.50 mob_death Grimshade Wolfkin appears!
+582.75 player_crit You hit Rotting Shambler for 297 (CRIT!)
+582.75 mob_death Rotting Shambler dies!
+584.25 mob_death Skeletal Archer appears!
+587.00 player_crit You hit Grimshade Wolfkin for 297 (CRIT!)
+588.75 player_crit You hit Grimshade Wolfkin for 184 (CRIT!)
+588.75 mob_death Grimshade Wolfkin dies!
+590.25 mob_death Grimshade Wolfkin appears!
+594.00 player_crit You hit Grimshade Wolfkin for 297 (CRIT!)
+595.75 player_crit You hit Grimshade Wolfkin for 368 (CRIT!)
+595.75 mob_death Grimshade Wolfkin dies!
+597.25 mob_death Rotting Shambler appears!
+
+## warlock cinderpact | seed=1
+0.25 mob_death Rampaging Boar appears!
+1.75 mob_death Kobold Miner appears!
+2.00 mob_death Rampaging Boar dies to Umbral Bolt!
+5.00 mob_death Kobold Miner appears!
+6.00 mob_death Kobold Miner dies to Umbral Bolt!
+9.00 mob_death Rampaging Boar appears!
+10.00 mob_death Kobold Miner dies to Umbral Bolt!
+13.00 mob_death Rampaging Boar appears!
+14.00 mob_death Rampaging Boar dies to Umbral Bolt!
+17.00 mob_death Kobold Miner appears!
+18.00 mob_death Rampaging Boar dies to Umbral Bolt!
+20.75 mob_attack Kobold Miner hits you for 14
+21.00 mob_death Grey Wolf appears!
+22.00 mob_death Kobold Miner dies to Umbral Bolt!
+25.00 mob_death Rampaging Boar appears!
+25.00 mob_attack Grey Wolf hits you for 9
+26.00 mob_death Grey Wolf dies to Umbral Bolt!
+29.00 mob_death Grey Wolf appears!
+30.00 mob_death Rampaging Boar dies to Umbral Bolt!
+30.00 mob_attack Rampaging Boar hits you for 15
+33.00 mob_death Kobold Miner appears!
+34.00 mob_death Grey Wolf dies to Umbral Bolt!
+37.00 mob_death Grey Wolf appears!
+38.00 mob_death Kobold Miner dies to Umbral Bolt!
+41.00 mob_death ★ Elite: ★ Kobold Miner appears!
+42.00 mob_death Grey Wolf dies to Umbral Bolt!
+44.50 mob_attack ★ Kobold Miner hits you for 26
+45.00 mob_death Rampaging Boar appears!
+46.00 player_attack You hit ★ Kobold Miner for 23
+46.50 mob_death Grey Wolf appears!
+46.75 mob_attack ★ Kobold Miner hits you for 26
+48.00 mob_death Grey Wolf appears!
+48.00 player_attack You hit ★ Kobold Miner for 23
+49.00 mob_attack ★ Kobold Miner hits you for 26
+50.00 mob_death ★ Kobold Miner dies to Umbral Bolt!
+50.00 player_attack You hit ★ Kobold Miner for 23
+53.00 mob_death Kobold Miner appears!
+53.50 mob_attack Rampaging Boar hits you for 15
+54.50 mob_death Rampaging Boar dies to Umbral Bolt!
+57.50 mob_death Kobold Miner appears!
+57.75 mob_attack Grey Wolf hits you for 9
+58.75 mob_death Grey Wolf dies to Umbral Bolt!
+58.75 player_attack You hit Grey Wolf for 23
+61.75 mob_death Grey Wolf appears!
+62.00 mob_attack Grey Wolf hits you for 9
+63.00 mob_death Grey Wolf dies to Umbral Bolt!
+63.00 player_attack You hit Grey Wolf for 23
+66.00 mob_death Kobold Miner appears!
+67.00 mob_death Grey Wolf dies to Umbral Bolt!
+70.00 mob_death Rampaging Boar appears!
+70.75 mob_attack Kobold Miner hits you for 14
+71.50 mob_death Kobold Miner dies to Umbral Bolt!
+74.50 mob_death Grey Wolf appears!
+75.50 mob_death Rampaging Boar dies to Umbral Bolt!
+78.25 mob_attack Grey Wolf hits you for 9
+78.50 mob_death Kobold Miner appears!
+79.50 mob_death Grey Wolf dies to Umbral Bolt!
+82.50 mob_death Grey Wolf appears!
+83.50 mob_death Kobold Miner dies to Umbral Bolt!
+86.50 mob_death Kobold Miner appears!
+87.25 mob_attack Grey Wolf hits you for 9
+88.00 mob_death Grey Wolf dies to Umbral Bolt!
+91.00 mob_death Rampaging Boar appears!
+92.00 mob_death Kobold Miner dies to Umbral Bolt!
+95.00 mob_death Kobold Miner appears!
+95.50 mob_attack Rampaging Boar hits you for 15
+96.50 mob_death Rampaging Boar dies to Umbral Bolt!
+99.25 mob_attack Kobold Miner hits you for 14
+99.50 mob_death Grey Wolf appears!
+100.50 mob_death Kobold Miner dies to Umbral Bolt!
+100.50 player_attack You hit Kobold Miner for 23
+103.50 mob_death Grey Wolf appears!
+103.75 mob_attack Grey Wolf hits you for 9
+104.75 mob_death Grey Wolf dies to Umbral Bolt!
+107.75 mob_death Grey Wolf appears!
+108.75 mob_death Grey Wolf dies to Umbral Bolt!
+109.25 mob_attack Kobold Miner joins the fight!
+111.75 mob_death Rampaging Boar appears!
+112.50 mob_attack Grey Wolf hits you for 9
+113.25 proc 🌀 The blow carries — 1 more caught for 56
+113.25 mob_death Grey Wolf dies to Umbral Bolt!
+115.25 mob_attack Kobold Miner hits you for 14
+115.25 player_death You have been slain! Respawning in 3s...
+118.25 player_respawn You rise from the grave...
+119.25 mob_death Grey Wolf appears!
+120.75 mob_death Grey Wolf dies to Umbral Bolt!
+120.75 mob_death Rampaging Boar appears!
+123.75 mob_death Kobold Miner appears!
+124.75 mob_death Rampaging Boar dies to Umbral Bolt!
+127.75 mob_death Grey Wolf appears!
+128.75 mob_death Kobold Miner dies to Umbral Bolt!
+131.75 mob_death Rampaging Boar appears!
+132.75 mob_death Grey Wolf dies to Umbral Bolt!
+135.75 mob_death Rampaging Boar appears!
+136.00 mob_attack Rampaging Boar hits you for 15
+136.75 player_attack You hit Rampaging Boar for 23
+137.00 mob_death Rampaging Boar dies to Umbral Bolt!
+140.00 mob_death ★ Elite: ★ Rampaging Boar appears!
+141.00 mob_death Rampaging Boar dies to Umbral Bolt!
+144.00 mob_death Kobold Miner appears!
+145.25 mob_attack ★ Rampaging Boar hits you for 27
+145.50 mob_death Grey Wolf appears!
+146.50 player_attack You hit ★ Rampaging Boar for 23
+147.00 mob_death Kobold Miner appears!
+147.00 mob_attack ★ Rampaging Boar hits you for 27
+148.50 player_attack You hit ★ Rampaging Boar for 23
+148.75 mob_attack ★ Rampaging Boar hits you for 27
+150.50 player_attack You hit ★ Rampaging Boar for 23
+150.50 mob_death ★ Rampaging Boar dies!
+152.00 mob_death Grey Wolf appears!
+153.50 mob_death Kobold Miner dies to Umbral Bolt!
+156.50 mob_death Rampaging Boar appears!
+157.50 mob_death Grey Wolf dies to Umbral Bolt!
+160.25 mob_attack Rampaging Boar hits you for 15
+160.50 mob_death Grey Wolf appears!
+161.50 mob_death Rampaging Boar dies to Umbral Bolt!
+161.50 player_attack You hit Rampaging Boar for 23
+164.50 mob_death Grey Wolf appears!
+164.50 mob_attack Grey Wolf hits you for 9
+165.50 mob_death Grey Wolf dies to Umbral Bolt!
+168.50 mob_death Rampaging Boar appears!
+169.50 mob_death Grey Wolf dies to Umbral Bolt!
+172.50 mob_death Kobold Miner appears!
+173.50 mob_death Grey Wolf dies to Umbral Bolt!
+176.50 mob_death Grey Wolf appears!
+177.50 mob_death Kobold Miner dies to Umbral Bolt!
+180.50 mob_death Grey Wolf appears!
+181.50 mob_death Rampaging Boar dies to Umbral Bolt!
+184.50 mob_death Rampaging Boar appears!
+185.50 mob_death Grey Wolf dies to Umbral Bolt!
+188.50 mob_death Rampaging Boar appears!
+189.50 mob_death Rampaging Boar dies to Umbral Bolt!
+189.50 mob_attack Rampaging Boar hits you for 15
+192.50 mob_death Rampaging Boar appears!
+193.50 mob_death Rampaging Boar dies to Umbral Bolt!
+196.50 mob_death Grey Wolf appears!
+197.50 mob_death Rampaging Boar dies to Umbral Bolt!
+200.50 mob_death Rampaging Boar appears!
+201.50 mob_death Grey Wolf dies to Umbral Bolt!
+204.50 mob_death Rampaging Boar appears!
+205.00 mob_attack Kobold Miner hits you for 14
+206.00 mob_death Kobold Miner dies to Umbral Bolt!
+206.50 mob_attack Rampaging Boar joins the fight!
+209.00 mob_death Kobold Miner appears!
+210.00 mob_death Rampaging Boar dies to Umbral Bolt!
+212.00 mob_attack Rampaging Boar hits you for 15
+213.00 mob_death Rampaging Boar appears!
+213.25 player_attack You hit Rampaging Boar for 23
+213.75 mob_attack Rampaging Boar hits you for 15
+214.50 mob_death Rampaging Boar dies to Umbral Bolt!
+217.50 mob_death Kobold Miner appears!
+218.50 mob_death Rampaging Boar dies to Umbral Bolt!
+221.50 mob_death Rampaging Boar appears!
+222.50 mob_death Kobold Miner dies to Umbral Bolt!
+225.50 mob_death Rampaging Boar appears!
+226.00 mob_attack Rampaging Boar hits you for 15
+227.00 mob_death Rampaging Boar dies to Umbral Bolt!
+230.00 mob_death Grey Wolf appears!
+230.50 mob_attack Rampaging Boar hits you for 15
+231.50 mob_death Rampaging Boar dies to Umbral Bolt!
+234.50 mob_death Rampaging Boar appears!
+235.50 mob_death Grey Wolf dies to Umbral Bolt!
+238.50 mob_death Rampaging Boar appears!
+239.25 mob_attack Rampaging Boar hits you for 15
+239.25 player_death You have been slain! Respawning in 3s...
+242.25 player_respawn You rise from the grave...
+243.75 mob_death ★ Elite: ★ Kobold Miner appears!
+245.25 mob_death Kobold Miner appears!
+246.75 mob_death Rampaging Boar appears!
+248.00 player_attack You hit ★ Kobold Miner for 23
+248.25 mob_death Rampaging Boar appears!
+248.25 mob_attack ★ Kobold Miner hits you for 26
+250.00 player_attack You hit ★ Kobold Miner for 23
+250.00 mob_death ★ Kobold Miner dies!
+251.50 mob_death Grey Wolf appears!
+253.50 mob_death Kobold Miner dies to Umbral Bolt!
+256.50 mob_death Kobold Miner appears!
+257.25 mob_attack Grey Wolf hits you for 9
+258.00 mob_death Grey Wolf dies to Umbral Bolt!
+261.00 mob_death Kobold Miner appears!
+262.00 mob_death Kobold Miner dies to Umbral Bolt!
+262.50 mob_attack Kobold Miner joins the fight!
+265.00 mob_death Grey Wolf appears!
+266.00 proc 🌀 The blow carries — 1 more caught for 56
+266.00 mob_death Rampaging Boar dies to Umbral Bolt!
+267.25 mob_attack Kobold Miner hits you for 14
+268.50 player_attack You hit Kobold Miner for 23
+269.00 mob_death Rampaging Boar appears!
+269.50 mob_attack Kobold Miner hits you for 14
+270.50 mob_death Kobold Miner dies to Umbral Bolt!
+270.50 player_attack You hit Kobold Miner for 23
+273.50 mob_death Kobold Miner appears!
+274.25 mob_attack Rampaging Boar hits you for 15
+275.00 mob_death Rampaging Boar dies to Umbral Bolt!
+278.00 mob_death Rampaging Boar appears!
+279.00 mob_death Kobold Miner dies to Umbral Bolt!
+279.00 mob_attack Kobold Miner hits you for 14
+282.00 mob_death ★ Elite: ★ Rampaging Boar appears!
+283.00 mob_death Rampaging Boar dies to Umbral Bolt!
+286.00 mob_death Rampaging Boar appears!
+287.00 mob_death Grey Wolf dies to Umbral Bolt!
+289.75 mob_attack Rampaging Boar hits you for 15
+290.00 mob_death Rampaging Boar appears!
+291.00 mob_death Rampaging Boar dies to Umbral Bolt!
+294.00 mob_death Rampaging Boar appears!
+295.00 mob_death Rampaging Boar dies to Umbral Bolt!
+295.00 mob_attack Rampaging Boar hits you for 15
+298.00 mob_death Kobold Miner appears!
+298.50 mob_attack Rampaging Boar hits you for 15
+298.75 player_attack You hit Rampaging Boar for 23
+299.50 mob_death Rampaging Boar dies to Umbral Bolt!
+302.50 mob_death Rampaging Boar appears!
+302.75 mob_attack Rampaging Boar hits you for 15
+303.75 mob_death Rampaging Boar dies to Umbral Bolt!
+306.75 mob_death Rampaging Boar appears!
+307.75 mob_death Rampaging Boar dies to Umbral Bolt!
+310.75 mob_death ★ Elite: ★ Rampaging Boar appears!
+310.75 mob_attack Rampaging Boar hits you for 15
+311.75 mob_death Rampaging Boar dies to Umbral Bolt!
+314.75 mob_death Rampaging Boar appears!
+315.25 mob_attack ★ Rampaging Boar hits you for 27
+316.50 player_attack You hit ★ Rampaging Boar for 23
+317.25 mob_attack ★ Rampaging Boar hits you for 27
+317.25 player_death You have been slain! Respawning in 3s...
+320.25 player_respawn You rise from the grave...
+321.75 mob_death Grey Wolf appears!
+323.25 mob_death Grey Wolf dies to Umbral Bolt!
+323.25 mob_death Grey Wolf appears!
+323.25 mob_attack Grey Wolf joins the fight!
+326.25 mob_death Grey Wolf appears!
+327.25 mob_death Grey Wolf dies to Umbral Bolt!
+330.25 mob_death Kobold Miner appears!
+331.25 mob_death Grey Wolf dies to Umbral Bolt!
+334.25 mob_death ★ Elite: ★ Grey Wolf appears!
+334.75 mob_attack Kobold Miner hits you for 14
+335.75 mob_death Kobold Miner dies to Umbral Bolt!
+335.75 mob_death Grey Wolf appears!
+338.75 mob_death Rampaging Boar appears!
+339.75 mob_death Grey Wolf dies to Umbral Bolt!
+342.75 mob_death Grey Wolf appears!
+343.75 mob_death Rampaging Boar dies to Umbral Bolt!
+343.75 mob_attack Rampaging Boar hits you for 15
+346.75 mob_death Grey Wolf appears!
+347.75 mob_death Grey Wolf dies to Umbral Bolt!
+350.75 mob_death Grey Wolf appears!
+351.75 mob_death Grey Wolf dies to Umbral Bolt!
+354.75 mob_death Grey Wolf appears!
+355.75 mob_death Grey Wolf dies to Umbral Bolt!
+358.75 mob_death Kobold Miner appears!
+359.75 mob_death Grey Wolf dies to Umbral Bolt!
+362.75 mob_death ★ Elite: ★ Rampaging Boar appears!
+363.75 mob_death Kobold Miner dies to Umbral Bolt!
+366.75 mob_death Rampaging Boar appears!
+368.25 mob_death Grey Wolf appears!
+368.25 mob_attack ★ Rampaging Boar hits you for 27
+369.50 player_attack You hit ★ Rampaging Boar for 23
+370.00 mob_attack ★ Rampaging Boar hits you for 27
+371.50 player_attack You hit ★ Rampaging Boar for 23
+371.75 mob_attack ★ Rampaging Boar hits you for 27
+373.50 player_crit You hit ★ Rampaging Boar for 66 (CRIT!)
+373.50 mob_death ★ Rampaging Boar dies!
+375.00 mob_death Kobold Miner appears!
+375.75 mob_death Rampaging Boar dies to Umbral Bolt!
+378.75 mob_death Rampaging Boar appears!
+379.75 mob_death Kobold Miner dies to Umbral Bolt!
+382.75 mob_death Grey Wolf appears!
+383.00 mob_attack Grey Wolf hits you for 9
+384.00 mob_death Grey Wolf dies to Umbral Bolt!
+384.00 player_attack You hit Grey Wolf for 23
+387.00 mob_death Kobold Miner appears!
+388.75 mob_attack ★ Grey Wolf hits you for 17
+389.75 player_attack You hit ★ Grey Wolf for 23
+390.75 mob_attack ★ Grey Wolf hits you for 17
+391.75 player_attack You hit ★ Grey Wolf for 23
+392.00 mob_death ★ Grey Wolf dies to Umbral Bolt!
+395.00 mob_death Kobold Miner appears!
+396.00 mob_death Kobold Miner dies to Umbral Bolt!
+396.00 mob_attack Kobold Miner hits you for 14
+399.00 mob_death Grey Wolf appears!
+400.00 mob_death Kobold Miner dies to Umbral Bolt!
+403.00 mob_death Kobold Miner appears!
+404.00 mob_death Grey Wolf dies to Umbral Bolt!
+407.00 mob_death Grey Wolf appears!
+407.75 mob_attack Kobold Miner hits you for 14
+408.50 mob_death Kobold Miner dies to Umbral Bolt!
+411.50 mob_death Rampaging Boar appears!
+412.00 mob_attack Grey Wolf hits you for 9
+412.75 player_crit You hit Grey Wolf for 66 (CRIT!)
+412.75 mob_death Grey Wolf dies!
+413.00 mob_death Rampaging Boar dies to Umbral Bolt!
+416.00 mob_death Kobold Miner appears!
+417.00 mob_death Grey Wolf dies to Umbral Bolt!
+420.00 mob_death Grey Wolf appears!
+421.00 mob_death Kobold Miner dies to Umbral Bolt!
+424.00 mob_death ★ Elite: ★ Grey Wolf appears!
+424.50 mob_attack Grey Wolf hits you for 9
+425.50 mob_death Grey Wolf dies to Umbral Bolt!
+425.50 mob_death Grey Wolf appears!
+425.50 player_attack You hit Grey Wolf for 23
+428.50 mob_death Kobold Miner appears!
+429.00 mob_attack Grey Wolf hits you for 9
+430.00 mob_death Grey Wolf dies to Umbral Bolt!
+430.00 player_attack You hit Grey Wolf for 23
+433.00 mob_death Kobold Miner appears!
+434.75 mob_attack ★ Grey Wolf hits you for 17
+434.75 player_death You have been slain! Respawning in 3s...
+437.75 player_respawn You rise from the grave...
+439.25 mob_death Rampaging Boar appears!
+440.75 mob_death Grey Wolf appears!
+441.00 mob_death Rampaging Boar dies to Umbral Bolt!
+444.00 mob_death Grey Wolf appears!
+445.00 mob_death Grey Wolf dies to Umbral Bolt!
+448.00 mob_death Kobold Miner appears!
+449.00 mob_death Grey Wolf dies to Umbral Bolt!
+452.00 mob_death Rampaging Boar appears!
+453.00 mob_death Kobold Miner dies to Umbral Bolt!
+456.00 mob_death Kobold Miner appears!
+457.00 mob_death Rampaging Boar dies to Umbral Bolt!
+460.00 mob_death Grey Wolf appears!
+460.00 mob_attack Kobold Miner hits you for 14
+461.00 mob_death Kobold Miner dies to Umbral Bolt!
+464.00 mob_death Grey Wolf appears!
+465.00 mob_death Grey Wolf dies to Umbral Bolt!
+468.00 mob_death Kobold Miner appears!
+469.00 mob_death Grey Wolf dies to Umbral Bolt!
+472.00 mob_death Grey Wolf appears!
+473.00 mob_death Kobold Miner dies to Umbral Bolt!
+476.00 mob_death Kobold Miner appears!
+477.00 mob_death Grey Wolf dies to Umbral Bolt!
+480.00 mob_death Kobold Miner appears!
+481.00 mob_death Kobold Miner dies to Umbral Bolt!
+484.00 mob_death Rampaging Boar appears!
+485.00 mob_death Kobold Miner dies to Umbral Bolt!
+488.00 mob_death Kobold Miner appears!
+489.00 mob_death Rampaging Boar dies to Umbral Bolt!
+492.00 mob_death Kobold Miner appears!
+493.00 mob_death Kobold Miner dies to Umbral Bolt!
+496.00 mob_death Grey Wolf appears!
+497.00 mob_death Kobold Miner dies to Umbral Bolt!
+500.00 mob_death Grey Wolf appears!
+501.00 mob_death Grey Wolf dies to Umbral Bolt!
+504.00 mob_death Kobold Miner appears!
+504.50 mob_attack Grey Wolf hits you for 9
+505.50 mob_death Grey Wolf dies to Umbral Bolt!
+505.50 mob_death Grey Wolf appears!
+508.50 mob_death Grey Wolf appears!
+509.50 mob_death Grey Wolf dies to Umbral Bolt!
+512.50 mob_death Kobold Miner appears!
+513.50 mob_death Grey Wolf dies to Umbral Bolt!
+516.50 mob_death Kobold Miner appears!
+516.75 mob_attack Kobold Miner hits you for 14
+517.75 mob_death Kobold Miner dies to Umbral Bolt!
+517.75 player_attack You hit Kobold Miner for 23
+520.75 mob_death Rampaging Boar appears!
+521.50 mob_attack Kobold Miner hits you for 14
+522.25 mob_death Kobold Miner dies to Umbral Bolt!
+522.25 mob_death Grey Wolf appears!
+522.25 player_attack You hit Kobold Miner for 23
+525.25 mob_death Kobold Miner appears!
+526.25 mob_death Rampaging Boar dies to Umbral Bolt!
+529.25 mob_death ★ Elite: ★ Rampaging Boar appears!
+529.25 mob_attack Kobold Miner hits you for 14
+530.25 mob_death Kobold Miner dies to Umbral Bolt!
+533.25 mob_death Rampaging Boar appears!
+533.25 mob_attack ★ Rampaging Boar hits you for 27
+534.50 player_attack You hit ★ Rampaging Boar for 23
+535.00 mob_attack ★ Rampaging Boar hits you for 27
+536.50 player_attack You hit ★ Rampaging Boar for 23
+536.75 mob_attack ★ Rampaging Boar hits you for 27
+538.50 player_attack You hit ★ Rampaging Boar for 23
+538.50 mob_death ★ Rampaging Boar dies!
+540.00 mob_death ★ Elite: ★ Grey Wolf appears!
+542.25 mob_death Rampaging Boar dies to Umbral Bolt!
+545.25 mob_death Kobold Miner appears!
+546.25 mob_attack ★ Grey Wolf hits you for 17
+547.50 player_attack You hit ★ Grey Wolf for 23
+548.25 mob_attack ★ Grey Wolf hits you for 17
+549.50 player_attack You hit ★ Grey Wolf for 23
+550.25 mob_death ★ Grey Wolf dies to Umbral Bolt!
+550.25 mob_attack ★ Grey Wolf hits you for 17
+553.25 mob_death Grey Wolf appears!
+554.25 mob_death Kobold Miner dies to Umbral Bolt!
+557.00 mob_attack Grey Wolf hits you for 9
+557.25 mob_death Grey Wolf appears!
+558.25 mob_death Grey Wolf dies to Umbral Bolt!
+561.25 mob_death Kobold Miner appears!
+561.75 mob_attack Grey Wolf hits you for 9
+561.75 player_death You have been slain! Respawning in 3s...
+569.75 player_respawn You rise from the grave...
+571.25 mob_death Rampaging Boar appears!
+572.75 mob_death Rampaging Boar dies to Umbral Bolt!
+572.75 mob_death Kobold Miner appears!
+575.75 mob_death Rampaging Boar appears!
+576.75 mob_death Kobold Miner dies to Umbral Bolt!
+576.75 player_attack You hit Kobold Miner for 23
+579.75 mob_death Grey Wolf appears!
+580.75 mob_death Rampaging Boar dies to Umbral Bolt!
+583.75 mob_death Grey Wolf appears!
+584.75 mob_death Grey Wolf dies to Umbral Bolt!
+584.75 mob_attack Grey Wolf hits you for 9
+587.75 mob_death Kobold Miner appears!
+588.75 mob_death Grey Wolf dies to Umbral Bolt!
+588.75 mob_attack Grey Wolf hits you for 9
+591.75 mob_death Grey Wolf appears!
+592.75 mob_death Kobold Miner dies to Umbral Bolt!
+595.75 mob_death Grey Wolf appears!
+596.75 mob_death Grey Wolf dies to Umbral Bolt!
+599.75 mob_death Rampaging Boar appears!
+
+## rogue twin fangs | seed=1
+0.25 mob_death Rampaging Boar appears!
+1.75 mob_death Grey Wolf appears!
+3.25 mob_death Grey Wolf appears!
+4.75 mob_death Rampaging Boar appears!
+5.25 proc ⚡ A moment of perfect stillness — guaranteed crit!
+5.25 player_crit You hit Rampaging Boar for 155 (CRIT!)
+5.25 mob_death Rampaging Boar dies!
+5.25 mob_attack Grey Wolf spots you and charges!
+6.75 mob_death Rampaging Boar appears!
+7.75 player_crit You hit Grey Wolf for 155 (CRIT!)
+7.75 mob_death Grey Wolf dies!
+9.25 mob_death Kobold Miner appears!
+11.00 player_crit You hit Rampaging Boar for 155 (CRIT!)
+11.00 mob_death Rampaging Boar dies!
+12.50 mob_death Kobold Miner appears!
+14.50 player_crit You hit Grey Wolf for 155 (CRIT!)
+14.50 mob_death Grey Wolf dies!
+16.00 mob_death Grey Wolf appears!
+20.25 player_crit You hit Kobold Miner for 155 (CRIT!)
+20.25 mob_death Kobold Miner dies!
+21.75 mob_death Kobold Miner appears!
+23.25 player_crit You hit Grey Wolf for 155 (CRIT!)
 23.25 mob_death Grey Wolf dies!
-23.25 level_up ★ Level Up! Now level 2!
 24.75 mob_death Grey Wolf appears!
-27.50 mob_attack Grey Wolf hits you for 6
-28.00 player_attack You hit Grey Wolf for 330
-28.00 mob_death Grey Wolf dies!
-29.50 mob_death Kobold Miner appears!
-33.75 mob_attack Grey Wolf hits you for 6
-34.25 player_attack You hit Grey Wolf for 336
-34.25 mob_death Grey Wolf dies!
-35.75 mob_death Rampaging Boar appears!
-39.25 mob_attack Kobold Miner hits you for 9
-39.50 player_attack You hit Kobold Miner for 336
-39.50 mob_death Kobold Miner dies!
-41.00 mob_death Kobold Miner appears!
-43.75 mob_attack Grey Wolf hits you for 6
-44.25 player_attack You hit Grey Wolf for 336
-44.25 mob_death Grey Wolf dies!
-45.75 mob_death Rampaging Boar appears!
-45.75 mob_attack Rampaging Boar joins the fight!
-49.50 mob_attack Rampaging Boar hits you for 9
-50.00 proc 🌀 The blow carries — 1 more caught for 302
-50.00 player_attack You hit Rampaging Boar for 336
-50.00 mob_death Rampaging Boar dies!
-50.00 mob_death Rampaging Boar dies!
-51.50 mob_death Kobold Miner appears!
-51.50 mob_attack Kobold Miner joins the fight!
-53.00 mob_death Grey Wolf appears!
-56.50 mob_attack Kobold Miner hits you for 9
-56.75 proc 🌀 The blow carries — 1 more caught for 302
-56.75 player_attack You hit Kobold Miner for 336
-56.75 mob_death Kobold Miner dies!
-56.75 mob_death Kobold Miner dies!
-58.25 mob_death Rampaging Boar appears!
-59.75 mob_death Kobold Miner appears!
-62.50 mob_attack Grey Wolf hits you for 6
-63.00 player_attack You hit Grey Wolf for 378
-63.00 mob_death Grey Wolf dies!
-63.50 mob_attack Kobold Miner joins the fight!
-64.50 mob_death Grey Wolf appears!
-68.25 mob_attack Rampaging Boar hits you for 9
-68.75 proc 🌀 The blow carries — 1 more caught for 340
-68.75 player_attack You hit Rampaging Boar for 378
-68.75 mob_death Rampaging Boar dies!
-68.75 mob_death Kobold Miner dies!
-70.25 mob_death Rampaging Boar appears!
-71.75 mob_death Grey Wolf appears!
-74.75 mob_attack Grey Wolf hits you for 6
-75.25 player_attack You hit Grey Wolf for 378
-75.25 mob_death Grey Wolf dies!
-76.75 mob_death Grey Wolf appears!
-79.75 mob_attack Grey Wolf hits you for 6
-80.25 player_attack You hit Grey Wolf for 378
-80.25 mob_death Grey Wolf dies!
-80.25 level_up ★ Level Up! Now level 3!
-81.75 mob_death Grey Wolf appears!
-81.75 mob_attack Grey Wolf joins the fight!
-86.50 mob_attack Rampaging Boar hits you for 9
-87.00 proc 🌀 The blow carries — 1 more caught for 342
-87.00 player_attack You hit Rampaging Boar for 380
-87.00 mob_death Rampaging Boar dies!
-87.00 mob_death Grey Wolf dies!
-88.50 mob_death Grey Wolf appears!
-90.00 mob_death Rampaging Boar appears!
-91.75 mob_attack Grey Wolf hits you for 6
-92.25 player_attack You hit Grey Wolf for 384
-92.25 mob_death Grey Wolf dies!
-93.75 mob_death Rampaging Boar appears!
-93.75 mob_attack Rampaging Boar joins the fight!
-97.75 mob_attack Rampaging Boar hits you for 9
-98.50 mob_attack Rampaging Boar hits you for 9
-99.00 proc 🌀 The blow carries — 1 more caught for 346
-99.00 player_attack You hit Rampaging Boar for 384
-99.00 mob_death Rampaging Boar dies!
-99.00 mob_death Rampaging Boar dies!
-100.50 mob_death ★ Elite: ★ Kobold Miner appears!
-102.00 mob_death Grey Wolf appears!
-103.75 mob_attack Grey Wolf hits you for 6
-104.25 player_attack You hit Grey Wolf for 384
-104.25 mob_death Grey Wolf dies!
-105.75 mob_death Rampaging Boar appears!
-108.25 mob_attack Grey Wolf hits you for 6
-108.75 player_attack You hit Grey Wolf for 384
-108.75 mob_death Grey Wolf dies!
-110.25 mob_death Rampaging Boar appears!
-113.25 mob_attack ★ Kobold Miner hits you for 16
-113.50 player_attack You hit ★ Kobold Miner for 384
-113.50 mob_death ★ Kobold Miner dies!
-115.00 mob_death Rampaging Boar appears!
-117.50 mob_attack Rampaging Boar hits you for 9
-118.00 player_crit You hit Rampaging Boar for 460 (CRIT!)
-118.00 mob_death Rampaging Boar dies!
-119.50 mob_death Rampaging Boar appears!
-123.50 mob_attack Rampaging Boar hits you for 9
-124.00 player_attack You hit Rampaging Boar for 384
-124.00 mob_death Rampaging Boar dies!
-124.50 mob_attack Rampaging Boar joins the fight!
-125.50 mob_death ★ Elite: ★ Rampaging Boar appears!
-130.00 mob_attack Rampaging Boar hits you for 9
-130.50 proc 🌀 The blow carries — 1 more caught for 346
-130.50 player_attack You hit Rampaging Boar for 384
-130.50 mob_death Rampaging Boar dies!
-130.50 mob_attack Rampaging Boar hits you for 9
-130.50 mob_death Rampaging Boar dies!
-132.00 mob_death Kobold Miner appears!
-133.50 mob_death Kobold Miner appears!
-137.00 mob_attack ★ Rampaging Boar hits you for 16
-137.50 player_attack You hit ★ Rampaging Boar for 390
-137.50 mob_death ★ Rampaging Boar dies!
-139.00 mob_death Grey Wolf appears!
-143.25 mob_attack Kobold Miner hits you for 8
-143.50 player_attack You hit Kobold Miner for 390
-143.50 mob_death Kobold Miner dies!
-150.00 mob_death Rampaging Boar appears!
-152.50 mob_attack Grey Wolf hits you for 5
-153.00 player_attack You hit Grey Wolf for 390
-153.00 mob_death Grey Wolf dies!
-154.50 mob_death Kobold Miner appears!
-162.50 mob_attack Rampaging Boar hits you for 9
-163.00 player_attack You hit Rampaging Boar for 390
-163.00 mob_death Rampaging Boar dies!
-164.50 mob_death Kobold Miner appears!
-168.75 mob_attack Kobold Miner hits you for 8
-169.00 player_attack You hit Kobold Miner for 390
-169.00 mob_death Kobold Miner dies!
-170.50 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
-178.75 player_attack You hit [BOSS] Elder Meadow Beast for 390
-179.25 mob_attack [BOSS] Elder Meadow Beast hits you for 81
-181.25 player_attack You hit [BOSS] Elder Meadow Beast for 506
-181.25 mob_death [BOSS] Elder Meadow Beast dies!
-181.25 level_up ★ Level Up! Now level 4!
-181.25 level_up ★ Level Up! Now level 5!
-182.75 mob_death Kobold Miner appears!
-184.25 mob_death Grey Wolf appears!
-185.75 mob_death Rampaging Boar appears!
-187.00 mob_attack Kobold Miner hits you for 8
-187.25 mob_death Grey Wolf appears!
-187.25 player_attack You hit Kobold Miner for 390
-187.25 mob_death Kobold Miner dies!
-188.75 mob_death Rampaging Boar appears!
-191.75 mob_attack Grey Wolf hits you for 5
-192.25 player_attack You hit Grey Wolf for 390
-192.25 mob_death Grey Wolf dies!
-193.75 mob_death Rampaging Boar appears!
-196.25 mob_attack Rampaging Boar hits you for 9
-196.75 player_attack You hit Rampaging Boar for 390
-196.75 mob_death Rampaging Boar dies!
-198.25 mob_death Grey Wolf appears!
-200.50 mob_attack Rampaging Boar hits you for 9
-201.00 player_attack You hit Rampaging Boar for 390
-201.00 mob_death Rampaging Boar dies!
-202.50 mob_death Rampaging Boar appears!
-205.75 mob_attack Rampaging Boar hits you for 9
-206.25 player_attack You hit Rampaging Boar for 390
-206.25 mob_death Rampaging Boar dies!
-207.75 mob_death Kobold Miner appears!
-210.00 mob_attack Grey Wolf hits you for 5
-210.50 player_attack You hit Grey Wolf for 390
-210.50 mob_death Grey Wolf dies!
-212.00 mob_death Grey Wolf appears!
-216.50 mob_attack Kobold Miner hits you for 8
-216.75 player_attack You hit Kobold Miner for 195
-216.75 mob_death Kobold Miner dies!
-218.25 mob_death Kobold Miner appears!
-218.25 mob_attack Kobold Miner joins the fight!
-222.25 mob_attack Grey Wolf hits you for 5
-222.75 proc 🌀 The blow carries — 1 more caught for 351
-222.75 player_attack You hit Grey Wolf for 390
-222.75 mob_death Grey Wolf dies!
-222.75 mob_attack Kobold Miner hits you for 8
-222.75 mob_death Kobold Miner dies!
-224.25 mob_death Grey Wolf appears!
-225.75 mob_death Kobold Miner appears!
-230.75 mob_attack Rampaging Boar hits you for 9
-231.25 player_attack You hit Rampaging Boar for 390
-231.25 mob_death Rampaging Boar dies!
-232.75 mob_death Kobold Miner appears!
-237.00 mob_attack Kobold Miner hits you for 8
-237.25 player_attack You hit Kobold Miner for 386
-237.25 mob_death Kobold Miner dies!
-238.75 mob_death Kobold Miner appears!
-241.25 mob_attack Kobold Miner hits you for 8
-241.25 player_death You have been slain! Respawning in 3s...
-244.25 player_respawn You rise from the grave...
-245.75 mob_death Rampaging Boar appears!
-247.25 mob_death ★ Elite: ★ Kobold Miner appears!
-247.25 mob_attack ★ Kobold Miner joins the fight!
-248.75 mob_death Grey Wolf appears!
-250.25 mob_death Kobold Miner appears!
-251.50 mob_attack ★ Kobold Miner hits you for 15
-251.75 mob_attack Rampaging Boar hits you for 8
-252.25 proc 🌀 The blow carries — 1 more caught for 347
-252.25 player_attack You hit Rampaging Boar for 386
-252.25 mob_death Rampaging Boar dies!
-252.25 mob_death ★ Kobold Miner dies!
-253.75 mob_death Grey Wolf appears!
-255.25 mob_death Kobold Miner appears!
-255.50 mob_attack Grey Wolf spots you and charges!
-257.75 mob_attack Kobold Miner hits you for 8
-258.00 proc 🌀 The blow carries — 1 more caught for 347
-258.00 player_attack You hit Kobold Miner for 386
-258.00 mob_death Kobold Miner dies!
-258.00 mob_death Grey Wolf dies!
-259.50 mob_death Grey Wolf appears!
-261.00 mob_death ★ Elite: ★ Kobold Miner appears!
-263.00 mob_attack Grey Wolf hits you for 5
-263.50 player_attack You hit Grey Wolf for 386
-263.50 mob_death Grey Wolf dies!
-264.00 mob_attack ★ Kobold Miner joins the fight!
-265.00 mob_death Kobold Miner appears!
-268.00 mob_attack Kobold Miner hits you for 8
-268.25 proc 🌀 The blow carries — 1 more caught for 347
-268.25 player_attack You hit Kobold Miner for 386
-268.25 mob_death Kobold Miner dies!
-268.25 mob_death ★ Kobold Miner dies!
-269.75 mob_death Grey Wolf appears!
-271.25 mob_death Kobold Miner appears!
-272.50 mob_attack Grey Wolf hits you for 5
-273.00 player_attack You hit Grey Wolf for 386
-273.00 mob_death Grey Wolf dies!
-274.50 mob_death Kobold Miner appears!
-277.25 mob_attack Kobold Miner hits you for 8
-277.50 player_attack You hit Kobold Miner for 386
-277.50 mob_death Kobold Miner dies!
-279.00 mob_death Grey Wolf appears!
-282.50 mob_attack Kobold Miner hits you for 8
-282.75 player_attack You hit Kobold Miner for 386
-282.75 mob_death Kobold Miner dies!
-284.25 mob_death Grey Wolf appears!
-286.25 mob_attack Grey Wolf hits you for 5
-286.75 player_attack You hit Grey Wolf for 193
-286.75 mob_death Grey Wolf dies!
-288.25 mob_death Grey Wolf appears!
-291.75 mob_attack Grey Wolf hits you for 5
-292.25 player_attack You hit Grey Wolf for 386
-292.25 mob_death Grey Wolf dies!
-320.25 proc ⚔️ Crafted Coarse Crude Weapon Oil!
-321.75 mob_death Kobold Miner appears!
-327.25 mob_attack Grey Wolf hits you for 5
-327.75 player_attack You hit Grey Wolf for 386
-327.75 mob_death Grey Wolf dies!
-329.25 mob_death Rampaging Boar appears!
-334.25 mob_attack Kobold Miner hits you for 8
-334.50 player_attack You hit Kobold Miner for 382
-334.50 mob_death Kobold Miner dies!
-336.00 mob_death Kobold Miner appears!
-339.75 mob_attack Rampaging Boar hits you for 8
-340.25 player_attack You hit Rampaging Boar for 376
-340.25 mob_death Rampaging Boar dies!
-341.75 mob_death Grey Wolf appears!
-344.50 mob_attack Kobold Miner hits you for 8
-344.75 player_attack You hit Kobold Miner for 376
-344.75 mob_death Kobold Miner dies!
-346.25 mob_death Grey Wolf appears!
-348.75 mob_attack Grey Wolf hits you for 5
-349.25 player_attack You hit Grey Wolf for 376
-349.25 mob_death Grey Wolf dies!
-362.25 proc ⚔️ Crafted Coarse Crude Weapon Oil!
-363.75 mob_death Kobold Miner appears!
-366.50 mob_attack Grey Wolf hits you for 5
-367.00 player_attack You hit Grey Wolf for 376
-367.00 mob_death Grey Wolf dies!
-368.50 mob_death Grey Wolf appears!
-371.25 mob_attack Kobold Miner hits you for 8
-371.50 player_attack You hit Kobold Miner for 376
-371.50 mob_death Kobold Miner dies!
-373.00 mob_death Kobold Miner appears!
-377.00 mob_attack Grey Wolf hits you for 5
-377.50 player_attack You hit Grey Wolf for 376
-377.50 mob_death Grey Wolf dies!
-379.00 mob_death Rampaging Boar appears!
-382.00 mob_attack Kobold Miner hits you for 8
-382.25 player_attack You hit Kobold Miner for 376
-382.25 mob_death Kobold Miner dies!
-383.75 mob_death Grey Wolf appears!
-386.75 mob_attack Rampaging Boar hits you for 8
-387.25 player_attack You hit Rampaging Boar for 188
-387.25 mob_death Rampaging Boar dies!
-388.75 mob_death Grey Wolf appears!
-391.25 mob_attack Grey Wolf hits you for 5
-391.75 player_attack You hit Grey Wolf for 376
-391.75 mob_death Grey Wolf dies!
-392.25 mob_attack Grey Wolf joins the fight!
-393.25 mob_death Grey Wolf appears!
-397.25 mob_attack Grey Wolf hits you for 5
-397.75 proc 🌀 The blow carries — 1 more caught for 761
-397.75 player_crit You hit Grey Wolf for 846 (CRIT!)
-397.75 mob_death Grey Wolf dies!
-397.75 mob_death Grey Wolf dies!
-399.25 mob_death Rampaging Boar appears!
-399.25 mob_attack Rampaging Boar joins the fight!
-400.75 mob_death Grey Wolf appears!
-403.25 mob_attack Rampaging Boar hits you for 8
-403.75 mob_attack Grey Wolf hits you for 5
-404.25 proc 🌀 The blow carries — 1 more caught for 317
-404.25 player_attack You hit Grey Wolf for 352
-404.25 mob_death Grey Wolf dies!
-404.25 mob_death Rampaging Boar dies!
-405.75 mob_death Rampaging Boar appears!
-407.25 mob_death Kobold Miner appears!
-409.00 mob_attack Grey Wolf hits you for 5
-409.50 player_attack You hit Grey Wolf for 352
-409.50 mob_death Grey Wolf dies!
-411.00 mob_death Grey Wolf appears!
-414.50 mob_attack Kobold Miner hits you for 8
-414.75 player_attack You hit Kobold Miner for 352
-414.75 mob_death Kobold Miner dies!
-416.25 mob_death Kobold Miner appears!
-418.50 mob_attack Rampaging Boar hits you for 8
-419.00 player_attack You hit Rampaging Boar for 176
-419.00 mob_death Rampaging Boar dies!
-419.00 level_up ★ Level Up! Now level 6!
-420.50 mob_death Rampaging Boar appears!
-423.25 mob_attack Kobold Miner hits you for 8
-423.50 player_crit You hit Kobold Miner for 846 (CRIT!)
-423.50 mob_death Kobold Miner dies!
-425.00 mob_death Kobold Miner appears!
-427.50 mob_attack Rampaging Boar hits you for 8
-428.00 player_attack You hit Rampaging Boar for 352
-428.00 mob_death Rampaging Boar dies!
-429.50 mob_death Kobold Miner appears!
-431.75 mob_attack Grey Wolf hits you for 5
-432.25 player_attack You hit Grey Wolf for 352
-432.25 mob_death Grey Wolf dies!
-433.75 mob_death ★ Elite: ★ Grey Wolf appears!
-436.50 mob_attack Kobold Miner hits you for 8
-436.75 player_crit You hit Kobold Miner for 846 (CRIT!)
-436.75 mob_death Kobold Miner dies!
-438.25 mob_death Grey Wolf appears!
-442.00 mob_attack Kobold Miner hits you for 8
-442.25 player_attack You hit Kobold Miner for 352
-442.25 mob_death Kobold Miner dies!
-443.75 mob_death Kobold Miner appears!
-446.50 mob_attack Grey Wolf hits you for 5
-447.00 player_attack You hit Grey Wolf for 176
-447.00 mob_death Grey Wolf dies!
-448.50 mob_death Grey Wolf appears!
-452.25 mob_attack ★ Grey Wolf hits you for 9
-452.75 player_attack You hit ★ Grey Wolf for 352
-452.75 mob_death ★ Grey Wolf dies!
-454.25 mob_death ★ Elite: ★ Rampaging Boar appears!
-457.75 mob_attack Grey Wolf hits you for 5
-458.25 player_attack You hit Grey Wolf for 352
-458.25 mob_death Grey Wolf dies!
-459.75 mob_death Rampaging Boar appears!
-459.75 mob_attack Rampaging Boar joins the fight!
-464.75 mob_attack ★ Rampaging Boar hits you for 14
-465.25 proc 🌀 The blow carries — 1 more caught for 317
-465.25 player_attack You hit ★ Rampaging Boar for 352
-465.25 mob_death ★ Rampaging Boar dies!
-465.25 mob_death Rampaging Boar dies!
-466.75 mob_death Kobold Miner appears!
-468.25 mob_death Grey Wolf appears!
-470.75 mob_attack Kobold Miner hits you for 8
-471.00 player_attack You hit Kobold Miner for 456
-471.00 mob_death Kobold Miner dies!
-472.50 mob_death Grey Wolf appears!
-475.50 mob_attack Kobold Miner hits you for 8
-475.75 player_attack You hit Kobold Miner for 456
-475.75 mob_death Kobold Miner dies!
-476.25 mob_attack Kobold Miner joins the fight!
-477.25 mob_death Rampaging Boar appears!
-480.75 mob_attack Grey Wolf hits you for 5
-481.25 proc 🌀 The blow carries — 1 more caught for 985
-481.25 player_crit You hit Grey Wolf for 1094 (CRIT!)
-481.25 mob_death Grey Wolf dies!
-481.25 mob_death Kobold Miner dies!
-482.75 mob_death Kobold Miner appears!
-484.25 mob_death Kobold Miner appears!
-486.75 mob_attack Grey Wolf hits you for 5
-487.25 player_attack You hit Grey Wolf for 456
-487.25 mob_death Grey Wolf dies!
-488.75 mob_death Rampaging Boar appears!
-491.25 mob_attack Kobold Miner hits you for 8
-491.50 player_attack You hit Kobold Miner for 456
-491.50 mob_death Kobold Miner dies!
-493.00 mob_death Rampaging Boar appears!
-496.25 mob_attack Rampaging Boar hits you for 8
-496.75 player_attack You hit Rampaging Boar for 456
-496.75 mob_death Rampaging Boar dies!
-498.25 mob_death Rampaging Boar appears!
-500.50 mob_attack Rampaging Boar hits you for 8
-500.50 player_death You have been slain! Respawning in 3s...
-503.50 player_respawn You rise from the grave...
-505.00 mob_death Grey Wolf appears!
-506.50 mob_death Grey Wolf appears!
-508.00 mob_death Rampaging Boar appears!
-509.50 mob_death ★ Elite: ★ Rampaging Boar appears!
-511.00 mob_attack Grey Wolf hits you for 5
-511.50 player_attack You hit Grey Wolf for 456
-511.50 mob_death Grey Wolf dies!
-513.00 mob_death Grey Wolf appears!
-515.25 mob_attack Rampaging Boar hits you for 8
-515.75 player_attack You hit Rampaging Boar for 456
-515.75 mob_death Rampaging Boar dies!
-517.25 mob_death Kobold Miner appears!
-520.00 mob_attack Grey Wolf hits you for 5
-520.50 player_attack You hit Grey Wolf for 456
-520.50 mob_death Grey Wolf dies!
-532.00 mob_death Grey Wolf appears!
-535.00 mob_attack Grey Wolf hits you for 5
-535.50 player_attack You hit Grey Wolf for 456
-535.50 mob_death Grey Wolf dies!
-537.00 mob_death Rampaging Boar appears!
-540.25 mob_attack ★ Rampaging Boar hits you for 14
-540.75 player_attack You hit ★ Rampaging Boar for 456
-540.75 mob_death ★ Rampaging Boar dies!
-542.25 mob_death Grey Wolf appears!
-545.00 mob_attack Grey Wolf hits you for 5
-545.50 player_attack You hit Grey Wolf for 456
-545.50 mob_death Grey Wolf dies!
-547.00 mob_death Grey Wolf appears!
-547.00 mob_attack Grey Wolf joins the fight!
-550.75 mob_attack Grey Wolf hits you for 5
-551.25 proc 🌀 The blow carries — 1 more caught for 492
-551.25 player_crit You hit Grey Wolf for 547 (CRIT!)
-551.25 mob_death Grey Wolf dies!
-551.25 mob_death Grey Wolf dies!
-552.75 mob_death Kobold Miner appears!
-554.25 mob_death Grey Wolf appears!
-558.75 mob_attack Rampaging Boar hits you for 8
-559.25 player_attack You hit Rampaging Boar for 456
-559.25 mob_death Rampaging Boar dies!
-560.75 mob_death Rampaging Boar appears!
-566.25 mob_attack Kobold Miner hits you for 8
-566.50 player_crit You hit Kobold Miner for 1094 (CRIT!)
-566.50 mob_death Kobold Miner dies!
-568.00 mob_death Rampaging Boar appears!
-571.00 mob_attack Grey Wolf hits you for 5
-571.50 player_attack You hit Grey Wolf for 456
-571.50 mob_death Grey Wolf dies!
-572.00 mob_attack Rampaging Boar joins the fight!
-573.00 mob_death Rampaging Boar appears!
-576.50 mob_attack Rampaging Boar hits you for 8
-577.00 proc 🌀 The blow carries — 1 more caught for 985
-577.00 player_crit You hit Rampaging Boar for 1094 (CRIT!)
-577.00 mob_death Rampaging Boar dies!
-577.00 mob_death Rampaging Boar dies!
-578.50 mob_death Kobold Miner appears!
-580.00 mob_death Rampaging Boar appears!
-582.25 mob_attack Rampaging Boar hits you for 8
-582.75 player_attack You hit Rampaging Boar for 456
-582.75 mob_death Rampaging Boar dies!
-584.25 mob_death Rampaging Boar appears!
-586.50 mob_attack Rampaging Boar hits you for 8
-587.00 player_attack You hit Rampaging Boar for 456
-587.00 mob_death Rampaging Boar dies!
-588.50 mob_death Kobold Miner appears!
-591.25 mob_attack Rampaging Boar hits you for 8
-591.75 player_attack You hit Rampaging Boar for 456
-591.75 mob_death Rampaging Boar dies!
-593.25 mob_death Kobold Miner appears!
-597.25 mob_attack Kobold Miner hits you for 8
-597.50 player_crit You hit Kobold Miner for 1094 (CRIT!)
-597.50 mob_death Kobold Miner dies!
-599.00 mob_death Kobold Miner appears!
+28.75 player_crit You hit Kobold Miner for 293 (CRIT!)
+28.75 mob_death Kobold Miner dies!
+30.25 mob_death Rampaging Boar appears!
+34.00 player_crit You hit Grey Wolf for 293 (CRIT!)
+34.00 mob_death Grey Wolf dies!
+35.50 mob_death Rampaging Boar appears!
+38.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+38.75 player_crit You hit Rampaging Boar for 293 (CRIT!)
+38.75 mob_death Rampaging Boar dies!
+40.25 mob_death Kobold Miner appears!
+43.00 player_crit You hit Rampaging Boar for 293 (CRIT!)
+43.00 mob_death Rampaging Boar dies!
+44.50 mob_death Rampaging Boar appears!
+47.75 player_crit You hit Kobold Miner for 293 (CRIT!)
+47.75 mob_death Kobold Miner dies!
+49.25 mob_death Rampaging Boar appears!
+53.25 player_crit You hit Kobold Miner for 293 (CRIT!)
+53.25 mob_death Kobold Miner dies!
+54.75 mob_death Rampaging Boar appears!
+59.00 player_crit You hit Rampaging Boar for 293 (CRIT!)
+59.00 mob_death Rampaging Boar dies!
+60.50 mob_death Kobold Miner appears!
+64.25 player_crit You hit Rampaging Boar for 293 (CRIT!)
+64.25 mob_death Rampaging Boar dies!
+65.75 mob_death Kobold Miner appears!
+69.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+69.75 player_crit You hit Kobold Miner for 293 (CRIT!)
+69.75 mob_death Kobold Miner dies!
+70.25 mob_attack Rampaging Boar joins the fight!
+71.25 mob_death Kobold Miner appears!
+73.75 proc 🌀 The blow carries — 1 more caught for 253
+73.75 player_crit You hit Rampaging Boar for 293 (CRIT!)
+73.75 mob_death Rampaging Boar dies!
+73.75 mob_death Rampaging Boar dies!
+75.25 mob_death Grey Wolf appears!
+75.25 mob_attack Grey Wolf joins the fight!
+76.75 mob_death Kobold Miner appears!
+78.25 player_crit You hit Kobold Miner for 293 (CRIT!)
+78.25 mob_death Kobold Miner dies!
+79.75 mob_death Kobold Miner appears!
+80.00 player_attack You hit Grey Wolf for 150
+80.00 mob_death Grey Wolf dies!
+86.50 mob_death Rampaging Boar appears!
+89.75 player_crit You hit Kobold Miner for 301 (CRIT!)
+89.75 mob_death Kobold Miner dies!
+91.25 mob_death ★ Elite: ★ Kobold Miner appears!
+94.50 player_crit You hit Rampaging Boar for 301 (CRIT!)
+94.50 mob_death Rampaging Boar dies!
+96.00 mob_death Kobold Miner appears!
+98.50 player_crit You hit ★ Kobold Miner for 301 (CRIT!)
+98.50 mob_death ★ Kobold Miner dies!
+100.00 mob_death Kobold Miner appears!
+102.75 player_crit You hit Kobold Miner for 301 (CRIT!)
+102.75 mob_death Kobold Miner dies!
+104.25 mob_death Rampaging Boar appears!
+106.25 proc ⚡ A moment of perfect stillness — guaranteed crit!
+106.25 player_crit You hit Kobold Miner for 301 (CRIT!)
+106.25 mob_death Kobold Miner dies!
+107.75 mob_death Rampaging Boar appears!
+111.25 player_crit You hit Rampaging Boar for 301 (CRIT!)
+111.25 mob_death Rampaging Boar dies!
+112.75 mob_death Grey Wolf appears!
+114.50 player_attack You hit Rampaging Boar for 150
+114.50 mob_death Rampaging Boar dies!
+116.00 mob_death Rampaging Boar appears!
+118.75 player_crit You hit Kobold Miner for 301 (CRIT!)
+118.75 mob_death Kobold Miner dies!
+120.25 mob_death Grey Wolf appears!
+121.75 player_crit You hit Grey Wolf for 301 (CRIT!)
+121.75 mob_death Grey Wolf dies!
+123.25 mob_death Rampaging Boar appears!
+125.00 player_attack You hit Grey Wolf for 150
+125.00 mob_death Grey Wolf dies!
+126.50 mob_death Kobold Miner appears!
+130.00 player_crit You hit Rampaging Boar for 301 (CRIT!)
+130.00 mob_death Rampaging Boar dies!
+131.50 mob_death Kobold Miner appears!
+135.50 player_crit You hit Kobold Miner for 301 (CRIT!)
+135.50 mob_death Kobold Miner dies!
+136.00 mob_attack Kobold Miner joins the fight!
+137.00 mob_death Grey Wolf appears!
+137.00 mob_attack Grey Wolf joins the fight!
+140.25 proc ⚡ A moment of perfect stillness — guaranteed crit!
+140.25 player_crit You hit Rampaging Boar for 301 (CRIT!)
+140.25 mob_death Rampaging Boar dies!
+141.75 mob_death Kobold Miner appears!
+141.75 proc 🌀 The blow carries — 1 more caught for 260
+141.75 player_crit You hit Kobold Miner for 301 (CRIT!)
+141.75 mob_death Kobold Miner dies!
+141.75 mob_death Grey Wolf dies!
+143.25 mob_death Rampaging Boar appears!
+144.75 mob_death Rampaging Boar appears!
+146.50 player_crit You hit Kobold Miner for 301 (CRIT!)
+146.50 mob_death Kobold Miner dies!
+148.00 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+154.00 player_crit You hit [BOSS] Elder Meadow Beast for 301 (CRIT!)
+155.25 player_attack You hit [BOSS] Elder Meadow Beast for 180
+155.25 mob_death [BOSS] Elder Meadow Beast dies!
+163.50 mob_death Plains Vulture appears!
+165.00 mob_death Dustwind Thug appears!
+166.50 mob_death Plains Vulture appears!
+168.00 mob_death Harrowfield Golem appears!
+168.50 player_crit You hit Plains Vulture for 293 (CRIT!)
+168.50 mob_death Plains Vulture dies!
+170.00 mob_death Dustwind Thug appears!
+172.00 mob_attack Dustwind Thug spots you and charges!
+172.50 player_crit You hit Dustwind Thug for 293 (CRIT!)
+172.50 mob_death Dustwind Thug dies!
+174.00 mob_death Plains Vulture appears!
+174.75 player_crit You hit Dustwind Thug for 293 (CRIT!)
+174.75 mob_death Dustwind Thug dies!
+176.25 mob_death Dustwind Thug appears!
+178.25 proc ⚡ A moment of perfect stillness — guaranteed crit!
+178.25 player_crit You hit Harrowfield Golem for 293 (CRIT!)
+178.25 mob_death Harrowfield Golem dies!
+179.75 mob_death Dustwind Thug appears!
+181.00 player_crit You hit Plains Vulture for 293 (CRIT!)
+181.00 mob_death Plains Vulture dies!
+182.50 mob_death Plains Vulture appears!
+185.00 player_crit You hit Dustwind Thug for 293 (CRIT!)
+185.00 mob_death Dustwind Thug dies!
+186.50 mob_death Dustwind Thug appears!
+189.00 player_crit You hit Plains Vulture for 293 (CRIT!)
+189.00 mob_death Plains Vulture dies!
+190.50 mob_death ★ Elite: ★ Plains Vulture appears!
+192.50 player_attack You hit Dustwind Thug for 147
+192.50 mob_death Dustwind Thug dies!
+194.00 mob_death Dustwind Thug appears!
+195.75 player_crit You hit ★ Plains Vulture for 293 (CRIT!)
+195.75 mob_death ★ Plains Vulture dies!
+197.25 mob_death Harrowfield Golem appears!
+199.25 player_crit You hit Plains Vulture for 293 (CRIT!)
+199.25 mob_death Plains Vulture dies!
+200.75 mob_death Harrowfield Golem appears!
+203.25 player_attack You hit Harrowfield Golem for 147
+204.50 player_crit You hit Harrowfield Golem for 352 (CRIT!)
+204.50 mob_death Harrowfield Golem dies!
+206.00 mob_death Harrowfield Golem appears!
+207.50 player_attack You hit Harrowfield Golem for 147
+208.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+208.75 player_crit You hit Harrowfield Golem for 352 (CRIT!)
+208.75 mob_death Harrowfield Golem dies!
+210.25 mob_death Plains Vulture appears!
+212.50 player_crit You hit Harrowfield Golem for 293 (CRIT!)
+212.50 mob_death Harrowfield Golem dies!
+214.00 mob_death Plains Vulture appears!
+216.25 player_crit You hit Dustwind Thug for 293 (CRIT!)
+216.25 mob_death Dustwind Thug dies!
+217.75 mob_death Harrowfield Golem appears!
+219.00 mob_attack Plains Vulture spots you and charges!
+219.25 player_crit You hit Plains Vulture for 293 (CRIT!)
+219.25 mob_death Plains Vulture dies!
+219.25 mob_attack Harrowfield Golem joins the fight!
+220.75 mob_death ★ Elite: ★ Dustwind Thug appears!
+221.50 player_attack You hit Plains Vulture for 147
+221.50 mob_death Plains Vulture dies!
+223.00 mob_death Dustwind Thug appears!
+223.25 player_crit You hit Harrowfield Golem for 293 (CRIT!)
+223.25 mob_death Harrowfield Golem dies!
+224.75 mob_death Harrowfield Golem appears!
+226.00 player_crit You hit Dustwind Thug for 293 (CRIT!)
+226.00 mob_death Dustwind Thug dies!
+227.50 mob_death ★ Elite: ★ Plains Vulture appears!
+229.75 player_crit You hit ★ Dustwind Thug for 716 (CRIT!)
+229.75 mob_death ★ Dustwind Thug dies!
+231.25 mob_death Plains Vulture appears!
+233.25 player_attack You hit Dustwind Thug for 358
+233.25 mob_death Dustwind Thug dies!
+234.75 mob_death Dustwind Thug appears!
+236.75 player_crit You hit Plains Vulture for 716 (CRIT!)
+236.75 mob_death Plains Vulture dies!
+238.25 mob_death Dustwind Thug appears!
+238.25 mob_attack Dustwind Thug joins the fight!
+241.25 proc ⚡ A moment of perfect stillness — guaranteed crit!
+241.25 proc 🌀 The blow carries — 1 more caught for 619
+241.25 player_crit You hit Dustwind Thug for 716 (CRIT!)
+241.25 mob_death Dustwind Thug dies!
+241.25 mob_death Dustwind Thug dies!
+242.75 mob_death Harrowfield Golem appears!
+244.25 mob_death Dustwind Thug appears!
+248.75 player_crit You hit ★ Plains Vulture for 716 (CRIT!)
+248.75 mob_death ★ Plains Vulture dies!
+250.25 mob_death Harrowfield Golem appears!
+251.50 player_crit You hit Dustwind Thug for 716 (CRIT!)
+251.50 mob_death Dustwind Thug dies!
+253.00 mob_death Harrowfield Golem appears!
+255.00 player_crit You hit Harrowfield Golem for 716 (CRIT!)
+255.00 mob_death Harrowfield Golem dies!
+256.50 mob_death Plains Vulture appears!
+258.25 player_attack You hit Harrowfield Golem for 358
+258.25 mob_death Harrowfield Golem dies!
+259.75 mob_death Plains Vulture appears!
+261.75 player_crit You hit Plains Vulture for 716 (CRIT!)
+261.75 mob_death Plains Vulture dies!
+263.25 mob_death Dustwind Thug appears!
+266.25 player_crit You hit Plains Vulture for 716 (CRIT!)
+266.25 mob_death Plains Vulture dies!
+266.75 mob_attack Harrowfield Golem joins the fight!
+267.75 mob_death Harrowfield Golem appears!
+270.25 proc 🌀 The blow carries — 1 more caught for 619
+270.25 player_crit You hit Dustwind Thug for 716 (CRIT!)
+270.25 mob_death Dustwind Thug dies!
+270.25 mob_death Harrowfield Golem dies!
+271.75 mob_death Dustwind Thug appears!
+273.25 mob_death Plains Vulture appears!
+274.50 proc ⚡ A moment of perfect stillness — guaranteed crit!
+274.50 player_crit You hit Harrowfield Golem for 716 (CRIT!)
+274.50 mob_death Harrowfield Golem dies!
+276.00 mob_death ★ Elite: ★ Plains Vulture appears!
+278.50 player_attack You hit Dustwind Thug for 358
+278.50 mob_death Dustwind Thug dies!
+280.00 mob_death Harrowfield Golem appears!
+282.25 player_crit You hit ★ Plains Vulture for 716 (CRIT!)
+282.25 mob_death ★ Plains Vulture dies!
+283.75 mob_death Plains Vulture appears!
+286.25 player_crit You hit Harrowfield Golem for 716 (CRIT!)
+286.25 mob_death Harrowfield Golem dies!
+287.75 mob_death Harrowfield Golem appears!
+289.25 player_crit You hit Plains Vulture for 716 (CRIT!)
+289.25 mob_death Plains Vulture dies!
+290.75 mob_death Harrowfield Golem appears!
+293.00 player_crit You hit Harrowfield Golem for 716 (CRIT!)
+293.00 mob_death Harrowfield Golem dies!
+293.50 mob_attack Harrowfield Golem joins the fight!
+294.50 mob_death Dustwind Thug appears!
+298.00 proc 🌀 The blow carries — 1 more caught for 619
+298.00 player_crit You hit Harrowfield Golem for 716 (CRIT!)
+298.00 mob_death Harrowfield Golem dies!
+298.00 mob_death Harrowfield Golem dies!
+299.50 mob_death Harrowfield Golem appears!
+301.00 mob_death Dustwind Thug appears!
+303.00 player_crit You hit Dustwind Thug for 716 (CRIT!)
+303.00 mob_death Dustwind Thug dies!
+304.50 mob_death Dustwind Thug appears!
+305.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+305.75 player_crit You hit Harrowfield Golem for 716 (CRIT!)
+305.75 mob_death Harrowfield Golem dies!
+307.25 mob_death Plains Vulture appears!
+309.75 player_crit You hit Dustwind Thug for 716 (CRIT!)
+309.75 mob_death Dustwind Thug dies!
+311.25 mob_death Plains Vulture appears!
+313.75 player_crit You hit Dustwind Thug for 716 (CRIT!)
+313.75 mob_death Dustwind Thug dies!
+315.25 mob_death Harrowfield Golem appears!
+319.50 player_crit You hit Plains Vulture for 716 (CRIT!)
+319.50 mob_death Plains Vulture dies!
+321.00 mob_death Harrowfield Golem appears!
+321.00 mob_attack Harrowfield Golem joins the fight!
+324.25 proc 🌀 The blow carries — 1 more caught for 619
+324.25 player_crit You hit Harrowfield Golem for 716 (CRIT!)
+324.25 mob_death Harrowfield Golem dies!
+324.25 mob_death Harrowfield Golem dies!
+325.75 mob_death Harrowfield Golem appears!
+327.25 mob_death Harrowfield Golem appears!
+327.50 mob_attack Harrowfield Golem joins the fight!
+330.75 proc 🌀 The blow carries — 1 more caught for 619
+330.75 player_crit You hit Plains Vulture for 716 (CRIT!)
+330.75 mob_death Plains Vulture dies!
+330.75 mob_death Harrowfield Golem dies!
+332.25 mob_death Harrowfield Golem appears!
+333.75 mob_death Harrowfield Golem appears!
+334.25 player_crit You hit Harrowfield Golem for 716 (CRIT!)
+334.25 mob_death Harrowfield Golem dies!
+335.75 mob_death Dustwind Thug appears!
+337.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+337.75 player_crit You hit Plains Vulture for 716 (CRIT!)
+337.75 mob_death Plains Vulture dies!
+339.25 mob_death Dustwind Thug appears!
+342.00 player_crit You hit Dustwind Thug for 716 (CRIT!)
+342.00 mob_death Dustwind Thug dies!
+343.50 mob_death Plains Vulture appears!
+348.00 player_crit You hit Dustwind Thug for 716 (CRIT!)
+348.00 mob_death Dustwind Thug dies!
+349.50 mob_death ⚠ BOSS: [BOSS] Bandit Warlord Grak appears!
+356.50 player_crit You hit [BOSS] Bandit Warlord Grak for 716 (CRIT!)
+357.75 player_crit You hit [BOSS] Bandit Warlord Grak for 716 (CRIT!)
+357.75 mob_death [BOSS] Bandit Warlord Grak dies!
+357.75 level_up ★ Level Up! Now level 21!
+366.00 mob_death Rotting Shambler appears!
+367.50 mob_death Rotting Shambler appears!
+368.75 player_crit You hit Rotting Shambler for 717 (CRIT!)
+368.75 mob_death Rotting Shambler dies!
+370.25 mob_death Rotting Shambler appears!
+371.75 mob_death Grimshade Wolfkin appears!
+373.25 mob_death Skeletal Archer appears!
+373.75 player_crit You hit Rotting Shambler for 717 (CRIT!)
+373.75 mob_death Rotting Shambler dies!
+375.25 mob_death Rotting Shambler appears!
+377.25 proc ⚡ A moment of perfect stillness — guaranteed crit!
+377.25 player_crit You hit Skeletal Archer for 717 (CRIT!)
+377.25 mob_death Skeletal Archer dies!
+378.75 mob_death Skeletal Archer appears!
+380.50 player_crit You hit Rotting Shambler for 717 (CRIT!)
+380.50 mob_death Rotting Shambler dies!
+382.00 mob_death Rotting Shambler appears!
+385.50 player_crit You hit Grimshade Wolfkin for 717 (CRIT!)
+385.50 mob_death Grimshade Wolfkin dies!
+387.00 mob_death Grimshade Wolfkin appears!
+390.00 player_crit You hit Rotting Shambler for 717 (CRIT!)
+390.00 mob_death Rotting Shambler dies!
+391.50 mob_death Skeletal Archer appears!
+394.25 player_crit You hit Grimshade Wolfkin for 717 (CRIT!)
+394.25 mob_death Grimshade Wolfkin dies!
+395.75 mob_death Skeletal Archer appears!
+399.75 player_crit You hit Skeletal Archer for 717 (CRIT!)
+399.75 mob_death Skeletal Archer dies!
+401.25 mob_death Grimshade Wolfkin appears!
+404.00 player_crit You hit Rotting Shambler for 717 (CRIT!)
+404.00 mob_death Rotting Shambler dies!
+405.50 mob_death Rotting Shambler appears!
+405.50 mob_attack Rotting Shambler joins the fight!
+409.50 proc ⚡ A moment of perfect stillness — guaranteed crit!
+409.50 proc 🌀 The blow carries — 1 more caught for 619
+409.50 player_crit You hit Skeletal Archer for 717 (CRIT!)
+409.50 mob_death Skeletal Archer dies!
+409.50 mob_death Rotting Shambler dies!
+411.00 mob_death Grimshade Wolfkin appears!
+412.50 mob_death Rotting Shambler appears!
+413.75 player_crit You hit Skeletal Archer for 717 (CRIT!)
+413.75 mob_death Skeletal Archer dies!
+415.25 mob_death Rotting Shambler appears!
+418.25 player_crit You hit Grimshade Wolfkin for 717 (CRIT!)
+418.25 mob_death Grimshade Wolfkin dies!
+419.75 mob_death Skeletal Archer appears!
+423.00 player_crit You hit Rotting Shambler for 717 (CRIT!)
+423.00 mob_death Rotting Shambler dies!
+424.50 mob_death Skeletal Archer appears!
+426.75 player_crit You hit Skeletal Archer for 717 (CRIT!)
+426.75 mob_death Skeletal Archer dies!
+428.25 mob_death Skeletal Archer appears!
+431.00 player_crit You hit Rotting Shambler for 717 (CRIT!)
+431.00 mob_death Rotting Shambler dies!
+432.50 mob_death Skeletal Archer appears!
+436.00 player_crit You hit Skeletal Archer for 717 (CRIT!)
+436.00 mob_death Skeletal Archer dies!
+437.50 mob_death Grimshade Wolfkin appears!
+440.50 proc ⚡ A moment of perfect stillness — guaranteed crit!
+440.50 player_crit You hit Skeletal Archer for 717 (CRIT!)
+440.50 mob_death Skeletal Archer dies!
+442.00 mob_death Rotting Shambler appears!
+444.25 player_crit You hit Grimshade Wolfkin for 717 (CRIT!)
+444.25 mob_death Grimshade Wolfkin dies!
+445.75 mob_death Skeletal Archer appears!
+449.50 player_crit You hit Rotting Shambler for 717 (CRIT!)
+449.50 mob_death Rotting Shambler dies!
+451.00 mob_death Grimshade Wolfkin appears!
+453.75 player_crit You hit Skeletal Archer for 717 (CRIT!)
+453.75 mob_death Skeletal Archer dies!
+454.25 mob_attack Grimshade Wolfkin joins the fight!
+455.25 mob_death Skeletal Archer appears!
+456.75 proc 🌀 The blow carries — 1 more caught for 619
+456.75 player_crit You hit Grimshade Wolfkin for 717 (CRIT!)
+456.75 mob_death Grimshade Wolfkin dies!
+456.75 mob_death Grimshade Wolfkin dies!
+458.25 mob_death Skeletal Archer appears!
+459.75 mob_death Grimshade Wolfkin appears!
+460.50 player_crit You hit Skeletal Archer for 717 (CRIT!)
+460.50 mob_death Skeletal Archer dies!
+462.00 mob_death Skeletal Archer appears!
+464.50 player_crit You hit Skeletal Archer for 717 (CRIT!)
+464.50 mob_death Skeletal Archer dies!
+476.00 mob_death Rotting Shambler appears!
+478.75 player_crit You hit Grimshade Wolfkin for 717 (CRIT!)
+478.75 mob_death Grimshade Wolfkin dies!
+480.25 mob_death Grimshade Wolfkin appears!
+483.00 proc ⚡ A moment of perfect stillness — guaranteed crit!
+483.00 player_crit You hit Rotting Shambler for 717 (CRIT!)
+483.00 mob_death Rotting Shambler dies!
+484.50 mob_death Grimshade Wolfkin appears!
+488.25 player_crit You hit Grimshade Wolfkin for 717 (CRIT!)
+488.25 mob_death Grimshade Wolfkin dies!
+489.75 mob_death Grimshade Wolfkin appears!
+491.50 player_attack You hit Grimshade Wolfkin for 359
+491.50 mob_death Grimshade Wolfkin dies!
+493.00 mob_death Rotting Shambler appears!
+498.50 player_crit You hit Grimshade Wolfkin for 717 (CRIT!)
+498.50 mob_death Grimshade Wolfkin dies!
+500.00 mob_death Grimshade Wolfkin appears!
+501.50 player_crit You hit Skeletal Archer for 717 (CRIT!)
+501.50 mob_death Skeletal Archer dies!
+503.00 mob_death Rotting Shambler appears!
+506.25 player_crit You hit Grimshade Wolfkin for 717 (CRIT!)
+506.25 mob_death Grimshade Wolfkin dies!
+507.75 mob_death Rotting Shambler appears!
+511.25 player_crit You hit Rotting Shambler for 717 (CRIT!)
+511.25 mob_death Rotting Shambler dies!
+512.75 mob_death Grimshade Wolfkin appears!
+516.50 proc ⚡ A moment of perfect stillness — guaranteed crit!
+516.50 player_crit You hit Rotting Shambler for 717 (CRIT!)
+516.50 mob_death Rotting Shambler dies!
+518.00 mob_death Rotting Shambler appears!
+522.50 player_crit You hit Grimshade Wolfkin for 717 (CRIT!)
+522.50 mob_death Grimshade Wolfkin dies!
+524.00 mob_death Skeletal Archer appears!
+525.00 player_crit You hit Rotting Shambler for 717 (CRIT!)
+525.00 mob_death Rotting Shambler dies!
+526.50 mob_death Skeletal Archer appears!
+530.50 player_crit You hit Skeletal Archer for 717 (CRIT!)
+530.50 mob_death Skeletal Archer dies!
+532.00 mob_death Skeletal Archer appears!
+535.00 player_crit You hit Skeletal Archer for 717 (CRIT!)
+535.00 mob_death Skeletal Archer dies!
+536.50 mob_death Skeletal Archer appears!
+541.00 player_crit You hit Skeletal Archer for 717 (CRIT!)
+541.00 mob_death Skeletal Archer dies!
+542.50 mob_death Grimshade Wolfkin appears!
+545.00 player_crit You hit Skeletal Archer for 757 (CRIT!)
+545.00 mob_death Skeletal Archer dies!
+546.50 mob_death Skeletal Archer appears!
+549.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+549.75 player_crit You hit Grimshade Wolfkin for 757 (CRIT!)
+549.75 mob_death Grimshade Wolfkin dies!
+551.25 mob_death ★ Elite: ★ Skeletal Archer appears!
+556.25 player_crit You hit Skeletal Archer for 757 (CRIT!)
+556.25 mob_death Skeletal Archer dies!
+557.75 mob_death Grimshade Wolfkin appears!
+560.75 player_crit You hit Rotting Shambler for 757 (CRIT!)
+560.75 mob_death Rotting Shambler dies!
+562.25 mob_death Skeletal Archer appears!
+565.50 player_crit You hit Grimshade Wolfkin for 757 (CRIT!)
+565.50 mob_death Grimshade Wolfkin dies!
+567.00 mob_death Skeletal Archer appears!
+572.50 player_crit You hit Skeletal Archer for 757 (CRIT!)
+572.50 mob_death Skeletal Archer dies!
+574.00 mob_death Skeletal Archer appears!
+575.75 player_crit You hit Skeletal Archer for 757 (CRIT!)
+575.75 mob_death Skeletal Archer dies!
+575.75 level_up ★ Level Up! Now level 22!
+577.25 mob_death Rotting Shambler appears!
+579.50 player_crit You hit ★ Skeletal Archer for 757 (CRIT!)
+579.50 mob_death ★ Skeletal Archer dies!
+596.00 mob_death Rotting Shambler appears!
+599.00 proc ⚡ A moment of perfect stillness — guaranteed crit!
+599.00 player_crit You hit Skeletal Archer for 757 (CRIT!)
+599.00 mob_death Skeletal Archer dies!
 
 ## warrior + party | seed=1
 0.25 mob_death Rampaging Boar appears!
@@ -6446,430 +7637,1684 @@
 
 ## warrior whirling | seed=2
 0.25 mob_death Rampaging Boar appears!
-1.75 mob_death Kobold Miner appears!
-3.25 mob_death Rampaging Boar appears!
+1.75 mob_death Rampaging Boar appears!
+3.25 mob_death Grey Wolf appears!
 4.75 mob_death Kobold Miner appears!
 4.75 mob_attack Rampaging Boar hits you for 9
-5.25 player_attack You hit Rampaging Boar for 330
+5.25 player_attack You hit Rampaging Boar for 348
 5.25 mob_death Rampaging Boar dies!
-6.75 mob_death Grey Wolf appears!
-9.50 mob_attack Rampaging Boar hits you for 9
-10.00 player_attack You hit Rampaging Boar for 330
-10.00 mob_death Rampaging Boar dies!
-11.50 mob_death Grey Wolf appears!
-14.75 mob_attack Kobold Miner hits you for 9
-15.00 player_attack You hit Kobold Miner for 330
-15.00 mob_death Kobold Miner dies!
-15.50 mob_attack Grey Wolf joins the fight!
-16.50 mob_death Grey Wolf appears!
-20.00 mob_attack Grey Wolf hits you for 6
-20.25 mob_attack Grey Wolf hits you for 6
-20.50 proc 🌀 The blow carries — 1 more caught for 297
-20.50 player_attack You hit Grey Wolf for 330
-20.50 mob_death Grey Wolf dies!
-20.50 mob_death Grey Wolf dies!
-20.50 level_up ★ Level Up! Now level 2!
-22.00 mob_death Grey Wolf appears!
-23.50 mob_death Kobold Miner appears!
-26.50 mob_attack Kobold Miner hits you for 9
-26.75 player_attack You hit Kobold Miner for 330
-26.75 mob_death Kobold Miner dies!
-28.25 mob_death Grey Wolf appears!
-33.00 mob_attack Grey Wolf hits you for 6
-33.50 player_attack You hit Grey Wolf for 330
-33.50 mob_death Grey Wolf dies!
-35.00 mob_death Kobold Miner appears!
-38.50 mob_attack Kobold Miner hits you for 8
-38.75 player_attack You hit Kobold Miner for 342
-38.75 mob_death Kobold Miner dies!
-40.25 mob_death Rampaging Boar appears!
-43.25 mob_attack Grey Wolf hits you for 5
-43.75 player_attack You hit Grey Wolf for 342
-43.75 mob_death Grey Wolf dies!
-45.25 mob_death Kobold Miner appears!
-45.25 mob_attack Kobold Miner joins the fight!
-48.75 mob_attack Kobold Miner hits you for 8
-49.00 proc 🌀 The blow carries — 1 more caught for 308
-49.00 player_attack You hit Kobold Miner for 342
-49.00 mob_death Kobold Miner dies!
-49.00 mob_death Kobold Miner dies!
-50.50 mob_death Rampaging Boar appears!
-52.00 mob_death Grey Wolf appears!
-52.50 mob_attack Rampaging Boar hits you for 9
-53.00 player_attack You hit Rampaging Boar for 342
-53.00 mob_death Rampaging Boar dies!
-54.50 mob_death Grey Wolf appears!
-59.50 mob_attack Grey Wolf hits you for 5
-60.00 player_attack You hit Grey Wolf for 171
-60.00 mob_death Grey Wolf dies!
-61.50 mob_death Rampaging Boar appears!
-65.75 mob_attack Grey Wolf hits you for 5
-66.25 player_attack You hit Grey Wolf for 342
-66.25 mob_death Grey Wolf dies!
-67.75 mob_death Kobold Miner appears!
-71.00 mob_attack Rampaging Boar hits you for 9
-71.50 player_attack You hit Rampaging Boar for 342
-71.50 mob_death Rampaging Boar dies!
-73.00 mob_death Grey Wolf appears!
-76.75 mob_attack Rampaging Boar hits you for 9
-77.25 player_attack You hit Rampaging Boar for 342
-77.25 mob_death Rampaging Boar dies!
-78.75 mob_death Grey Wolf appears!
-83.50 mob_attack Grey Wolf hits you for 5
-84.00 player_attack You hit Grey Wolf for 342
-84.00 mob_death Grey Wolf dies!
-85.50 mob_death Grey Wolf appears!
-90.00 mob_attack Kobold Miner hits you for 8
-90.25 player_attack You hit Kobold Miner for 342
-90.25 mob_death Kobold Miner dies!
-90.25 level_up ★ Level Up! Now level 3!
-91.75 mob_death Grey Wolf appears!
-94.00 mob_attack Grey Wolf hits you for 5
-94.50 player_attack You hit Grey Wolf for 350
+6.75 mob_death Kobold Miner appears!
+9.25 mob_attack Rampaging Boar hits you for 9
+9.75 player_attack You hit Rampaging Boar for 348
+9.75 mob_death Rampaging Boar dies!
+10.25 mob_attack Grey Wolf joins the fight!
+10.50 mob_attack Kobold Miner joins the fight!
+11.25 mob_death Kobold Miner appears!
+14.50 mob_attack Kobold Miner hits you for 9
+14.75 proc 🌀 The blow carries — 2 more caught for 313
+14.75 player_attack You hit Kobold Miner for 348
+14.75 mob_death Kobold Miner dies!
+14.75 mob_death Grey Wolf dies!
+14.75 mob_death Kobold Miner dies!
+16.25 mob_death Kobold Miner appears!
+17.75 mob_death Kobold Miner appears!
+19.25 mob_death Grey Wolf appears!
+21.50 mob_attack Kobold Miner hits you for 9
+21.75 player_attack You hit Kobold Miner for 366
+21.75 mob_death Kobold Miner dies!
+23.25 mob_death Grey Wolf appears!
+27.25 mob_attack Kobold Miner hits you for 9
+27.50 player_attack You hit Kobold Miner for 366
+27.50 mob_death Kobold Miner dies!
+29.00 mob_death Rampaging Boar appears!
+33.50 mob_attack Kobold Miner hits you for 9
+33.75 player_attack You hit Kobold Miner for 366
+33.75 mob_death Kobold Miner dies!
+35.25 mob_death Grey Wolf appears!
+39.25 mob_attack Rampaging Boar hits you for 9
+39.75 player_attack You hit Rampaging Boar for 366
+39.75 mob_death Rampaging Boar dies!
+41.25 mob_death Grey Wolf appears!
+46.00 mob_attack Grey Wolf hits you for 6
+46.50 player_attack You hit Grey Wolf for 366
+46.50 mob_death Grey Wolf dies!
+48.00 mob_death Grey Wolf appears!
+57.25 mob_attack Grey Wolf hits you for 6
+57.75 player_attack You hit Grey Wolf for 366
+57.75 mob_death Grey Wolf dies!
+59.25 mob_death Rampaging Boar appears!
+62.00 mob_attack Grey Wolf hits you for 6
+62.50 player_attack You hit Grey Wolf for 366
+62.50 mob_death Grey Wolf dies!
+64.00 mob_death Grey Wolf appears!
+67.50 mob_attack Rampaging Boar hits you for 9
+68.00 player_attack You hit Rampaging Boar for 366
+68.00 mob_death Rampaging Boar dies!
+69.50 mob_death Grey Wolf appears!
+72.25 mob_attack Grey Wolf hits you for 6
+72.75 player_attack You hit Grey Wolf for 366
+72.75 mob_death Grey Wolf dies!
+74.25 mob_death Grey Wolf appears!
+76.75 mob_attack Grey Wolf hits you for 6
+77.25 player_attack You hit Grey Wolf for 572
+77.25 mob_death Grey Wolf dies!
+78.75 mob_death Rampaging Boar appears!
+82.25 mob_attack Grey Wolf hits you for 6
+82.75 player_attack You hit Grey Wolf for 572
+82.75 mob_death Grey Wolf dies!
+84.25 mob_death Kobold Miner appears!
+87.75 mob_attack Grey Wolf hits you for 6
+88.25 player_attack You hit Grey Wolf for 572
+88.25 mob_death Grey Wolf dies!
+89.75 mob_death Rampaging Boar appears!
+94.00 mob_attack Grey Wolf hits you for 6
+94.50 player_attack You hit Grey Wolf for 572
 94.50 mob_death Grey Wolf dies!
+95.00 mob_attack Rampaging Boar joins the fight!
 96.00 mob_death Kobold Miner appears!
-99.25 mob_attack Grey Wolf hits you for 5
-99.75 player_attack You hit Grey Wolf for 350
-99.75 mob_death Grey Wolf dies!
-101.25 mob_death Grey Wolf appears!
-101.50 mob_attack Grey Wolf joins the fight!
-105.50 mob_attack Grey Wolf hits you for 5
-106.50 mob_attack Grey Wolf hits you for 5
-107.00 proc 🌀 The blow carries — 1 more caught for 315
-107.00 player_attack You hit Grey Wolf for 350
-107.00 mob_death Grey Wolf dies!
-107.00 mob_death Grey Wolf dies!
-108.50 mob_death Rampaging Boar appears!
-110.00 mob_death Rampaging Boar appears!
-111.75 mob_attack Grey Wolf hits you for 5
-112.25 player_attack You hit Grey Wolf for 354
-112.25 mob_death Grey Wolf dies!
-113.75 mob_death Kobold Miner appears!
-118.25 mob_attack Rampaging Boar hits you for 9
-118.75 player_attack You hit Rampaging Boar for 412
-118.75 mob_death Rampaging Boar dies!
-119.25 mob_attack Kobold Miner joins the fight!
-120.25 mob_death Grey Wolf appears!
-123.50 mob_attack Rampaging Boar hits you for 9
-124.00 proc 🌀 The blow carries — 1 more caught for 371
-124.00 player_attack You hit Rampaging Boar for 412
+102.00 mob_attack Rampaging Boar hits you for 9
+102.50 proc 🌀 The blow carries — 1 more caught for 515
+102.50 player_attack You hit Rampaging Boar for 572
+102.50 mob_death Rampaging Boar dies!
+102.50 mob_attack Rampaging Boar hits you for 9
+102.50 mob_death Rampaging Boar dies!
+104.00 mob_death Kobold Miner appears!
+105.50 mob_death Rampaging Boar appears!
+107.75 mob_attack Kobold Miner hits you for 9
+108.00 player_crit You hit Kobold Miner for 1372 (CRIT!)
+108.00 mob_death Kobold Miner dies!
+108.50 mob_attack Rampaging Boar joins the fight!
+109.50 mob_death ★ Elite: ★ Rampaging Boar appears!
+113.75 mob_attack Kobold Miner hits you for 9
+114.00 proc 🌀 The blow carries — 1 more caught for 515
+114.00 player_attack You hit Kobold Miner for 572
+114.00 mob_death Kobold Miner dies!
+114.00 mob_death Rampaging Boar dies!
+115.50 mob_death Kobold Miner appears!
+117.00 mob_death Grey Wolf appears!
+120.00 mob_attack ★ Rampaging Boar hits you for 16
+120.50 player_attack You hit ★ Rampaging Boar for 572
+120.50 mob_death ★ Rampaging Boar dies!
+121.00 mob_attack Kobold Miner joins the fight!
+122.00 mob_death Grey Wolf appears!
+122.00 mob_attack Grey Wolf joins the fight!
+126.75 mob_attack Grey Wolf hits you for 5
+127.50 mob_attack Grey Wolf hits you for 5
+128.00 proc 🌀 The blow carries — 2 more caught for 499
+128.00 player_attack You hit Grey Wolf for 554
+128.00 mob_death Grey Wolf dies!
+128.00 mob_death Kobold Miner dies!
+128.00 mob_death Grey Wolf dies!
+129.50 mob_death Kobold Miner appears!
+131.00 mob_death Grey Wolf appears!
+132.50 mob_death Rampaging Boar appears!
+136.25 mob_attack Kobold Miner hits you for 8
+136.50 player_attack You hit Kobold Miner for 554
+136.50 mob_death Kobold Miner dies!
+138.00 mob_death ★ Elite: ★ Grey Wolf appears!
+139.75 mob_attack Kobold Miner hits you for 8
+140.00 player_crit You hit Kobold Miner for 1332 (CRIT!)
+140.00 mob_death Kobold Miner dies!
+141.50 mob_death Grey Wolf appears!
+145.50 mob_attack ★ Grey Wolf hits you for 9
+146.00 player_attack You hit ★ Grey Wolf for 554
+146.00 mob_death ★ Grey Wolf dies!
+147.50 mob_death Rampaging Boar appears!
+151.75 mob_attack Grey Wolf hits you for 5
+152.25 player_attack You hit Grey Wolf for 554
+152.25 mob_death Grey Wolf dies!
+153.75 mob_death Rampaging Boar appears!
+158.25 mob_attack Rampaging Boar hits you for 8
+158.75 player_attack You hit Rampaging Boar for 554
+158.75 mob_death Rampaging Boar dies!
+160.25 mob_death Grey Wolf appears!
+163.50 mob_attack Rampaging Boar hits you for 8
+164.00 player_attack You hit Rampaging Boar for 554
+164.00 mob_death Rampaging Boar dies!
+165.50 mob_death Rampaging Boar appears!
+170.75 mob_attack Grey Wolf hits you for 5
+171.25 player_attack You hit Grey Wolf for 554
+171.25 mob_death Grey Wolf dies!
+171.75 mob_attack Rampaging Boar joins the fight!
+172.75 mob_death Grey Wolf appears!
+176.25 mob_attack Grey Wolf hits you for 5
+176.75 proc 🌀 The blow carries — 1 more caught for 499
+176.75 player_attack You hit Grey Wolf for 554
+176.75 mob_death Grey Wolf dies!
+176.75 mob_death Rampaging Boar dies!
+178.25 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+186.25 player_attack You hit [BOSS] Elder Meadow Beast for 554
+186.25 mob_death [BOSS] Elder Meadow Beast dies!
+194.50 mob_death ★ Elite: ★ Dustwind Thug appears!
+196.00 mob_death Plains Vulture appears!
+197.50 mob_death Plains Vulture appears!
+199.00 mob_death Dustwind Thug appears!
+200.25 mob_attack ★ Dustwind Thug hits you for 32
+200.75 player_attack You hit ★ Dustwind Thug for 554
+200.75 mob_death ★ Dustwind Thug dies!
+202.25 mob_death Harrowfield Golem appears!
+204.00 mob_attack Plains Vulture hits you for 12
+205.00 player_attack You hit Plains Vulture for 600
+205.00 mob_death Plains Vulture dies!
+206.50 mob_death Dustwind Thug appears!
+209.75 player_crit You hit Harrowfield Golem for 1440 (CRIT!)
+209.75 mob_death Harrowfield Golem dies!
+221.25 mob_death Harrowfield Golem appears!
+223.25 mob_attack Plains Vulture hits you for 12
+224.25 player_crit You hit Plains Vulture for 1440 (CRIT!)
+224.25 mob_death Plains Vulture dies!
+225.75 mob_death Dustwind Thug appears!
+230.00 player_attack You hit Harrowfield Golem for 600
+230.00 mob_death Harrowfield Golem dies!
+231.50 mob_death Dustwind Thug appears!
+234.25 mob_attack Dustwind Thug hits you for 18
+234.75 player_attack You hit Dustwind Thug for 600
+234.75 mob_death Dustwind Thug dies!
+236.25 mob_death Dustwind Thug appears!
+239.00 mob_attack Dustwind Thug hits you for 18
+239.50 player_attack You hit Dustwind Thug for 600
+239.50 mob_death Dustwind Thug dies!
+241.00 mob_death Harrowfield Golem appears!
+244.75 mob_attack Dustwind Thug hits you for 18
+245.25 player_attack You hit Dustwind Thug for 600
+245.25 mob_death Dustwind Thug dies!
+246.75 mob_death Dustwind Thug appears!
+249.75 mob_attack Dustwind Thug hits you for 18
+250.25 player_attack You hit Dustwind Thug for 600
+250.25 mob_death Dustwind Thug dies!
+251.75 mob_death Dustwind Thug appears!
+254.50 mob_attack Dustwind Thug hits you for 18
+255.00 player_attack You hit Dustwind Thug for 600
+255.00 mob_death Dustwind Thug dies!
+256.50 mob_death Plains Vulture appears!
+260.00 mob_attack Dustwind Thug hits you for 18
+260.50 player_crit You hit Dustwind Thug for 1413 (CRIT!)
+260.50 mob_death Dustwind Thug dies!
+262.00 mob_death Harrowfield Golem appears!
+265.50 mob_attack Plains Vulture hits you for 12
+266.50 player_attack You hit Plains Vulture for 1178
+266.50 mob_death Plains Vulture dies!
+268.00 mob_death Plains Vulture appears!
+272.00 player_crit You hit Harrowfield Golem for 2826 (CRIT!)
+272.00 mob_death Harrowfield Golem dies!
+273.50 mob_death Harrowfield Golem appears!
+278.50 mob_attack Dustwind Thug hits you for 18
+279.00 player_attack You hit Dustwind Thug for 1178
+279.00 mob_death Dustwind Thug dies!
+280.50 mob_death Harrowfield Golem appears!
+283.75 player_crit You hit Harrowfield Golem for 2826 (CRIT!)
+283.75 mob_death Harrowfield Golem dies!
+285.25 mob_death Dustwind Thug appears!
+290.00 player_attack You hit Harrowfield Golem for 1178
+290.00 mob_death Harrowfield Golem dies!
+291.50 mob_death Harrowfield Golem appears!
+295.75 mob_attack Dustwind Thug hits you for 18
+296.25 player_attack You hit Dustwind Thug for 1178
+296.25 mob_death Dustwind Thug dies!
+297.75 mob_death Harrowfield Golem appears!
+301.25 player_attack You hit Harrowfield Golem for 1178
+301.25 mob_death Harrowfield Golem dies!
+302.75 mob_death ★ Elite: ★ Dustwind Thug appears!
+305.75 player_attack You hit Harrowfield Golem for 1178
+305.75 mob_death Harrowfield Golem dies!
+307.25 mob_death Dustwind Thug appears!
+311.00 player_attack You hit Harrowfield Golem for 2208
+311.00 mob_death Harrowfield Golem dies!
+312.50 mob_death Plains Vulture appears!
+315.75 mob_attack Dustwind Thug hits you for 17
+316.25 player_crit You hit Dustwind Thug for 5302 (CRIT!)
+316.25 mob_death Dustwind Thug dies!
+317.75 mob_death Dustwind Thug appears!
+320.75 mob_attack Plains Vulture hits you for 11
+321.75 player_attack You hit Plains Vulture for 1104
+321.75 mob_death Plains Vulture dies!
+327.25 mob_attack Dustwind Thug joins the fight!
+328.25 mob_death Plains Vulture appears!
+328.25 mob_attack Plains Vulture joins the fight!
+331.50 mob_attack ★ Dustwind Thug hits you for 30
+332.00 proc 🌀 The blow carries — 2 more caught for 4772
+332.00 player_crit You hit ★ Dustwind Thug for 5302 (CRIT!)
+332.00 mob_death ★ Dustwind Thug dies!
+332.00 mob_death Dustwind Thug dies!
+332.00 mob_death Plains Vulture dies!
+333.50 mob_death Plains Vulture appears!
+333.50 mob_attack Plains Vulture joins the fight!
+335.00 mob_death Harrowfield Golem appears!
+336.50 mob_death Dustwind Thug appears!
+338.00 mob_attack Plains Vulture hits you for 8
+338.50 mob_attack Plains Vulture hits you for 8
+339.00 proc 🌀 The blow carries — 1 more caught for 2057
+339.00 player_attack You hit Plains Vulture for 2286
+339.00 mob_death Plains Vulture dies!
+339.00 mob_death Plains Vulture dies!
+369.00 proc 🛡️ Crafted Coarse Tin Shield Plate!
+370.50 mob_death Dustwind Thug appears!
+372.00 mob_death Dustwind Thug appears!
+374.75 player_attack You hit Harrowfield Golem for 2286
+374.75 mob_death Harrowfield Golem dies!
+376.25 mob_death Dustwind Thug appears!
+380.75 mob_attack Dustwind Thug hits you for 13
+381.25 player_attack You hit Dustwind Thug for 2286
+381.25 mob_death Dustwind Thug dies!
+382.75 mob_death Dustwind Thug appears!
+384.75 mob_attack Dustwind Thug hits you for 13
+385.25 player_attack You hit Dustwind Thug for 2286
+385.25 mob_death Dustwind Thug dies!
+386.75 mob_death Dustwind Thug appears!
+391.25 mob_attack Dustwind Thug hits you for 12
+391.75 player_crit You hit Dustwind Thug for 5648 (CRIT!)
+391.75 mob_death Dustwind Thug dies!
+393.25 mob_death Dustwind Thug appears!
+393.25 mob_attack Dustwind Thug joins the fight!
+397.25 mob_attack Dustwind Thug hits you for 12
+397.25 mob_attack Dustwind Thug hits you for 12
+397.75 proc 🌀 The blow carries — 1 more caught for 5083
+397.75 player_crit You hit Dustwind Thug for 5648 (CRIT!)
+397.75 mob_death Dustwind Thug dies!
+397.75 mob_death Dustwind Thug dies!
+399.25 mob_death ★ Elite: ★ Plains Vulture appears!
+400.75 mob_death Plains Vulture appears!
+403.25 mob_attack Dustwind Thug hits you for 12
+403.75 player_attack You hit Dustwind Thug for 2354
+403.75 mob_death Dustwind Thug dies!
+404.25 mob_attack Plains Vulture joins the fight!
+405.25 mob_death Harrowfield Golem appears!
+407.50 mob_attack ★ Plains Vulture hits you for 14
+408.50 proc 🌀 The blow carries — 1 more caught for 5083
+408.50 player_crit You hit ★ Plains Vulture for 5648 (CRIT!)
+408.50 mob_death ★ Plains Vulture dies!
+408.50 mob_death Plains Vulture dies!
+410.00 mob_death Harrowfield Golem appears!
+411.50 mob_death Plains Vulture appears!
+413.50 player_attack You hit Harrowfield Golem for 2354
+413.50 mob_death Harrowfield Golem dies!
+415.00 mob_death Plains Vulture appears!
+418.00 mob_attack Plains Vulture hits you for 8
+419.00 player_attack You hit Plains Vulture for 1177
+419.00 mob_death Plains Vulture dies!
+420.50 mob_death Plains Vulture appears!
+424.25 mob_attack Plains Vulture hits you for 8
+425.25 player_crit You hit Plains Vulture for 5648 (CRIT!)
+425.25 mob_death Plains Vulture dies!
+426.75 mob_death Harrowfield Golem appears!
+426.75 mob_attack Harrowfield Golem joins the fight!
+431.75 proc 🌀 The blow carries — 1 more caught for 2119
+431.75 player_attack You hit Harrowfield Golem for 2354
+431.75 mob_death Harrowfield Golem dies!
+431.75 mob_death Harrowfield Golem dies!
+433.25 mob_death Harrowfield Golem appears!
+434.75 mob_death Dustwind Thug appears!
+437.00 mob_attack Dustwind Thug hits you for 12
+437.50 player_attack You hit Dustwind Thug for 2354
+437.50 mob_death Dustwind Thug dies!
+439.00 mob_death Harrowfield Golem appears!
+441.75 mob_attack Dustwind Thug hits you for 12
+442.25 player_crit You hit Dustwind Thug for 5648 (CRIT!)
+442.25 mob_death Dustwind Thug dies!
+443.75 mob_death Dustwind Thug appears!
+447.00 player_crit You hit Harrowfield Golem for 5648 (CRIT!)
+447.00 mob_death Harrowfield Golem dies!
+448.50 mob_death Dustwind Thug appears!
+453.00 player_crit You hit Harrowfield Golem for 5648 (CRIT!)
+453.00 mob_death Harrowfield Golem dies!
+454.50 mob_death Dustwind Thug appears!
+457.50 mob_attack Dustwind Thug hits you for 12
+458.00 player_attack You hit Dustwind Thug for 2354
+458.00 mob_death Dustwind Thug dies!
+459.50 mob_death Harrowfield Golem appears!
+461.50 mob_attack Dustwind Thug hits you for 12
+462.00 player_attack You hit Dustwind Thug for 2354
+462.00 mob_death Dustwind Thug dies!
+462.50 mob_attack Harrowfield Golem joins the fight!
+463.50 mob_death Plains Vulture appears!
+468.75 mob_attack Dustwind Thug hits you for 12
+469.25 proc 🌀 The blow carries — 1 more caught for 2119
+469.25 player_attack You hit Dustwind Thug for 2354
+469.25 mob_death Dustwind Thug dies!
+469.25 mob_death Harrowfield Golem dies!
+470.75 mob_death Dustwind Thug appears!
+472.25 mob_death Dustwind Thug appears!
+474.25 mob_attack Plains Vulture hits you for 8
+475.25 player_crit You hit Plains Vulture for 5648 (CRIT!)
+475.25 mob_death Plains Vulture dies!
+476.75 mob_death Dustwind Thug appears!
+481.50 mob_attack Dustwind Thug hits you for 12
+482.00 player_crit You hit Dustwind Thug for 5648 (CRIT!)
+482.00 mob_death Dustwind Thug dies!
+483.50 mob_death Harrowfield Golem appears!
+488.50 mob_attack Dustwind Thug hits you for 12
+489.00 player_attack You hit Dustwind Thug for 2354
+489.00 mob_death Dustwind Thug dies!
+490.50 mob_death ⚠ BOSS: [BOSS] Bandit Warlord Grak appears!
+497.50 player_crit You hit [BOSS] Bandit Warlord Grak for 5648 (CRIT!)
+497.50 mob_death [BOSS] Bandit Warlord Grak dies!
+497.50 level_up ★ Level Up! Now level 21!
+505.75 mob_death ★ Elite: ★ Skeletal Archer appears!
+507.25 mob_death Rotting Shambler appears!
+508.75 mob_death Rotting Shambler appears!
+510.25 mob_death Skeletal Archer appears!
+510.50 mob_attack ★ Skeletal Archer hits you for 34
+511.50 player_crit You hit ★ Skeletal Archer for 5652 (CRIT!)
+511.50 mob_death ★ Skeletal Archer dies!
+512.00 mob_attack Skeletal Archer joins the fight!
+513.00 mob_death Rotting Shambler appears!
+516.75 mob_attack Skeletal Archer hits you for 20
+517.00 proc 🌀 The blow carries — 1 more caught for 5087
+517.00 player_crit You hit Rotting Shambler for 5652 (CRIT!)
+517.00 mob_death Rotting Shambler dies!
+517.00 mob_death Skeletal Archer dies!
+518.50 mob_death Skeletal Archer appears!
+520.00 mob_death Grimshade Wolfkin appears!
+523.00 player_attack You hit Rotting Shambler for 2356
+523.00 mob_death Rotting Shambler dies!
+524.50 mob_death Rotting Shambler appears!
+529.25 player_attack You hit Rotting Shambler for 2356
+529.25 mob_death Rotting Shambler dies!
+530.75 mob_death Skeletal Archer appears!
+530.75 mob_attack Skeletal Archer joins the fight!
+534.25 mob_attack Skeletal Archer hits you for 20
+535.75 proc 🌀 The blow carries — 1 more caught for 5087
+535.75 player_crit You hit Rotting Shambler for 5652 (CRIT!)
+535.75 mob_death Rotting Shambler dies!
+535.75 mob_attack Skeletal Archer hits you for 20
+535.75 mob_death Skeletal Archer dies!
+536.25 mob_attack Grimshade Wolfkin joins the fight!
+537.25 mob_death Grimshade Wolfkin appears!
+538.75 mob_death Grimshade Wolfkin appears!
+541.25 mob_attack Skeletal Archer hits you for 20
+542.25 proc 🌀 The blow carries — 1 more caught for 2120
+542.25 player_attack You hit Skeletal Archer for 2356
+542.25 mob_death Skeletal Archer dies!
+542.25 mob_death Grimshade Wolfkin dies!
+543.75 mob_death Grimshade Wolfkin appears!
+545.25 mob_death Grimshade Wolfkin appears!
+546.75 mob_attack Grimshade Wolfkin hits you for 26
+547.25 player_attack You hit Grimshade Wolfkin for 2356
+547.25 mob_death Grimshade Wolfkin dies!
+548.75 mob_death Skeletal Archer appears!
+552.00 mob_attack Grimshade Wolfkin hits you for 26
+552.50 player_attack You hit Grimshade Wolfkin for 2356
+552.50 mob_death Grimshade Wolfkin dies!
+554.00 mob_death Rotting Shambler appears!
+557.50 mob_attack Skeletal Archer hits you for 20
+558.50 player_attack You hit Skeletal Archer for 2356
+558.50 mob_death Skeletal Archer dies!
+560.00 mob_death Grimshade Wolfkin appears!
+564.50 player_crit You hit Rotting Shambler for 5652 (CRIT!)
+564.50 mob_death Rotting Shambler dies!
+566.00 mob_death Grimshade Wolfkin appears!
+577.00 mob_attack Grimshade Wolfkin spots you and charges!
+580.25 mob_attack Grimshade Wolfkin joins the fight!
+586.75 mob_attack Grimshade Wolfkin hits you for 26
+587.25 player_crit You hit Grimshade Wolfkin for 5652 (CRIT!)
+587.25 mob_death Grimshade Wolfkin dies!
+588.75 mob_death Skeletal Archer appears!
+591.25 mob_attack Grimshade Wolfkin hits you for 26
+591.50 mob_attack Grimshade Wolfkin joins the fight!
+591.75 player_crit You hit Grimshade Wolfkin for 5652 (CRIT!)
+591.75 mob_death Grimshade Wolfkin dies!
+
+## mage walking pyre | seed=2
+0.25 mob_death Rampaging Boar appears!
+1.75 mob_death Grey Wolf appears!
+3.25 mob_death Rampaging Boar appears!
+4.75 mob_death Grey Wolf appears!
+4.75 player_crit You hit Rampaging Boar for 117 (CRIT!)
+4.75 mob_death Rampaging Boar dies!
+6.25 mob_death Rampaging Boar appears!
+10.75 player_crit You hit Grey Wolf for 117 (CRIT!)
+10.75 mob_death Grey Wolf dies!
+12.25 mob_death Kobold Miner appears!
+17.00 player_crit You hit Rampaging Boar for 117 (CRIT!)
+17.00 mob_death Rampaging Boar dies!
+18.50 mob_death Kobold Miner appears!
+22.00 player_crit You hit Rampaging Boar for 117 (CRIT!)
+22.00 mob_death Rampaging Boar dies!
+23.50 mob_death Kobold Miner appears!
+27.75 player_crit You hit Kobold Miner for 117 (CRIT!)
+27.75 mob_death Kobold Miner dies!
+39.25 mob_death Grey Wolf appears!
+42.75 player_crit You hit Grey Wolf for 117 (CRIT!)
+42.75 mob_death Grey Wolf dies!
+44.25 mob_death Grey Wolf appears!
+48.25 player_crit You hit Grey Wolf for 117 (CRIT!)
+48.25 mob_death Grey Wolf dies!
+49.75 mob_death Kobold Miner appears!
+53.25 player_crit You hit Kobold Miner for 117 (CRIT!)
+53.25 mob_death Kobold Miner dies!
+54.75 mob_death Kobold Miner appears!
+58.25 player_crit You hit Kobold Miner for 117 (CRIT!)
+58.25 mob_death Kobold Miner dies!
+78.25 proc 🩹 Coarse Linen Bandage — healed 40 HP
+78.75 mob_attack Kobold Miner joins the fight!
+79.75 mob_death Rampaging Boar appears!
+83.75 player_crit You hit Grey Wolf for 117 (CRIT!)
+83.75 mob_death Grey Wolf dies!
+85.25 mob_death ★ Elite: ★ Kobold Miner appears!
+85.75 player_crit You hit Kobold Miner for 117 (CRIT!)
+85.75 mob_death Kobold Miner dies!
+86.25 mob_attack Rampaging Boar joins the fight!
+87.25 mob_death Rampaging Boar appears!
+90.50 player_crit You hit ★ Kobold Miner for 117 (CRIT!)
+92.00 mob_attack Rampaging Boar hits you for 15
+92.25 player_crit You hit ★ Kobold Miner for 145 (CRIT!)
+92.25 mob_death ★ Kobold Miner dies!
+93.75 mob_death Kobold Miner appears!
+94.25 player_crit You hit Rampaging Boar for 117 (CRIT!)
+94.25 mob_death Rampaging Boar dies!
+95.75 mob_death Grey Wolf appears!
+98.50 player_crit You hit Kobold Miner for 117 (CRIT!)
+98.50 mob_death Kobold Miner dies!
+100.00 mob_death ★ Elite: ★ Kobold Miner appears!
+102.75 player_crit You hit Grey Wolf for 58 (CRIT!)
+102.75 mob_death Grey Wolf dies!
+104.25 mob_death Kobold Miner appears!
+106.75 player_crit You hit ★ Kobold Miner for 117 (CRIT!)
+108.50 player_crit You hit ★ Kobold Miner for 145 (CRIT!)
+108.50 mob_death ★ Kobold Miner dies!
+110.00 mob_death Grey Wolf appears!
+113.75 player_crit You hit Rampaging Boar for 117 (CRIT!)
+113.75 mob_death Rampaging Boar dies!
+115.25 mob_death Rampaging Boar appears!
+118.75 player_crit You hit Grey Wolf for 117 (CRIT!)
+118.75 mob_death Grey Wolf dies!
+120.25 mob_death Kobold Miner appears!
+124.00 player_crit You hit Rampaging Boar for 117 (CRIT!)
 124.00 mob_death Rampaging Boar dies!
-124.00 mob_death Kobold Miner dies!
-125.50 mob_death Kobold Miner appears!
-127.00 mob_death ★ Elite: ★ Kobold Miner appears!
-128.25 mob_attack Grey Wolf hits you for 5
-128.75 player_crit You hit Grey Wolf for 990 (CRIT!)
-128.75 mob_death Grey Wolf dies!
-130.25 mob_death Rampaging Boar appears!
-132.75 mob_attack Kobold Miner hits you for 8
-133.00 player_attack You hit Kobold Miner for 412
-133.00 mob_death Kobold Miner dies!
+125.50 mob_death Rampaging Boar appears!
+130.25 player_crit You hit Kobold Miner for 117 (CRIT!)
+130.25 mob_death Kobold Miner dies!
+131.75 mob_death Rampaging Boar appears!
+134.25 player_crit You hit Rampaging Boar for 117 (CRIT!)
+134.25 mob_death Rampaging Boar dies!
+135.75 mob_death Rampaging Boar appears!
+138.50 player_crit You hit Rampaging Boar for 117 (CRIT!)
+138.50 mob_death Rampaging Boar dies!
+145.00 mob_death Rampaging Boar appears!
+148.75 player_crit You hit Rampaging Boar for 117 (CRIT!)
+148.75 mob_death Rampaging Boar dies!
+150.25 mob_death Rampaging Boar appears!
+154.00 player_crit You hit Rampaging Boar for 117 (CRIT!)
+154.00 mob_death Rampaging Boar dies!
+155.50 mob_death Rampaging Boar appears!
+159.50 player_crit You hit Kobold Miner for 117 (CRIT!)
+159.50 mob_death Kobold Miner dies!
+161.00 mob_death Kobold Miner appears!
+164.25 player_crit You hit Rampaging Boar for 117 (CRIT!)
+164.25 mob_death Rampaging Boar dies!
+165.75 mob_death Rampaging Boar appears!
+169.00 player_crit You hit Kobold Miner for 117 (CRIT!)
+169.00 mob_death Kobold Miner dies!
+170.50 mob_death Rampaging Boar appears!
+174.50 player_crit You hit Rampaging Boar for 117 (CRIT!)
+174.50 mob_death Rampaging Boar dies!
+176.00 mob_death Kobold Miner appears!
+178.75 player_crit You hit Rampaging Boar for 117 (CRIT!)
+178.75 mob_death Rampaging Boar dies!
+180.25 mob_death Grey Wolf appears!
+184.25 player_crit You hit Kobold Miner for 117 (CRIT!)
+184.25 mob_death Kobold Miner dies!
+185.75 mob_death Grey Wolf appears!
+188.50 player_crit You hit Grey Wolf for 117 (CRIT!)
+188.50 mob_death Grey Wolf dies!
+190.00 mob_death ★ Elite: ★ Grey Wolf appears!
+192.25 player_crit You hit Grey Wolf for 117 (CRIT!)
+192.25 mob_death Grey Wolf dies!
+193.75 mob_death Kobold Miner appears!
+198.50 player_crit You hit ★ Grey Wolf for 117 (CRIT!)
+200.25 player_crit You hit ★ Grey Wolf for 145 (CRIT!)
+200.25 mob_death ★ Grey Wolf dies!
+201.75 mob_death Kobold Miner appears!
+205.50 player_crit You hit Kobold Miner for 117 (CRIT!)
+205.50 mob_death Kobold Miner dies!
+207.00 mob_death Kobold Miner appears!
+212.25 player_crit You hit Kobold Miner for 117 (CRIT!)
+212.25 mob_death Kobold Miner dies!
+213.75 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+221.00 player_crit You hit [BOSS] Elder Meadow Beast for 117 (CRIT!)
+222.75 player_crit You hit [BOSS] Elder Meadow Beast for 117 (CRIT!)
+224.50 player_crit You hit [BOSS] Elder Meadow Beast for 117 (CRIT!)
+226.25 player_crit You hit [BOSS] Elder Meadow Beast for 72 (CRIT!)
+226.25 mob_death [BOSS] Elder Meadow Beast dies!
+234.50 mob_death Harrowfield Golem appears!
+236.00 mob_death Plains Vulture appears!
+237.50 mob_death Plains Vulture appears!
+238.75 player_attack You hit Harrowfield Golem for 167
+239.00 mob_death Dustwind Thug appears!
+240.50 player_crit You hit Harrowfield Golem for 582 (CRIT!)
+240.50 mob_death Harrowfield Golem dies!
+242.00 mob_death Harrowfield Golem appears!
+244.00 mob_attack Plains Vulture hits you for 14
+244.50 player_crit You hit Plains Vulture for 235 (CRIT!)
+244.50 mob_death Plains Vulture dies!
+246.00 mob_death Plains Vulture appears!
+249.00 player_crit You hit Harrowfield Golem for 470 (CRIT!)
+249.00 mob_death Harrowfield Golem dies!
+265.50 mob_death Harrowfield Golem appears!
+270.00 player_crit You hit Plains Vulture for 470 (CRIT!)
+270.00 mob_death Plains Vulture dies!
+288.00 proc 🔮 Crafted Coarse Wool Mana Wrap!
+289.50 mob_death Dustwind Thug appears!
+292.00 player_crit You hit Dustwind Thug for 684 (CRIT!)
+292.00 mob_death Dustwind Thug dies!
+293.50 mob_death Harrowfield Golem appears!
+296.25 player_crit You hit Plains Vulture for 684 (CRIT!)
+296.25 mob_death Plains Vulture dies!
+297.75 mob_death Dustwind Thug appears!
+301.25 player_crit You hit Harrowfield Golem for 684 (CRIT!)
+301.25 mob_death Harrowfield Golem dies!
+302.75 mob_death Plains Vulture appears!
+306.50 player_crit You hit Dustwind Thug for 684 (CRIT!)
+306.50 mob_death Dustwind Thug dies!
+308.00 mob_death Plains Vulture appears!
+311.75 player_crit You hit Dustwind Thug for 777 (CRIT!)
+311.75 mob_death Dustwind Thug dies!
+313.25 mob_death Harrowfield Golem appears!
+316.25 player_crit You hit Harrowfield Golem for 777 (CRIT!)
+316.25 mob_death Harrowfield Golem dies!
+317.75 mob_death Harrowfield Golem appears!
+328.75 player_crit You hit Harrowfield Golem for 777 (CRIT!)
+328.75 mob_death Harrowfield Golem dies!
+330.25 mob_death Dustwind Thug appears!
+334.50 player_crit You hit Harrowfield Golem for 777 (CRIT!)
+334.50 mob_death Harrowfield Golem dies!
+336.00 mob_death Harrowfield Golem appears!
+340.25 player_crit You hit Dustwind Thug for 777 (CRIT!)
+340.25 mob_death Dustwind Thug dies!
+341.75 mob_death Dustwind Thug appears!
+345.00 player_crit You hit Harrowfield Golem for 777 (CRIT!)
+345.00 mob_death Harrowfield Golem dies!
+346.50 mob_death Plains Vulture appears!
+349.50 player_crit You hit Dustwind Thug for 777 (CRIT!)
+349.50 mob_death Dustwind Thug dies!
+351.00 mob_death Harrowfield Golem appears!
+351.00 mob_attack Harrowfield Golem joins the fight!
+355.00 proc 🌀 The blow carries — 1 more caught for 684
+355.00 player_crit You hit Plains Vulture for 777 (CRIT!)
+355.00 mob_death Plains Vulture dies!
+355.00 mob_death Harrowfield Golem dies!
+356.50 mob_death Plains Vulture appears!
+358.00 mob_death Harrowfield Golem appears!
+358.75 mob_attack Plains Vulture hits you for 14
+359.25 player_crit You hit Plains Vulture for 777 (CRIT!)
+359.25 mob_death Plains Vulture dies!
+360.75 mob_death Dustwind Thug appears!
+363.50 player_crit You hit Harrowfield Golem for 777 (CRIT!)
+363.50 mob_death Harrowfield Golem dies!
+365.00 mob_death Dustwind Thug appears!
+369.00 player_crit You hit Dustwind Thug for 777 (CRIT!)
+369.00 mob_death Dustwind Thug dies!
+370.50 mob_death Plains Vulture appears!
+374.50 player_crit You hit Dustwind Thug for 777 (CRIT!)
+374.50 mob_death Dustwind Thug dies!
+376.00 mob_death Harrowfield Golem appears!
+378.75 mob_attack Plains Vulture hits you for 14
+379.25 player_crit You hit Plains Vulture for 777 (CRIT!)
+379.25 mob_death Plains Vulture dies!
+380.75 mob_death Harrowfield Golem appears!
+383.00 mob_attack Plains Vulture hits you for 14
+383.50 player_crit You hit Plains Vulture for 777 (CRIT!)
+383.50 mob_death Plains Vulture dies!
+385.00 mob_death Dustwind Thug appears!
+388.50 player_crit You hit Harrowfield Golem for 777 (CRIT!)
+388.50 mob_death Harrowfield Golem dies!
+390.00 mob_death Plains Vulture appears!
+393.50 player_crit You hit Dustwind Thug for 777 (CRIT!)
+393.50 mob_death Dustwind Thug dies!
+395.00 mob_death Dustwind Thug appears!
+399.00 player_crit You hit Plains Vulture for 777 (CRIT!)
+399.00 mob_death Plains Vulture dies!
+399.50 mob_attack Harrowfield Golem joins the fight!
+400.50 mob_death Plains Vulture appears!
+405.25 proc 🌀 The blow carries — 1 more caught for 684
+405.25 player_crit You hit Dustwind Thug for 777 (CRIT!)
+405.25 mob_death Dustwind Thug dies!
+405.25 mob_death Harrowfield Golem dies!
+406.75 mob_death Plains Vulture appears!
+408.25 mob_death Plains Vulture appears!
+409.00 player_crit You hit Plains Vulture for 777 (CRIT!)
+409.00 mob_death Plains Vulture dies!
+410.50 mob_death Dustwind Thug appears!
+413.25 player_crit You hit Plains Vulture for 777 (CRIT!)
+413.25 mob_death Plains Vulture dies!
+413.75 mob_attack Plains Vulture joins the fight!
+414.75 mob_death Dustwind Thug appears!
+414.75 mob_attack Dustwind Thug joins the fight!
+419.25 proc 🌀 The blow carries — 2 more caught for 684
+419.25 player_crit You hit Dustwind Thug for 777 (CRIT!)
+419.25 mob_death Dustwind Thug dies!
+419.25 mob_attack Dustwind Thug hits you for 19
+419.25 mob_death Dustwind Thug dies!
+419.25 mob_death Plains Vulture dies!
+420.75 mob_death Harrowfield Golem appears!
+422.25 mob_death Dustwind Thug appears!
+423.75 mob_death Dustwind Thug appears!
+427.25 player_crit You hit Plains Vulture for 777 (CRIT!)
+427.25 mob_death Plains Vulture dies!
+428.75 mob_death Dustwind Thug appears!
+432.00 player_crit You hit Dustwind Thug for 777 (CRIT!)
+432.00 mob_death Dustwind Thug dies!
+443.50 mob_death Harrowfield Golem appears!
+447.50 player_crit You hit Dustwind Thug for 777 (CRIT!)
+447.50 mob_death Dustwind Thug dies!
+449.00 mob_death Dustwind Thug appears!
+453.25 player_crit You hit Dustwind Thug for 777 (CRIT!)
+453.25 mob_death Dustwind Thug dies!
+454.75 mob_death Dustwind Thug appears!
+460.00 player_crit You hit Harrowfield Golem for 777 (CRIT!)
+460.00 mob_death Harrowfield Golem dies!
+461.50 mob_death Dustwind Thug appears!
+464.50 player_crit You hit Dustwind Thug for 777 (CRIT!)
+464.50 mob_death Dustwind Thug dies!
+466.00 mob_death Dustwind Thug appears!
+468.25 player_crit You hit Dustwind Thug for 777 (CRIT!)
+468.25 mob_death Dustwind Thug dies!
+469.75 mob_death Dustwind Thug appears!
+472.75 player_crit You hit Dustwind Thug for 777 (CRIT!)
+472.75 mob_death Dustwind Thug dies!
+474.25 mob_death Harrowfield Golem appears!
+477.00 player_crit You hit Dustwind Thug for 777 (CRIT!)
+477.00 mob_death Dustwind Thug dies!
+478.50 mob_death Dustwind Thug appears!
+483.00 player_crit You hit Harrowfield Golem for 777 (CRIT!)
+483.00 mob_death Harrowfield Golem dies!
+484.50 mob_death ★ Elite: ★ Plains Vulture appears!
+486.75 player_crit You hit Dustwind Thug for 777 (CRIT!)
+486.75 mob_death Dustwind Thug dies!
+488.25 mob_death Dustwind Thug appears!
+492.25 player_crit You hit Dustwind Thug for 777 (CRIT!)
+492.25 mob_death Dustwind Thug dies!
+493.75 mob_death Dustwind Thug appears!
+497.50 player_crit You hit Harrowfield Golem for 777 (CRIT!)
+497.50 mob_death Harrowfield Golem dies!
+499.00 mob_death Plains Vulture appears!
+502.00 player_crit You hit Dustwind Thug for 777 (CRIT!)
+502.00 mob_death Dustwind Thug dies!
+503.50 mob_death Plains Vulture appears!
+507.00 player_crit You hit Plains Vulture for 777 (CRIT!)
+507.00 mob_death Plains Vulture dies!
+508.50 mob_death Plains Vulture appears!
+513.25 player_crit You hit Plains Vulture for 777 (CRIT!)
+513.25 mob_death Plains Vulture dies!
+514.75 mob_death Dustwind Thug appears!
+518.25 player_crit You hit Plains Vulture for 777 (CRIT!)
+518.25 mob_death Plains Vulture dies!
+518.75 mob_attack Dustwind Thug joins the fight!
+519.75 mob_death Plains Vulture appears!
+524.00 proc 🌀 The blow carries — 1 more caught for 684
+524.00 player_crit You hit ★ Plains Vulture for 777 (CRIT!)
+524.00 mob_death ★ Plains Vulture dies!
+524.00 mob_death Dustwind Thug dies!
+525.50 mob_death ⚠ BOSS: [BOSS] Bandit Warlord Grak appears!
+532.50 player_crit You hit [BOSS] Bandit Warlord Grak for 777 (CRIT!)
+534.25 player_crit You hit [BOSS] Bandit Warlord Grak for 777 (CRIT!)
+534.25 mob_death [BOSS] Bandit Warlord Grak dies!
+534.25 level_up ★ Level Up! Now level 21!
+542.50 mob_death Skeletal Archer appears!
+544.00 mob_death Rotting Shambler appears!
+545.50 mob_death Grimshade Wolfkin appears!
+547.00 mob_death ★ Elite: ★ Skeletal Archer appears!
+547.75 player_crit You hit Skeletal Archer for 799 (CRIT!)
+547.75 mob_death Skeletal Archer dies!
+549.25 mob_death Skeletal Archer appears!
+552.00 player_crit You hit ★ Skeletal Archer for 799 (CRIT!)
+552.00 mob_death ★ Skeletal Archer dies!
+553.50 mob_death Grimshade Wolfkin appears!
+556.75 player_crit You hit Grimshade Wolfkin for 799 (CRIT!)
+556.75 mob_death Grimshade Wolfkin dies!
+558.25 mob_death Grimshade Wolfkin appears!
+562.00 player_crit You hit Skeletal Archer for 799 (CRIT!)
+562.00 mob_death Skeletal Archer dies!
+563.50 mob_death Rotting Shambler appears!
+567.75 player_crit You hit Grimshade Wolfkin for 799 (CRIT!)
+567.75 mob_death Grimshade Wolfkin dies!
+569.25 mob_death Skeletal Archer appears!
+571.50 player_crit You hit Rotting Shambler for 799 (CRIT!)
+571.50 mob_death Rotting Shambler dies!
+573.00 mob_death Skeletal Archer appears!
+573.25 mob_attack Skeletal Archer joins the fight!
+578.00 player_crit You hit Rotting Shambler for 799 (CRIT!)
+578.00 mob_death Rotting Shambler dies!
+579.50 mob_death Grimshade Wolfkin appears!
+579.50 mob_attack Skeletal Archer hits you for 27
+580.00 player_crit You hit Skeletal Archer for 799 (CRIT!)
+580.00 mob_death Skeletal Archer dies!
+581.50 mob_death Rotting Shambler appears!
+581.50 mob_attack Rotting Shambler joins the fight!
+585.75 player_crit You hit Grimshade Wolfkin for 889 (CRIT!)
+585.75 mob_death Grimshade Wolfkin dies!
+587.25 mob_death Rotting Shambler appears!
+587.75 player_crit You hit Rotting Shambler for 889 (CRIT!)
+587.75 mob_death Rotting Shambler dies!
+589.25 mob_death Grimshade Wolfkin appears!
+589.25 mob_attack Grimshade Wolfkin joins the fight!
+594.00 proc 🌀 The blow carries — 1 more caught for 782
+594.00 player_crit You hit Rotting Shambler for 889 (CRIT!)
+594.00 mob_death Rotting Shambler dies!
+594.00 mob_death Grimshade Wolfkin dies!
+595.50 mob_death Grimshade Wolfkin appears!
+597.00 mob_death Skeletal Archer appears!
+599.75 player_crit You hit Grimshade Wolfkin for 889 (CRIT!)
+599.75 mob_death Grimshade Wolfkin dies!
+
+## warlock cinderpact | seed=2
+0.25 mob_death Rampaging Boar appears!
+1.75 mob_death Grey Wolf appears!
+2.00 mob_death Rampaging Boar dies to Umbral Bolt!
+5.00 mob_death Kobold Miner appears!
+6.00 mob_death Grey Wolf dies to Umbral Bolt!
+9.00 mob_death Rampaging Boar appears!
+10.00 mob_death Kobold Miner dies to Umbral Bolt!
+13.00 mob_death Grey Wolf appears!
+14.00 mob_death Rampaging Boar dies to Umbral Bolt!
+17.00 mob_death Rampaging Boar appears!
+18.00 mob_death Grey Wolf dies to Umbral Bolt!
+21.00 mob_death ★ Elite: ★ Rampaging Boar appears!
+22.00 mob_death Rampaging Boar dies to Umbral Bolt!
+25.00 mob_death Grey Wolf appears!
+26.50 mob_death Rampaging Boar appears!
+28.00 mob_death Kobold Miner appears!
+28.00 mob_attack ★ Rampaging Boar hits you for 27
+28.50 player_attack You hit ★ Rampaging Boar for 23
+29.75 mob_attack ★ Rampaging Boar hits you for 27
+30.50 player_attack You hit ★ Rampaging Boar for 23
+31.50 mob_attack ★ Rampaging Boar hits you for 27
+32.50 player_attack You hit ★ Rampaging Boar for 23
+32.50 mob_death ★ Rampaging Boar dies!
+34.00 mob_death Kobold Miner appears!
+34.50 mob_death Grey Wolf dies to Umbral Bolt!
+37.50 mob_death Rampaging Boar appears!
+38.50 mob_death Kobold Miner dies to Umbral Bolt!
+41.50 mob_death Kobold Miner appears!
+42.50 mob_death Rampaging Boar dies to Umbral Bolt!
+43.00 mob_attack Rampaging Boar joins the fight!
+45.50 mob_death Grey Wolf appears!
+46.25 mob_attack Kobold Miner hits you for 12
+47.00 proc 🌀 The blow carries — 1 more caught for 56
+47.00 mob_death Kobold Miner dies to Umbral Bolt!
+48.50 mob_attack Rampaging Boar hits you for 12
+49.25 player_attack You hit Rampaging Boar for 23
+50.00 mob_death Kobold Miner appears!
+50.25 mob_attack Rampaging Boar hits you for 12
+51.25 mob_death Rampaging Boar dies to Umbral Bolt!
+51.25 player_attack You hit Rampaging Boar for 23
+54.25 mob_death Rampaging Boar appears!
+55.25 mob_death Grey Wolf dies to Umbral Bolt!
+58.00 mob_attack Rampaging Boar hits you for 12
+58.25 mob_death Rampaging Boar appears!
+59.25 mob_death Rampaging Boar dies to Umbral Bolt!
+62.25 mob_death Kobold Miner appears!
+63.25 mob_death Kobold Miner dies to Umbral Bolt!
+63.25 mob_attack Kobold Miner hits you for 12
+66.25 mob_death Rampaging Boar appears!
+66.50 mob_attack Rampaging Boar hits you for 12
+66.75 player_attack You hit Rampaging Boar for 23
+67.50 mob_death Rampaging Boar dies to Umbral Bolt!
+70.50 mob_death Rampaging Boar appears!
+71.50 mob_death Rampaging Boar dies to Umbral Bolt!
+71.50 mob_attack Rampaging Boar hits you for 12
+74.50 mob_death Kobold Miner appears!
+75.50 mob_death Rampaging Boar dies to Umbral Bolt!
+75.50 mob_attack Rampaging Boar hits you for 12
+78.50 mob_death Grey Wolf appears!
+79.50 mob_death Kobold Miner dies to Umbral Bolt!
+82.50 mob_death Grey Wolf appears!
+82.75 mob_attack Grey Wolf hits you for 8
+83.75 mob_death Grey Wolf dies to Umbral Bolt!
+83.75 player_attack You hit Grey Wolf for 23
+86.75 mob_death Grey Wolf appears!
+87.50 mob_attack Grey Wolf hits you for 8
+88.25 mob_death Grey Wolf dies to Umbral Bolt!
+91.25 mob_death Rampaging Boar appears!
+92.25 mob_death Grey Wolf dies to Umbral Bolt!
+95.00 mob_attack Rampaging Boar hits you for 12
+95.25 mob_death Grey Wolf appears!
+96.25 mob_death Rampaging Boar dies to Umbral Bolt!
+99.25 mob_death Grey Wolf appears!
+100.25 mob_death Grey Wolf dies to Umbral Bolt!
+103.25 mob_death Kobold Miner appears!
+103.50 mob_attack Kobold Miner hits you for 12
+104.50 mob_death Kobold Miner dies to Umbral Bolt!
+107.50 mob_death Kobold Miner appears!
+108.50 mob_death Grey Wolf dies to Umbral Bolt!
+109.00 mob_attack Kobold Miner joins the fight!
+111.50 mob_death Rampaging Boar appears!
+112.50 proc 🌀 The blow carries — 1 more caught for 56
+112.50 mob_death Kobold Miner dies to Umbral Bolt!
+114.00 mob_attack Kobold Miner hits you for 12
+115.00 player_attack You hit Kobold Miner for 23
+115.50 mob_death Rampaging Boar appears!
+116.25 mob_attack Kobold Miner hits you for 12
+116.25 player_death You have been slain! Respawning in 3s...
+124.25 player_respawn You rise from the grave...
+125.75 mob_death Kobold Miner appears!
+127.25 mob_death Kobold Miner appears!
+127.50 mob_death Kobold Miner dies to Umbral Bolt!
+130.50 mob_death Rampaging Boar appears!
+131.50 mob_death Kobold Miner dies to Umbral Bolt!
 134.50 mob_death Kobold Miner appears!
-138.50 mob_attack ★ Kobold Miner hits you for 15
-138.75 player_attack You hit ★ Kobold Miner for 412
-138.75 mob_death ★ Kobold Miner dies!
-140.25 mob_death Grey Wolf appears!
-143.25 mob_attack Rampaging Boar hits you for 8
-143.75 player_attack You hit Rampaging Boar for 412
-143.75 mob_death Rampaging Boar dies!
-145.25 mob_death Rampaging Boar appears!
-149.00 mob_attack Grey Wolf hits you for 5
-149.50 player_attack You hit Grey Wolf for 206
-149.50 mob_death Grey Wolf dies!
-151.00 mob_death Rampaging Boar appears!
-153.75 mob_attack Rampaging Boar hits you for 8
-154.25 player_attack You hit Rampaging Boar for 412
-154.25 mob_death Rampaging Boar dies!
-155.75 mob_death Kobold Miner appears!
-158.50 mob_attack Rampaging Boar hits you for 8
-159.00 player_attack You hit Rampaging Boar for 412
-159.00 mob_death Rampaging Boar dies!
-165.50 mob_death Kobold Miner appears!
-171.25 mob_attack Kobold Miner hits you for 8
-171.50 player_attack You hit Kobold Miner for 412
-171.50 mob_death Kobold Miner dies!
-173.00 mob_death Rampaging Boar appears!
-178.75 mob_attack Kobold Miner hits you for 8
-179.00 player_attack You hit Kobold Miner for 474
-179.00 mob_death Kobold Miner dies!
-180.50 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
-187.25 player_attack You hit [BOSS] Elder Meadow Beast for 474
-187.25 mob_death [BOSS] Elder Meadow Beast dies!
-187.25 level_up ★ Level Up! Now level 4!
-187.25 level_up ★ Level Up! Now level 5!
-188.75 mob_death ★ Elite: ★ Rampaging Boar appears!
-190.25 mob_death Grey Wolf appears!
-191.75 mob_death Kobold Miner appears!
-193.25 mob_death Grey Wolf appears!
-195.00 mob_attack ★ Rampaging Boar hits you for 14
-195.50 player_crit You hit ★ Rampaging Boar for 1144 (CRIT!)
-195.50 mob_death ★ Rampaging Boar dies!
-197.00 mob_death Rampaging Boar appears!
-199.75 mob_attack Kobold Miner hits you for 8
-200.00 player_crit You hit Kobold Miner for 1192 (CRIT!)
-200.00 mob_death Kobold Miner dies!
-201.50 mob_death Grey Wolf appears!
-203.75 mob_attack Grey Wolf hits you for 5
-204.25 player_attack You hit Grey Wolf for 498
-204.25 mob_death Grey Wolf dies!
-205.75 mob_death Grey Wolf appears!
-209.00 mob_attack Rampaging Boar hits you for 8
-209.50 player_attack You hit Rampaging Boar for 498
-209.50 mob_death Rampaging Boar dies!
-211.00 mob_death Rampaging Boar appears!
-214.50 mob_attack Grey Wolf hits you for 5
-215.00 player_attack You hit Grey Wolf for 498
-215.00 mob_death Grey Wolf dies!
-216.50 mob_death Grey Wolf appears!
-220.00 mob_attack Rampaging Boar hits you for 8
-220.50 player_attack You hit Rampaging Boar for 498
-220.50 mob_death Rampaging Boar dies!
-222.00 mob_death Kobold Miner appears!
-226.25 mob_attack Grey Wolf hits you for 5
-226.75 player_attack You hit Grey Wolf for 498
-226.75 mob_death Grey Wolf dies!
-228.25 mob_death Grey Wolf appears!
-232.50 mob_attack Kobold Miner hits you for 8
-232.75 player_attack You hit Kobold Miner for 498
-232.75 mob_death Kobold Miner dies!
-234.25 mob_death Rampaging Boar appears!
-237.50 mob_attack Grey Wolf hits you for 5
-238.00 player_crit You hit Grey Wolf for 1192 (CRIT!)
-238.00 mob_death Grey Wolf dies!
-239.50 mob_death Kobold Miner appears!
-242.75 mob_attack Grey Wolf hits you for 5
-243.25 player_attack You hit Grey Wolf for 502
-243.25 mob_death Grey Wolf dies!
-243.25 mob_attack Rampaging Boar spots you and charges!
-244.75 mob_death Grey Wolf appears!
-246.50 mob_attack Rampaging Boar hits you for 8
-247.00 player_crit You hit Rampaging Boar for 601 (CRIT!)
-247.00 mob_death Rampaging Boar dies!
-248.50 mob_death Grey Wolf appears!
-251.75 mob_attack Grey Wolf hits you for 5
-252.25 player_attack You hit Grey Wolf for 502
-252.25 mob_death Grey Wolf dies!
-253.75 mob_death Kobold Miner appears!
-258.25 mob_attack Grey Wolf hits you for 5
-258.75 player_crit You hit Grey Wolf for 1202 (CRIT!)
-258.75 mob_death Grey Wolf dies!
-260.25 mob_death Kobold Miner appears!
-265.50 mob_attack Kobold Miner hits you for 8
-265.75 player_attack You hit Kobold Miner for 502
-265.75 mob_death Kobold Miner dies!
-267.25 mob_death Rampaging Boar appears!
-267.25 mob_attack Rampaging Boar joins the fight!
-271.25 mob_attack Kobold Miner hits you for 8
-271.50 proc 🌀 The blow carries — 1 more caught for 452
-271.50 player_attack You hit Kobold Miner for 502
-271.50 mob_death Kobold Miner dies!
-271.50 mob_death Rampaging Boar dies!
-273.00 mob_death Grey Wolf appears!
-274.50 mob_death Grey Wolf appears!
-278.50 mob_attack Grey Wolf hits you for 5
-279.00 player_attack You hit Grey Wolf for 502
-279.00 mob_death Grey Wolf dies!
-280.50 mob_death Grey Wolf appears!
-283.75 mob_attack Grey Wolf hits you for 5
-284.25 player_attack You hit Grey Wolf for 502
-284.25 mob_death Grey Wolf dies!
-285.75 mob_death Rampaging Boar appears!
-289.00 mob_attack Grey Wolf hits you for 5
-289.50 player_attack You hit Grey Wolf for 502
-289.50 mob_death Grey Wolf dies!
-291.00 mob_death Rampaging Boar appears!
-294.50 mob_attack Grey Wolf hits you for 5
-295.00 player_crit You hit Grey Wolf for 1202 (CRIT!)
-295.00 mob_death Grey Wolf dies!
-296.50 mob_death Grey Wolf appears!
-299.25 mob_attack Rampaging Boar hits you for 8
-299.75 player_attack You hit Rampaging Boar for 502
-299.75 mob_death Rampaging Boar dies!
-306.25 mob_death Rampaging Boar appears!
-308.75 mob_attack Rampaging Boar hits you for 8
-309.25 player_attack You hit Rampaging Boar for 502
-309.25 mob_death Rampaging Boar dies!
-310.75 mob_death Grey Wolf appears!
-314.00 mob_attack Rampaging Boar hits you for 8
-314.50 player_attack You hit Rampaging Boar for 502
-314.50 mob_death Rampaging Boar dies!
-316.00 mob_death ★ Elite: ★ Rampaging Boar appears!
-318.50 mob_attack Grey Wolf hits you for 5
-319.00 player_attack You hit Grey Wolf for 502
-319.00 mob_death Grey Wolf dies!
-320.50 mob_death Grey Wolf appears!
-324.00 mob_attack ★ Rampaging Boar hits you for 15
-324.50 player_attack You hit ★ Rampaging Boar for 502
-324.50 mob_death ★ Rampaging Boar dies!
-326.00 mob_death Kobold Miner appears!
-330.50 mob_attack Grey Wolf hits you for 5
-330.50 player_death You have been slain! Respawning in 3s...
-333.50 player_respawn You rise from the grave...
-335.00 mob_death Rampaging Boar appears!
-336.50 mob_death Grey Wolf appears!
-338.00 mob_death Kobold Miner appears!
-339.50 mob_death Rampaging Boar appears!
-340.00 mob_attack Rampaging Boar hits you for 8
-340.50 player_attack You hit Rampaging Boar for 502
-340.50 mob_death Rampaging Boar dies!
-353.50 proc ⚔️ Crafted Coarse Crude Weapon Oil!
-355.00 mob_death Rampaging Boar appears!
-358.00 mob_attack Rampaging Boar hits you for 8
-358.50 player_attack You hit Rampaging Boar for 502
-358.50 mob_death Rampaging Boar dies!
-360.00 mob_death Rampaging Boar appears!
-362.00 mob_attack Rampaging Boar hits you for 8
-362.50 player_crit You hit Rampaging Boar for 1202 (CRIT!)
-362.50 mob_death Rampaging Boar dies!
-363.00 mob_attack Grey Wolf joins the fight!
-364.00 mob_death Rampaging Boar appears!
-368.25 mob_attack Rampaging Boar hits you for 8
-368.75 proc 🌀 The blow carries — 1 more caught for 452
-368.75 player_attack You hit Rampaging Boar for 502
-368.75 mob_death Rampaging Boar dies!
-368.75 mob_death Grey Wolf dies!
-370.25 mob_death Kobold Miner appears!
-371.75 mob_death Grey Wolf appears!
-374.00 mob_attack Rampaging Boar hits you for 8
-374.50 player_crit You hit Rampaging Boar for 1202 (CRIT!)
-374.50 mob_death Rampaging Boar dies!
-376.00 mob_death Rampaging Boar appears!
-378.25 mob_attack Grey Wolf hits you for 5
-378.75 player_attack You hit Grey Wolf for 502
-378.75 mob_death Grey Wolf dies!
-380.25 mob_death Rampaging Boar appears!
-384.50 mob_attack Kobold Miner hits you for 8
-384.75 player_attack You hit Kobold Miner for 502
-384.75 mob_death Kobold Miner dies!
-386.25 mob_death Rampaging Boar appears!
-389.75 mob_attack Rampaging Boar hits you for 8
-390.25 player_attack You hit Rampaging Boar for 502
-390.25 mob_death Rampaging Boar dies!
-391.75 mob_death Rampaging Boar appears!
-396.50 mob_attack Rampaging Boar hits you for 8
-397.00 player_attack You hit Rampaging Boar for 502
-397.00 mob_death Rampaging Boar dies!
-398.50 mob_death Kobold Miner appears!
-402.00 mob_attack Rampaging Boar hits you for 8
-402.50 player_attack You hit Rampaging Boar for 624
-402.50 mob_death Rampaging Boar dies!
-404.00 mob_death Rampaging Boar appears!
-407.50 mob_attack Kobold Miner hits you for 8
-407.75 player_attack You hit Kobold Miner for 624
-407.75 mob_death Kobold Miner dies!
-409.25 mob_death Grey Wolf appears!
-414.00 mob_attack Rampaging Boar hits you for 8
-414.50 player_attack You hit Rampaging Boar for 624
-414.50 mob_death Rampaging Boar dies!
-416.00 mob_death Grey Wolf appears!
-421.75 mob_attack Grey Wolf hits you for 5
-422.25 player_attack You hit Grey Wolf for 624
-422.25 mob_death Grey Wolf dies!
-423.75 mob_death Kobold Miner appears!
-428.25 mob_attack Kobold Miner hits you for 8
-428.50 player_attack You hit Kobold Miner for 624
-428.50 mob_death Kobold Miner dies!
-430.00 mob_death Kobold Miner appears!
-430.00 mob_attack Kobold Miner joins the fight!
-436.00 mob_attack Kobold Miner hits you for 8
-436.00 mob_attack Kobold Miner hits you for 8
-436.25 proc 🌀 The blow carries — 1 more caught for 562
-436.25 player_attack You hit Kobold Miner for 624
-436.25 mob_death Kobold Miner dies!
-436.25 level_up ★ Level Up! Now level 6!
-436.25 mob_death Kobold Miner dies!
-437.75 mob_death ★ Elite: ★ Kobold Miner appears!
-439.25 mob_death ★ Elite: ★ Kobold Miner appears!
-441.50 mob_attack Grey Wolf hits you for 5
-442.00 player_attack You hit Grey Wolf for 624
-442.00 mob_death Grey Wolf dies!
-443.50 mob_death Rampaging Boar appears!
-447.00 mob_attack ★ Kobold Miner hits you for 15
-447.25 player_crit You hit ★ Kobold Miner for 1500 (CRIT!)
-447.25 mob_death ★ Kobold Miner dies!
-447.75 mob_attack Rampaging Boar joins the fight!
-448.75 mob_death Kobold Miner appears!
-452.25 mob_attack Rampaging Boar hits you for 8
-452.75 proc 🌀 The blow carries — 1 more caught for 562
-452.75 player_attack You hit Rampaging Boar for 624
-452.75 mob_death Rampaging Boar dies!
-452.75 mob_death Rampaging Boar dies!
-454.25 mob_death Rampaging Boar appears!
-455.75 mob_death Kobold Miner appears!
-457.75 mob_attack Kobold Miner hits you for 8
-458.00 player_attack You hit Kobold Miner for 624
-458.00 mob_death Kobold Miner dies!
-459.50 mob_death Kobold Miner appears!
-462.50 mob_attack Kobold Miner hits you for 8
-462.75 player_attack You hit Kobold Miner for 876
-462.75 mob_death Kobold Miner dies!
-464.25 mob_death Grey Wolf appears!
-467.50 mob_attack Kobold Miner hits you for 8
-467.75 player_crit You hit Kobold Miner for 2104 (CRIT!)
-467.75 mob_death Kobold Miner dies!
-469.25 mob_death Kobold Miner appears!
-473.25 mob_attack Grey Wolf hits you for 5
-473.75 player_crit You hit Grey Wolf for 2104 (CRIT!)
-473.75 mob_death Grey Wolf dies!
-475.25 mob_death Grey Wolf appears!
-479.25 mob_attack Kobold Miner hits you for 8
-479.50 player_attack You hit Kobold Miner for 438
-479.50 mob_death Kobold Miner dies!
-481.00 mob_death Kobold Miner appears!
-484.50 mob_attack Grey Wolf hits you for 5
-485.00 player_attack You hit Grey Wolf for 876
-485.00 mob_death Grey Wolf dies!
-485.50 mob_attack Rampaging Boar joins the fight!
-486.50 mob_death ★ Elite: ★ Rampaging Boar appears!
-491.00 mob_attack ★ Kobold Miner hits you for 15
-491.25 proc 🌀 The blow carries — 1 more caught for 788
-491.25 player_attack You hit ★ Kobold Miner for 876
-491.25 mob_death ★ Kobold Miner dies!
-491.25 mob_death Rampaging Boar dies!
-502.75 mob_death Grey Wolf appears!
-504.25 mob_death Grey Wolf appears!
-505.00 mob_attack ★ Rampaging Boar hits you for 15
-505.50 player_attack You hit ★ Rampaging Boar for 876
-505.50 mob_death ★ Rampaging Boar dies!
-507.00 mob_death Grey Wolf appears!
-511.25 mob_attack Grey Wolf hits you for 5
-511.75 player_attack You hit Grey Wolf for 876
-511.75 mob_death Grey Wolf dies!
-534.75 proc ⚔️ Crafted Coarse Crude Weapon Oil!
-536.25 mob_death Kobold Miner appears!
-541.00 mob_attack Grey Wolf hits you for 5
-541.50 player_attack You hit Grey Wolf for 876
-541.50 mob_death Grey Wolf dies!
-543.00 mob_death Grey Wolf appears!
-547.25 mob_attack Kobold Miner hits you for 8
-547.50 player_attack You hit Kobold Miner for 876
-547.50 mob_death Kobold Miner dies!
-549.00 mob_death Kobold Miner appears!
-552.00 mob_attack Grey Wolf hits you for 5
-552.50 player_crit You hit Grey Wolf for 2104 (CRIT!)
-552.50 mob_death Grey Wolf dies!
-570.50 proc ⚔️ Crafted Coarse Crude Weapon Oil!
-572.00 mob_death Kobold Miner appears!
-575.50 mob_attack Kobold Miner hits you for 8
-575.75 player_attack You hit Kobold Miner for 876
-575.75 mob_death Kobold Miner dies!
-577.25 mob_death Rampaging Boar appears!
-581.00 mob_attack Kobold Miner hits you for 8
-581.25 player_attack You hit Kobold Miner for 876
-581.25 mob_death Kobold Miner dies!
-582.75 mob_death Kobold Miner appears!
-585.75 mob_attack Rampaging Boar hits you for 7
-586.25 player_attack You hit Rampaging Boar for 876
-586.25 mob_death Rampaging Boar dies!
-587.75 mob_death Rampaging Boar appears!
-591.75 mob_attack Kobold Miner hits you for 7
-592.00 player_attack You hit Kobold Miner for 876
-592.00 mob_death Kobold Miner dies!
-593.50 mob_death Grey Wolf appears!
-596.50 mob_attack Rampaging Boar hits you for 7
-597.00 player_crit You hit Rampaging Boar for 2104 (CRIT!)
-597.00 mob_death Rampaging Boar dies!
-598.50 mob_death Rampaging Boar appears!
+135.50 mob_death Rampaging Boar dies to Umbral Bolt!
+138.50 mob_death Grey Wolf appears!
+139.50 mob_death Kobold Miner dies to Umbral Bolt!
+142.50 mob_death Grey Wolf appears!
+143.50 mob_death Grey Wolf dies to Umbral Bolt!
+146.50 mob_death Rampaging Boar appears!
+147.50 mob_death Grey Wolf dies to Umbral Bolt!
+150.50 mob_death Kobold Miner appears!
+151.50 mob_death Rampaging Boar dies to Umbral Bolt!
+154.50 mob_death Kobold Miner appears!
+155.00 mob_attack Kobold Miner hits you for 12
+156.00 mob_death Kobold Miner dies to Umbral Bolt!
+156.00 mob_death Kobold Miner appears!
+159.00 mob_death Kobold Miner appears!
+159.25 mob_attack Kobold Miner hits you for 12
+160.00 player_attack You hit Kobold Miner for 23
+160.25 mob_death Kobold Miner dies to Umbral Bolt!
+163.25 mob_death Rampaging Boar appears!
+164.25 mob_death Kobold Miner dies to Umbral Bolt!
+164.25 mob_attack Kobold Miner hits you for 12
+167.25 mob_death Grey Wolf appears!
+168.25 mob_death Rampaging Boar dies to Umbral Bolt!
+171.25 mob_death Kobold Miner appears!
+172.25 mob_death Grey Wolf dies to Umbral Bolt!
+175.25 mob_death Rampaging Boar appears!
+176.25 mob_death Kobold Miner dies to Umbral Bolt!
+179.25 mob_death Kobold Miner appears!
+179.25 mob_attack Kobold Miner joins the fight!
+180.25 mob_death Rampaging Boar dies to Umbral Bolt!
+182.00 mob_attack Kobold Miner hits you for 12
+183.25 mob_death Grey Wolf appears!
+183.50 player_attack You hit Kobold Miner for 23
+184.25 mob_death Kobold Miner dies to Umbral Bolt!
+184.25 mob_attack Kobold Miner hits you for 12
+187.25 mob_death Grey Wolf appears!
+188.25 mob_death Grey Wolf dies to Umbral Bolt!
+191.25 mob_death Rampaging Boar appears!
+192.25 mob_death Grey Wolf dies to Umbral Bolt!
+195.25 mob_death Kobold Miner appears!
+196.25 mob_death Kobold Miner dies to Umbral Bolt!
+199.25 mob_death Rampaging Boar appears!
+200.25 mob_death Kobold Miner dies to Umbral Bolt!
+203.25 mob_death Kobold Miner appears!
+204.00 mob_attack Rampaging Boar hits you for 12
+204.75 mob_death Rampaging Boar dies to Umbral Bolt!
+204.75 mob_death Grey Wolf appears!
+207.75 mob_death Kobold Miner appears!
+208.50 mob_attack Kobold Miner hits you for 12
+209.00 player_attack You hit Kobold Miner for 23
+209.25 mob_death Kobold Miner dies to Umbral Bolt!
+211.00 mob_attack Rampaging Boar joins the fight!
+212.25 mob_death Kobold Miner appears!
+213.25 proc 🌀 The blow carries — 1 more caught for 56
+213.25 mob_death Grey Wolf dies to Umbral Bolt!
+213.25 mob_attack Grey Wolf hits you for 8
+215.25 mob_attack Rampaging Boar hits you for 12
+215.50 player_attack You hit Rampaging Boar for 23
+216.25 mob_death Rampaging Boar appears!
+217.00 mob_attack Rampaging Boar hits you for 12
+217.50 player_attack You hit Rampaging Boar for 23
+217.75 mob_death Rampaging Boar dies to Umbral Bolt!
+220.75 mob_death Rampaging Boar appears!
+221.25 mob_attack Rampaging Boar hits you for 12
+222.25 mob_death Rampaging Boar dies to Umbral Bolt!
+222.25 player_attack You hit Rampaging Boar for 23
+225.00 mob_attack Rampaging Boar hits you for 12
+225.25 mob_death Kobold Miner appears!
+226.25 mob_death Rampaging Boar dies to Umbral Bolt!
+226.25 player_attack You hit Rampaging Boar for 23
+229.25 mob_death Rampaging Boar appears!
+230.25 mob_death Kobold Miner dies to Umbral Bolt!
+230.25 mob_attack Kobold Miner hits you for 12
+233.25 mob_death Kobold Miner appears!
+234.25 mob_death Kobold Miner dies to Umbral Bolt!
+237.25 mob_death Kobold Miner appears!
+238.25 mob_death Kobold Miner dies to Umbral Bolt!
+241.25 mob_death Rampaging Boar appears!
+242.25 mob_death Rampaging Boar dies to Umbral Bolt!
+245.25 mob_death Grey Wolf appears!
+246.25 mob_death Kobold Miner dies to Umbral Bolt!
+249.25 mob_death Grey Wolf appears!
+250.25 mob_death Grey Wolf dies to Umbral Bolt!
+250.75 mob_attack Grey Wolf joins the fight!
+253.25 mob_death Grey Wolf appears!
+254.25 proc 🌀 The blow carries — 1 more caught for 56
+254.25 mob_death Kobold Miner dies to Umbral Bolt!
+255.00 mob_attack Grey Wolf hits you for 8
+256.75 player_attack You hit Grey Wolf for 23
+256.75 mob_attack Grey Wolf hits you for 8
+257.25 mob_death Grey Wolf appears!
+258.25 mob_death Grey Wolf dies to Umbral Bolt!
+261.25 mob_death Rampaging Boar appears!
+261.25 mob_attack Grey Wolf hits you for 8
+262.25 mob_death Grey Wolf dies to Umbral Bolt!
+265.25 mob_death Grey Wolf appears!
+266.25 mob_death Rampaging Boar dies to Umbral Bolt!
+266.25 mob_attack Rampaging Boar hits you for 12
+269.25 mob_death Rampaging Boar appears!
+270.25 mob_death Grey Wolf dies to Umbral Bolt!
+273.25 mob_death Rampaging Boar appears!
+274.25 mob_death Rampaging Boar dies to Umbral Bolt!
+277.25 mob_death Grey Wolf appears!
+278.25 mob_death Rampaging Boar dies to Umbral Bolt!
+281.25 mob_death Rampaging Boar appears!
+281.25 mob_attack Grey Wolf hits you for 8
+282.25 mob_death Grey Wolf dies to Umbral Bolt!
+285.25 mob_death Grey Wolf appears!
+285.75 mob_attack Rampaging Boar hits you for 12
+286.75 mob_death Rampaging Boar dies to Umbral Bolt!
+286.75 player_attack You hit Rampaging Boar for 23
+289.75 mob_death Rampaging Boar appears!
+290.75 mob_death Grey Wolf dies to Umbral Bolt!
+293.75 mob_death ★ Elite: ★ Kobold Miner appears!
+293.75 mob_attack Grey Wolf hits you for 8
+293.75 player_death You have been slain! Respawning in 3s...
+296.75 player_respawn You rise from the grave...
+298.25 mob_death Rampaging Boar appears!
+299.75 mob_death Kobold Miner appears!
+300.00 mob_death Rampaging Boar dies to Umbral Bolt!
+303.00 mob_death Grey Wolf appears!
+304.00 mob_death Kobold Miner dies to Umbral Bolt!
+307.00 mob_death Grey Wolf appears!
+308.00 mob_death Grey Wolf dies to Umbral Bolt!
+311.00 mob_death Rampaging Boar appears!
+312.00 mob_death Grey Wolf dies to Umbral Bolt!
+315.00 mob_death Kobold Miner appears!
+315.50 mob_attack Rampaging Boar hits you for 12
+316.50 mob_death Rampaging Boar dies to Umbral Bolt!
+316.50 mob_death Kobold Miner appears!
+319.50 mob_death Grey Wolf appears!
+320.25 mob_attack Kobold Miner hits you for 12
+321.00 mob_death Kobold Miner dies to Umbral Bolt!
+321.00 mob_death Kobold Miner appears!
+324.00 mob_death Grey Wolf appears!
+325.00 mob_death Grey Wolf dies to Umbral Bolt!
+325.00 mob_attack Grey Wolf hits you for 8
+328.00 mob_death Grey Wolf appears!
+329.00 mob_death Grey Wolf dies to Umbral Bolt!
+332.00 mob_death Kobold Miner appears!
+332.25 mob_attack Grey Wolf hits you for 8
+333.25 mob_death Grey Wolf dies to Umbral Bolt!
+336.25 mob_death Grey Wolf appears!
+337.25 mob_death Kobold Miner dies to Umbral Bolt!
+340.25 mob_death Kobold Miner appears!
+340.25 mob_attack Grey Wolf hits you for 8
+341.25 mob_death Grey Wolf dies to Umbral Bolt!
+341.25 player_attack You hit Grey Wolf for 23
+344.25 mob_death ★ Elite: ★ Kobold Miner appears!
+345.00 mob_attack Kobold Miner hits you for 12
+345.75 mob_death Kobold Miner dies to Umbral Bolt!
+345.75 player_attack You hit Kobold Miner for 23
+346.25 mob_attack ★ Kobold Miner joins the fight!
+348.75 mob_death Grey Wolf appears!
+349.50 mob_attack Kobold Miner hits you for 12
+350.00 proc 🌀 The blow carries — 1 more caught for 18
+350.00 player_attack You hit Kobold Miner for 23
+350.25 mob_death Kobold Miner dies to Umbral Bolt!
+351.75 mob_attack ★ Kobold Miner hits you for 22
+352.00 player_attack You hit ★ Kobold Miner for 23
+353.25 mob_death Kobold Miner appears!
+354.00 player_attack You hit ★ Kobold Miner for 23
+354.00 mob_attack ★ Kobold Miner hits you for 22
+356.00 player_crit You hit ★ Kobold Miner for 66 (CRIT!)
+356.00 mob_death ★ Kobold Miner dies!
+357.50 mob_death Grey Wolf appears!
+358.75 mob_death Kobold Miner dies to Umbral Bolt!
+361.75 mob_death Rampaging Boar appears!
+362.75 mob_death Grey Wolf dies to Umbral Bolt!
+365.75 mob_death Grey Wolf appears!
+365.75 mob_attack Grey Wolf joins the fight!
+366.75 mob_death Rampaging Boar dies to Umbral Bolt!
+368.75 mob_attack Grey Wolf hits you for 8
+369.75 mob_death Rampaging Boar appears!
+369.75 player_attack You hit Grey Wolf for 23
+370.75 mob_death Grey Wolf dies to Umbral Bolt!
+370.75 mob_attack Grey Wolf hits you for 8
+373.75 mob_death Kobold Miner appears!
+374.75 mob_death Kobold Miner dies to Umbral Bolt!
+377.75 mob_death Grey Wolf appears!
+378.75 mob_death Kobold Miner dies to Umbral Bolt!
+381.75 mob_death Rampaging Boar appears!
+382.75 mob_death Grey Wolf dies to Umbral Bolt!
+385.75 mob_death Rampaging Boar appears!
+386.50 mob_attack Rampaging Boar hits you for 12
+387.25 mob_death Rampaging Boar dies to Umbral Bolt!
+390.25 mob_death Grey Wolf appears!
+391.25 mob_death Rampaging Boar dies to Umbral Bolt!
+394.25 mob_death Kobold Miner appears!
+395.25 mob_death Grey Wolf dies to Umbral Bolt!
+398.25 mob_death Kobold Miner appears!
+399.25 mob_death Grey Wolf dies to Umbral Bolt!
+402.25 mob_death Kobold Miner appears!
+402.50 mob_attack Kobold Miner hits you for 12
+403.50 mob_death Kobold Miner dies to Umbral Bolt!
+406.50 mob_death Grey Wolf appears!
+407.50 mob_death Kobold Miner dies to Umbral Bolt!
+407.50 mob_attack Kobold Miner hits you for 12
+408.00 mob_attack Rampaging Boar joins the fight!
+410.50 mob_death Grey Wolf appears!
+411.50 mob_death Kobold Miner dies to Umbral Bolt!
+411.50 proc 🌀 The blow carries — 1 more caught for 18
+411.50 player_attack You hit Kobold Miner for 23
+411.75 mob_attack Rampaging Boar hits you for 12
+413.25 mob_attack Rampaging Boar hits you for 12
+413.50 player_attack You hit Rampaging Boar for 23
+414.50 mob_death ★ Elite: ★ Kobold Miner appears!
+415.00 mob_attack Rampaging Boar hits you for 12
+415.50 player_attack You hit Rampaging Boar for 23
+416.00 mob_death Rampaging Boar dies to Umbral Bolt!
+419.00 mob_death Kobold Miner appears!
+419.75 mob_attack ★ Kobold Miner hits you for 22
+419.75 player_death You have been slain! Respawning in 3s...
+422.75 player_respawn You rise from the grave...
+424.25 mob_death Kobold Miner appears!
+425.75 mob_death Rampaging Boar appears!
+426.00 mob_death Kobold Miner dies to Umbral Bolt!
+429.00 mob_death Kobold Miner appears!
+430.00 mob_death Rampaging Boar dies to Umbral Bolt!
+433.00 mob_death Kobold Miner appears!
+433.00 mob_attack Kobold Miner hits you for 12
+434.00 mob_death Kobold Miner dies to Umbral Bolt!
+437.00 mob_death Rampaging Boar appears!
+438.00 mob_death Kobold Miner dies to Umbral Bolt!
+441.00 mob_death Grey Wolf appears!
+442.00 mob_death Rampaging Boar dies to Umbral Bolt!
+445.00 mob_death Kobold Miner appears!
+446.00 mob_death Grey Wolf dies to Umbral Bolt!
+449.00 mob_death ★ Elite: ★ Kobold Miner appears!
+449.50 mob_attack Kobold Miner hits you for 12
+450.50 mob_death Kobold Miner dies to Umbral Bolt!
+450.50 mob_death Grey Wolf appears!
+450.50 player_attack You hit Kobold Miner for 23
+453.50 mob_death Kobold Miner appears!
+454.25 mob_attack ★ Kobold Miner hits you for 22
+455.00 mob_death Grey Wolf appears!
+455.00 player_attack You hit ★ Kobold Miner for 23
+456.50 mob_attack ★ Kobold Miner hits you for 22
+457.00 player_attack You hit ★ Kobold Miner for 23
+458.75 mob_attack ★ Kobold Miner hits you for 22
+459.00 player_attack You hit ★ Kobold Miner for 23
+459.50 mob_death ★ Kobold Miner dies to Umbral Bolt!
+462.50 mob_death Grey Wolf appears!
+463.50 mob_death Grey Wolf dies to Umbral Bolt!
+466.25 mob_attack Grey Wolf hits you for 8
+466.50 mob_death Grey Wolf appears!
+467.50 mob_death Grey Wolf dies to Umbral Bolt!
+470.25 mob_attack Grey Wolf hits you for 8
+470.50 mob_death Grey Wolf appears!
+471.50 mob_death Grey Wolf dies to Umbral Bolt!
+471.50 player_attack You hit Grey Wolf for 23
+474.50 mob_death Kobold Miner appears!
+475.50 mob_death Grey Wolf dies to Umbral Bolt!
+476.00 mob_attack Kobold Miner joins the fight!
+478.50 mob_death Grey Wolf appears!
+478.50 mob_attack Kobold Miner hits you for 12
+479.50 proc 🌀 The blow carries — 1 more caught for 56
+479.50 mob_death Kobold Miner dies to Umbral Bolt!
+481.00 mob_attack Kobold Miner hits you for 12
+481.75 player_attack You hit Kobold Miner for 23
+482.50 mob_death Grey Wolf appears!
+483.25 mob_attack Kobold Miner hits you for 12
+483.75 player_attack You hit Kobold Miner for 23
+484.00 mob_death Kobold Miner dies to Umbral Bolt!
+487.00 mob_death Grey Wolf appears!
+487.75 mob_attack Grey Wolf hits you for 8
+488.50 mob_death Grey Wolf dies to Umbral Bolt!
+488.50 player_attack You hit Grey Wolf for 23
+491.50 mob_death Kobold Miner appears!
+492.00 mob_attack Grey Wolf hits you for 8
+492.75 player_attack You hit Grey Wolf for 23
+493.00 mob_death Grey Wolf dies to Umbral Bolt!
+496.00 mob_death Grey Wolf appears!
+496.75 mob_attack Grey Wolf hits you for 8
+497.50 mob_death Grey Wolf dies to Umbral Bolt!
+500.50 mob_death ★ Elite: ★ Rampaging Boar appears!
+501.50 mob_death Grey Wolf dies to Umbral Bolt!
+504.50 mob_death Kobold Miner appears!
+505.50 mob_attack ★ Rampaging Boar hits you for 22
+506.50 player_attack You hit ★ Rampaging Boar for 23
+507.25 mob_attack ★ Rampaging Boar hits you for 22
+507.25 player_death You have been slain! Respawning in 3s...
+510.25 player_respawn You rise from the grave...
+511.75 mob_death Grey Wolf appears!
+513.25 mob_death Grey Wolf dies to Umbral Bolt!
+513.25 mob_death Kobold Miner appears!
+516.25 mob_death Grey Wolf appears!
+517.25 mob_death Kobold Miner dies to Umbral Bolt!
+520.25 mob_death Rampaging Boar appears!
+521.25 mob_death Grey Wolf dies to Umbral Bolt!
+521.25 mob_attack Grey Wolf hits you for 8
+524.25 mob_death ★ Elite: ★ Grey Wolf appears!
+525.25 mob_death Rampaging Boar dies to Umbral Bolt!
+528.25 mob_death Rampaging Boar appears!
+529.75 mob_death Rampaging Boar appears!
+531.00 mob_attack ★ Grey Wolf hits you for 14
+531.25 mob_death Rampaging Boar appears!
+531.50 player_attack You hit ★ Grey Wolf for 23
+533.00 mob_attack ★ Grey Wolf hits you for 14
+533.50 player_attack You hit ★ Grey Wolf for 23
+533.75 mob_death ★ Grey Wolf dies to Umbral Bolt!
+536.75 mob_death Kobold Miner appears!
+536.75 mob_attack Rampaging Boar hits you for 12
+537.50 player_attack You hit Rampaging Boar for 23
+537.75 mob_death Rampaging Boar dies to Umbral Bolt!
+540.75 mob_death Grey Wolf appears!
+540.75 mob_attack Rampaging Boar hits you for 12
+541.75 mob_death Rampaging Boar dies to Umbral Bolt!
+544.75 mob_death Grey Wolf appears!
+545.25 mob_attack Grey Wolf hits you for 8
+546.25 mob_death Grey Wolf dies to Umbral Bolt!
+546.25 player_attack You hit Grey Wolf for 23
+549.25 mob_death Rampaging Boar appears!
+550.25 mob_death Grey Wolf dies to Umbral Bolt!
+550.25 mob_attack Grey Wolf hits you for 8
+553.25 mob_death Grey Wolf appears!
+554.25 mob_death Rampaging Boar dies to Umbral Bolt!
+557.25 mob_death Rampaging Boar appears!
+558.25 mob_death Grey Wolf dies to Umbral Bolt!
+561.25 mob_death Rampaging Boar appears!
+562.25 mob_death Rampaging Boar dies to Umbral Bolt!
+565.25 mob_death Rampaging Boar appears!
+566.25 mob_death Rampaging Boar dies to Umbral Bolt!
+569.25 mob_death Rampaging Boar appears!
+570.25 mob_death Rampaging Boar dies to Umbral Bolt!
+573.25 mob_death Rampaging Boar appears!
+573.50 mob_attack Rampaging Boar hits you for 12
+574.50 mob_death Rampaging Boar dies to Umbral Bolt!
+577.50 mob_death Rampaging Boar appears!
+578.50 mob_death Rampaging Boar dies to Umbral Bolt!
+581.50 mob_death Kobold Miner appears!
+582.50 mob_death Rampaging Boar dies to Umbral Bolt!
+585.50 mob_death Rampaging Boar appears!
+586.00 mob_attack Kobold Miner hits you for 12
+586.75 player_attack You hit Kobold Miner for 23
+587.00 mob_death Kobold Miner dies to Umbral Bolt!
+590.00 mob_death Kobold Miner appears!
+590.50 mob_attack Rampaging Boar hits you for 12
+591.50 mob_death Rampaging Boar dies to Umbral Bolt!
+594.50 mob_death Grey Wolf appears!
+595.25 mob_attack Kobold Miner hits you for 12
+596.00 player_crit You hit Kobold Miner for 66 (CRIT!)
+596.00 mob_death Kobold Miner dies!
+597.50 mob_death Rampaging Boar appears!
+600.00 mob_death Grey Wolf dies to Umbral Bolt!
+
+## rogue twin fangs | seed=2
+0.25 mob_death Rampaging Boar appears!
+1.75 mob_death Rampaging Boar appears!
+3.25 mob_death Grey Wolf appears!
+4.00 proc ⚡ A moment of perfect stillness — guaranteed crit!
+4.00 player_crit You hit Rampaging Boar for 155 (CRIT!)
+4.00 mob_death Rampaging Boar dies!
+4.50 mob_attack Grey Wolf joins the fight!
+5.50 mob_death Rampaging Boar appears!
+7.00 mob_death Kobold Miner appears!
+7.25 proc 🌀 The blow carries — 1 more caught for 134
+7.25 player_crit You hit Rampaging Boar for 155 (CRIT!)
+7.25 mob_death Rampaging Boar dies!
+7.25 mob_death Grey Wolf dies!
+8.75 mob_death Grey Wolf appears!
+8.75 mob_attack Grey Wolf joins the fight!
+10.25 mob_death Kobold Miner appears!
+11.50 proc 🌀 The blow carries — 1 more caught for 134
+11.50 player_crit You hit Rampaging Boar for 155 (CRIT!)
+11.50 mob_death Rampaging Boar dies!
+11.50 mob_death Grey Wolf dies!
+13.00 mob_death Kobold Miner appears!
+14.50 mob_death Grey Wolf appears!
+15.00 player_attack You hit Kobold Miner for 78
+15.00 mob_death Kobold Miner dies!
+16.50 mob_death Kobold Miner appears!
+18.25 player_crit You hit Kobold Miner for 155 (CRIT!)
+18.25 mob_death Kobold Miner dies!
+19.75 mob_death Kobold Miner appears!
+22.25 player_crit You hit Kobold Miner for 155 (CRIT!)
+22.25 mob_death Kobold Miner dies!
+23.75 mob_death Kobold Miner appears!
+26.25 player_crit You hit Kobold Miner for 155 (CRIT!)
+26.25 mob_death Kobold Miner dies!
+27.75 mob_death Grey Wolf appears!
+31.00 player_crit You hit Kobold Miner for 155 (CRIT!)
+31.00 mob_death Kobold Miner dies!
+32.50 mob_death Kobold Miner appears!
+35.00 proc ⚡ A moment of perfect stillness — guaranteed crit!
+35.00 player_crit You hit Grey Wolf for 172 (CRIT!)
+35.00 mob_death Grey Wolf dies!
+41.50 mob_death Grey Wolf appears!
+44.50 player_crit You hit Grey Wolf for 172 (CRIT!)
+44.50 mob_death Grey Wolf dies!
+46.00 mob_death Rampaging Boar appears!
+48.25 player_crit You hit Grey Wolf for 172 (CRIT!)
+48.25 mob_death Grey Wolf dies!
+49.75 mob_death Rampaging Boar appears!
+53.75 player_crit You hit Rampaging Boar for 172 (CRIT!)
+53.75 mob_death Rampaging Boar dies!
+55.25 mob_death ★ Elite: ★ Kobold Miner appears!
+58.25 player_crit You hit Kobold Miner for 183 (CRIT!)
+58.25 mob_death Kobold Miner dies!
+59.75 mob_death Rampaging Boar appears!
+61.00 player_crit You hit ★ Kobold Miner for 183 (CRIT!)
+61.00 mob_death ★ Kobold Miner dies!
+62.50 mob_death Kobold Miner appears!
+62.50 mob_attack Kobold Miner joins the fight!
+66.25 player_crit You hit Kobold Miner for 183 (CRIT!)
+66.25 mob_death Kobold Miner dies!
+67.75 mob_death Rampaging Boar appears!
+67.75 player_crit You hit Kobold Miner for 183 (CRIT!)
+67.75 mob_death Kobold Miner dies!
+69.25 mob_death Rampaging Boar appears!
+73.50 proc ⚡ A moment of perfect stillness — guaranteed crit!
+73.50 player_crit You hit Rampaging Boar for 196 (CRIT!)
+73.50 mob_death Rampaging Boar dies!
+75.00 mob_death Rampaging Boar appears!
+77.50 player_crit You hit Rampaging Boar for 196 (CRIT!)
+77.50 mob_death Rampaging Boar dies!
+79.00 mob_death Grey Wolf appears!
+81.25 player_crit You hit Rampaging Boar for 196 (CRIT!)
+81.25 mob_death Rampaging Boar dies!
+82.75 mob_death Rampaging Boar appears!
+85.25 player_attack You hit Grey Wolf for 98
+85.25 mob_death Grey Wolf dies!
+86.75 mob_death Rampaging Boar appears!
+88.25 player_crit You hit Rampaging Boar for 196 (CRIT!)
+88.25 mob_death Rampaging Boar dies!
+89.75 mob_death Kobold Miner appears!
+93.25 player_crit You hit Rampaging Boar for 196 (CRIT!)
+93.25 mob_death Rampaging Boar dies!
+94.75 mob_death Rampaging Boar appears!
+98.00 mob_attack Rampaging Boar spots you and charges!
+99.25 player_crit You hit Kobold Miner for 196 (CRIT!)
+99.25 mob_death Kobold Miner dies!
+100.75 mob_death Grey Wolf appears!
+101.50 player_crit You hit Rampaging Boar for 196 (CRIT!)
+101.50 mob_death Rampaging Boar dies!
+103.00 mob_death Kobold Miner appears!
+105.25 proc ⚡ A moment of perfect stillness — guaranteed crit!
+105.25 player_crit You hit Rampaging Boar for 196 (CRIT!)
+105.25 mob_death Rampaging Boar dies!
+106.75 mob_death Grey Wolf appears!
+110.25 player_crit You hit Rampaging Boar for 196 (CRIT!)
+110.25 mob_death Rampaging Boar dies!
+111.75 mob_death Rampaging Boar appears!
+115.50 player_crit You hit Grey Wolf for 196 (CRIT!)
+115.50 mob_death Grey Wolf dies!
+117.00 mob_death Kobold Miner appears!
+120.00 player_crit You hit Rampaging Boar for 196 (CRIT!)
+120.00 mob_death Rampaging Boar dies!
+121.50 mob_death Rampaging Boar appears!
+124.25 player_crit You hit Grey Wolf for 196 (CRIT!)
+124.25 mob_death Grey Wolf dies!
+125.75 mob_death Kobold Miner appears!
+127.25 player_crit You hit Kobold Miner for 196 (CRIT!)
+127.25 mob_death Kobold Miner dies!
+128.75 mob_death Kobold Miner appears!
+131.75 player_crit You hit Kobold Miner for 196 (CRIT!)
+131.75 mob_death Kobold Miner dies!
+133.25 mob_death Grey Wolf appears!
+135.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+135.75 player_crit You hit Kobold Miner for 196 (CRIT!)
+135.75 mob_death Kobold Miner dies!
+137.25 mob_death Rampaging Boar appears!
+139.25 player_crit You hit Rampaging Boar for 196 (CRIT!)
+139.25 mob_death Rampaging Boar dies!
+140.75 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+146.25 player_crit You hit [BOSS] Elder Meadow Beast for 196 (CRIT!)
+147.50 player_crit You hit [BOSS] Elder Meadow Beast for 196 (CRIT!)
+148.00 mob_attack [BOSS] Elder Meadow Beast hits you for 109
+148.75 player_attack You hit [BOSS] Elder Meadow Beast for 117
+148.75 mob_death [BOSS] Elder Meadow Beast dies!
+157.00 mob_death Plains Vulture appears!
+158.50 mob_death Plains Vulture appears!
+160.00 mob_death Harrowfield Golem appears!
+161.50 mob_death Dustwind Thug appears!
+162.00 player_crit You hit Plains Vulture for 550 (CRIT!)
+162.00 mob_death Plains Vulture dies!
+163.50 mob_death Harrowfield Golem appears!
+166.50 player_crit You hit Plains Vulture for 550 (CRIT!)
+166.50 mob_death Plains Vulture dies!
+168.00 mob_death Plains Vulture appears!
+170.50 player_crit You hit Harrowfield Golem for 550 (CRIT!)
+170.50 mob_death Harrowfield Golem dies!
+172.00 mob_death Dustwind Thug appears!
+174.00 proc ⚡ A moment of perfect stillness — guaranteed crit!
+174.00 player_crit You hit Plains Vulture for 566 (CRIT!)
+174.00 mob_death Plains Vulture dies!
+175.50 mob_death ★ Elite: ★ Dustwind Thug appears!
+177.25 player_crit You hit Dustwind Thug for 566 (CRIT!)
+177.25 mob_death Dustwind Thug dies!
+178.75 mob_death Plains Vulture appears!
+181.25 player_crit You hit ★ Dustwind Thug for 566 (CRIT!)
+181.25 mob_death ★ Dustwind Thug dies!
+182.75 mob_death Dustwind Thug appears!
+186.25 player_crit You hit Plains Vulture for 566 (CRIT!)
+186.25 mob_death Plains Vulture dies!
+187.75 mob_death ★ Elite: ★ Dustwind Thug appears!
+190.75 player_crit You hit Dustwind Thug for 566 (CRIT!)
+190.75 mob_death Dustwind Thug dies!
+192.25 mob_death Plains Vulture appears!
+196.25 player_crit You hit ★ Dustwind Thug for 566 (CRIT!)
+196.25 mob_death ★ Dustwind Thug dies!
+197.75 mob_death Dustwind Thug appears!
+201.25 player_crit You hit Dustwind Thug for 566 (CRIT!)
+201.25 mob_death Dustwind Thug dies!
+202.75 mob_death Harrowfield Golem appears!
+204.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+204.75 player_crit You hit Dustwind Thug for 566 (CRIT!)
+204.75 mob_death Dustwind Thug dies!
+206.25 mob_death Dustwind Thug appears!
+209.50 player_crit You hit Harrowfield Golem for 566 (CRIT!)
+209.50 mob_death Harrowfield Golem dies!
+211.00 mob_death Plains Vulture appears!
+215.50 player_crit You hit Dustwind Thug for 566 (CRIT!)
+215.50 mob_death Dustwind Thug dies!
+217.00 mob_death Plains Vulture appears!
+220.25 player_crit You hit Plains Vulture for 566 (CRIT!)
+220.25 mob_death Plains Vulture dies!
+221.75 mob_death ★ Elite: ★ Harrowfield Golem appears!
+225.50 player_crit You hit Plains Vulture for 566 (CRIT!)
+225.50 mob_death Plains Vulture dies!
+227.00 mob_death Harrowfield Golem appears!
+229.75 player_crit You hit ★ Harrowfield Golem for 566 (CRIT!)
+229.75 mob_death ★ Harrowfield Golem dies!
+231.25 mob_death Plains Vulture appears!
+235.50 proc ⚡ A moment of perfect stillness — guaranteed crit!
+235.50 player_crit You hit Harrowfield Golem for 566 (CRIT!)
+235.50 mob_death Harrowfield Golem dies!
+237.00 mob_death Dustwind Thug appears!
+239.25 player_crit You hit Plains Vulture for 566 (CRIT!)
+239.25 mob_death Plains Vulture dies!
+240.75 mob_death Plains Vulture appears!
+243.50 player_crit You hit Dustwind Thug for 566 (CRIT!)
+243.50 mob_death Dustwind Thug dies!
+245.00 mob_death Plains Vulture appears!
+247.50 player_crit You hit Harrowfield Golem for 566 (CRIT!)
+247.50 mob_death Harrowfield Golem dies!
+254.00 mob_death Plains Vulture appears!
+257.50 player_crit You hit Plains Vulture for 566 (CRIT!)
+257.50 mob_death Plains Vulture dies!
+259.00 mob_death Harrowfield Golem appears!
+261.00 player_crit You hit Plains Vulture for 566 (CRIT!)
+261.00 mob_death Plains Vulture dies!
+262.50 mob_death Plains Vulture appears!
+265.50 player_crit You hit Harrowfield Golem for 566 (CRIT!)
+265.50 mob_death Harrowfield Golem dies!
+267.00 mob_death Dustwind Thug appears!
+269.25 player_crit You hit Plains Vulture for 566 (CRIT!)
+269.25 mob_death Plains Vulture dies!
+270.75 mob_death Dustwind Thug appears!
+273.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+273.75 player_crit You hit Dustwind Thug for 566 (CRIT!)
+273.75 mob_death Dustwind Thug dies!
+275.25 mob_death Dustwind Thug appears!
+275.25 mob_attack Dustwind Thug joins the fight!
+277.50 player_crit You hit Dustwind Thug for 566 (CRIT!)
+277.50 mob_death Dustwind Thug dies!
+279.00 mob_death Dustwind Thug appears!
+279.00 player_crit You hit Dustwind Thug for 566 (CRIT!)
+279.00 mob_death Dustwind Thug dies!
+280.50 mob_death Harrowfield Golem appears!
+284.50 player_crit You hit Dustwind Thug for 566 (CRIT!)
+284.50 mob_death Dustwind Thug dies!
+286.00 mob_death Plains Vulture appears!
+286.00 mob_attack Plains Vulture joins the fight!
+288.50 proc 🌀 The blow carries — 1 more caught for 245
+288.50 player_attack You hit Harrowfield Golem for 283
+288.50 mob_death Harrowfield Golem dies!
+288.50 mob_death Plains Vulture dies!
+290.00 mob_death Plains Vulture appears!
+291.50 mob_death Plains Vulture appears!
+293.75 player_crit You hit Plains Vulture for 549 (CRIT!)
+293.75 mob_death Plains Vulture dies!
+295.25 mob_death Harrowfield Golem appears!
+298.25 player_crit You hit Plains Vulture for 549 (CRIT!)
+298.25 mob_death Plains Vulture dies!
+299.75 mob_death Dustwind Thug appears!
+302.50 player_crit You hit Plains Vulture for 549 (CRIT!)
+302.50 mob_death Plains Vulture dies!
+304.00 mob_death Harrowfield Golem appears!
+304.00 mob_attack Harrowfield Golem joins the fight!
+307.50 proc ⚡ A moment of perfect stillness — guaranteed crit!
+307.50 proc 🌀 The blow carries — 1 more caught for 474
+307.50 player_crit You hit Plains Vulture for 549 (CRIT!)
+307.50 mob_death Plains Vulture dies!
+307.50 mob_death Harrowfield Golem dies!
+309.00 mob_death Dustwind Thug appears!
+310.50 mob_death Plains Vulture appears!
+314.00 player_crit You hit Harrowfield Golem for 549 (CRIT!)
+314.00 mob_death Harrowfield Golem dies!
+315.50 mob_death Harrowfield Golem appears!
+315.50 mob_attack Harrowfield Golem joins the fight!
+318.75 proc 🌀 The blow carries — 1 more caught for 474
+318.75 player_crit You hit Dustwind Thug for 549 (CRIT!)
+318.75 mob_death Dustwind Thug dies!
+318.75 mob_death Harrowfield Golem dies!
+320.25 mob_death Dustwind Thug appears!
+321.75 mob_death Harrowfield Golem appears!
+323.50 mob_attack Dustwind Thug spots you and charges!
+325.25 player_crit You hit Plains Vulture for 549 (CRIT!)
+325.25 mob_death Plains Vulture dies!
+326.75 mob_death Plains Vulture appears!
+326.75 player_crit You hit Dustwind Thug for 549 (CRIT!)
+326.75 mob_death Dustwind Thug dies!
+327.25 mob_attack Harrowfield Golem joins the fight!
+328.25 mob_death Dustwind Thug appears!
+330.00 proc 🌀 The blow carries — 1 more caught for 474
+330.00 player_crit You hit Plains Vulture for 549 (CRIT!)
+330.00 mob_death Plains Vulture dies!
+330.00 mob_death Harrowfield Golem dies!
+331.50 mob_death Dustwind Thug appears!
+333.00 mob_death Dustwind Thug appears!
+334.50 player_crit You hit Dustwind Thug for 549 (CRIT!)
+334.50 mob_death Dustwind Thug dies!
+336.00 mob_death Plains Vulture appears!
+338.00 proc ⚡ A moment of perfect stillness — guaranteed crit!
+338.00 player_crit You hit Dustwind Thug for 549 (CRIT!)
+338.00 mob_death Dustwind Thug dies!
+339.50 mob_death Plains Vulture appears!
+341.75 player_crit You hit Dustwind Thug for 549 (CRIT!)
+341.75 mob_death Dustwind Thug dies!
+343.25 mob_death Harrowfield Golem appears!
+346.25 player_crit You hit Plains Vulture for 549 (CRIT!)
+346.25 mob_death Plains Vulture dies!
+347.75 mob_death Plains Vulture appears!
+350.75 player_crit You hit Plains Vulture for 549 (CRIT!)
+350.75 mob_death Plains Vulture dies!
+368.75 proc 🥷 Crafted Coarse Light Armor Kit!
+370.25 mob_death Plains Vulture appears!
+374.00 player_crit You hit Plains Vulture for 549 (CRIT!)
+374.00 mob_death Plains Vulture dies!
+375.50 mob_death Plains Vulture appears!
+379.00 player_crit You hit Plains Vulture for 549 (CRIT!)
+379.00 mob_death Plains Vulture dies!
+380.50 mob_death Plains Vulture appears!
+384.50 player_crit You hit Plains Vulture for 549 (CRIT!)
+384.50 mob_death Plains Vulture dies!
+386.00 mob_death ★ Elite: ★ Dustwind Thug appears!
+389.00 proc ⚡ A moment of perfect stillness — guaranteed crit!
+389.00 player_crit You hit Plains Vulture for 549 (CRIT!)
+389.00 mob_death Plains Vulture dies!
+390.50 mob_death Plains Vulture appears!
+394.00 player_crit You hit ★ Dustwind Thug for 549 (CRIT!)
+394.00 mob_death ★ Dustwind Thug dies!
+395.50 mob_death ⚠ BOSS: [BOSS] Bandit Warlord Grak appears!
+401.25 player_crit You hit [BOSS] Bandit Warlord Grak for 549 (CRIT!)
+402.50 player_crit You hit [BOSS] Bandit Warlord Grak for 549 (CRIT!)
+402.50 mob_attack [BOSS] Bandit Warlord Grak hits you for 226
+402.50 player_death You have been slain! Respawning in 3s...
+405.50 player_respawn You rise from the grave...
+407.00 mob_death ⚠ BOSS: [BOSS] Bandit Warlord Grak appears!
+408.25 player_crit You hit [BOSS] Bandit Warlord Grak for 659 (CRIT!)
+408.25 mob_death [BOSS] Bandit Warlord Grak dies!
+408.25 level_up ★ Level Up! Now level 21!
+416.50 mob_death ★ Elite: ★ Rotting Shambler appears!
+418.00 mob_death Grimshade Wolfkin appears!
+419.50 mob_death Rotting Shambler appears!
+421.00 mob_death Rotting Shambler appears!
+421.25 player_crit You hit ★ Rotting Shambler for 550 (CRIT!)
+422.50 player_attack You hit ★ Rotting Shambler for 275
+422.50 mob_attack ★ Rotting Shambler hits you for 114
+423.75 player_attack You hit ★ Rotting Shambler for 330
+423.75 mob_death ★ Rotting Shambler dies!
+425.25 mob_death Skeletal Archer appears!
+428.00 player_crit You hit Rotting Shambler for 550 (CRIT!)
+428.00 mob_death Rotting Shambler dies!
+429.50 mob_death Grimshade Wolfkin appears!
+433.50 proc ⚡ A moment of perfect stillness — guaranteed crit!
+433.50 player_crit You hit Skeletal Archer for 550 (CRIT!)
+433.50 mob_death Skeletal Archer dies!
+435.00 mob_death Grimshade Wolfkin appears!
+437.25 player_crit You hit Grimshade Wolfkin for 550 (CRIT!)
+437.25 mob_death Grimshade Wolfkin dies!
+438.75 mob_death Rotting Shambler appears!
+440.75 player_crit You hit Grimshade Wolfkin for 550 (CRIT!)
+440.75 mob_death Grimshade Wolfkin dies!
+442.25 mob_death Rotting Shambler appears!
+445.25 player_attack You hit Rotting Shambler for 275
+446.50 player_crit You hit Rotting Shambler for 661 (CRIT!)
+446.50 mob_death Rotting Shambler dies!
+448.00 mob_death Rotting Shambler appears!
+449.75 player_crit You hit Rotting Shambler for 550 (CRIT!)
+449.75 mob_death Rotting Shambler dies!
+451.25 mob_death Grimshade Wolfkin appears!
+452.75 player_crit You hit Grimshade Wolfkin for 552 (CRIT!)
+452.75 mob_death Grimshade Wolfkin dies!
+454.25 mob_death Grimshade Wolfkin appears!
+454.25 mob_attack Grimshade Wolfkin joins the fight!
+456.25 player_crit You hit Rotting Shambler for 552 (CRIT!)
+456.25 mob_death Rotting Shambler dies!
+457.75 mob_death Grimshade Wolfkin appears!
+458.00 player_crit You hit Grimshade Wolfkin for 552 (CRIT!)
+458.00 mob_death Grimshade Wolfkin dies!
+459.50 mob_death Skeletal Archer appears!
+461.25 player_crit You hit Grimshade Wolfkin for 552 (CRIT!)
+461.25 mob_death Grimshade Wolfkin dies!
+462.75 mob_death Rotting Shambler appears!
+465.50 proc ⚡ A moment of perfect stillness — guaranteed crit!
+465.50 player_crit You hit Skeletal Archer for 569 (CRIT!)
+465.50 mob_death Skeletal Archer dies!
+467.00 mob_death Rotting Shambler appears!
+469.25 player_crit You hit Rotting Shambler for 569 (CRIT!)
+469.25 mob_death Rotting Shambler dies!
+469.75 mob_attack Rotting Shambler joins the fight!
+470.75 mob_death Skeletal Archer appears!
+473.25 proc 🌀 The blow carries — 1 more caught for 492
+473.25 player_crit You hit Rotting Shambler for 569 (CRIT!)
+473.25 mob_death Rotting Shambler dies!
+473.25 mob_death Rotting Shambler dies!
+474.75 mob_death Skeletal Archer appears!
+476.25 mob_death Rotting Shambler appears!
+477.50 player_crit You hit Skeletal Archer for 569 (CRIT!)
+477.50 mob_death Skeletal Archer dies!
+479.00 mob_death Grimshade Wolfkin appears!
+481.75 player_crit You hit Rotting Shambler for 569 (CRIT!)
+481.75 mob_death Rotting Shambler dies!
+483.25 mob_death Rotting Shambler appears!
+485.00 player_attack You hit Grimshade Wolfkin for 276
+485.75 mob_attack Grimshade Wolfkin hits you for 38
+486.25 player_crit You hit Grimshade Wolfkin for 662 (CRIT!)
+486.25 mob_death Grimshade Wolfkin dies!
+487.75 mob_death Rotting Shambler appears!
+489.25 mob_attack Rotting Shambler joins the fight!
+491.75 proc 🌀 The blow carries — 1 more caught for 477
+491.75 player_crit You hit Rotting Shambler for 552 (CRIT!)
+491.75 mob_death Rotting Shambler dies!
+491.75 mob_death Rotting Shambler dies!
+493.25 mob_death Rotting Shambler appears!
+493.25 mob_attack Rotting Shambler joins the fight!
+494.75 mob_death Grimshade Wolfkin appears!
+497.25 proc ⚡ A moment of perfect stillness — guaranteed crit!
+497.25 proc 🌀 The blow carries — 1 more caught for 477
+497.25 player_crit You hit Grimshade Wolfkin for 552 (CRIT!)
+497.25 mob_death Grimshade Wolfkin dies!
+497.25 mob_death Rotting Shambler dies!
+502.75 mob_attack Grimshade Wolfkin joins the fight!
+503.75 mob_death Grimshade Wolfkin appears!
+505.25 mob_death Rotting Shambler appears!
+507.00 proc 🌀 The blow carries — 1 more caught for 456
+507.00 player_crit You hit Skeletal Archer for 528 (CRIT!)
+507.00 mob_death Skeletal Archer dies!
+507.00 mob_death Grimshade Wolfkin dies!
+508.50 mob_death Grimshade Wolfkin appears!
+510.00 mob_death Rotting Shambler appears!
+512.25 player_crit You hit Rotting Shambler for 528 (CRIT!)
+512.25 mob_death Rotting Shambler dies!
+513.75 mob_death Grimshade Wolfkin appears!
+516.75 player_crit You hit Rotting Shambler for 528 (CRIT!)
+516.75 mob_death Rotting Shambler dies!
+518.25 mob_death Rotting Shambler appears!
+520.25 player_crit You hit Grimshade Wolfkin for 528 (CRIT!)
+520.25 mob_death Grimshade Wolfkin dies!
+521.75 mob_death Grimshade Wolfkin appears!
+523.25 player_crit You hit Grimshade Wolfkin for 528 (CRIT!)
+523.25 mob_death Grimshade Wolfkin dies!
+524.75 mob_death Rotting Shambler appears!
+527.50 player_crit You hit Rotting Shambler for 528 (CRIT!)
+527.50 mob_death Rotting Shambler dies!
+529.00 mob_death Rotting Shambler appears!
+533.25 proc ⚡ A moment of perfect stillness — guaranteed crit!
+533.25 player_crit You hit Grimshade Wolfkin for 528 (CRIT!)
+533.25 mob_death Grimshade Wolfkin dies!
+534.75 mob_death Grimshade Wolfkin appears!
+537.00 player_crit You hit Rotting Shambler for 528 (CRIT!)
+537.00 mob_death Rotting Shambler dies!
+537.50 mob_attack Rotting Shambler joins the fight!
+538.50 mob_death Rotting Shambler appears!
+541.50 proc 🌀 The blow carries — 1 more caught for 456
+541.50 player_crit You hit Grimshade Wolfkin for 528 (CRIT!)
+541.50 mob_death Grimshade Wolfkin dies!
+541.50 mob_death Rotting Shambler dies!
+543.00 mob_death Grimshade Wolfkin appears!
+544.50 mob_death Rotting Shambler appears!
+547.00 player_crit You hit Rotting Shambler for 528 (CRIT!)
+547.00 mob_death Rotting Shambler dies!
+548.50 mob_death Skeletal Archer appears!
+552.00 player_crit You hit Grimshade Wolfkin for 528 (CRIT!)
+552.00 mob_death Grimshade Wolfkin dies!
+553.50 mob_death Grimshade Wolfkin appears!
+555.50 player_crit You hit Rotting Shambler for 528 (CRIT!)
+555.50 mob_death Rotting Shambler dies!
+557.00 mob_death Skeletal Archer appears!
+558.50 player_attack You hit Skeletal Archer for 264
+558.50 mob_death Skeletal Archer dies!
+559.00 mob_attack Grimshade Wolfkin joins the fight!
+560.00 mob_death Skeletal Archer appears!
+560.00 mob_attack Skeletal Archer joins the fight!
+562.75 proc 🌀 The blow carries — 1 more caught for 456
+562.75 player_crit You hit Grimshade Wolfkin for 528 (CRIT!)
+562.75 mob_death Grimshade Wolfkin dies!
+562.75 mob_death Grimshade Wolfkin dies!
+564.25 mob_death Grimshade Wolfkin appears!
+564.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+564.75 player_crit You hit Skeletal Archer for 528 (CRIT!)
+564.75 mob_death Skeletal Archer dies!
+566.25 mob_death Rotting Shambler appears!
+567.75 mob_death Rotting Shambler appears!
+571.50 player_crit You hit Grimshade Wolfkin for 528 (CRIT!)
+571.50 mob_death Grimshade Wolfkin dies!
+573.00 mob_death Skeletal Archer appears!
+574.75 player_crit You hit Rotting Shambler for 528 (CRIT!)
+574.75 mob_death Rotting Shambler dies!
+576.25 mob_death Rotting Shambler appears!
+578.50 player_crit You hit Skeletal Archer for 528 (CRIT!)
+578.50 mob_death Skeletal Archer dies!
+580.00 mob_death Rotting Shambler appears!
+583.75 player_crit You hit Rotting Shambler for 528 (CRIT!)
+583.75 mob_death Rotting Shambler dies!
+585.25 mob_death Rotting Shambler appears!
+586.25 player_crit You hit Rotting Shambler for 531 (CRIT!)
+586.25 mob_death Rotting Shambler dies!
+586.25 level_up ★ Level Up! Now level 22!
+587.75 mob_death Skeletal Archer appears!
+589.75 player_attack You hit Rotting Shambler for 266
+591.00 player_crit You hit Rotting Shambler for 638 (CRIT!)
+591.00 mob_death Rotting Shambler dies!
+592.50 mob_death Skeletal Archer appears!
+594.75 proc ⚡ A moment of perfect stillness — guaranteed crit!
+594.75 player_crit You hit Skeletal Archer for 531 (CRIT!)
+594.75 mob_death Skeletal Archer dies!
+596.25 mob_death Rotting Shambler appears!
+598.25 player_crit You hit Skeletal Archer for 531 (CRIT!)
+598.25 mob_death Skeletal Archer dies!
+599.75 mob_death Rotting Shambler appears!
 
 ## warrior + party | seed=2
 0.25 mob_death Rampaging Boar appears!

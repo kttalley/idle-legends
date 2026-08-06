@@ -217,6 +217,9 @@ export interface ScenarioOpts {
    * for plausibility, not coverage, and can silently stop exercising a mechanic.
    */
   forceTalents?: Record<string, number>
+  /** Start the hero at this level. Needed whenever a case depends on an action-bar slot,
+   *  since those open at 1 / 8 / 16 and a short trace never levels that far. */
+  forceLevel?: number
 }
 
 declare const process: { argv?: string[]; stdout: { write(s: string): void } }
@@ -307,6 +310,7 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     spendTalents: false,
     captureCombatTrace: false,
     forceTalents: {},
+    forceLevel: 0,
     ...opts,
   }
 
@@ -324,13 +328,23 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     ? allocateSpec(mulberry32(((o.seed ?? 0) * 7919 + 13) | 0), o.playerClass, 41)
     : {}
 
-  if (Object.keys(o.forceTalents).length) {
+  // A forced build usually needs a level to go with it. Action-bar slots open at levels
+  // 1 / 8 / 16, so a 10-minute trace hero — who reaches about level 5 — can never cast
+  // the slot-2 or slot-3 ability at all. Two of the three AoE capstones ride those, and
+  // pinning their talents while leaving the hero at level 5 produced a trace with the
+  // build allocated and the effect provably unreachable: green over nothing, which is
+  // precisely the coverage gap these cases exist to close.
+  if (o.forceLevel > 0) {
+    useGameStore.setState({ level: o.forceLevel })
+  }
+  if (Object.keys(o.forceTalents).length || o.forceLevel > 0) {
     // Straight onto the state: `allocateTalent` gates on points spent per tree, which is
     // the whole thing being bypassed here.
     const st = store.getState()
+    const allocs = Object.keys(o.forceTalents).length ? o.forceTalents : st.talentAllocs
     useGameStore.setState({
-      talentAllocs: { ...o.forceTalents },
-      stats: { ...compileStats(st.playerClass, st.level, st.equipment, o.forceTalents,
+      talentAllocs: { ...allocs },
+      stats: { ...compileStats(st.playerClass, st.level, st.equipment, allocs,
                                RACE_DEFINITIONS[st.playerRace]?.racialPassive ?? {}),
                currentHp: st.stats.currentHp },
     })
@@ -525,7 +539,7 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
     playerClass: 'warrior', playerRace: 'human', stepSeconds: 0.25,
     sampleEveryMinutes: 5, advanceZones: false, sellCommons: false,
     buyBagSlots: false, buyContract: false, buyUpgrades: false, autoEquip: false,
-    disableAutoEquip: false, disableAutoAdvance: false, seed: null, partySize: 0, spendTalents: false, captureCombatTrace: false, forceTalents: {}, ...opts,
+    disableAutoEquip: false, disableAutoAdvance: false, seed: null, partySize: 0, spendTalents: false, captureCombatTrace: false, forceTalents: {}, forceLevel: 0, ...opts,
   }
   if (typeof __setSeed === 'function') __setSeed(o.seed)
 
