@@ -191,7 +191,7 @@ export const SHADOWED_EDGE_TALENTS: TalentNodeDef[] = [
   {
     id: 'ass_mutilate',
     name: 'Twin Fangs',
-    description: 'Cruel Stroke strikes a third time, and everything you have poisoned dies faster.',
+    description: 'Cruel Stroke strikes a third time — and the third finds every throat within reach.',
     icon: '🔪',
     row: 7, col: 2, maxRanks: 1, requiresPoints: 30,
     requires: 'ass_cruel_stroke_mastery',
@@ -199,6 +199,11 @@ export const SHADOWED_EDGE_TALENTS: TalentNodeDef[] = [
       { type: 'mechanic', mechanic: 'executioner', valuePerRank: 0.20 },
       { type: 'ability', ability: 'rogue_sinister_strike', mod: 'damage', valuePerRank: 0.50,
         note: 'Twin Fangs: a third blade enters the exchange' },
+      // The rogue's answer to a pack. Lighter than the warrior's whirlwind on purpose —
+      // this is a single-target class buying a way not to drown, not a new identity.
+      { type: 'ability', ability: 'rogue_sinister_strike', mod: 'rider', valuePerRank: 1,
+        rider: { type: 'splash', value: 0.40, stacks: 1 },
+        note: 'The third blade catches everyone near you for 40%' },
     ],
   },
 ]

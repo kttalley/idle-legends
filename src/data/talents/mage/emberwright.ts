@@ -181,10 +181,17 @@ export const EMBERWRIGHT_TALENTS: TalentNodeDef[] = [
   {
     id: 'emb_living_bomb',
     name: 'Walking Pyre',
-    description: 'Increases critical strike damage bonus by a further {n}% per rank.',
+    description: 'Your fire spreads — Cinderburst catches everything near it. Also increases critical strike damage bonus by {n}% per rank.',
     icon: '☄',
     row: 7, col: 1, maxRanks: 3, requiresPoints: 30,
-    effects: [{ type: 'mechanic', mechanic: 'crit_damage', valuePerRank: 0.15 }],
+    effects: [
+      { type: 'mechanic', mechanic: 'crit_damage', valuePerRank: 0.15 },
+      // The node was called Walking Pyre while doing nothing but raising crit damage —
+      // a name promising an explosion, attached to a number. Now the fire actually walks.
+      { type: 'ability', ability: 'mage_combustion', mod: 'rider', valuePerRank: 1,
+        rider: { type: 'splash', value: 0.55, stacks: 1 },
+        note: 'The blaze spreads to everything near you for 55%' },
+    ],
   },
   {
     id: 'emb_phoenix',

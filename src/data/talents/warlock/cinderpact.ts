@@ -197,6 +197,11 @@ export const CINDERPACT_TALENTS: TalentNodeDef[] = [
       { type: 'mechanic', mechanic: 'dot_amp', valuePerRank: 0.30 },
       { type: 'ability', ability: 'warlock_dark_pact', mod: 'cooldown', valuePerRank: 0.45,
         note: 'Cinderpact: cooldown slashed' },
+      // "and everything burns" has been in this description the whole time while the
+      // effect list burned exactly one target. Bleak Bargain now carries to the crowd.
+      { type: 'ability', ability: 'warlock_dark_pact', mod: 'rider', valuePerRank: 1,
+        rider: { type: 'splash', value: 0.50, stacks: 1 },
+        note: 'Everything near you burns for 50% of the blow' },
     ],
   },
 ]
