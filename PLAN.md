@@ -1135,9 +1135,44 @@ building this, and fix the `pointer-events` bug above first or the leave button 
 > - *Stage 2(f), dropping `procState.openerUsed`.* Belongs with the `stepCombat` lift; doing
 >   it before there is a per-combatant home means inventing a temporary one and undoing it.
 >
-> **Then:** 5 (dead fields, ability layer), 6 (N-sided proper), 7 (C6). Note that **stage 6
-> is the same work as Track C2 in `.planning/world-systems-plan.md`** ("multiple concurrent
-> enemies") — one job described in two documents. Whichever one is executed, update both.
+> **Stage 6 — the SEAM is in, landed inert (`3f2c575`).** `swingAtHero(attacker)` replaces
+> the block that named `currentMob` as the attacker, `registerKill` takes a victim, and
+> `attackAccum` moved onto `MobInstance`. Both goldens stayed **byte-identical**, which is
+> the whole point of landing it switched off: the extraction is provably a no-op, so the
+> gameplay change starts from a verified base. `MAX_MELEE_ATTACKERS` is the single
+> character that turns it on.
+>
+> **It is held at 1 because turning it to 2 was measured and the measurement said no:**
+>
+> | attackers | settled offline-parity error | online gold, worst seeds |
+> |---|---|---|
+> | 1 | +5.4% (band is ±10%) | ~4,500–5,200 |
+> | 2 | **+28.6% FAIL** | 1,903 / 2,916 — collapse |
+>
+> One extra attacker doubles incoming damage against unchanged outgoing damage, and the
+> hero cannot fight two things: `sweeping_strikes` compiles to `sweepingStrikesEnabled`,
+> read by nothing. So the defensive half **cannot ship before the offensive half** — which
+> makes this section's own warning ("N-sided does not *unlock* AoE talents — it creates the
+> obligation to design them") the load-bearing sentence in the track, not an aside.
+>
+> **Two bugs found by measuring it:**
+> - *Fixed.* The respawn branch returned before `accrueRates`, so the offline rate measured
+>   output per second **alive** while the projection replays it against wall-clock. Deaths
+>   were rare enough to hide it inside the band. Folding dead ticks in at zero output moved
+>   settled parity from 6.4% → **2.2%**.
+> - *Open, and PRE-EXISTING — not caused by stage 6.* One seed in eight produces **0 gold
+>   and 0 kills across a 60-minute settled window** on `main` today (seed 6 at
+>   `--parity --settled --minutes 60 --warmup 120`). The hero is alive and the run is simply
+>   over. `--assert` passes anyway because it means the seeds together, so a total soft-lock
+>   in 12% of runs is currently invisible to the gate. Worth its own investigation; the
+>   failing seed number moves whenever RNG draw order changes, so chase the shape, not the 6.
+>
+> **Then:** 5 (dead fields, ability layer), 6b (cleave + raise the ceiling), 7 (C6). Note
+> that **stage 6 is the same work as Track C2 in `.planning/world-systems-plan.md`**
+> ("multiple concurrent enemies") — one job described in two documents. Whichever one is
+> executed, update both. Track C2's stated blocker there ("the store models exactly one
+> enemy at a time", "`activeDoTs` is a single global list") is **stale**: C7 built `mobs[]`,
+> `targetMobId` and per-mob `dots` already.
 >
 > **A standing measurement caveat.** econSim reports "unchanged" for things it cannot reach.
 > Its hero kills whatever it engages and never switches targets, so the target-switch fix

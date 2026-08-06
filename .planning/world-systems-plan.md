@@ -205,7 +205,23 @@ decoration into a destination.
 
 ## Track C — manual targeting & player intent
 
-### The blocker, stated plainly
+### The blocker, stated plainly — SOLVED, and replaced by a different one
+
+> **Stale as written (corrected 2026-08-05).** C7 built the multi-enemy world model:
+> `mobs: MobInstance[]`, `targetMobId`, and `dots` living **on each mob** — `currentMob`
+> and `activeDoTs` are now projections of whichever one is targeted, rebuilt each tick.
+> Four mobs already stand in the world with positions, patrols and aggro.
+>
+> **The real blocker is now the reverse of the one below.** The model holds a population;
+> the *combat* still only lets one of them swing. `3f2c575` landed the seam that lifts
+> that (`swingAtHero`, a per-mob `attackAccum`, a victim-taking `registerKill`) and left
+> it switched off at `MAX_MELEE_ATTACKERS = 1`, because turning it on was measured:
+> one extra attacker doubles incoming damage against unchanged outgoing damage, breaks
+> offline parity (+5.4% → +28.6%), and collapses online throughput on several seeds.
+>
+> So C2 is no longer "hold more than one enemy". It is **give the hero a way to fight more
+> than one** — `sweeping_strikes` compiles to a flag nothing reads — and then raise the
+> ceiling in the same commit. See PLAN.md's C5 stage 6 box for the numbers.
 
 `currentMob: MobInstance | null` — **the store models exactly one enemy at a time**, and
 `activeDoTs: ActiveDoT[]` is a single global list, not per-target. So "let the player pick
