@@ -24,7 +24,7 @@ import { UPGRADES, upgradeCost } from '../data/upgrades'
 import { slotStorage } from '../store/saveSlots'
 import { projectOfflineProgress } from '../engine/offline'
 import { itemPower, generateItem } from '../data/items'
-import { ELITE_DROP_CHANCE_MULT } from '../engine/loot'
+import { ELITE_DROP_CHANCE_MULT, placeDrop } from '../engine/loot'
 import { joinParty, disbandParty } from '../engine/party'
 import { allocateSpec } from '../engine/ambient'
 import { mulberry32 } from '../engine/rng'
@@ -754,6 +754,50 @@ export function runLootFidelity(): Violation[] {
     fail('offline drop quality matches online',
       `offline mean rarity ${offlineMean.toFixed(3)} over ${bagged.length} drops ` +
       `vs online ${onlineMean.toFixed(3)} — idling yields ${(gap * 100).toFixed(1)}% worse gear per drop`)
+  }
+
+  // 3. A PROTECTED drop survives the ladder.
+  //
+  // Written before uniques exist, because the failure mode is silent and permanent: the
+  // ladder disposes by `itemPower`, and a unique's value is its identity rather than its
+  // stat budget. A low-power unique therefore looks exactly like vendor trash to both
+  // disposal paths — the factor sells it, or a full bag scraps it — and the player never
+  // learns the drop happened. Losing the first unique someone earns is not a bug you get
+  // to fix afterwards.
+  const proto = generateItem('weapon', 10, 0)
+  const guarded: typeof proto = { ...proto, protected: true, vendorValue: 5 }
+  const emptyEq = {
+    weapon: null, helm: null, chest: null, legs: null, boots: null, trinket: null,
+  } as Record<string, typeof proto | null>
+  const dropCtx = {
+    playerClass: 'warrior' as ClassType, level: 60,
+    talentAllocs: {}, racialPassive: {}, autoEquip: false,
+    // The REAL contract shape. A first cut invented `{ rarityThreshold, active }`, which
+    // type-checked through the `as never` casts and made `contractSells` return false for
+    // everything — so the sell case passed by never running. Same vacuous-green shape
+    // that has bitten three times today; the fields are `threshold` and `lapsed`.
+    contract: {
+      threshold: 'legendary' as const, upkeepTimer: 999, soldSinceBill: 0, lapsed: false,
+    },
+  }
+
+  // (a) The factor must not sell it, however far the threshold is opened up. A better
+  //     piece is already worn, so without a guard this is a straight sale.
+  const worn = { ...proto, vendorValue: 999 }
+  const sellCase = placeDrop(guarded, { ...emptyEq, weapon: worn } as never,
+                             new Array(20).fill(null), dropCtx as never)
+  if (sellCase.outcome === 'sold') {
+    fail('a protected drop is never sold', 'the merchant contract sold a protected item')
+  }
+
+  // (b) A full bag must not scrap it. Something disposable is in there; that should go
+  //     instead.
+  const fullBag: (typeof proto | null)[] = new Array(20).fill(null)
+    .map(() => ({ ...generateItem('helm', 5, 0), vendorValue: 1 }))
+  const bagCase = placeDrop(guarded, emptyEq as never, fullBag as never,
+                            { ...dropCtx, contract: null } as never)
+  if (bagCase.outcome === 'salvaged') {
+    fail('a protected drop is never salvaged', 'a full bag scrapped a protected item')
   }
   return out
 }

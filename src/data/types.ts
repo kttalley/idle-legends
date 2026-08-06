@@ -431,6 +431,17 @@ export interface Item {
   statBonuses: StatBonuses
   vendorValue: number
   spriteKey?: string
+  /**
+   * Never sell this, and never scrap it — whatever the numbers say.
+   *
+   * The drop ladder disposes by `itemPower`, which is the right rule for gear and the
+   * wrong one for a unique, whose value is its identity rather than its stat budget. A
+   * low-power unique otherwise looks exactly like vendor trash to BOTH disposal paths:
+   * the factor sells it, or a full bag scraps it, and the player never learns the drop
+   * happened. That failure is silent and permanent, so the flag exists before the first
+   * unique does. Optional, so every save and every existing item reads as unprotected.
+   */
+  protected?: boolean
 }
 
 // ── The merchant contract ─────────────────────────────────────────────────────

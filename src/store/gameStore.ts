@@ -3312,6 +3312,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const s = get()
     const item = s.inventory[i]
     if (!item) return
+    // The same guard the automatic ladder carries. A unique that survives the factor and
+    // a full bag only to be lost to one mis-tap is the identical failure with a slower
+    // fuse, and the UI hides the Sell control for these rather than offering a trap.
+    if (item.protected) return
     const inventory = [...s.inventory]
     inventory[i] = null
     set({ inventory, gold: s.gold + item.vendorValue })
@@ -3321,7 +3325,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const s = get()
     let gained = 0
     const inventory = s.inventory.map(item => {
-      if (item?.rarity === 'common') { gained += item.vendorValue; return null }
+      if (item?.rarity === 'common' && !item.protected) { gained += item.vendorValue; return null }
       return item
     })
     set({ inventory, gold: s.gold + gained })

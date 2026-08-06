@@ -88,6 +88,9 @@ export function contractWouldSell(
   inventory: (Item | null)[],
   item: Item,
 ): boolean {
+  // A protected item is outside the arrangement entirely — the factor deals in surplus,
+  // and a unique is not surplus however modest its stat line.
+  if (item.protected) return false
   if (!contractSells(contract, item.rarity)) return false
   const power = itemPower(item)
   const equipped = equipment[item.slot]
@@ -165,6 +168,35 @@ export function placeDrop(
   if (empty >= 0) {
     inv[empty] = pending
     return { equipment: eq, inventory: inv, sold: 0, salvaged: 0, outcome, disposed: null }
+  }
+
+  // ── The bag is full ───────────────────────────────────────────────────────
+  // Normally the incoming drop is what gets scrapped. A protected one instead evicts the
+  // least valuable thing that ISN'T protected and takes its slot — otherwise the ladder
+  // would destroy a unique for the crime of arriving late, which is the one outcome the
+  // flag exists to prevent.
+  if (pending.protected) {
+    let worstIdx = -1
+    let worstPower = Infinity
+    for (let i = 0; i < inv.length; i++) {
+      const held = inv[i]
+      if (!held || held.protected) continue
+      const p = itemPower(held)
+      if (p < worstPower) { worstPower = p; worstIdx = i }
+    }
+    if (worstIdx >= 0) {
+      const evicted = inv[worstIdx]!
+      inv[worstIdx] = pending
+      return {
+        equipment: eq, inventory: inv,
+        sold: 0, salvaged: salvageValue(evicted, ctx.salvageBonus ?? 0),
+        outcome, disposed: evicted,
+      }
+    }
+    // Every slot already holds something protected. Nothing can be evicted without
+    // destroying another unique, so the incoming one falls through and IS scrapped —
+    // the single case where protection cannot be honoured, and it takes a bag with no
+    // ordinary item left in it to reach.
   }
 
   return {

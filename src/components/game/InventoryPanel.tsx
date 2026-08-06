@@ -84,7 +84,13 @@ export function InventoryPanel() {
         compare: equipment[item.slot],
         actions: [
           { label: 'Equip', tone: 'primary', onClick: () => equipItem(inspecting.index) },
-          { label: `Sell — ${item.vendorValue}g`, tone: 'danger', onClick: () => sellItem(inspecting.index) },
+          // A protected item has no Sell control at all. The store refuses the sale
+          // anyway, and a button that silently does nothing is worse than no button —
+          // it reads as a bug rather than as protection.
+          ...(item.protected ? [] : [
+            { label: `Sell — ${item.vendorValue}g`, tone: 'danger' as const,
+              onClick: () => sellItem(inspecting.index) },
+          ]),
         ],
       }
     }
