@@ -24,6 +24,7 @@ import { PARTY_MAX } from '../../engine/party'
 import { Animator } from '../animation'
 import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId, useScaffoldArt } from './fftaRoster'
 import { mulberry32, subStream, type Rng } from '../../engine/rng'
+import { deepestSpec } from '../../data/specs'
 import { AGGRESSIVE_RE, combatantOnlyWorldFields, isRangedMob } from '../../engine/mobBehaviour'
 import { runFight, type FightEvent, type HeroCombatant } from '../../engine/fight'
 import {
@@ -215,9 +216,49 @@ const FX_COLORS: Record<string, { core: string; glow: string }> = {
   'spell/frost':  { core: '#dcf4ff', glow: '#3c8ce0' },
   'spell/holy':   { core: '#fff6c8', glow: '#f0c030' },
   'fx/hitflash':  { core: '#ffd8b0', glow: '#ff5828' },
+  // Added for per-archetype attack colour. Arcane reads blue-violet so it cannot be
+  // mistaken for shadow at a glance; nature is the rogue's venom green; steel is the
+  // physical default, which is what every class used to get regardless of school.
+  'spell/arcane': { core: '#e8d4ff', glow: '#6a4cf0' },
+  'spell/nature': { core: '#d8ffb0', glow: '#4ba82c' },
+  'fx/steel':     { core: '#eaf0ff', glow: '#7fb0ff' },
 }
 function fxColors(pal: string): { core: string; glow: string } {
-  return FX_COLORS[pal] ?? { core: '#eaf0ff', glow: '#7fb0ff' }
+  return FX_COLORS[pal] ?? FX_COLORS['fx/steel']
+}
+
+/**
+ * What a hero's blows should LOOK like — school and whether they are thrown.
+ *
+ * Every class swung the same steel-white spark spray, so a warlock draining life and a
+ * warrior hitting something with an axe were visually identical, and a mage auto-attacked
+ * by lunging into melee. The talent trees already carry the answer: the deepest spec IS
+ * the archetype, and the palette registry already holds a colour per school.
+ *
+ * Falls back to the class's own school when no spec leads (a fresh or evenly-split hero),
+ * so this never depends on having spent talent points.
+ */
+const SPEC_SCHOOL: Record<string, string> = {
+  // warrior — steel, all three
+  ironcleave: 'fx/steel', bulwark: 'fx/steel', warbringer: 'fx/steel',
+  // mage
+  emberwright: 'spell/fire', glacial_rite: 'spell/frost', the_unwritten: 'spell/arcane',
+  // rogue — venom, save the shadow tree
+  gutterwork: 'spell/nature', shadowed_edge: 'spell/shadow', the_long_quiet: 'spell/shadow',
+  // warlock — cinderpact is the fire pact; the rest is shadow
+  cinderpact: 'spell/fire', bleakweave: 'spell/shadow', the_binding: 'spell/shadow',
+}
+const CLASS_SCHOOL: Record<string, string> = {
+  warrior: 'fx/steel', rogue: 'spell/nature',
+  mage: 'spell/frost', warlock: 'spell/shadow',
+}
+/** Casters throw their attacks; melee classes carry them in. */
+const CLASS_THROWS: Record<string, boolean> = {
+  warrior: false, rogue: false, mage: true, warlock: true,
+}
+function heroSchool(cls: ClassType, allocs: Record<string, number>): string {
+  const spec = deepestSpec(cls, allocs)
+  return (spec && SPEC_SCHOOL[spec.id]) || CLASS_SCHOOL[cls] || 'fx/steel'
 }
 
 // Per-biome ambient particle character (environment life). Purely decorative canvas
@@ -645,6 +686,11 @@ export class WorldSceneController {
   /** Debounce so one splashed BURST plays one whirlwind, not one per enemy caught.
    *  Three rings and three screen shakes on a single frame read as a fault, not as force. */
   private splashRingCool = 0
+  /** The hero's attack school and whether they throw it, derived from their deepest
+   *  talent spec each sync. Cached rather than recomputed per hit: `deepestSpec` walks
+   *  every tree, and an auto-attack fires several times a second. */
+  private heroFxSchool = 'fx/steel'
+  private heroThrows = false
   // Bystanders still walking in from beyond the horizon → their station (wx,wy above).
   private arriving = new Set<string>()
   /** Which mob `this.mob` currently represents. Identity, not sprite — see the handoff. */
@@ -1607,6 +1653,8 @@ export class WorldSceneController {
 
     this.mobWasPresent = this.showMob
     this.playerDead = !state.isAlive
+    this.heroFxSchool = heroSchool(state.playerClass, state.talentAllocs)
+    this.heroThrows = CLASS_THROWS[state.playerClass] ?? false
   }
 
   /**
@@ -1828,12 +1876,24 @@ export class WorldSceneController {
       target.animator.set('hit')
       target.animator.restart()
     }
-    if (fn.isCrit) this.spawnBurst(target.tx, target.ty, 'spell/holy')
+    if (fn.isCrit) this.spawnBurst(target.tx, target.ty, this.heroFxSchool)
     // Rumble scales with the hit: crits kick hard + a brief hit-stop; normal a nudge.
     this.punch(fn.isCrit ? 3.6 : 1.3, fn.isCrit ? 0.05 : 0)
-    // Melee spark spray — steel-white, gold on a crit.
+    // ── The blow, in the hero's own school ────────────────────────────────────
+    // Every class used to throw the same steel-white spray and lunge into melee to do it,
+    // so a warlock draining life and a warrior with an axe were indistinguishable, and a
+    // mage auto-attacked by running up and hitting things. The deepest talent spec is the
+    // archetype and the palette registry already holds a colour per school, so both the
+    // tint and the delivery follow from what the hero actually is.
     const mm = this.worldMid(target)
-    const mc = fn.isCrit ? fxColors('spell/holy') : { core: '#eaf0ff', glow: '#7fb0ff' }
+    const mc = fxColors(this.heroFxSchool)
+    if (this.heroThrows) {
+      // Casters throw it. The lunge above still plays — it reads as the cast gesture —
+      // but the damage arrives with the bolt rather than with the body.
+      this.emitCharge(this.worldMid(this.player).x, this.worldMid(this.player).y, mc.core, mc.glow)
+      this.spawnBolt(this.player.tx, this.player.ty, target.tx, target.ty,
+                     this.heroFxSchool, target, fn.isCrit ? 1.6 : 1)
+    }
     this.emitImpact(mm.x, mm.y, mc.core, mc.glow, fn.isCrit ? 1.7 : 0.9)
     this.spawnFloater(
       target, `${fn.value}${fn.isCrit ? '!' : ''}`, fn.isCrit,
