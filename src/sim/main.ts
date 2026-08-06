@@ -142,6 +142,12 @@ if (process.argv.includes('--parity')) {
         forceTalents: { frost_frostbite: 3, frost_permafrost: 3 } } },
     { label: 'rogue seal fate',    o: { playerClass: 'rogue',
         forceTalents: { ass_seal_fate: 5, ass_vile_poisons: 4 } } },
+    // Reaping Arc's periodic double-damage window. Added with the talent itself: no case
+    // here reached `arms_sweeping_strikes`, so this golden matched byte-identically across
+    // a change that took the talent from doing nothing to doubling five attacks a minute.
+    { label: 'warrior reaping arc', o: { playerClass: 'warrior',
+        forceTalents: { arms_deflection: 5, arms_tactical_mastery: 5, arms_deep_wounds: 3,
+                        arms_two_handed: 5, arms_impale: 2, arms_sweeping_strikes: 1 } } },
     { label: 'warrior + party',    o: { playerClass: 'warrior', spendTalents: true, partySize: 3 } },
   ]
   const out: string[] = [

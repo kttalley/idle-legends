@@ -351,6 +351,17 @@ export const RAMPAGE_MAX_STACKS = 5
 export const EXTRA_HIT_MULT = 0.7
 export const FLURRY_MULT = 0.5
 
+/**
+ * Reaping Arc, read straight off the talent's own description: "Every 30s your next 5
+ * attacks deal double damage." Every hit spends a charge, not just the primary swing —
+ * the text says attacks, and a proc hit is an attack. That is the one place this differs
+ * from the free crit next to it, which is swing-only because a proc riding on a swing
+ * would otherwise consume the moment that spawned it.
+ */
+export const REAPING_ARC_SECONDS = 30
+export const REAPING_ARC_CHARGES = 5
+export const REAPING_ARC_MULT = 2
+
 /** Ceiling on arcane charges. Uncapped, a long fight would end in one swing. */
 export const ARCANE_MAX_CHARGES = 8
 
@@ -455,7 +466,8 @@ export function resolvePlayerAttack(
  */
 export function advanceHeroUpkeep(
   procState: CombatProcState,
-  fx: Pick<CompiledTalentEffects, 'timedCritSeconds' | 'secondWindHpPerTick'>,
+  fx: Pick<CompiledTalentEffects,
+    'timedCritSeconds' | 'secondWindHpPerTick' | 'sweepingStrikesEnabled'>,
   hp: { currentHp: number; maxHp: number },
   dt: number,
 ): { healed: number } {
@@ -472,6 +484,18 @@ export function advanceHeroUpkeep(
   // fight sits inside rather than a counter that has to be fed.
   if (fx.timedCritSeconds > 0 && procState.timedCritTimer > 0) {
     procState.timedCritTimer = Math.max(0, procState.timedCritTimer - dt)
+  }
+
+  // Reaping Arc, on the same rhythm. The talent ships to players reading "Every 30s your
+  // next 5 attacks deal double damage" and, until now, did NOTHING: its effect compiled to
+  // `sweepingStrikesEnabled` (combat.ts:128) and no code ever read that flag. A talent
+  // point spent on it bought a description.
+  if (fx.sweepingStrikesEnabled) {
+    procState.reapingArcTimer = Math.max(0, procState.reapingArcTimer - dt)
+    if (procState.reapingArcTimer <= 0 && procState.reapingArcCharges <= 0) {
+      procState.reapingArcCharges = REAPING_ARC_CHARGES
+      procState.reapingArcTimer = REAPING_ARC_SECONDS
+    }
   }
 
   // Second Wind. Below half health only — which is what stops it being a flat regen aura
@@ -575,9 +599,19 @@ export function resolveHeroTurn(
         rng: ctx.rng,
       },
     )
+    // Reaping Arc is spent HERE rather than inside `resolvePlayerAttack`, so the window
+    // covers a turn's every hit exactly once and both loops consume it identically —
+    // the divergence stage 2 spent its commits reconciling started as effects applied on
+    // one side of this boundary and not the other.
+    let damage = res.damage
+    if (ctx.procState.reapingArcCharges > 0) {
+      ctx.procState.reapingArcCharges--
+      damage = Math.round(damage * REAPING_ARC_MULT)
+    }
+
     const outcome = applyHit({
       kind,
-      damage: res.damage,
+      damage,
       crit: res.isCrit,
       triggeredDoTs: res.triggeredDoTs,
       lifeDrawn: res.lifeDrawn,

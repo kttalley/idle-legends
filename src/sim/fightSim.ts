@@ -96,6 +96,21 @@ const TALENT_BUILDS: { label: string; cls: ClassType; allocs: Record<string, num
     allocs: { arms_sword_spec: 5, wbr_flurry: 3, arms_improved_rend: 2 },
   },
   {
+    // Reaping Arc — the periodic double-damage window. Added when the talent was made
+    // real, for the reason stage 0 exists: no build allocated `arms_sweeping_strikes`, so
+    // the golden went on passing byte-identically while the effect it was meant to cover
+    // did nothing whatsoever. A green gate over an unexercised path is not evidence.
+    //
+    // 20 points of Ironcleave first, because that is what row 5 costs; allocating the
+    // capstone alone would be a build no player can actually hold.
+    label: 'warrior reaping arc',
+    cls: 'warrior',
+    allocs: {
+      arms_deflection: 5, arms_tactical_mastery: 5, arms_deep_wounds: 3,
+      arms_two_handed: 5, arms_impale: 2, arms_sweeping_strikes: 1,
+    },
+  },
+  {
     // block/avoid (Shield Spec) — the only path that exercises `resolveMobAttack`'s
     // avoidance roll, and therefore the only way a `block` event ever reaches the log.
     // Retaliation and damage reduction ride along so the HERO-DEFENDER path is covered

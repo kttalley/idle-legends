@@ -98,6 +98,7 @@ function freshProcState(): CombatProcState {
     procTargetId: null,  // one opponent for the whole fight; nothing to re-scope
     winterChillStacks: 0, comboPoints: 0, remorselessActive: false, iceBlockUsed: false,
     lastStandUsed: false, rampageStacks: 0, arcaneCharges: 0, timedCritTimer: 0,
+    reapingArcTimer: 0, reapingArcCharges: 0,
     openerUsed: false, mobFrozen: false, mobFrozenTimer: 0, iceBarrierHp: 0,
   }
 }

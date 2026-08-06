@@ -134,6 +134,8 @@ function defaultProcState(): CombatProcState {
     rampageStacks: 0,
     arcaneCharges: 0,
     timedCritTimer: 0,
+    reapingArcTimer: 0,
+    reapingArcCharges: 0,
     openerUsed: false,
     mobFrozen: false,
     mobFrozenTimer: 0,

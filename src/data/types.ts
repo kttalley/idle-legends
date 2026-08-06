@@ -393,6 +393,12 @@ export interface CombatProcState {
   arcaneCharges: number
   /** Counts down to the next free guaranteed crit; 0 means the next swing is one. */
   timedCritTimer: number
+  /** Reaping Arc: seconds until the next window opens. Same rhythm as `timedCritTimer` —
+   *  it ticks whether or not the hero is swinging, so it is something the fight sits
+   *  inside rather than a counter that has to be fed. */
+  reapingArcTimer: number
+  /** Attacks left in the open Reaping Arc window, each at double damage. */
+  reapingArcCharges: number
   /** The opener against THIS target has been spent. Reset on every new engagement. */
   openerUsed: boolean
   mobFrozen: boolean
