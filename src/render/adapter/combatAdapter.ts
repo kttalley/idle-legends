@@ -3919,6 +3919,7 @@ export class WorldSceneController {
       id: `ambient_mob_${a.grp}`,
       templateId: 'ambient' as MobInstance['templateId'],
       name: 'Beast',
+      attackAccum: 0,
       currentHp: maxHp, maxHp,
       damage: Math.round(3 + lvl * 1.1),
       xpReward: 0, goldMin: 0, goldMax: 0, lootTableIds: [],

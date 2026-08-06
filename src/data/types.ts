@@ -586,6 +586,15 @@ export interface MobInstance {
   /** Damage-over-time effects live ON the mob, so switching targets can't leak another
    *  mob's bleeds onto the new one. `activeDoTs` mirrors the current target's list. */
   dots: ActiveDoT[]
+  /** Seconds banked toward this mob's next swing. Per-mob because the whole population
+   *  can be mid-swing at once — the hero's engaged target used to be the only thing that
+   *  attacked, so one shared accumulator on the state was enough. It no longer is: a
+   *  shared clock would let four mobs share one swing, or fire all four on the same beat.
+   *
+   *  Session state. `mobs` is cleared on load (`rehydrateState`), so this needs no
+   *  migration; `persistedBoss` is the one mob that survives a reload, and it is
+   *  defaulted on the way back in. */
+  attackAccum: number
 }
 
 // ── Zones ─────────────────────────────────────────────────────────────────────

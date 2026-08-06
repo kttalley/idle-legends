@@ -517,6 +517,13 @@ function rehydrateState(saved: GameState): GameState {
   saved.playerMapPos  = { x: 32, y: 32 }
   saved.weatherState  = { type: 'clear', timer: 45, cloudOffset: 0, rainPhase: 0 }
   saved.mobMapOffset       = { dx: 0, dy: 0 }
+  // `mobs` is cleared on load, so per-mob swing clocks need no migration — except for
+  // the one mob that DOES survive a reload. A banked boss written before `attackAccum`
+  // existed comes back with it undefined, and `undefined >= attackSpeedSeconds` is
+  // false, so it would stand there and never swing again.
+  if (saved.persistedBoss) {
+    saved.persistedBoss.attackAccum = saved.persistedBoss.attackAccum ?? 0
+  }
   saved.currentTown        = null
   saved.activeTownNpc      = null
   saved.generatedTownNames = saved.generatedTownNames ?? {}
@@ -1277,6 +1284,7 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
     isBoss,
     ...placeInWorld(state, { name, isBoss }),
     dots: [],
+    attackAccum: 0,
   }
 }
 
@@ -1385,6 +1393,47 @@ function placeInWorld(
 /** How many enemies populate a zone at once. The boss fights alone — a lair should not
  *  be a crowd, and it keeps the climactic encounter reading as one. */
 const MOB_POPULATION = 4
+/** How close a mob must be to swing, in tiles. Was an unnamed 1.5 on the engaged
+ *  target's check; naming it matters now that the whole pack tests against it, because
+ *  two different reaches would mean bystanders that hit from outside the fight. */
+const MELEE_RANGE = 1.5
+/**
+ * How many mobs may be swinging at the hero at once, target included.
+ *
+ * Not a difficulty knob — a survivability floor, and it was measured rather than
+ * guessed. Letting the whole population (`MOB_POPULATION`, 4) swing freely put the
+ * settled hero into an unrecoverable spiral on multiple seeds: die, respawn at half
+ * health, get surrounded again before the health matters, repeat. One 60-minute
+ * measured window ended with **0 kills and 0 gold** — the run was simply over, which is
+ * the same failure the economy plan recorded for a hero who never equips.
+ *
+ * The asymmetry is the reason. The hero can only fight ONE thing at a time — the sole
+ * cleave talent, `sweeping_strikes`, compiles to a flag nothing reads — so N attackers
+ * multiplied incoming damage by N against unchanged outgoing damage. Two is the number
+ * that keeps a pack feeling like a pack while leaving the fight winnable.
+ *
+ * **Set to 1 deliberately, which means today's behaviour is unchanged: only the engaged
+ * target swings.** The machinery below is live and the seam is real — raising this to 2
+ * turns the pack on in one character. It is held at 1 because turning it on was measured
+ * and the measurement said no:
+ *
+ * | attackers | mean offline-parity error | online gold, worst seeds |
+ * |---|---|---|
+ * | 1 (this) | +5.4% — inside the ±10% band | ~4,500–5,200 |
+ * | 2        | +28.6% — FAIL              | 1,903 / 2,916 — collapse |
+ *
+ * One extra attacker doubles incoming damage against unchanged outgoing damage, and on
+ * several seeds that tipped the settled hero into a spiral: online throughput fell away
+ * mid-window while the offline projection kept replaying the healthier rate measured
+ * before it. The parity break is the symptom; the asymmetry is the disease.
+ *
+ * So this rises to 2 in the same commit that gives the hero something to answer a pack
+ * WITH — `sweeping_strikes` currently compiles to `sweepingStrikesEnabled`, which is
+ * read by nothing (`combat.ts:128` is its only assignment). That is the offensive half,
+ * and the plan's warning that N-sided "does not unlock AoE talents, it creates the
+ * obligation to design them" turns out to be the load-bearing sentence in the track.
+ */
+const MAX_MELEE_ATTACKERS = 1
 
 // ── Allies ────────────────────────────────────────────────────────────────────
 /** An ally wears nothing. Frozen so a stray write cannot quietly gear the whole party. */
@@ -2018,7 +2067,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     // Is the mob close enough to fight? (arrives from map edge over ~5s)
     const rawMobDist = Math.sqrt(mobOffset.dx ** 2 + mobOffset.dy ** 2)
-    const mobEngaged = !!target && rawMobDist < 1.5
+    const mobEngaged = !!target && rawMobDist < MELEE_RANGE
 
     // ── Tick down skill cooldowns ───────────────────────────────────────────
     for (const id of Object.keys(skillCooldowns)) {
@@ -2082,6 +2131,17 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         // discard this tick's working copy and silently reset the hero's swing timer every
         // frame — the same shape of omission that once froze the whole world tick.
         combatAccum: accum,
+        // Dead time is still time, and the offline projection replays a rate against
+        // WALL-CLOCK seconds. This branch returned before `accrueRates`, so the rate
+        // measured output per second *alive* — every respawn silently inflated it, and
+        // offline paid for hours the hero would have spent on the floor.
+        //
+        // Latent until now: deaths were rare enough that the bias sat inside the ±10%
+        // parity band (measured 6.4%). Letting the whole pack swing made dying ordinary
+        // and pushed it to 22.9%, which is how it surfaced. Folding the tick in at zero
+        // output makes the rate honest about downtime by construction rather than by
+        // the hero happening not to die.
+        offlineRates: accrueRates(state.offlineRates, deltaSeconds, 0, 0, 0),
             combatLog: [...newLogs, ...state.combatLog].slice(0, LOG_MAX) })
       return
     }
@@ -2238,9 +2298,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Everything below is the original handler, moved verbatim: loot, XP, levelling, zone
     // unlocks, quest completion, boss bookkeeping and the drop ladder all still run in the
     // store, exactly once, wherever the blow came from.
-    const registerKill = (): boolean => {
-      if (!currentMob || currentMob.currentHp > 0) return false
-      const deadMob = currentMob!
+    // Pays out a corpse: loot, gold, XP, kill counting, boss bookkeeping, and removal
+    // from the population. Defaults to the engaged target, which was the only thing that
+    // could die back when the target was the only thing that fought. Retaliation can now
+    // kill a mob the hero never targeted, and a kill that pays nothing is a worse bug
+    // than no kill at all — so the victim is a parameter.
+    const registerKill = (victim: MobInstance | null = currentMob): boolean => {
+      if (!victim || victim.currentHp > 0) return false
+      const deadMob = victim
       const loot = rollLoot(deadMob, level, stats.goldFindBonus, upg)
       gold += loot.gold
       killGoldThisTick += loot.gold
@@ -2400,12 +2465,18 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // Drop the corpse out of the population and release the player's commitment —
       // "until the enemy is killed" ends here. The next tick auto-picks the nearest
       // survivor unless the player names another.
-      mobs = mobs.filter(m => m.id !== currentMob!.id)
-      targetMobId = null
-      currentMob = null
-      activeDoTs  = []
+      mobs = mobs.filter(m => m.id !== deadMob.id)
       mobRespawnTimer = MOB_RESPAWN_SECONDS
-      resetCombatAccumulators()
+      // Only the ENGAGED target's death ends the engagement. A bystander killed by
+      // Retaliation must not drop the hero's target or reset their swing timer — that
+      // would hand the player a free clock reset for standing in a crowd, and would
+      // yank the camera off the enemy they are actually fighting.
+      if (deadMob.id === currentMob?.id) {
+        targetMobId = null
+        currentMob = null
+        activeDoTs  = []
+        resetCombatAccumulators()
+      }
       return true
     }
 
@@ -2697,13 +2768,18 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
     }
 
-    // ── Mob attacks player ───────────────────────────────────────────────────
-    if (currentMob && !procState.mobFrozen && mobEngaged) {
-      accum.mob += deltaSeconds
-      let mobCatchup = 0
-      while (currentMob && accum.mob >= currentMob.attackSpeedSeconds
-             && mobCatchup++ < CATCHUP_MAX_SWINGS) {
-        accum.mob -= currentMob.attackSpeedSeconds
+    // ── One mob's swing ──────────────────────────────────────────────────────
+    // This was the engaged target's exclusive privilege. Everything in it was already
+    // generic — the ally threat share, the barrier, pushback, Glacial Tomb, The Last
+    // Yard, death — except that it named `currentMob` as the attacker. Naming the
+    // attacker instead is the whole of what lets the rest of the pack fight.
+    //
+    // Returns the attacker, which Retaliation may have damaged; the caller writes it
+    // back. Thorns deaths are NOT registered in here, for the reason the original code
+    // gave: the exchange below still reads the attacker after the blow lands.
+    const swingAtHero = (attacker: MobInstance): MobInstance => {
+      let atk = attacker
+      {
         // ── Who does it swing at? ──────────────────────────────────────────
         // With a party standing, some of the incoming damage goes to them. Held below
         // half (ALLY_THREAT_SHARE) on purpose: the player is the one making decisions,
@@ -2719,7 +2795,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             a.currentHp / Math.max(1, a.stats.maxHp) < lo.currentHp / Math.max(1, lo.stats.maxHp) ? a : lo)
           const allyFx = compileTalentEffects(victim.playerClass, victim.talentAllocs)
           const hit = resolveMobAttack(
-            currentMob, victim.stats.armor, allyFx.mobAttackSpeedFactor, allyFx,
+            atk, victim.stats.armor, allyFx.mobAttackSpeedFactor, allyFx,
             () => allyRoll(victim),
           )
           if (hit.blocked) {
@@ -2728,7 +2804,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             victim.currentHp = Math.max(0, victim.currentHp - hit.damage)
             newFns.push(fn(hit.damage, false, true, false, '#ff9c9c', victim.key))
             if (hit.thorns > 0) {
-              currentMob = { ...currentMob, currentHp: currentMob.currentHp - hit.thorns }
+              atk = { ...atk, currentHp: atk.currentHp - hit.thorns }
               newFns.push(fn(hit.thorns, false, false, false, '#ffaa44', victim.key))
             }
             if (victim.currentHp <= 0) {
@@ -2739,21 +2815,21 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           }
           // The mob spent its swing on the ally; the hero takes nothing this beat. Thorns
           // may have killed it, so register before falling through.
-          registerKill()
+          registerKill(atk)
         } else {
         // Fifth argument was omitted, so the avoidance roll drew off the global too.
-        const swing = resolveMobAttack(currentMob, stats.armor, fx.mobAttackSpeedFactor, fx, combatRng)
+        const swing = resolveMobAttack(atk, stats.armor, fx.mobAttackSpeedFactor, fx, combatRng)
         let mobDmg = swing.damage
 
         if (swing.blocked) {
           newFns.push(fn(0, false, true, false, '#88aaff'))
-          newLogs.push(log('proc', `🛡 Blocked ${currentMob.name}'s blow!`, '#88aaff'))
+          newLogs.push(log('proc', `🛡 Blocked ${atk.name}'s blow!`, '#88aaff'))
         }
 
         // Retaliation — measured against damage actually dealt, so it never scales with
         // how badly the hero happens to be geared.
         if (swing.thorns > 0) {
-          currentMob = { ...currentMob, currentHp: currentMob.currentHp - swing.thorns }
+          atk = { ...atk, currentHp: atk.currentHp - swing.thorns }
           newFns.push(fn(swing.thorns, false, false, false, '#ffaa44'))
           // NOT registered here. `registerKill` nulls `currentMob`, and the rest of this
           // exchange still reads it (the hit log at `${currentMob.name}` below). The mob's
@@ -2771,7 +2847,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         if (mobDmg > 0) {
           stats.currentHp = Math.max(0, stats.currentHp - mobDmg)
           newFns.push(fn(mobDmg, false, true, false))
-          newLogs.push(log('mob_attack', `${currentMob.name} hits you for ${mobDmg}`, '#ff8888'))
+          newLogs.push(log('mob_attack', `${atk.name} hits you for ${mobDmg}`, '#ff8888'))
 
           // Cast pushback: a hit while channelling delays the cast (WoW-style),
           // capped per-cast so a fast mob can't lock you out forever.
@@ -2823,6 +2899,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             respawnTimer = RESPAWN_TIMER_SECONDS
             stats.currentHp = 0
             castState = null   // death interrupts any channel
+            // The boss to bank is the one being FOUGHT, not necessarily the one that
+            // landed the blow. Academic today — a boss empties the field, so it is the
+            // only thing swinging — but it stops being academic the moment adds exist.
             if (currentMob?.isBoss) {
               persistedBoss = currentMob
             }
@@ -2839,11 +2918,68 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         }
         }   // end: mob swung at the hero rather than an ally
       }
+      return atk
     }
 
-    // Retaliation's kill, registered once the exchange above has fully resolved — the
-    // block reads `currentMob` throughout and `registerKill` nulls it. A no-op unless
-    // thorns actually took the mob to zero.
+    // ── The engaged target swings ────────────────────────────────────────────
+    if (currentMob && !procState.mobFrozen && mobEngaged) {
+      accum.mob += deltaSeconds
+      let mobCatchup = 0
+      while (currentMob && isAlive && accum.mob >= currentMob.attackSpeedSeconds
+             && mobCatchup++ < CATCHUP_MAX_SWINGS) {
+        accum.mob -= currentMob.attackSpeedSeconds
+        const after = swingAtHero(currentMob)
+        // Dying scatters the encounter, and `swingAtHero` has already emptied the field.
+        // Writing the attacker back here would put one body straight back on it.
+        currentMob = isAlive ? after : null
+      }
+    }
+
+    // ── ...and so does the rest of the pack ──────────────────────────────────
+    // The engaged target used to be the only thing that ever swung, so a hero who pulled
+    // four mobs fought one and was escorted by three spectators — `aggro` promised a
+    // threat the combat never delivered. Every mob that has noticed the hero and is
+    // standing in melee now takes its own swings, on its own clock.
+    //
+    // `mobFrozen` deliberately does not gate this: it is target-scoped (keyed on
+    // `procTargetId`), so freezing what you are fighting has never held the crowd.
+    //
+    // Iterated by id against a snapshot rather than by index, because a swing can empty
+    // the field (the hero falls) or remove a body (Retaliation), and an index into a list
+    // that just changed length is how a bystander gets skipped or swung twice.
+    if (isAlive) {
+      // Nearest first, then capped: the mobs in the hero's face are the ones that get to
+      // swing, and the ones behind them are waiting their turn rather than piling on.
+      const slots = MAX_MELEE_ATTACKERS - (currentMob && mobEngaged ? 1 : 0)
+      const pack = mobs
+        .filter(m => m.aggro && m.id !== currentMob?.id)
+        .sort((a, b) =>
+          (a.offset.dx ** 2 + a.offset.dy ** 2) - (b.offset.dx ** 2 + b.offset.dy ** 2))
+        .slice(0, Math.max(0, slots))
+        .map(m => m.id)
+      for (const id of pack) {
+        if (!isAlive) break
+        let m = mobs.find(x => x.id === id)
+        if (!m) continue
+        // Out of reach: no swing and no banking. A mob that accrued while closing would
+        // arrive owing the hero a burst, which reads as being ambushed by arithmetic.
+        if (Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) >= MELEE_RANGE) continue
+        m = { ...m, attackAccum: m.attackAccum + deltaSeconds }
+        let packCatchup = 0
+        while (isAlive && m.attackAccum >= m.attackSpeedSeconds
+               && packCatchup++ < CATCHUP_MAX_SWINGS) {
+          m = swingAtHero({ ...m, attackAccum: m.attackAccum - m.attackSpeedSeconds })
+        }
+        if (m.currentHp <= 0) { registerKill(m); continue }
+        const i = mobs.findIndex(x => x.id === id)
+        if (i >= 0) mobs[i] = m
+      }
+    }
+
+    // Retaliation's kill on the ENGAGED target, registered once the exchange above has
+    // fully resolved — the block reads `currentMob` throughout and `registerKill` nulls
+    // it. A no-op unless thorns actually took the mob to zero. Pack members register
+    // their own deaths inline above, because nothing downstream reads them.
     registerKill()
 
     // ── Auto-gather: if drifting near a resource node with no active combat ──
