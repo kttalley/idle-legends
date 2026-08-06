@@ -1121,6 +1121,32 @@ function advanceMobs(
   const mask = zm ? getWalkMask(zm) : null
   const logs: ReturnType<typeof log>[] = []
 
+  // ── Social aggro: pulling one thing pulls its neighbours ──────────────────
+  // Packs could not form before this. Four mobs are scattered over a 64×64 torus — 4,096
+  // tiles — so the odds of two being near each other by chance are tiny, and it showed:
+  // a splash radius of 3.5 caught NOBODY across a whole 10-minute trace, while the same
+  // run at radius 64 caught 77. Every AoE talent in the game was landing on empty ground.
+  //
+  // Raising the attacker cap alone would not have fixed that; there was nothing standing
+  // there to raise it for. Mobs noticing each other is what turns a population into an
+  // encounter, and it is how the games this one is modelled on have always worked: you
+  // pull one, its friends come.
+  //
+  // A single pass, not transitive — a chain reaction across a whole zone would drag every
+  // body onto the hero at once. Neighbours of an aggroed mob join; neighbours of THOSE
+  // wait for their own turn, next tick, by which time the leash may already have let go.
+  for (const m of mobs) {
+    if (!m.aggro) continue
+    for (const other of mobs) {
+      if (other.aggro || other.id === m.id) continue
+      if (temperamentOf(other) === 'lair') continue   // a lair boss holds its ground
+      if (torusDistance(other.pos, m.pos) > SOCIAL_AGGRO_RADIUS) continue
+      other.aggro = true
+      other.patrolTarget = null
+      logs.push(log('mob_attack', `${other.name} joins the fight!`, '#ff8844'))
+    }
+  }
+
   for (const m of mobs) {
     const distToPlayer = torusDistance(m.pos, player)
     const temperament = temperamentOf(m)
@@ -1437,28 +1463,34 @@ const MELEE_RANGE = 1.5
  * multiplied incoming damage by N against unchanged outgoing damage. Two is the number
  * that keeps a pack feeling like a pack while leaving the fight winnable.
  *
- * **Set to 1 deliberately, which means today's behaviour is unchanged: only the engaged
- * target swings.** The machinery below is live and the seam is real — raising this to 2
- * turns the pack on in one character. It is held at 1 because turning it on was measured
- * and the measurement said no:
+ * Held at **1** while the hero had no answer to a pack, because raising it then was
+ * measured and the measurement said no: at 2, offline parity went +5.4% → **+28.6%
+ * (FAIL)** and online gold collapsed on several seeds (1,903 and 2,916 against a healthy
+ * ~4,500–5,200). One extra attacker doubled incoming damage against unchanged outgoing.
  *
- * | attackers | mean offline-parity error | online gold, worst seeds |
+ * **Now 3, because the outgoing side finally moved.** Three things landed together and
+ * the asymmetry closed: the hero casts their own abilities instead of leaving the action
+ * bar as decoration, `splash` makes AoE talents real, and social aggro means a pack is
+ * something that actually gathers. Re-measured across the same gates:
+ *
+ * | attackers | settled offline-parity error | verdict |
  * |---|---|---|
- * | 1 (this) | +5.4% — inside the ±10% band | ~4,500–5,200 |
- * | 2        | +28.6% — FAIL              | 1,903 / 2,916 — collapse |
+ * | 2 (before the offensive half) | +28.6% | FAIL — collapse |
+ * | 3 (this)                      | +6.6%  | all invariants hold, 0/8 seeds out |
+ * | 4 (the whole population)      | +9.5%  | holds, but sits on the band's edge |
  *
- * One extra attacker doubles incoming damage against unchanged outgoing damage, and on
- * several seeds that tipped the settled hero into a spiral: online throughput fell away
- * mid-window while the offline projection kept replaying the healthier rate measured
- * before it. The parity break is the symptom; the asymmetry is the disease.
- *
- * So this rises to 2 in the same commit that gives the hero something to answer a pack
- * WITH — `sweeping_strikes` currently compiles to `sweepingStrikesEnabled`, which is
- * read by nothing (`combat.ts:128` is its only assignment). That is the offensive half,
- * and the plan's warning that N-sided "does not unlock AoE talents, it creates the
- * obligation to design them" turns out to be the load-bearing sentence in the track.
+ * 3 rather than 4 on purpose. It keeps real headroom instead of passing by 0.5%, and a
+ * fourth body waiting its turn behind the three in your face reads as a pack with depth
+ * rather than as everything piling on at once.
  */
-const MAX_MELEE_ATTACKERS = 1
+const MAX_MELEE_ATTACKERS = 3
+/** How far a splashed blow carries, in tiles. Wider than `MELEE_RANGE` because a
+ *  whirlwind should catch the ones closing on you, not only the one you are trading
+ *  with — but well short of the screen, so it reads as a swing and not an airstrike. */
+const SPLASH_RADIUS = 3.5
+/** How close a mob must be to an already-angry one to join in, in tiles. Wider than
+ *  `SPLASH_RADIUS` so a pack that gathers is a pack an AoE can actually catch. */
+const SOCIAL_AGGRO_RADIUS = 7
 
 // ── Allies ────────────────────────────────────────────────────────────────────
 /** An ally wears nothing. Frozen so a stray write cannot quietly gear the whole party. */
@@ -2140,6 +2172,41 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       }
     }
 
+    // ── Auto-cast: the hero uses their own abilities ─────────────────────────
+    // Until now NOTHING called `activateAbility` except a finger on a button. Three slots
+    // per class, reshaped by whichever tree the hero fed — "the whole trick", per
+    // `abilities.ts` — and an unattended hero pressed none of them, ever. For a game whose
+    // premise is progress while you are away, the entire action bar was decoration, and
+    // both harnesses were blind to it because neither taps buttons either.
+    //
+    // Slot order, first one ready. Slot 1 is the class's bread-and-butter strike and the
+    // later slots are the situational ones, so "lowest ready slot" is a reasonable rotation
+    // without inventing a priority language. Deliberately no RNG: an idle rotation that
+    // rolled dice would be one more unseeded draw per tick (Track P0) for no benefit.
+    //
+    // Manual control keeps the bar to itself — a player holding the wheel is choosing when
+    // to spend cooldowns, and spending them for them is exactly the "auto gameplay
+    // overrides what I wanted" complaint Track C exists to answer.
+    if (isAlive && !castState && !castCompletedId && controlMode === 'idle'
+        && currentMob && state.gameMode === 'combat') {
+      const ready = ACTIVE_ABILITIES.find(a =>
+        a.classes.includes(state.playerClass)
+        && level >= a.unlockLevel
+        && (skillCooldowns[a.id] ?? 0) <= 0
+        // Self-target abilities are the only ones castable with nothing engaged; the
+        // guard above already requires a target, so this only filters heals-when-full.
+        && !(a.effects.some(e => e.type === 'hot') && stats.currentHp >= stats.maxHp))
+      if (ready) {
+        const castTime = (ready.castTimeSeconds ?? 0) * (fx.abilityMods[ready.id]?.castTimeMult ?? 1)
+        if (castTime > 0) {
+          castState = { abilityId: ready.id, name: ready.name, icon: ready.icon,
+                        total: castTime, remaining: castTime, pushback: 0 }
+        } else {
+          castCompletedId = ready.id
+        }
+      }
+    }
+
     // ── Player respawn ──────────────────────────────────────────────────────
     if (!isAlive) {
       respawnTimer = Math.max(0, respawnTimer - deltaSeconds)
@@ -2657,6 +2724,32 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             if (cgBuff && hit.crit) cgBuff.stacks = (cgBuff.stacks ?? 1) - 1
             const nhBuff = activeBuffs.find(b => b.type === 'next_hit_multiplier' && (b.stacks ?? 0) > 0)
             if (nhBuff) nhBuff.stacks = (nhBuff.stacks ?? 1) - 1
+            // ── Splash: the blow lands on everything standing near you ──
+            // The capstones that grant this have always SAID so ("Battle Cry becomes a
+            // whirlwind — it also bleeds everything it touches") and always been flavour
+            // text over a damage mod. This is the sentence, executed.
+            const spBuff = activeBuffs.find(b => b.type === 'splash' && (b.stacks ?? 0) > 0)
+            if (spBuff && hit.damage > 0) {
+              spBuff.stacks = (spBuff.stacks ?? 1) - 1
+              const splashDmg = Math.max(1, Math.round(hit.damage * spBuff.value))
+              let struck = 0
+              for (let i = 0; i < mobs.length; i++) {
+                const m = mobs[i]
+                if (m.id === currentMob!.id) continue
+                if (Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) > SPLASH_RADIUS) continue
+                mobs[i] = { ...m, currentHp: m.currentHp - splashDmg, aggro: true }
+                struck++
+                if (state.settings.showDamageNumbers) {
+                  newFns.push(fn(splashDmg, false, false, false, '#ff9944'))
+                }
+              }
+              // Deaths are NOT registered here. A corpse sweep after the exchange pays out
+              // everything that reached zero this tick, whatever killed it — see below.
+              if (struck > 0) {
+                newLogs.push(log('proc',
+                  `🌀 The blow carries — ${struck} more caught for ${splashDmg}`, '#ff9944'))
+              }
+            }
             const lsBuff = activeBuffs.find(b => b.type === 'lifesteal_buff' && hit.crit)
             if (lsBuff && (lsBuff.stacks ?? 0) > 0) {
               lsBuff.stacks = (lsBuff.stacks ?? 1) - 1
@@ -3006,6 +3099,21 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // it. A no-op unless thorns actually took the mob to zero. Pack members register
     // their own deaths inline above, because nothing downstream reads them.
     registerKill()
+
+    // ── The corpse sweep ─────────────────────────────────────────────────────
+    // One place that pays out anything standing at zero, whatever put it there. Splash
+    // needs it — a whirlwind that kills three bystanders must pay for three bystanders —
+    // but the reason it is a SWEEP rather than a splash-specific branch is that this
+    // codebase has a history of damage sources growing their own half-kill handlers:
+    // `finishCast`'s Umbral Bolt path calls `rollLoot` and skips XP, kill counting, boss
+    // bookkeeping and `placeDrop` entirely (a documented C6 trap). Anything that reaches
+    // zero now pays the full price through `registerKill`, once.
+    //
+    // Snapshot the ids first: `registerKill` filters `mobs`, so iterating it live would
+    // skip every second corpse.
+    for (const id of mobs.filter(m => m.currentHp <= 0).map(m => m.id)) {
+      registerKill(mobs.find(m => m.id === id) ?? null)
+    }
 
     // ── Auto-gather: if drifting near a resource node with no active combat ──
     let nextGameMode: GameMode = state.gameMode as GameMode

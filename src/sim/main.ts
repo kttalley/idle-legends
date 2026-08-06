@@ -148,6 +148,14 @@ if (process.argv.includes('--parity')) {
     { label: 'warrior reaping arc', o: { playerClass: 'warrior',
         forceTalents: { arms_deflection: 5, arms_tactical_mastery: 5, arms_deep_wounds: 3,
                         arms_two_handed: 5, arms_impale: 2, arms_sweeping_strikes: 1 } } },
+    // The Whirling — Battle Cry's blow carrying to everything nearby. 30 points of
+    // Ironcleave first, because that is what row 7 costs and a capstone allocated alone
+    // is a build no player can hold.
+    { label: 'warrior whirling', o: { playerClass: 'warrior',
+        forceTalents: { arms_heroic_strike: 3, arms_deflection: 5, arms_tactical_mastery: 5,
+                        arms_deep_wounds: 3, arms_two_handed: 5, arms_impale: 2,
+                        arms_sweeping_strikes: 1, arms_executioner: 3, arms_hamstring: 3,
+                        arms_bladestorm: 1 } } },
     { label: 'warrior + party',    o: { playerClass: 'warrior', spendTalents: true, partySize: 3 } },
   ]
   const out: string[] = [

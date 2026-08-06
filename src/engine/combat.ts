@@ -748,7 +748,7 @@ export function makeAbilityBuff(
   const colorMap: Record<string, string> = {
     armor_buff: '#6699ff', lifesteal_buff: '#ff4444', speed_buff: '#ffcc00',
     crit_guarantee: '#ffaa00', crit_buff_pct: '#ffcc00', hot: '#44ff88',
-    dot_amplify: '#aa00cc', next_hit_multiplier: '#ffffff',
+    dot_amplify: '#aa00cc', next_hit_multiplier: '#ffffff', splash: '#ff9944',
   }
   return {
     id: `buff_${abilityId}_${Date.now()}`,

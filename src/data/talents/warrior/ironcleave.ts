@@ -207,6 +207,14 @@ export const IRONCLEAVE_TALENTS: TalentNodeDef[] = [
         type: 'ability', ability: 'warrior_battle_cry', mod: 'damage', valuePerRank: 0.50,
         note: 'The Whirling: strikes everything around you',
       },
+      // The line above claimed the whirlwind for a long time while only raising a single
+      // target's damage. This is the claim, as an effect: Battle Cry's empowered blow now
+      // carries to everything standing near the hero, for 60% of what the target took.
+      {
+        type: 'ability', ability: 'warrior_battle_cry', mod: 'rider', valuePerRank: 1,
+        rider: { type: 'splash', value: 0.60, stacks: 1 },
+        note: 'Catches every enemy near you for 60% of the blow',
+      },
     ],
   },
 ]

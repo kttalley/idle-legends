@@ -291,6 +291,11 @@ export type AbilityEffectType =
   | 'speed_buff'          | 'freeze_mob'     | 'crit_guarantee'
   | 'crit_buff_pct'       | 'heal'           | 'hot'
   | 'dot_amplify'         | 'shadow_bolt'
+  /** Your next attack also strikes everything standing near you, for `value` of the
+   *  damage it dealt to the target. Carried as a buff and spent by the swing that uses
+   *  it, exactly like `next_hit_multiplier` — the capstones that grant it describe an
+   *  empowered BLOW ("Battle Cry becomes a whirlwind"), not an instant nuke. */
+  | 'splash'
 
 export interface ActiveAbilityDef {
   id: string
