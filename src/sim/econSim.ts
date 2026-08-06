@@ -15,6 +15,7 @@
 import { useGameStore } from '../store/gameStore'
 import {
   INVENTORY_SLOTS, RARITY_WEIGHTS, BAG_SLOTS_MAX_PURCHASED, ZONE_STUCK_SECONDS,
+  ELITE_SPAWN_CHANCE,
 } from '../data/constants'
 import type { ClassType, GameState, RaceType, TownId, ZoneId } from '../data/types'
 import { ZONE_ORDER } from '../data/zones'
@@ -22,7 +23,8 @@ import { canEnterZone, townForZone } from '../engine/zoneProgression'
 import { UPGRADES, upgradeCost } from '../data/upgrades'
 import { slotStorage } from '../store/saveSlots'
 import { projectOfflineProgress } from '../engine/offline'
-import { itemPower } from '../data/items'
+import { itemPower, generateItem } from '../data/items'
+import { ELITE_DROP_CHANCE_MULT } from '../engine/loot'
 import { joinParty, disbandParty } from '../engine/party'
 import { allocateSpec } from '../engine/ambient'
 import { mulberry32 } from '../engine/rng'
@@ -657,6 +659,104 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
 // has the array and not the counter, so `rehydrateState` has to reconcile them — and
 // getting that wrong either shrinks a paid-for bag or deletes the items in it. This
 // drives the real save path (slotStorage → loadSlot) rather than trusting the reader.
+
+// ── Loot fidelity: does being away get you the same QUALITY of drops? ─────────
+//
+// Every existing gate measures gold, kills and levels — quantities. None of them can see
+// what a drop IS. So the whole tier system is invisible to the suite: an elite doubles
+// the drop chance and biases rarity (`loot.ts:30-33`), while the offline projection rolls
+// `generateItem(slot, level, 0)` at a flat `ITEM_DROP_CHANCE` (`offline.ts`), knowing
+// nothing about tiers at all. Both numbers still add up, so everything reports green.
+//
+// This is written BEFORE the C6 work it exists to check, and it is expected to FAIL on
+// the current code. A gate authored after the fix, against the fix, only proves the fix
+// agrees with itself.
+const RARITY_RANK: Record<string, number> = {
+  common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4,
+}
+
+/** Mean rarity rank of N generated items at a given bias. */
+function meanRarity(n: number, level: number, bias: number): number {
+  let total = 0
+  for (let i = 0; i < n; i++) {
+    total += RARITY_RANK[generateItem('weapon', level, bias).rarity] ?? 0
+  }
+  return total / n
+}
+
+export function runLootFidelity(): Violation[] {
+  const out: Violation[] = []
+  const fail = (rule: string, detail: string) => out.push({ tick: 0, minute: 0, rule, detail })
+  if (typeof __setSeed === 'function') __setSeed(4242)
+
+  const N = 20000
+  const LEVEL = 40
+
+  // 1. An elite's drop must actually be better than a trash mob's. This is the premise
+  //    the tier system rests on; if it ever stops holding, elites are just health bars.
+  const normal = meanRarity(N, LEVEL, 0)
+  const elite = meanRarity(N, LEVEL, 1.5)
+  const boss = meanRarity(N, LEVEL, 3)
+  if (!(elite > normal * 1.05)) {
+    fail('elite drops beat normal', `elite mean rarity ${elite.toFixed(3)} vs normal ${normal.toFixed(3)}`)
+  }
+  if (!(boss > elite)) {
+    fail('boss drops beat elite', `boss ${boss.toFixed(3)} vs elite ${elite.toFixed(3)}`)
+  }
+
+  // 2. Online/offline QUALITY parity. Online, a share of kills are elites and those rolls
+  //    carry a bias; offline, every roll is bias 0. Compare the mean rarity an hour of
+  //    each produces. Gold parity already holds to well under 1%, so a hero who idles
+  //    should not quietly receive worse GEAR for the same hour.
+  //
+  //    Elite share is the spawn chance directly (`gameStore.spawnMob`).
+  const eliteShare = ELITE_SPAWN_CHANCE
+  // Elites also drop twice as often, so they are over-represented among drops relative
+  // to their share of kills — weight by drop chance, not by kill count.
+  const wElite = eliteShare * ELITE_DROP_CHANCE_MULT
+  const wNormal = (1 - eliteShare)
+  const onlineMean = (wNormal * normal + wElite * elite) / (wNormal + wElite)
+
+  // The offline side is RUN, not modelled. Asserting against a formula copied out of
+  // `offline.ts` would only prove the projection agrees with my description of it — the
+  // exact tautology this gate exists to avoid. So: drive the real
+  // `projectOfflineProgress` with a known elite share and read the rarities it actually
+  // put in the bag.
+  const store = useGameStore
+  store.getState().initGame('warrior', 'human')
+  const base = store.getState()
+  const KILLS = 4000
+  const probe: GameState = {
+    ...JSON.parse(JSON.stringify(base)),
+    level: LEVEL,
+    // A big empty bag, so the drop ladder does not sell or scrap the sample out from
+    // under the measurement.
+    inventory: new Array(400).fill(null),
+    merchantContract: null,
+    settings: { ...base.settings, autoEquip: false },
+    offlineRates: {
+      seconds: 3600, gold: 100000, xp: 100000,
+      kills: KILLS, eliteKills: Math.round(KILLS * eliteShare),
+    },
+    lastTickTimestamp: Date.now() - 3600 * 1000,
+  }
+  const outcome = projectOfflineProgress(probe, Date.now())
+  const bagged = ((outcome?.patch.inventory ?? []) as (typeof base.inventory)).filter(Boolean)
+  if (bagged.length < 50) {
+    fail('offline drop quality matches online',
+      `only ${bagged.length} offline drops sampled — too few to judge quality`)
+    return out
+  }
+  const offlineMean =
+    bagged.reduce((a, it) => a + (RARITY_RANK[it!.rarity] ?? 0), 0) / bagged.length
+  const gap = (onlineMean - offlineMean) / onlineMean
+  if (gap > 0.02) {
+    fail('offline drop quality matches online',
+      `offline mean rarity ${offlineMean.toFixed(3)} over ${bagged.length} drops ` +
+      `vs online ${onlineMean.toFixed(3)} — idling yields ${(gap * 100).toFixed(1)}% worse gear per drop`)
+  }
+  return out
+}
 
 export function runSaveMigration(): Violation[] {
   const out: Violation[] = []

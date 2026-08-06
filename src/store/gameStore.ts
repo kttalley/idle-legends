@@ -2096,6 +2096,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Combat output this tick, folded into the decaying rate window at the end. This is
     // what offline progress replays, so it has to be measured rather than assumed.
     let killsThisTick = 0
+    let eliteKillsThisTick = 0
     let xpThisTick = 0
     // ONLY the gold mobs drop. Proceeds from selling or scrapping loot are deliberately
     // excluded: the offline projection re-rolls those drops and runs them through the real
@@ -2476,6 +2477,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
       xp += deadMob.xpReward
       killsThisTick++
+      // Tiered kills are tracked separately because DROPS are not interchangeable: an
+      // elite doubles the drop chance and rolls at a rarity bias. Without this the
+      // offline projection has no way to know an hour was spent on elites and rolls the
+      // whole hour as trash, which measured 4.9% worse gear per drop for idling.
+      if (deadMob.isElite || deadMob.isBoss) eliteKillsThisTick++
       xpThisTick += deadMob.xpReward
       while (xp >= xpForLevel(level)) {
         xp -= xpForLevel(level)
@@ -3213,6 +3219,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       totalPlayTime: state.totalPlayTime + deltaSeconds,
       offlineRates: accrueRates(
         state.offlineRates, deltaSeconds, killGoldThisTick, xpThisTick, killsThisTick,
+        eliteKillsThisTick,
       ),
       // Evidence for the retreat rule. Reset whenever the hero changes zone, so it always
       // describes the ground they are standing on.

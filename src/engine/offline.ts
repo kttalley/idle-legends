@@ -5,7 +5,7 @@ import {
 import { GATHER_SECONDS, GATHER_YIELD, purityToQuality } from './crafting'
 import type { GameState, Item, QualityTier, Slot } from '../data/types'
 import { generateItem } from '../data/items'
-import { placeDrop } from './loot'
+import { placeDrop, ELITE_RARITY_BIAS, ELITE_DROP_CHANCE_MULT } from './loot'
 import { compileStats } from './combat'
 import { xpForLevel } from './progression'
 import { RACE_DEFINITIONS } from '../data/races'
@@ -99,15 +99,31 @@ export interface OfflineRates {
   gold: number
   xp: number
   kills: number
+  /**
+   * Of those kills, how many were elites or bosses.
+   *
+   * Drops are not interchangeable: an elite doubles the drop chance and biases rarity
+   * (`loot.ts`), so an hour's loot depends on WHAT the hero killed and not only how many.
+   * Offline used to roll every drop at `generateItem(slot, level, 0)`, so idling returned
+   * measurably poorer gear than watching the same hour — 4.9% lower mean rarity per drop,
+   * invisible to every gate here because they all count gold and kills rather than
+   * quality.
+   *
+   * Measured rather than assumed from `ELITE_SPAWN_CHANCE`, for the same reason the rest
+   * of this file replays a measured rate instead of modelling one: a hero farming a boss,
+   * or one whose zone runs hot with elites, is not the average hero.
+   */
+  eliteKills: number
 }
 
 export function emptyRates(): OfflineRates {
-  return { seconds: 0, gold: 0, xp: 0, kills: 0 }
+  return { seconds: 0, gold: 0, xp: 0, kills: 0, eliteKills: 0 }
 }
 
 /** Fold one tick of field time — and anything it killed — into the decaying record. */
 export function accrueRates(
   r: OfflineRates, deltaSeconds: number, gold: number, xp: number, kills: number,
+  eliteKills = 0,
 ): OfflineRates {
   const w = Math.exp(-deltaSeconds / OFFLINE_RATE_WINDOW_SECONDS)
   return {
@@ -115,6 +131,9 @@ export function accrueRates(
     gold: r.gold * w + gold,
     xp: r.xp * w + xp,
     kills: r.kills * w + kills,
+    // Legacy saves have no `eliteKills`; `?? 0` keeps them decaying from zero rather
+    // than turning the whole record into NaN on the first tick after a load.
+    eliteKills: (r.eliteKills ?? 0) * w + eliteKills,
   }
 }
 
@@ -193,10 +212,22 @@ export function projectOfflineProgress(state: GameState, now: number): OfflineOu
   let salvagedGold = 0
   let equipped = 0, sold = 0, bagged = 0, scrapped = 0
 
-  const drops = Math.round(kills * (ITEM_DROP_CHANCE + fx.dropChance))
+  // Split the hour by what was actually being killed. Elites drop twice as often and
+  // roll at a rarity bias, so a flat `kills × ITEM_DROP_CHANCE` at bias 0 both
+  // under-counts the drops and under-rolls every one of them.
+  const eliteShare = rates.kills > 0 ? Math.min(1, (rates.eliteKills ?? 0) / rates.kills) : 0
+  const eliteKills = Math.round(kills * eliteShare)
+  const normalKills = kills - eliteKills
+  const baseChance = ITEM_DROP_CHANCE + fx.dropChance
+  const normalDrops = Math.round(normalKills * baseChance)
+  // `loot.ts` gives an elite `baseChance * 2` and a rarity bias of 1.5. Mirrored here
+  // rather than re-derived, because two descriptions of the same drop table is exactly
+  // how online and offline drift apart.
+  const eliteDrops = Math.round(eliteKills * baseChance * ELITE_DROP_CHANCE_MULT)
+  const drops = normalDrops + eliteDrops
   for (let i = 0; i < drops; i++) {
     const slot = ALL_SLOTS[Math.floor(Math.random() * ALL_SLOTS.length)]
-    const item = generateItem(slot, level, 0)
+    const item = generateItem(slot, level, i < eliteDrops ? ELITE_RARITY_BIAS : 0)
     const placed = placeDrop(item, equipment, inventory, {
       playerClass: state.playerClass, level, talentAllocs: state.talentAllocs,
       racialPassive, autoEquip: state.settings?.autoEquip !== false,

@@ -2,7 +2,7 @@
 // `node tools/sim/run.mjs [--minutes N] [--advance] [--sell] [--step S] [--class C]`.
 
 import {
-  runScenario, runSweep, runInvariants, runSaveMigration, runOfflineParity,
+  runScenario, runSweep, runInvariants, runSaveMigration, runOfflineParity, runLootFidelity,
   formatReport, formatSweep, formatParity, MEAN_TOLERANCE,
   type ScenarioOpts, type Violation,
 } from './econSim'
@@ -104,6 +104,17 @@ if (process.argv.includes('--parity')) {
   } else {
     failed++
     process.stdout.write(`  FAIL  offline OUT-EARNS online by ${(movingErr * 100).toFixed(1)}% — idling would beat playing\n`)
+  }
+
+  // Loot QUALITY, which every other gate here is blind to: they all count gold, kills
+  // and levels, and none of them can see what a drop actually is.
+  const loot = runLootFidelity()
+  if (loot.length === 0) {
+    process.stdout.write('  ok    loot fidelity — elites out-drop trash, offline matches online\n')
+  } else {
+    failed++
+    process.stdout.write('  FAIL  loot fidelity\n')
+    for (const v of loot) process.stdout.write(`          [${v.rule}] ${v.detail}\n`)
   }
 
   const migration = runSaveMigration()

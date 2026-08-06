@@ -14,6 +14,16 @@ export interface LootResult {
 
 const ALL_SLOTS: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket']
 
+/**
+ * What a tier is worth at the drop table. Exported because the OFFLINE projection has to
+ * reproduce the same mix — it rolled every drop at bias 0 and a flat drop chance, which
+ * made an idled hour return measurably poorer gear than a watched one. Two copies of
+ * these numbers is precisely how the two paths drift.
+ */
+export const ELITE_RARITY_BIAS = 1.5
+export const BOSS_RARITY_BIAS = 3
+export const ELITE_DROP_CHANCE_MULT = 2
+
 export function rollLoot(
   mob: MobInstance, level: number, goldFindBonus: number,
   /** Standing-upgrade bonuses. Defaulted so callers that predate them are unchanged. */
@@ -27,9 +37,9 @@ export function rollLoot(
   // Item
   let item: Item | null = null
   const baseChance = ITEM_DROP_CHANCE + (fx.dropChance ?? 0)
-  const dropChance = mob.isElite ? baseChance * 2 : mob.isBoss ? 1.0 : baseChance
+  const dropChance = mob.isElite ? baseChance * ELITE_DROP_CHANCE_MULT : mob.isBoss ? 1.0 : baseChance
   if (Math.random() < dropChance) {
-    const rarityBias = mob.isBoss ? 3 : mob.isElite ? 1.5 : 0
+    const rarityBias = mob.isBoss ? BOSS_RARITY_BIAS : mob.isElite ? ELITE_RARITY_BIAS : 0
     const slot = ALL_SLOTS[Math.floor(Math.random() * ALL_SLOTS.length)]
     item = generateItem(slot, level, rarityBias)
   }
