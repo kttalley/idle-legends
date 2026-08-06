@@ -247,39 +247,124 @@ nothing interesting to target.
 
 ---
 
-## Track F — flight paths between zones
+## Track F — mounts, flight masters, and city-gated travel
 
 **Shape:** replace the current travel animation (the hero walks and the map scrolls past)
 with an aerial flight-path ride, old-WoW flight-master style. Faction-flavoured mounts:
 **gryphons for the Lastlight Concord, wyverns for the Ashmarch** — which is exactly the
 split Track R already established, so the mount reads as faction identity, not decoration.
+The hero graduates onto a mount the moment they leave a zone behind, so advancing to the
+next zone is something you *see* rather than a progress bar.
 
 **Why this is cheap here.** Nearly every piece already exists:
-- `travelProgress` runs 0→1 over `travelDuration` (8s per zone step) and `TravelOverlay`
-  already renders it with a cancel action.
+- `travelProgress` runs 0→1 over `travelDuration` (8s per zone step, `gameStore.ts:3367`)
+  and `TravelOverlay` already renders it with a cancel action.
 - The scene already animates entity **altitude** — `player.z` drives the jump arc — so
   lifting a rider off the ground is not new machinery.
 - The camera already follows the player's feet and the ground is a wrapped torus, so a
   long scrolling overflight is the existing camera doing its normal job.
 - Two rigs (gryphon, wyvern) × the palette registry covers faction and rarity variants,
   same content-multiplier trick as everything else.
+- The town hub is already a real scene with a fixed NPC anchor layout (`townNpcs.ts`), so
+  a flight master is a fifth `TownServiceKind` and one more anchor, not a new screen.
 
-**Scope:**
+### F0 — the travel model changes shape first
+
+Today `beginTravel(toZone)` (`gameStore.ts:3360`) is callable from anywhere, and
+`enterTown`/`leaveTown` (`:3526`, `:3537`) are **instant mode flips** — you blink into the
+town scene and blink back out. That is the thing to fix before any mount art matters.
+
+**The rule:** you only leave a zone by *flying out of its city*, and you only arrive in a
+zone by *landing in its city*. Zone-to-zone movement is city→city, arranged by that city's
+flight master. Wilderness is somewhere you ride out to, never somewhere you depart from.
+
+So one zone change becomes a **journey of three legs**, each with its own animation:
+
+| Leg | From → to | Presentation |
+|---|---|---|
+| 1. **Ride in** | wilderness → origin city | mount up where you stand, ride to the city gate, land |
+| 2. **Flight** | origin city → destination city | takeoff arc, cruise at altitude, descent |
+| 3. **Ride out** | destination city → wilderness | lift from the pad, ride out to the hunting ground |
+
+**This must not become a click tax.** The `ZoneSelector` button stays one click: it queues
+all three legs and the journey runs itself. Walking to the city to talk to an NPC is the
+*manual* path for a player who wants it, and the flight master is where you browse
+destinations — but an idle player clicks the zone and watches. Same principle as Track G
+and Track C: **manual is an override, never a requirement.** Auto-advance (the roamer at
+`gameStore.ts:2954`) must build its journey through the same queue, not bypass it.
+
+**Implementation.** Keep `travelProgress`/`travelDuration` as the per-leg clock and add a
+journey wrapper — `travelLeg: 'ride_in' | 'flight' | 'ride_out'` plus the destination — so
+the arrival handler (`:1788`) advances to the next leg instead of always dropping into
+`gameMode: 'combat'`. Leg 2 ends in `enterTown`-equivalent state for the destination city;
+leg 3 begins from it.
+
+**Budget the legs out of the existing total** — do not add time. Total journey stays
+`dist * 8`; ride-in and ride-out are fixed short (~1.5s each) and the flight absorbs the
+remainder, so a one-zone hop is 1.5 + 5 + 1.5 = the 8s it is today. Throughput unchanged.
+
+**Cancel, per leg.** `TravelOverlay`'s cancel currently just returns you to the origin zone.
+Mid-air there is no coherent ground position to return to, so: cancelling during ride-in
+drops you back in the wilderness; cancelling during flight **lands you at the origin city**
+rather than aborting to nowhere; ride-out cancel leaves you in the destination city. Never
+trap an idle player in a cutscene they can't leave.
+
+**Save compatibility.** `rehydrateState` already nulls `travelTarget`/`travelProgress` on
+load (`:497-499`), so a save taken mid-journey lands the hero back in their origin zone.
+That is acceptable — but say so out loud, because with journeys it silently discards two
+more legs than it used to. All new fields are additive with defaults, same pattern as the
+quest system.
+
+### F1 — BLOCKER: six of twelve zones have no city
+
+`thornvale_jungle`, `ashfire_peaks`, `the_bloodfields`, `venom_hollows`, `cinderfall_wastes`
+and `the_maw_eternal` have no entry in `data/towns.ts`. Under today's rules that is an
+*economy* problem (see `.planning/economy-and-towns-plan.md` §0.5 — no vendor, no bag slots,
+no rest). Under F0's rules it becomes a **traversal** problem: a zone with no city has no
+flight master, so there is no way in and no way out. **F0 cannot ship until this is closed.**
+
+It is data, not code (`TOWNS` entries + `linkedZone` + a faction/type per town), but the
+names are world-bible territory, so they are the owner's call — `docs/art-direction.md`.
+
+### F2 — the flight master
+
+- A fifth `TownServiceKind` in `townNpcs.ts` (`rest | outfitter | factor | quartermaster`
+  → `+ flightmaster`) and one more anchor in the shared `TOWN_NPCS` roster. The town scene
+  gains a **landing pad** near that anchor — the point every arrival lands on and every
+  departure lifts from, so the city has a visible front door.
+- Their panel lists destination cities with flight time and the same lock reasons
+  `ZoneSelector` already renders via `getZoneProgression`.
+- **Destinations = every unlocked zone's city.** Do *not* gate on cities you've personally
+  visited, old-WoW style — that re-creates the overland walk this track exists to remove,
+  and it would strand a player who auto-advanced past a city they never entered.
+- Hostile cities (Ironcrag Hold, Wardrum Bastion) charge a markup rather than refuse the
+  flight, matching the smugglers-not-closed-doors call in Track T.
+
+### F3 — rigs and presentation
+
 1. Mount rigs + a flap animation; rider composited above the mount (single-layer, matching
    the existing one-weapon-layer simplification).
 2. Travel mode in the scene controller: takeoff arc → cruise at altitude with the ground
    scrolling beneath → descent on arrival. Shadow scales with altitude (the scene already
    draws shadows separately from bodies, so this is a size multiplier).
-3. Flight paths anchored at **town** nodes, which gives Track T's towns a genuine second
-   function and makes a flight master a natural NPC there.
-4. Keep the existing overlay as the skip/cancel affordance — never trap an idle player in
-   an 8-second cutscene they can't leave.
+3. **Legs 1 and 3 fly too, just low.** Reusing the same rig at low altitude with a faster
+   flap avoids authoring a third ground-mount rig, and a hovering gryphon reads correctly
+   in the genre. The alternative — a separate running rig — is the decision to revisit if
+   the low-altitude version looks weightless.
 
 **Risks:** flight is a *presentation* mode over an existing timer — it must not become a
-gate on progression, and `travelDuration` should stay untouched so throughput is unchanged.
+gate on progression, and the total `travelDuration` must stay untouched so throughput is
+unchanged. The genuinely new risk is F0: turning one instant mode flip into a three-leg
+state machine touches travel, towns, auto-advance and offline at once. Land F0 behind the
+existing overlay before any mount art exists, so a regression is a timing bug and not an
+art bug.
 
-**Effort:** ~350–500 lines plus two rigs. Sequence after Track T's vendor (so towns are
-worth flying between) and after the gathering pass.
+**Effort:** F0 ~250–350 lines (store journey state + arrival chaining + cancel semantics),
+F1 data only, F2 ~150 lines + one anchor, F3 ~350–500 lines plus two rigs.
+
+**Sequencing:** F1 (data) → F0 (journey model) → F2 (flight master) → F3 (mounts + flight
+presentation). Land the whole track after Track T's vendor, so cities are worth flying
+between, and after the gathering pass.
 
 ## Recommended order across tracks
 
@@ -290,7 +375,10 @@ worth flying between) and after the gathering pass.
 3. **Track T vendor + bank.** Highest gameplay-per-line in this document.
 4. **Track G in-world gathering.** Do it after the vendor exists, so better materials have
    somewhere to go.
-5. Track T trainer / quest board, Track G expedition screen.
+5. **Track F1** (the six missing cities) — data only, and it unblocks both the economy in
+   the late zones and all of Track F. Cheap enough to slot in early once the names exist.
+6. **Track F0–F3** (city-gated journeys, then mounts).
+7. Track T trainer / quest board, Track G expedition screen.
 
 ## Open questions
 
@@ -299,3 +387,8 @@ worth flying between) and after the gathering pass.
 3. **Does blocking cliffs feel right?** It's safe by the connectivity data, but cliffs are
    generated as the *shoreline ring* around water, so blocking them widens every lake's
    footprint by one tile. Worth a look in-game before committing.
+4. **Names for the six missing cities** (Track F1) — owner's call, and it blocks Track F.
+5. **Do the wilderness legs fly or run?** (Plan: fly low, one rig — see F3.3.)
+6. **Should the mount be visible outside travel?** A summonable mount for crossing a zone
+   on the ground is a natural monetization SKU (Track M) but a different feature; Track F
+   deliberately scopes the mount to journeys only.

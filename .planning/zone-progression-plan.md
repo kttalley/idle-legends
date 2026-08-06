@@ -4,6 +4,16 @@
 plan's §5 introduced was fixed later in 13d6a01; see that commit for the boss-vs-level
 pacing problem it exposed, which is still open.
 
+**Superseded in part (2026-08-05).** `.planning/world-systems-plan.md` **Track F** re-gates
+travel: zone changes become city→city flights arranged by a flight master, wrapped in a
+three-leg journey (ride to the city → fly → ride out to the wilderness). That changes two
+things this plan built. §5's **Venture Onward** button, and §2's `claimQuestReward`, call
+`beginTravel` directly and will need to queue a journey instead — the quest still hands the
+player one click, but the click now buys a flight out of the city rather than a walk. And
+§8's "manual travel to an old zone" is no longer possible from open wilderness; it starts
+from a city like everything else. The unlock rules in §1 are untouched — Track F changes
+*how* you get there, never *whether* you may.
+
 ## Goal
 
 Replace the dev-only zone dropdown with a real, level-and-boss-gated zone progression. Add lightweight auto-generated quests between zones, hide the dev jump behind a URL flag, and enhance faction-specific flavor in contested/Horde zones.

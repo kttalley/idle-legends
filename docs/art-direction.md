@@ -184,6 +184,37 @@ hunch vs armored hero stance changes meaning, and the ogre/golem/giant/beast net
 its own frames); duskcat owns the tail-hook + head-below-rump prowl so any future
 boar/bear rig must carry its head level with no tail hook.
 
+### 2.4b Mount coverage — 2 rigs (added 2026-08-05, not yet spec'd)
+
+Driven by `.planning/world-systems-plan.md` **Track F3**: zone-to-zone travel becomes a
+ridden flight, so the hero graduates onto a mount when they leave a zone behind. Two rigs,
+split on faction exactly as Track R already splits everything else:
+
+| Rig | Faction | Serves |
+|---|---|---|
+| **mount_gryphon** | Lastlight Concord | all Concord journeys; rarity/tier via palette |
+| **mount_wyvern** | Ashmarch | all Ashmarch journeys; same palette ladder |
+
+Four things make these cheaper than a normal rig, and one makes them dearer:
+
+- **`mob_ashdrake` (§3) is the silhouette reference for the wyvern** — it already serves the
+  drake/wyrm/**wyvern** pool at 36×26, and its wing-and-neck construction transfers. What
+  does *not* transfer is the animation table: a mount needs flap-cruise, takeoff and
+  landing, and has no attack, hit or death cycle at all.
+- **Palette is the whole variant story again** — faction on 9–12, rarity on 13–15 — so a
+  premium mount skin (Track M) is a palette row, not a sheet.
+- **Only two facings, and travel controls the camera**, so a journey can be authored to
+  favour the facing that reads best rather than covering every angle.
+- **The rider is a composite, not baked in** — the existing hero sheet drawn above the
+  mount at a saddle anchor, matching the one-weapon-layer simplification. That is what keeps
+  this at 2 rigs instead of 2 × 5 hero rigs.
+- **The dearer part:** these are the first rigs needing a *seated* hero pose. Budget one
+  extra frame pair per hero rig for a ride pose, or accept the standing pose at a saddle
+  offset for the MVP and fork on complaints — same policy as §2.1's weak reads.
+
+Frames, anchors and slot maps are unspec'd; they want a §3 template pass each before build,
+and they sequence after the 18-sheet monster tier below.
+
 ### 2.5 Production sizing & build order
 
 Nominal frame scheme 13 f × 2 facings = 26/rig; actual verified rigs ran **11–26 frames**
@@ -192,6 +223,8 @@ Nominal frame scheme 13 f × 2 facings = 26/rig; actual verified rigs ran **11�
 - **MVP tier: 17 sheets** (5 hero + 12 monster; grubkin is palette-only) ≈ ~180 frames.
 - **Full tier: 18 sheets** (+carrionkite) at full layouts ≈ ~470 frames. [Speculative]
   pool: stoutguard, colossus horn pass, tuskhog → up to 21.
+- **Mount tier: +2 sheets** (§2.4b gryphon, wyvern) → up to 23. Short tables (flap, takeoff,
+  landing — no combat cycles), so ~20–30 frames each. Blocked on a §3 spec pass.
 - **Build order:** 1 gloomling (pipeline warm-up) · 2 vanguard (highest traffic) · 3 shade
   · 4 magus · 5 cogling+grubkin palette · 6 colossus · 7 gravewalker · 8 duskcat ·
   9 gnarljaw · 10 cinderwisp · 11 ashdrake · 12 orbwatcher · 13–17 scuttler, marshcoil,
@@ -1292,7 +1325,11 @@ Remaining:
    fork, `mob_tuskhog` (boar), `mob_carrionkite` (bird).
 3. **Tooling:** ~~`death` fix in `importSprite.mjs`~~ (done); ~~`--palette` slot-order
    flag~~ (done); replace `biome/map080`.
-4. **Internal-id cleanup (post-launch, needs save migration):** snake_case ids like
+4. **Mount rigs (§2.4b, added 2026-08-05):** `mount_gryphon` and `mount_wyvern`, plus a
+   seated hero pose or an accepted standing-at-saddle-offset MVP. Unspec'd — needs a §3
+   template pass each. Gated by `.planning/world-systems-plan.md` Track F, which lands F0–F2
+   (the city-gated journey model and the flight master) before any of this art is needed.
+5. **Internal-id cleanup (post-launch, needs save migration):** snake_case ids like
    `warsong_mesa`, `grimshade_worgen`, `worgen_hide` still carry coined words inside the
    bundle. Not user-visible and exempt from the submission sweep, but worth retiring when
    a save-migration window opens.

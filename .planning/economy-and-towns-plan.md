@@ -1,7 +1,8 @@
 # Plan — The Economy: Gold, Inventory, Towns & Merchants
 
 **Status: T1, T2 and the four idle-loop holes BUILT (2026-07-25). T3 open, T4 blocked, T5 open.**
-**BLOCKER FOUND: half the zones have no town — see §0.5.**
+**BLOCKER FOUND: half the zones have no town — see §0.5. Now escalated to a traversal
+hard-block by Track F; see the note there.**
 **Written as a cold-start brief:** a fresh session can execute this without prior conversation.
 
 Supersedes and expands **Track T** in `.planning/world-systems-plan.md`.
@@ -64,6 +65,12 @@ Fixing it is data, not code (`TOWNS` entries + `linkedZone`), but the names are 
 territory — see `docs/art-direction.md` — so it is left for the owner. Note the runtime
 already overwrites static town names via `generatedTownNames`, so the committed strings are
 fallbacks rather than canon.
+
+**Escalated 2026-08-05.** `.planning/world-systems-plan.md` Track F re-gates zone travel so
+you can only fly out of a city and only land in one, via that city's flight master. Under
+those rules a townless zone has no way in and no way out — this stops being an economy hole
+and becomes a **traversal hard-block**. It is now Track F1, and Track F cannot ship until
+the six names exist.
 
 ### 0.1 Two soft-locks found on the way (both fixed)
 
