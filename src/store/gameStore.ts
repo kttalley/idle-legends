@@ -51,6 +51,7 @@ import {
 } from '../engine/mobBehaviour'
 import {
   INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
+  PARTY_MOB_HP_SCALE, PARTY_MOB_DAMAGE_SCALE, PARTY_MOB_REWARD_SCALE,
   ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE,
   BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
   AUTOSAVE_INTERVAL_MS, ZONE_STUCK_SECONDS,
@@ -1305,6 +1306,20 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
   // Circuit scaling: each completed loop increases mob HP and damage by 50%
   const circuitMult = 1 + (state.zoneCircuit ?? 0) * 0.5
 
+  // Party scaling. `.planning`/PLAN.md recorded this as blocked on architecture — that
+  // "party membership lives in engine/party.ts module state behind the no-store-import
+  // rule, so spawnMob has no data path to it". That is STALE: C4 moved `allies` onto
+  // GameState, and `spawnMob` already receives the state. No boundary is broken here.
+  //
+  // Counted by party SIZE rather than by who is currently standing: a mob's difficulty
+  // is fixed when it spawns, and deriving it from a transient downed/alive count would
+  // make the world get easier precisely when the party is losing — a spiral in the
+  // flattering direction, and one that rewards letting companions die.
+  const partySize = state.allies?.length ?? 0
+  const partyHpMult = 1 + partySize * PARTY_MOB_HP_SCALE
+  const partyDmgMult = 1 + partySize * PARTY_MOB_DAMAGE_SCALE
+  const partyRewardMult = 1 + partySize * PARTY_MOB_REWARD_SCALE
+
   // Hoisted: temperament and placement are both derived from the display name, since
   // that is what `mobBehaviour` matches on.
   const name = isBoss ? `[BOSS] ${template.name}`
@@ -1315,8 +1330,8 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
     id: `mob_${++mobInstanceSeq}`,
     templateId: template.id,
     name,
-    currentHp: Math.round(template.hp * hpMult * circuitMult),
-    maxHp:     Math.round(template.hp * hpMult * circuitMult),
+    currentHp: Math.round(template.hp * hpMult * circuitMult * partyHpMult),
+    maxHp:     Math.round(template.hp * hpMult * circuitMult * partyHpMult),
     // dmgMult belongs on damage, not on the swing interval. It used to be applied to
     // attackSpeedSeconds, but resolveMobAttack computes a swing as
     // `damage × attackSpeedSeconds × speedFactor` (combat.ts:463) — so a longer interval
@@ -1324,10 +1339,14 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
     // multiplier cancelled itself. Elites hit 1.8× harder 1.8× less often for identical
     // DPS, which made them pure health sponges and left ELITE/BOSS_DAMAGE_MULTIPLIER as
     // dead constants. C6's "make elites hit harder" dial now actually turns something.
-    damage: Math.round(template.damage * circuitMult * dmgMult),
-    xpReward: Math.round(template.xpReward * (isBoss ? 3 : isElite ? 2 : 1) * circuitMult),
-    goldMin: template.goldMin,
-    goldMax: template.goldMax,
+    damage: Math.round(template.damage * circuitMult * dmgMult * partyDmgMult),
+    // Rewards ride the SAME multiplier as health. Without this a party would face fatter
+    // targets for identical pay — companions would be a straight downgrade, and the
+    // measured +27.9% gold would invert. A party should win on speed and safety, which it
+    // still does; it should not also win on arithmetic.
+    xpReward: Math.round(template.xpReward * (isBoss ? 3 : isElite ? 2 : 1) * circuitMult * partyRewardMult),
+    goldMin: Math.round(template.goldMin * partyRewardMult),
+    goldMax: Math.round(template.goldMax * partyRewardMult),
     lootTableIds: template.lootTableIds,
     spriteKey: template.spriteKey,
     attackSpeedSeconds: template.attackSpeedSeconds,

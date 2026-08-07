@@ -119,6 +119,36 @@ export const BOSS_DAMAGE_MULTIPLIER = 2.5
 export const ELITE_HP_MULTIPLIER = 3
 export const ELITE_DAMAGE_MULTIPLIER = 1.8
 
+// ── Party scaling ─────────────────────────────────────────────────────────────
+// A party used to be free power: measured at three companions, gold +27.9% and deaths
+// **-78.5%**. Survivability is a fine reason to bring friends; near-immunity is not, and
+// it made every tier below a boss decorative for a partied hero.
+//
+// Mobs scale with the party, and rewards scale too — but on their OWN, much smaller
+// number. All three were measured at three companions rather than reasoned about:
+//
+//   reward scale   gold delta   deaths delta   verdict
+//   full (=HP)      +204.0%       -18.3%       trivialises the economy instead
+//   none            +4.2%         -39.8%       a party is a pure safety net, no edge
+//   0.07/ally       +20.8%        -40.9%       chosen
+//
+// Damage scales at less than half the rate of health on purpose. Health lengthens the
+// fight, which is what restores tension; damage shortens the hero's life, and an idle
+// game that kills unattended heroes is broken rather than difficult.
+/** Extra mob health per companion. Rewards do NOT follow this — see below. */
+export const PARTY_MOB_HP_SCALE = 0.35
+/** Extra mob damage per companion. Deliberately smaller — see above. */
+export const PARTY_MOB_DAMAGE_SCALE = 0.15
+/**
+ * Extra gold and XP per companion. Its OWN number, not the health scale, because
+ * throughput here is spawn-limited rather than damage-limited: a solo hero already kills
+ * faster than the field refills, so reward-per-kill multiplies income almost directly.
+ * Paying the full health multiplier measured at gold +204% — a party that trivialises the
+ * economy instead of the fights. Sized so companions are visibly worth forming without
+ * being the best gold strategy in the game.
+ */
+export const PARTY_MOB_REWARD_SCALE = 0.07
+
 // ── Autosave ──────────────────────────────────────────────────────────────────
 export const AUTOSAVE_INTERVAL_MS = 10_000
 

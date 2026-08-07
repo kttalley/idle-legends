@@ -4415,699 +4415,812 @@
 9.75 player_attack SimAlly2 hits Rampaging Boar for 14
 10.50 player_attack SimAlly0 hits Rampaging Boar for 15
 10.50 player_attack SimAlly1 hits Rampaging Boar for 15
-11.00 mob_attack Rampaging Boar hits you for 12
+11.00 mob_attack Rampaging Boar hits you for 18
 11.25 player_attack SimAlly2 hits Rampaging Boar for 14
 11.50 player_attack You hit Rampaging Boar for 63
-11.50 mob_death Rampaging Boar dies!
-13.00 mob_death ★ Elite: ★ Rampaging Boar appears!
-14.50 player_attack SimAlly0 hits Kobold Miner for 15
+12.25 player_attack SimAlly0 hits Rampaging Boar for 15
+12.25 mob_death Rampaging Boar dies!
+13.75 mob_death Grey Wolf appears!
 14.50 player_attack SimAlly1 hits Kobold Miner for 15
 15.00 player_attack SimAlly2 hits Kobold Miner for 14
-15.75 mob_attack Kobold Miner hits you for 12
-16.00 player_attack You hit Kobold Miner for 63
-16.00 mob_death Kobold Miner dies!
-17.50 mob_death Grey Wolf appears!
-18.50 player_attack SimAlly0 hits ★ Rampaging Boar for 15
-18.50 player_attack SimAlly1 hits ★ Rampaging Boar for 15
-18.75 player_attack SimAlly2 hits ★ Rampaging Boar for 14
-20.00 mob_attack ★ Rampaging Boar hits you for 22
-20.25 player_attack SimAlly2 hits ★ Rampaging Boar for 14
-20.50 player_attack You hit ★ Rampaging Boar for 63
-20.50 player_attack SimAlly0 hits ★ Rampaging Boar for 15
-20.50 player_attack SimAlly1 hits ★ Rampaging Boar for 15
-21.75 player_attack SimAlly2 hits ★ Rampaging Boar for 14
-22.25 player_attack SimAlly0 hits ★ Rampaging Boar for 15
-22.25 player_attack SimAlly1 hits ★ Rampaging Boar for 15
-22.25 mob_death ★ Rampaging Boar dies!
-22.25 level_up ★ Level Up! Now level 2!
-23.75 mob_death Kobold Miner appears!
-26.75 player_attack SimAlly2 hits Grey Wolf for 14
-27.25 player_attack SimAlly0 hits Grey Wolf for 15
-27.25 player_attack SimAlly1 hits Grey Wolf for 15
-27.25 mob_death Grey Wolf dies!
-28.75 mob_death Rampaging Boar appears!
-31.50 player_attack SimAlly2 hits Kobold Miner for 14
-32.00 player_crit SimAlly0 hits Kobold Miner for 31 (CRIT!)
-32.00 player_attack SimAlly1 hits Kobold Miner for 15
-32.00 mob_death Kobold Miner dies!
-33.50 mob_death Rampaging Boar appears!
-36.00 player_attack SimAlly2 hits Rampaging Boar for 14
-36.50 player_attack SimAlly0 hits Rampaging Boar for 15
-36.50 player_attack SimAlly1 hits Rampaging Boar for 15
-37.25 player_attack You hit Rampaging Boar for 66
-37.25 mob_death Rampaging Boar dies!
-48.75 mob_death Rampaging Boar appears!
-51.00 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
-52.00 player_attack SimAlly0 hits Rampaging Boar for 15
-52.00 player_attack SimAlly1 hits Rampaging Boar for 15
-52.50 player_attack SimAlly2 hits Rampaging Boar for 14
-52.50 mob_death Rampaging Boar dies!
-54.00 mob_death Grey Wolf appears!
-56.50 player_attack SimAlly0 hits Rampaging Boar for 15
-56.50 player_attack SimAlly1 hits Rampaging Boar for 15
-56.75 player_attack SimAlly2 hits Rampaging Boar for 14
-57.25 mob_attack Rampaging Boar hits you for 12
-57.75 player_attack You hit Rampaging Boar for 69
-57.75 mob_death Rampaging Boar dies!
-59.25 mob_death Kobold Miner appears!
-60.75 player_attack SimAlly0 hits Rampaging Boar for 15
-60.75 player_attack SimAlly1 hits Rampaging Boar for 15
-60.75 player_attack SimAlly2 hits Rampaging Boar for 14
-62.25 player_attack SimAlly2 hits Rampaging Boar for 14
-62.50 player_attack You hit Rampaging Boar for 69
-62.50 mob_death Rampaging Boar dies!
-64.00 mob_death Kobold Miner appears!
-66.50 player_attack SimAlly0 hits Kobold Miner for 15
-66.50 player_attack SimAlly1 hits Kobold Miner for 15
-67.75 player_crit SimAlly2 hits Kobold Miner for 28 (CRIT!)
-67.75 mob_death Kobold Miner dies!
-68.25 mob_attack Grey Wolf joins the fight!
-69.25 mob_death Rampaging Boar appears!
-69.25 mob_attack Rampaging Boar joins the fight!
-72.25 player_attack SimAlly0 hits Kobold Miner for 15
-72.25 player_crit SimAlly1 hits Kobold Miner for 31 (CRIT!)
-73.25 player_crit SimAlly2 hits Kobold Miner for 28 (CRIT!)
-73.25 mob_death Kobold Miner dies!
-74.25 player_attack SimAlly0 hits Rampaging Boar for 15
-74.25 player_attack SimAlly1 hits Rampaging Boar for 15
-74.75 mob_death Grey Wolf appears!
-74.75 player_attack SimAlly2 hits Rampaging Boar for 14
-75.75 player_attack You hit Rampaging Boar for 69
-75.75 mob_death Rampaging Boar dies!
-76.25 player_attack SimAlly0 hits Grey Wolf for 15
-76.25 player_attack SimAlly1 hits Grey Wolf for 15
-76.50 player_attack SimAlly2 hits Grey Wolf for 14
-76.50 mob_death Grey Wolf dies!
-78.00 mob_death Grey Wolf appears!
-79.50 mob_death Rampaging Boar appears!
-80.50 player_attack SimAlly0 hits Grey Wolf for 15
-80.50 player_attack SimAlly1 hits Grey Wolf for 15
-80.50 player_attack SimAlly2 hits Grey Wolf for 14
-80.50 mob_death Grey Wolf dies!
-80.50 level_up ★ Level Up! Now level 3!
-82.00 mob_death Kobold Miner appears!
-84.75 player_attack SimAlly2 hits Grey Wolf for 14
+16.00 player_attack SimAlly0 hits Kobold Miner for 15
+16.25 player_attack SimAlly1 hits Kobold Miner for 15
+16.50 player_attack SimAlly2 hits Kobold Miner for 14
+16.50 mob_attack Kobold Miner hits you for 17
+16.75 player_attack You hit Kobold Miner for 63
+16.75 mob_death Kobold Miner dies!
+18.25 mob_death Rampaging Boar appears!
+20.50 player_attack SimAlly0 hits Grey Wolf for 15
+20.50 player_attack SimAlly2 hits Grey Wolf for 14
+20.75 player_attack SimAlly1 hits Grey Wolf for 15
+21.00 mob_attack Grey Wolf hits you for 11
+21.50 player_attack You hit Grey Wolf for 63
+21.50 mob_death Grey Wolf dies!
+21.50 level_up ★ Level Up! Now level 2!
+23.00 mob_death Kobold Miner appears!
+25.00 player_attack SimAlly2 hits Rampaging Boar for 14
+25.25 player_attack SimAlly0 hits Rampaging Boar for 15
+25.50 player_attack SimAlly1 hits Rampaging Boar for 15
+26.50 player_attack SimAlly2 hits Rampaging Boar for 14
+26.75 player_attack You hit Rampaging Boar for 63
+27.00 player_attack SimAlly0 hits Rampaging Boar for 15
+27.00 mob_death Rampaging Boar dies!
+28.50 mob_death Kobold Miner appears!
+29.00 player_attack SimAlly1 hits Kobold Miner for 15
+29.75 player_attack SimAlly2 hits Kobold Miner for 14
+30.25 player_crit SimAlly0 hits Kobold Miner for 31 (CRIT!)
+30.75 player_attack SimAlly1 hits Kobold Miner for 15
+30.75 mob_attack Kobold Miner hits you for 17
+31.00 player_attack You hit Kobold Miner for 63
+31.00 mob_death Kobold Miner dies!
+32.50 mob_death Rampaging Boar appears!
+35.75 player_attack SimAlly2 hits Kobold Miner for 14
+36.50 player_attack SimAlly0 hits Kobold Miner for 15
+37.00 player_attack SimAlly1 hits Kobold Miner for 15
+37.25 player_crit SimAlly2 hits Kobold Miner for 28 (CRIT!)
+37.50 mob_attack Kobold Miner hits you for 17
+37.75 player_attack You hit Kobold Miner for 63
+37.75 mob_death Kobold Miner dies!
+39.25 mob_death Rampaging Boar appears!
+42.75 player_attack SimAlly0 hits Rampaging Boar for 15
+43.00 player_attack SimAlly2 hits Rampaging Boar for 14
+43.25 player_attack SimAlly1 hits Rampaging Boar for 15
+44.25 player_attack You hit Rampaging Boar for 63
+44.50 player_attack SimAlly0 hits Rampaging Boar for 15
+44.50 player_attack SimAlly2 hits Rampaging Boar for 14
+44.50 mob_death Rampaging Boar dies!
+46.00 mob_death Rampaging Boar appears!
+49.00 player_attack SimAlly1 hits Rampaging Boar for 15
+50.00 player_attack SimAlly2 hits Rampaging Boar for 14
+50.25 player_attack SimAlly0 hits Rampaging Boar for 15
+50.75 player_attack SimAlly1 hits Rampaging Boar for 15
+51.00 player_attack You hit Rampaging Boar for 64
+51.50 player_attack SimAlly2 hits Rampaging Boar for 14
+51.50 mob_death Rampaging Boar dies!
+52.00 mob_attack Rampaging Boar joins the fight!
+53.00 mob_death Grey Wolf appears!
+55.00 player_attack SimAlly0 hits Grey Wolf for 15
+55.50 player_attack SimAlly1 hits Grey Wolf for 15
+56.00 player_crit SimAlly2 hits Grey Wolf for 28 (CRIT!)
+56.50 mob_attack Grey Wolf hits you for 11
+56.75 player_attack SimAlly0 hits Grey Wolf for 15
+57.00 player_attack You hit Grey Wolf for 66
+57.00 mob_death Grey Wolf dies!
+57.50 player_crit SimAlly1 hits Rampaging Boar for 31 (CRIT!)
+57.75 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
+58.50 mob_death Grey Wolf appears!
+59.00 player_attack SimAlly0 hits Rampaging Boar for 15
+59.25 player_attack SimAlly2 hits Rampaging Boar for 14
+59.50 player_attack You hit Rampaging Boar for 68
+59.50 mob_death Rampaging Boar dies!
+61.00 mob_death Kobold Miner appears!
+61.50 player_attack SimAlly1 hits Grey Wolf for 15
+62.75 player_attack SimAlly0 hits Grey Wolf for 15
+62.75 player_attack SimAlly2 hits Grey Wolf for 14
+63.25 player_attack SimAlly1 hits Grey Wolf for 15
+63.25 mob_attack Grey Wolf hits you for 11
+63.75 player_attack You hit Grey Wolf for 68
+63.75 mob_death Grey Wolf dies!
+65.25 mob_death Kobold Miner appears!
+66.50 player_attack SimAlly2 hits Grey Wolf for 14
+66.75 player_attack SimAlly0 hits Grey Wolf for 15
+67.25 player_attack SimAlly1 hits Grey Wolf for 15
+68.00 player_attack SimAlly2 hits Grey Wolf for 14
+68.25 player_attack You hit Grey Wolf for 68
+68.25 mob_death Grey Wolf dies!
+69.75 mob_death Grey Wolf appears!
+72.50 player_attack SimAlly0 hits Kobold Miner for 15
+73.00 player_crit SimAlly1 hits Kobold Miner for 31 (CRIT!)
+73.50 player_attack SimAlly2 hits Kobold Miner for 14
+74.25 player_attack SimAlly0 hits Kobold Miner for 15
+74.50 player_attack You hit Kobold Miner for 68
+74.50 mob_death Kobold Miner dies!
+74.50 level_up ★ Level Up! Now level 3!
+76.00 mob_death Grey Wolf appears!
+78.00 player_attack SimAlly1 hits Grey Wolf for 15
+78.25 player_attack SimAlly2 hits Grey Wolf for 14
+79.50 player_attack SimAlly0 hits Grey Wolf for 15
+79.50 mob_attack Grey Wolf hits you for 11
+79.75 player_attack SimAlly2 hits Grey Wolf for 14
+80.00 player_attack You hit Grey Wolf for 68
+80.00 mob_death Grey Wolf dies!
+81.50 mob_death Rampaging Boar appears!
+83.75 player_attack SimAlly1 hits Grey Wolf for 15
 85.00 player_attack SimAlly0 hits Grey Wolf for 15
-85.00 player_crit SimAlly1 hits Grey Wolf for 31 (CRIT!)
-85.00 mob_death Grey Wolf dies!
-86.50 mob_death Kobold Miner appears!
-90.75 player_attack SimAlly2 hits Rampaging Boar for 14
-91.00 player_attack SimAlly0 hits Rampaging Boar for 15
-91.00 player_attack SimAlly1 hits Rampaging Boar for 15
-91.25 mob_attack Rampaging Boar hits you for 12
-91.75 player_attack You hit Rampaging Boar for 69
-91.75 mob_death Rampaging Boar dies!
-93.25 mob_death Rampaging Boar appears!
-97.25 player_attack SimAlly2 hits Kobold Miner for 14
-98.00 player_attack SimAlly0 hits Kobold Miner for 15
-98.00 player_attack SimAlly1 hits Kobold Miner for 15
-98.75 player_attack SimAlly2 hits Kobold Miner for 14
-98.75 mob_death Kobold Miner dies!
-100.25 mob_death Grey Wolf appears!
+85.00 player_attack SimAlly2 hits Grey Wolf for 14
+85.50 player_attack SimAlly1 hits Grey Wolf for 15
+86.00 player_attack You hit Grey Wolf for 68
+86.00 mob_death Grey Wolf dies!
+87.50 mob_death Grey Wolf appears!
+91.25 player_attack SimAlly2 hits Rampaging Boar for 14
+91.50 player_attack SimAlly0 hits Rampaging Boar for 15
+92.00 player_attack SimAlly1 hits Rampaging Boar for 15
+92.50 mob_attack Rampaging Boar hits you for 18
+92.75 player_attack SimAlly2 hits Rampaging Boar for 14
+93.00 player_attack You hit Rampaging Boar for 68
+93.25 player_attack SimAlly0 hits Rampaging Boar for 15
+93.25 mob_death Rampaging Boar dies!
+94.75 mob_death Rampaging Boar appears!
+96.00 player_attack SimAlly1 hits Grey Wolf for 15
+96.50 player_attack SimAlly2 hits Grey Wolf for 14
+97.00 player_attack SimAlly0 hits Grey Wolf for 15
+97.75 player_attack You hit Grey Wolf for 68
+97.75 mob_death Grey Wolf dies!
+99.25 mob_death Grey Wolf appears!
+100.25 player_attack SimAlly1 hits Rampaging Boar for 15
+100.50 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
 101.50 player_attack SimAlly0 hits Rampaging Boar for 15
-101.50 player_attack SimAlly1 hits Rampaging Boar for 15
 102.00 player_attack SimAlly2 hits Rampaging Boar for 14
-103.00 player_attack You hit Rampaging Boar for 69
-103.00 mob_death Rampaging Boar dies!
-103.50 mob_attack Grey Wolf joins the fight!
-104.50 mob_death Grey Wolf appears!
-107.00 player_attack SimAlly0 hits Grey Wolf for 15
-107.00 player_attack SimAlly1 hits Grey Wolf for 15
-107.25 player_attack SimAlly2 hits Grey Wolf for 14
-107.25 mob_death Grey Wolf dies!
-108.75 mob_death Grey Wolf appears!
-109.00 player_attack SimAlly0 hits Grey Wolf for 15
-109.00 player_attack SimAlly1 hits Grey Wolf for 15
-109.00 player_attack SimAlly2 hits Grey Wolf for 14
-109.00 mob_death Grey Wolf dies!
-110.50 mob_death Rampaging Boar appears!
-114.00 player_attack SimAlly2 hits Grey Wolf for 14
-114.25 player_attack SimAlly0 hits Grey Wolf for 15
-114.25 player_attack SimAlly1 hits Grey Wolf for 15
-114.25 mob_death Grey Wolf dies!
-115.75 mob_death Kobold Miner appears!
-118.75 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
-119.25 player_attack SimAlly0 hits Rampaging Boar for 15
-119.25 player_attack SimAlly1 hits Rampaging Boar for 15
-119.25 mob_attack Rampaging Boar hits you for 11
-119.75 player_attack You hit Rampaging Boar for 69
-119.75 mob_death Rampaging Boar dies!
-121.25 mob_death Rampaging Boar appears!
-124.75 player_attack SimAlly2 hits Kobold Miner for 14
-125.50 player_attack SimAlly0 hits Kobold Miner for 15
-125.50 player_attack SimAlly1 hits Kobold Miner for 15
-126.25 player_crit SimAlly2 hits Kobold Miner for 28 (CRIT!)
-126.25 mob_death Kobold Miner dies!
-127.75 mob_death Rampaging Boar appears!
-129.50 player_attack SimAlly0 hits Rampaging Boar for 15
-129.50 player_attack SimAlly1 hits Rampaging Boar for 15
-130.00 player_attack SimAlly2 hits Rampaging Boar for 14
-131.00 player_attack You hit Rampaging Boar for 69
-131.00 mob_death Rampaging Boar dies!
-132.50 mob_death Rampaging Boar appears!
-135.00 player_attack SimAlly0 hits Kobold Miner for 15
-135.00 player_attack SimAlly1 hits Kobold Miner for 15
-135.25 player_attack SimAlly2 hits Kobold Miner for 14
-136.75 player_attack SimAlly0 hits Kobold Miner for 15
-136.75 mob_death Kobold Miner dies!
-138.25 mob_death Kobold Miner appears!
-139.25 player_attack SimAlly1 hits Grey Wolf for 15
-139.25 player_attack SimAlly2 hits Grey Wolf for 14
-140.75 player_attack SimAlly2 hits Grey Wolf for 14
-140.75 mob_death Grey Wolf dies!
-142.25 mob_death Kobold Miner appears!
-144.00 player_attack SimAlly0 hits Kobold Miner for 15
-144.25 player_attack SimAlly1 hits Kobold Miner for 15
-145.25 player_attack SimAlly2 hits Kobold Miner for 14
-145.75 player_attack SimAlly0 hits Kobold Miner for 15
-145.75 mob_death Kobold Miner dies!
-146.25 mob_attack Rampaging Boar joins the fight!
-147.25 mob_death Kobold Miner appears!
-147.25 mob_attack Kobold Miner joins the fight!
-149.75 player_attack SimAlly1 hits Rampaging Boar for 15
-150.50 player_attack SimAlly2 hits Rampaging Boar for 14
-151.00 player_attack SimAlly0 hits Rampaging Boar for 15
-151.50 player_attack SimAlly1 hits Rampaging Boar for 15
-151.75 player_attack You hit Rampaging Boar for 69
-151.75 mob_death Rampaging Boar dies!
-152.25 player_attack SimAlly2 hits Rampaging Boar for 14
-153.00 player_attack SimAlly0 hits Rampaging Boar for 15
-153.00 mob_attack Kobold Miner hits you for 10
-153.25 mob_death Rampaging Boar appears!
-153.50 player_attack SimAlly1 hits Rampaging Boar for 15
-153.75 player_attack SimAlly2 hits Rampaging Boar for 14
-153.75 mob_attack Rampaging Boar hits you for 11
-154.25 player_attack You hit Rampaging Boar for 69
-154.25 mob_death Rampaging Boar dies!
-155.00 player_attack SimAlly0 hits Kobold Miner for 15
-155.50 player_attack SimAlly1 hits Kobold Miner for 15
-155.50 player_attack SimAlly2 hits Kobold Miner for 14
-155.75 mob_death Grey Wolf appears!
-156.50 mob_attack Kobold Miner hits you for 10
-156.75 player_attack You hit Kobold Miner for 69
-156.75 mob_death Kobold Miner dies!
+102.00 mob_attack Rampaging Boar hits you for 18
+102.25 player_attack SimAlly1 hits Rampaging Boar for 15
+102.50 player_attack You hit Rampaging Boar for 68
+102.50 mob_death Rampaging Boar dies!
+104.00 mob_death Rampaging Boar appears!
+106.00 player_attack SimAlly0 hits Grey Wolf for 15
+106.25 player_crit SimAlly2 hits Grey Wolf for 28 (CRIT!)
+106.75 player_attack SimAlly1 hits Grey Wolf for 15
+107.00 player_death SimAlly0 goes down!
+107.50 player_attack You hit Grey Wolf for 68
+107.50 mob_death Grey Wolf dies!
+109.00 mob_death Grey Wolf appears!
+112.50 player_attack SimAlly2 hits Rampaging Boar for 14
+113.25 player_attack SimAlly1 hits Rampaging Boar for 15
+114.00 player_attack SimAlly2 hits Rampaging Boar for 14
+114.00 mob_attack Rampaging Boar hits you for 18
+114.50 player_attack You hit Rampaging Boar for 68
+115.00 player_attack SimAlly1 hits Rampaging Boar for 15
+115.50 player_attack SimAlly2 hits Rampaging Boar for 14
+115.50 mob_death Rampaging Boar dies!
+117.00 mob_death Grey Wolf appears!
+117.00 mob_attack Grey Wolf joins the fight!
+119.00 player_respawn SimAlly0 gets back up.
+120.75 player_attack SimAlly1 hits Kobold Miner for 15
+121.00 player_attack SimAlly2 hits Kobold Miner for 14
+121.50 player_attack SimAlly0 hits Kobold Miner for 15
+121.75 mob_attack Kobold Miner hits you for 17
+122.00 player_attack You hit Kobold Miner for 68
+122.50 player_attack SimAlly2 hits Kobold Miner for 14
+122.50 mob_death Kobold Miner dies!
+122.75 player_attack SimAlly1 hits Grey Wolf for 15
+123.25 player_attack SimAlly0 hits Grey Wolf for 15
+124.00 mob_death Rampaging Boar appears!
+124.00 player_attack SimAlly2 hits Grey Wolf for 14
+124.50 player_attack SimAlly1 hits Grey Wolf for 15
+125.00 player_attack You hit Grey Wolf for 68
+125.00 mob_death Grey Wolf dies!
+126.50 mob_death ★ Elite: ★ Kobold Miner appears!
+127.50 player_attack SimAlly0 hits Rampaging Boar for 15
+128.00 player_attack SimAlly2 hits Rampaging Boar for 14
+128.75 player_attack SimAlly1 hits Rampaging Boar for 15
+129.25 player_attack SimAlly0 hits Rampaging Boar for 15
+129.25 mob_attack Rampaging Boar hits you for 17
+129.50 player_attack SimAlly2 hits Rampaging Boar for 14
+129.75 player_attack You hit Rampaging Boar for 68
+129.75 mob_death Rampaging Boar dies!
+131.25 mob_death Grey Wolf appears!
+132.50 player_attack SimAlly1 hits ★ Kobold Miner for 15
+133.00 player_attack SimAlly2 hits ★ Kobold Miner for 14
+133.25 player_attack SimAlly0 hits ★ Kobold Miner for 15
+133.75 mob_attack ★ Kobold Miner hits you for 29
+134.00 player_attack You hit ★ Kobold Miner for 68
+134.25 player_attack SimAlly1 hits ★ Kobold Miner for 15
+134.50 player_crit SimAlly2 hits ★ Kobold Miner for 28 (CRIT!)
+135.00 player_attack SimAlly0 hits ★ Kobold Miner for 15
+136.00 player_attack SimAlly2 hits ★ Kobold Miner for 14
+136.25 player_attack SimAlly1 hits ★ Kobold Miner for 15
+136.50 player_attack You hit ★ Kobold Miner for 68
+136.75 player_attack SimAlly0 hits ★ Kobold Miner for 15
+137.50 player_attack SimAlly2 hits ★ Kobold Miner for 14
+138.00 player_attack SimAlly1 hits ★ Kobold Miner for 15
+138.25 mob_attack ★ Kobold Miner hits you for 29
+138.50 player_attack SimAlly0 hits ★ Kobold Miner for 15
+139.00 player_attack You hit ★ Kobold Miner for 68
+139.00 mob_death ★ Kobold Miner dies!
+140.50 mob_death Kobold Miner appears!
+141.25 player_attack SimAlly2 hits Rampaging Boar for 14
+142.00 player_attack SimAlly1 hits Rampaging Boar for 15
+142.50 player_attack SimAlly0 hits Rampaging Boar for 15
+142.75 player_attack SimAlly2 hits Rampaging Boar for 14
+143.50 player_attack You hit Rampaging Boar for 68
+143.75 player_attack SimAlly1 hits Rampaging Boar for 15
+143.75 mob_death Rampaging Boar dies!
+144.25 mob_attack Kobold Miner joins the fight!
+145.25 mob_death Grey Wolf appears!
+147.25 player_attack SimAlly0 hits Grey Wolf for 15
+147.25 player_attack SimAlly2 hits Grey Wolf for 14
+148.25 player_attack SimAlly1 hits Grey Wolf for 15
+148.50 mob_attack Grey Wolf hits you for 10
+148.75 player_attack SimAlly2 hits Grey Wolf for 14
+149.00 player_attack You hit Grey Wolf for 68
+149.00 mob_death Grey Wolf dies!
+149.25 player_attack SimAlly0 hits Kobold Miner for 15
+150.50 mob_death Kobold Miner appears!
+150.50 player_attack SimAlly1 hits Kobold Miner for 15
+150.50 player_attack SimAlly2 hits Kobold Miner for 14
+151.00 player_attack SimAlly0 hits Kobold Miner for 15
+151.25 player_death SimAlly0 goes down!
+151.50 player_crit You hit Kobold Miner for 136 (CRIT!)
+151.50 mob_death Kobold Miner dies!
+153.00 mob_death Rampaging Boar appears!
+155.00 player_attack SimAlly2 hits Grey Wolf for 14
+155.25 player_attack SimAlly1 hits Grey Wolf for 15
+156.25 mob_attack Grey Wolf hits you for 10
+156.50 player_attack SimAlly2 hits Grey Wolf for 14
+156.75 player_attack You hit Grey Wolf for 68
+156.75 mob_death Grey Wolf dies!
 158.25 mob_death Kobold Miner appears!
-159.25 player_attack SimAlly0 hits Rampaging Boar for 15
-159.25 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
-159.75 player_attack SimAlly1 hits Rampaging Boar for 15
-160.75 player_attack SimAlly2 hits Rampaging Boar for 14
-160.75 mob_death Rampaging Boar dies!
-162.25 mob_death Rampaging Boar appears!
-163.75 player_attack SimAlly0 hits Kobold Miner for 15
-164.25 player_attack SimAlly1 hits Kobold Miner for 15
-165.00 player_attack SimAlly2 hits Kobold Miner for 14
-165.50 player_attack SimAlly0 hits Kobold Miner for 15
-165.50 mob_death Kobold Miner dies!
-166.00 mob_attack Kobold Miner joins the fight!
-167.00 mob_death Grey Wolf appears!
-171.25 player_attack SimAlly1 hits Rampaging Boar for 15
-171.75 player_attack SimAlly2 hits Rampaging Boar for 14
-172.25 player_attack SimAlly0 hits Rampaging Boar for 15
-172.50 mob_attack Rampaging Boar hits you for 11
-173.00 player_attack You hit Rampaging Boar for 69
-173.00 mob_death Rampaging Boar dies!
-173.25 player_attack SimAlly1 hits Kobold Miner for 15
-173.50 player_attack SimAlly2 hits Kobold Miner for 14
-174.25 player_attack SimAlly0 hits Kobold Miner for 15
-174.50 mob_death Rampaging Boar appears!
-175.00 player_attack SimAlly1 hits Kobold Miner for 15
-175.00 mob_death Kobold Miner dies!
-176.50 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
-182.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
-183.00 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 15
-183.50 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
-183.75 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
-184.25 player_attack You hit [BOSS] Elder Meadow Beast for 69
-184.75 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 15
-184.75 mob_attack [BOSS] Elder Meadow Beast hits you for 98
-185.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
-185.50 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
-186.50 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 15
-186.50 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
-186.75 player_attack You hit [BOSS] Elder Meadow Beast for 69
-187.25 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
-187.75 player_death SimAlly0 goes down!
-188.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
-189.00 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
-189.25 player_attack You hit [BOSS] Elder Meadow Beast for 69
-189.50 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
-190.75 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
-190.75 mob_death [BOSS] Elder Meadow Beast dies!
-190.75 level_up ★ Level Up! Now level 4!
-190.75 level_up ★ Level Up! Now level 5!
-192.25 mob_death Rampaging Boar appears!
-193.75 mob_death Rampaging Boar appears!
-195.25 mob_death Grey Wolf appears!
-196.50 player_attack SimAlly2 hits Rampaging Boar for 14
-196.75 mob_death ★ Elite: ★ Grey Wolf appears!
-198.00 player_attack SimAlly1 hits Rampaging Boar for 16
-198.00 player_attack SimAlly2 hits Rampaging Boar for 14
-198.00 mob_attack Rampaging Boar hits you for 11
-198.50 player_attack You hit Rampaging Boar for 70
-198.50 mob_death Rampaging Boar dies!
-199.75 player_respawn SimAlly0 gets back up.
-200.00 mob_death ★ Elite: ★ Grey Wolf appears!
-200.00 mob_attack ★ Grey Wolf joins the fight!
-203.00 player_attack SimAlly2 hits ★ Grey Wolf for 14
-203.25 player_attack SimAlly1 hits ★ Grey Wolf for 16
-203.75 player_attack SimAlly0 hits ★ Grey Wolf for 16
-203.75 mob_attack ★ Grey Wolf hits you for 12
-204.25 player_attack You hit ★ Grey Wolf for 70
-204.50 player_attack SimAlly2 hits ★ Grey Wolf for 14
-204.50 mob_death ★ Grey Wolf dies!
-205.00 player_crit SimAlly1 hits ★ Grey Wolf for 31 (CRIT!)
-205.50 player_attack SimAlly0 hits ★ Grey Wolf for 16
-206.00 mob_death ★ Elite: ★ Rampaging Boar appears!
-206.00 player_attack SimAlly2 hits ★ Grey Wolf for 14
-206.75 player_attack SimAlly1 hits ★ Grey Wolf for 16
-207.00 player_attack You hit ★ Grey Wolf for 70
-207.00 mob_death ★ Grey Wolf dies!
-208.50 mob_death Rampaging Boar appears!
-208.50 mob_attack Rampaging Boar joins the fight!
-210.75 player_attack SimAlly0 hits ★ Rampaging Boar for 16
-211.00 player_attack SimAlly2 hits ★ Rampaging Boar for 14
-212.00 player_attack SimAlly1 hits ★ Rampaging Boar for 16
-212.25 mob_attack ★ Rampaging Boar hits you for 19
-212.50 player_attack SimAlly0 hits ★ Rampaging Boar for 16
-212.50 player_attack SimAlly2 hits ★ Rampaging Boar for 14
-212.75 player_attack You hit ★ Rampaging Boar for 70
-212.75 mob_attack Rampaging Boar hits you for 11
-214.00 player_attack SimAlly1 hits ★ Rampaging Boar for 16
-214.00 player_attack SimAlly2 hits ★ Rampaging Boar for 14
-214.00 mob_attack ★ Rampaging Boar hits you for 19
-214.50 player_attack SimAlly0 hits ★ Rampaging Boar for 16
-214.50 mob_attack Rampaging Boar hits you for 11
-215.25 player_attack You hit ★ Rampaging Boar for 70
-215.25 mob_death ★ Rampaging Boar dies!
-215.75 player_attack SimAlly2 hits Rampaging Boar for 14
-216.00 player_attack SimAlly1 hits Rampaging Boar for 16
-216.50 player_attack SimAlly0 hits Rampaging Boar for 16
-216.75 mob_death Kobold Miner appears!
-217.25 player_attack SimAlly2 hits Rampaging Boar for 14
-217.25 mob_attack Rampaging Boar hits you for 11
-217.75 player_attack You hit Rampaging Boar for 95
-217.75 mob_death Rampaging Boar dies!
-219.25 mob_death Kobold Miner appears!
-221.50 player_crit SimAlly1 hits Kobold Miner for 31 (CRIT!)
-222.00 player_attack SimAlly0 hits Kobold Miner for 16
-222.50 player_attack SimAlly2 hits Kobold Miner for 14
-222.50 mob_death Kobold Miner dies!
-224.00 mob_death Kobold Miner appears!
-226.00 player_attack SimAlly1 hits Rampaging Boar for 16
-226.50 player_attack SimAlly0 hits Rampaging Boar for 16
-226.75 player_attack SimAlly2 hits Rampaging Boar for 14
-227.25 mob_attack Rampaging Boar hits you for 11
-227.75 player_attack You hit Rampaging Boar for 95
-227.75 mob_death Rampaging Boar dies!
-229.25 mob_death Rampaging Boar appears!
-231.75 player_attack SimAlly1 hits Kobold Miner for 16
-232.25 player_attack SimAlly0 hits Kobold Miner for 16
-232.25 player_attack SimAlly2 hits Kobold Miner for 14
-233.75 player_crit SimAlly1 hits Kobold Miner for 31 (CRIT!)
-233.75 mob_death Kobold Miner dies!
-235.25 mob_death Rampaging Boar appears!
-235.25 mob_attack Rampaging Boar joins the fight!
-237.25 player_attack SimAlly2 hits Rampaging Boar for 14
-237.50 player_attack SimAlly0 hits Rampaging Boar for 16
-238.75 player_attack SimAlly1 hits Rampaging Boar for 16
-238.75 player_attack SimAlly2 hits Rampaging Boar for 14
-239.00 mob_attack Rampaging Boar hits you for 11
-239.00 mob_attack Rampaging Boar hits you for 11
-239.25 player_attack SimAlly0 hits Rampaging Boar for 16
-239.25 mob_death Rampaging Boar dies!
-240.50 player_attack SimAlly2 hits Rampaging Boar for 14
-240.75 mob_death Grey Wolf appears!
-240.75 player_attack SimAlly1 hits Rampaging Boar for 16
-241.00 player_attack SimAlly0 hits Rampaging Boar for 16
-241.25 mob_attack Rampaging Boar hits you for 11
-241.75 player_attack You hit Rampaging Boar for 95
-241.75 mob_death Rampaging Boar dies!
-243.25 mob_death Grey Wolf appears!
-246.50 player_attack SimAlly2 hits Grey Wolf for 14
-247.00 player_attack SimAlly1 hits Grey Wolf for 16
-247.25 player_attack SimAlly0 hits Grey Wolf for 16
-247.25 mob_death Grey Wolf dies!
-248.75 mob_death Grey Wolf appears!
-250.50 player_attack SimAlly2 hits Grey Wolf for 14
-251.25 player_attack SimAlly0 hits Grey Wolf for 16
-251.25 player_attack SimAlly1 hits Grey Wolf for 16
-251.25 mob_death Grey Wolf dies!
-252.75 mob_death Rampaging Boar appears!
-254.75 player_attack SimAlly2 hits Kobold Miner for 14
-255.75 player_attack SimAlly0 hits Kobold Miner for 16
-255.75 player_attack SimAlly1 hits Kobold Miner for 16
-256.25 player_attack You hit Kobold Miner for 95
-256.25 mob_death Kobold Miner dies!
-257.75 mob_death Kobold Miner appears!
-260.50 player_attack SimAlly2 hits Rampaging Boar for 14
-261.75 player_attack SimAlly0 hits Rampaging Boar for 16
-261.75 player_attack SimAlly1 hits Rampaging Boar for 16
-262.00 player_attack SimAlly2 hits Rampaging Boar for 14
-262.75 player_attack You hit Rampaging Boar for 95
-262.75 mob_death Rampaging Boar dies!
-264.25 mob_death Grey Wolf appears!
-267.50 player_attack SimAlly0 hits Grey Wolf for 16
-267.50 player_crit SimAlly1 hits Grey Wolf for 31 (CRIT!)
-267.50 mob_death Grey Wolf dies!
-269.00 mob_death Kobold Miner appears!
-270.25 player_attack SimAlly2 hits Grey Wolf for 14
-271.75 player_attack SimAlly0 hits Grey Wolf for 16
-271.75 player_attack SimAlly1 hits Grey Wolf for 16
-271.75 mob_death Grey Wolf dies!
-273.25 mob_death Kobold Miner appears!
-274.50 player_attack SimAlly2 hits Kobold Miner for 14
-276.00 player_attack SimAlly0 hits Kobold Miner for 16
-276.00 player_attack SimAlly1 hits Kobold Miner for 16
-276.00 player_attack SimAlly2 hits Kobold Miner for 14
-276.00 mob_death Kobold Miner dies!
-277.50 mob_death Kobold Miner appears!
-282.00 player_attack SimAlly2 hits Kobold Miner for 14
-282.50 player_attack SimAlly0 hits Kobold Miner for 16
-282.50 player_attack SimAlly1 hits Kobold Miner for 16
-283.00 player_attack You hit Kobold Miner for 95
-283.00 mob_death Kobold Miner dies!
-284.50 mob_death Rampaging Boar appears!
-286.00 player_attack SimAlly2 hits Kobold Miner for 14
-286.75 player_crit SimAlly0 hits Kobold Miner for 31 (CRIT!)
-286.75 player_attack SimAlly1 hits Kobold Miner for 16
-286.75 mob_death Kobold Miner dies!
-288.25 mob_death Rampaging Boar appears!
-290.25 player_attack SimAlly2 hits Rampaging Boar for 14
-291.00 player_attack SimAlly0 hits Rampaging Boar for 16
-291.00 player_attack SimAlly1 hits Rampaging Boar for 16
-291.25 mob_attack Rampaging Boar hits you for 10
-291.75 player_attack You hit Rampaging Boar for 95
-291.75 mob_death Rampaging Boar dies!
-293.25 mob_death Rampaging Boar appears!
-293.50 player_attack SimAlly2 hits Grey Wolf for 14
-294.50 player_attack SimAlly0 hits Grey Wolf for 16
-294.50 player_attack SimAlly1 hits Grey Wolf for 16
-294.50 mob_death Grey Wolf dies!
-296.00 mob_death Kobold Miner appears!
-298.25 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
-299.25 player_attack SimAlly0 hits Rampaging Boar for 16
-299.25 player_attack SimAlly1 hits Rampaging Boar for 16
-299.75 player_attack SimAlly2 hits Rampaging Boar for 14
-299.75 mob_death Rampaging Boar dies!
-317.75 proc ⚔️ Crafted Coarse Crude Weapon Oil!
-319.25 mob_death Grey Wolf appears!
-322.00 player_attack SimAlly0 hits Kobold Miner for 16
-322.00 player_attack SimAlly1 hits Kobold Miner for 16
-322.00 player_attack SimAlly2 hits Kobold Miner for 14
-323.00 player_attack You hit Kobold Miner for 95
-323.00 mob_death Kobold Miner dies!
-324.50 mob_death Rampaging Boar appears!
-326.25 player_attack SimAlly2 hits Grey Wolf for 14
-326.50 player_attack SimAlly0 hits Grey Wolf for 16
-326.50 player_attack SimAlly1 hits Grey Wolf for 16
-326.50 mob_death Grey Wolf dies!
-328.00 mob_death Rampaging Boar appears!
-330.25 player_attack SimAlly2 hits Rampaging Boar for 14
+160.75 player_attack SimAlly1 hits Rampaging Boar for 15
+161.75 player_attack SimAlly2 hits Rampaging Boar for 14
+162.50 player_attack SimAlly1 hits Rampaging Boar for 15
+162.75 player_attack You hit Rampaging Boar for 68
+163.25 player_respawn SimAlly0 gets back up.
+163.25 player_attack SimAlly2 hits Rampaging Boar for 14
+164.25 player_attack SimAlly1 hits Rampaging Boar for 15
+164.25 mob_death Rampaging Boar dies!
+165.75 mob_death Grey Wolf appears!
+168.25 player_attack SimAlly0 hits Kobold Miner for 15
+168.25 player_attack SimAlly2 hits Kobold Miner for 14
+169.50 player_attack SimAlly1 hits Kobold Miner for 15
+169.75 player_attack SimAlly2 hits Kobold Miner for 14
+169.75 mob_attack Kobold Miner hits you for 16
+170.00 player_attack You hit Kobold Miner for 68
+170.00 mob_death Kobold Miner dies!
+170.00 level_up ★ Level Up! Now level 4!
+193.00 proc ⚔️ Crafted Coarse Crude Weapon Oil!
+194.50 mob_death Kobold Miner appears!
+196.75 player_attack SimAlly0 hits Kobold Miner for 15
+198.00 player_attack SimAlly1 hits Kobold Miner for 15
+198.00 player_attack SimAlly2 hits Kobold Miner for 14
+198.50 player_attack SimAlly0 hits Kobold Miner for 15
+199.00 player_attack You hit Kobold Miner for 68
+199.00 mob_death Kobold Miner dies!
+200.50 mob_death Kobold Miner appears!
+202.75 player_attack SimAlly2 hits Grey Wolf for 14
+203.00 player_crit SimAlly1 hits Grey Wolf for 31 (CRIT!)
+203.50 player_attack SimAlly0 hits Grey Wolf for 15
+204.00 mob_attack Grey Wolf hits you for 11
+204.25 player_attack SimAlly2 hits Grey Wolf for 14
+204.50 player_attack You hit Grey Wolf for 68
+204.50 mob_death Grey Wolf dies!
+206.00 mob_death Kobold Miner appears!
+208.50 player_attack SimAlly1 hits Kobold Miner for 15
+209.25 player_attack SimAlly0 hits Kobold Miner for 15
+209.50 player_attack SimAlly2 hits Kobold Miner for 14
+210.25 player_attack SimAlly1 hits Kobold Miner for 15
+210.25 mob_attack Kobold Miner hits you for 17
+210.50 player_attack You hit Kobold Miner for 68
+210.50 mob_death Kobold Miner dies!
+212.00 mob_death ★ Elite: ★ Grey Wolf appears!
+214.50 player_attack SimAlly0 hits Kobold Miner for 15
+214.50 player_attack SimAlly2 hits Kobold Miner for 14
+215.75 player_attack SimAlly1 hits Kobold Miner for 15
+216.00 player_attack SimAlly2 hits Kobold Miner for 14
+216.25 player_attack You hit Kobold Miner for 68
+216.25 mob_death Kobold Miner dies!
+217.75 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+223.25 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 15
+224.50 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
+224.50 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
+225.00 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 15
+225.50 player_attack You hit [BOSS] Elder Meadow Beast for 68
+226.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
+226.00 mob_attack [BOSS] Elder Meadow Beast hits you for 165
+226.00 player_death You have been slain! Respawning in 3s...
+229.00 player_respawn You rise from the grave...
+230.50 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+230.75 player_crit SimAlly1 hits [BOSS] Elder Meadow Beast for 31 (CRIT!)
+231.25 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 15
+232.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
+232.50 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
+233.00 player_attack You hit [BOSS] Elder Meadow Beast for 68
+233.25 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 15
+233.50 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
+233.50 mob_attack [BOSS] Elder Meadow Beast hits you for 165
+234.25 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
+235.00 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 15
+235.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
+235.50 player_attack You hit [BOSS] Elder Meadow Beast for 68
+236.25 player_crit SimAlly1 hits [BOSS] Elder Meadow Beast for 31 (CRIT!)
+236.50 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
+236.50 mob_attack [BOSS] Elder Meadow Beast hits you for 165
+236.50 player_death You have been slain! Respawning in 3s...
+239.50 player_respawn You rise from the grave...
+241.00 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+241.25 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 15
+242.50 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
+242.50 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
+243.00 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 15
+243.50 player_attack You hit [BOSS] Elder Meadow Beast for 68
+244.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
+244.00 player_death SimAlly0 goes down!
+244.25 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
+245.50 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
+246.00 player_attack You hit [BOSS] Elder Meadow Beast for 68
+246.00 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
+247.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 14
+247.00 mob_attack [BOSS] Elder Meadow Beast hits you for 165
+247.75 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 15
+248.50 player_attack You hit [BOSS] Elder Meadow Beast for 68
+248.50 mob_death [BOSS] Elder Meadow Beast dies!
+248.50 level_up ★ Level Up! Now level 5!
+250.00 mob_death Grey Wolf appears!
+251.50 mob_death Kobold Miner appears!
+253.00 mob_death Kobold Miner appears!
+253.75 player_attack SimAlly2 hits Grey Wolf for 14
+254.50 mob_death Kobold Miner appears!
+255.00 player_attack SimAlly1 hits Grey Wolf for 16
+255.25 player_attack SimAlly2 hits Grey Wolf for 14
+255.50 mob_attack Grey Wolf hits you for 11
+256.00 player_respawn SimAlly0 gets back up.
+256.00 player_crit You hit Grey Wolf for 138 (CRIT!)
+256.00 mob_death Grey Wolf dies!
+257.50 mob_death Rampaging Boar appears!
+259.25 player_attack SimAlly1 hits Kobold Miner for 16
+259.25 player_attack SimAlly2 hits Kobold Miner for 14
+260.25 player_attack SimAlly0 hits Kobold Miner for 16
+260.50 mob_attack Kobold Miner hits you for 17
+260.75 player_attack You hit Kobold Miner for 69
+260.75 mob_death Kobold Miner dies!
+262.25 mob_death Rampaging Boar appears!
+263.00 player_attack SimAlly2 hits Rampaging Boar for 14
+263.25 player_crit SimAlly1 hits Rampaging Boar for 31 (CRIT!)
+264.25 player_attack SimAlly0 hits Rampaging Boar for 16
+264.50 player_attack SimAlly2 hits Rampaging Boar for 14
+264.75 mob_attack Rampaging Boar hits you for 18
+265.00 player_attack SimAlly1 hits Rampaging Boar for 16
+265.25 player_attack You hit Rampaging Boar for 69
+265.25 mob_death Rampaging Boar dies!
+288.25 proc ⚔️ Crafted Coarse Crude Weapon Oil!
+289.75 mob_death Grey Wolf appears!
+290.75 player_attack SimAlly0 hits Rampaging Boar for 16
+290.75 player_attack SimAlly2 hits Rampaging Boar for 14
+291.50 player_attack SimAlly1 hits Rampaging Boar for 16
+292.25 player_crit You hit Rampaging Boar for 138 (CRIT!)
+292.25 mob_death Rampaging Boar dies!
+293.75 mob_death Grey Wolf appears!
+296.00 player_attack SimAlly2 hits Kobold Miner for 14
+296.25 player_attack SimAlly0 hits Kobold Miner for 16
+297.25 player_attack SimAlly1 hits Kobold Miner for 16
+297.50 player_attack SimAlly2 hits Kobold Miner for 14
+298.00 mob_attack Kobold Miner hits you for 17
+298.25 player_attack You hit Kobold Miner for 69
+298.25 mob_death Kobold Miner dies!
+299.75 mob_death Rampaging Boar appears!
+301.50 player_attack SimAlly0 hits Grey Wolf for 16
+302.25 player_attack SimAlly1 hits Grey Wolf for 16
+302.25 player_attack SimAlly2 hits Grey Wolf for 14
+303.25 player_attack SimAlly0 hits Grey Wolf for 16
+303.75 player_attack You hit Grey Wolf for 69
+303.75 mob_death Grey Wolf dies!
+304.75 mob_attack Grey Wolf joins the fight!
+305.25 mob_death Grey Wolf appears!
+305.25 mob_attack Grey Wolf joins the fight!
+308.75 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
+309.00 player_attack SimAlly1 hits Rampaging Boar for 16
+310.00 player_attack SimAlly0 hits Rampaging Boar for 16
+310.25 player_attack SimAlly2 hits Rampaging Boar for 14
+310.50 mob_attack Rampaging Boar hits you for 14
+310.50 player_death You have been slain! Respawning in 3s...
+313.50 player_respawn You rise from the grave...
+315.00 mob_death Kobold Miner appears!
+316.50 mob_death Rampaging Boar appears!
+318.00 mob_death Grey Wolf appears!
+318.50 player_attack SimAlly1 hits Kobold Miner for 16
+319.50 mob_death Kobold Miner appears!
+319.50 player_attack SimAlly0 hits Kobold Miner for 16
+319.50 player_attack SimAlly2 hits Kobold Miner for 14
+320.25 player_attack SimAlly1 hits Kobold Miner for 16
+320.75 player_attack You hit Kobold Miner for 69
+320.75 mob_death Kobold Miner dies!
+322.25 mob_death Kobold Miner appears!
+324.00 player_attack SimAlly2 hits Kobold Miner for 14
+324.25 player_attack SimAlly0 hits Kobold Miner for 16
+325.25 player_attack SimAlly1 hits Kobold Miner for 16
+325.50 player_attack SimAlly2 hits Kobold Miner for 14
+325.75 mob_attack Kobold Miner hits you for 13
+326.00 player_attack You hit Kobold Miner for 69
+326.00 mob_death Kobold Miner dies!
+327.50 mob_death ★ Elite: ★ Grey Wolf appears!
+328.75 player_attack SimAlly0 hits Rampaging Boar for 16
+329.50 player_attack SimAlly1 hits Rampaging Boar for 16
+329.50 player_attack SimAlly2 hits Rampaging Boar for 14
+330.25 mob_attack Rampaging Boar hits you for 14
 330.50 player_attack SimAlly0 hits Rampaging Boar for 16
-330.50 player_attack SimAlly1 hits Rampaging Boar for 16
-330.75 player_death SimAlly0 goes down!
-331.25 player_attack You hit Rampaging Boar for 95
-331.25 mob_death Rampaging Boar dies!
-332.75 mob_death Rampaging Boar appears!
-334.75 player_attack SimAlly2 hits Rampaging Boar for 14
-335.25 player_crit SimAlly1 hits Rampaging Boar for 31 (CRIT!)
-336.00 mob_attack Rampaging Boar hits you for 9
-336.25 player_attack SimAlly2 hits Rampaging Boar for 14
-336.50 player_attack You hit Rampaging Boar for 95
-336.50 mob_death Rampaging Boar dies!
-338.00 mob_death Rampaging Boar appears!
-340.25 player_attack SimAlly1 hits Rampaging Boar for 16
-341.00 player_attack SimAlly2 hits Rampaging Boar for 14
-341.50 mob_attack Rampaging Boar hits you for 9
-342.00 player_attack You hit Rampaging Boar for 95
-342.00 mob_death Rampaging Boar dies!
-365.00 proc ⚔️ Crafted Coarse Crude Weapon Oil!
-365.75 player_respawn SimAlly0 gets back up.
-366.50 mob_death Rampaging Boar appears!
-369.00 player_attack SimAlly1 hits Rampaging Boar for 16
-369.25 player_attack SimAlly2 hits Rampaging Boar for 14
-370.50 player_attack SimAlly0 hits Rampaging Boar for 16
-370.50 mob_attack Rampaging Boar hits you for 9
-370.75 player_attack SimAlly1 hits Rampaging Boar for 16
-370.75 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
-370.75 mob_death Rampaging Boar dies!
-372.25 mob_death Rampaging Boar appears!
-375.50 player_attack SimAlly0 hits Rampaging Boar for 16
-375.50 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
-375.75 player_attack SimAlly1 hits Rampaging Boar for 16
-376.50 player_attack You hit Rampaging Boar for 95
-376.50 mob_death Rampaging Boar dies!
-378.00 mob_death Kobold Miner appears!
-380.00 player_attack SimAlly2 hits Rampaging Boar for 14
-380.25 player_attack SimAlly0 hits Rampaging Boar for 16
-380.50 player_attack SimAlly1 hits Rampaging Boar for 16
-381.50 player_attack SimAlly2 hits Rampaging Boar for 14
-381.75 player_attack You hit Rampaging Boar for 95
-381.75 mob_death Rampaging Boar dies!
-383.25 mob_death Rampaging Boar appears!
-384.25 player_attack SimAlly0 hits Kobold Miner for 16
-384.50 player_attack SimAlly1 hits Kobold Miner for 16
-385.25 player_attack SimAlly2 hits Kobold Miner for 14
-386.00 mob_attack Kobold Miner hits you for 8
-386.25 player_attack You hit Kobold Miner for 95
-386.25 mob_death Kobold Miner dies!
-387.75 mob_death Rampaging Boar appears!
-388.75 player_attack SimAlly0 hits Rampaging Boar for 16
-389.00 player_attack SimAlly1 hits Rampaging Boar for 16
-389.25 player_attack SimAlly2 hits Rampaging Boar for 14
-390.50 player_attack SimAlly0 hits Rampaging Boar for 16
-390.50 mob_attack Rampaging Boar hits you for 9
-390.75 player_attack SimAlly1 hits Rampaging Boar for 16
-390.75 mob_death Rampaging Boar dies!
-392.25 mob_death Grey Wolf appears!
-394.25 player_attack SimAlly2 hits Rampaging Boar for 14
-395.50 player_attack SimAlly0 hits Rampaging Boar for 16
-395.75 player_attack SimAlly1 hits Rampaging Boar for 16
-395.75 player_attack SimAlly2 hits Rampaging Boar for 14
-396.00 mob_attack Rampaging Boar hits you for 9
-396.00 player_death You have been slain! Respawning in 3s...
-399.00 player_respawn You rise from the grave...
-400.50 mob_death ★ Elite: ★ Rampaging Boar appears!
-402.00 mob_death Rampaging Boar appears!
-403.50 mob_death Grey Wolf appears!
-404.75 player_attack SimAlly0 hits ★ Rampaging Boar for 16
-404.75 player_attack SimAlly2 hits ★ Rampaging Boar for 14
-405.00 mob_death Rampaging Boar appears!
-405.00 player_attack SimAlly1 hits ★ Rampaging Boar for 16
-406.00 player_attack You hit ★ Rampaging Boar for 95
-406.25 player_attack SimAlly2 hits ★ Rampaging Boar for 14
-406.50 player_attack SimAlly0 hits ★ Rampaging Boar for 16
-406.75 player_attack SimAlly1 hits ★ Rampaging Boar for 16
-407.75 player_crit SimAlly2 hits ★ Rampaging Boar for 28 (CRIT!)
-407.75 mob_death ★ Rampaging Boar dies!
-409.25 mob_death Kobold Miner appears!
-410.75 player_attack SimAlly0 hits Rampaging Boar for 16
-411.00 player_attack SimAlly1 hits Rampaging Boar for 16
-411.50 player_attack SimAlly2 hits Rampaging Boar for 14
-412.00 mob_attack Rampaging Boar hits you for 9
-412.50 player_attack You hit Rampaging Boar for 95
-412.50 mob_death Rampaging Boar dies!
-412.50 level_up ★ Level Up! Now level 6!
-414.00 mob_death Rampaging Boar appears!
-415.00 player_attack SimAlly0 hits Kobold Miner for 16
-415.25 player_attack SimAlly1 hits Kobold Miner for 16
-415.50 player_attack SimAlly2 hits Kobold Miner for 14
-416.75 player_attack SimAlly0 hits Kobold Miner for 16
-416.75 mob_death Kobold Miner dies!
-418.25 mob_death Grey Wolf appears!
-420.50 player_attack SimAlly1 hits Rampaging Boar for 16
-420.50 player_attack SimAlly2 hits Rampaging Boar for 14
-421.75 player_attack SimAlly0 hits Rampaging Boar for 16
-422.00 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
-422.00 mob_death Rampaging Boar dies!
-423.50 mob_death Rampaging Boar appears!
-425.00 player_attack SimAlly1 hits Grey Wolf for 16
-426.25 player_attack SimAlly0 hits Grey Wolf for 16
-426.25 player_attack SimAlly2 hits Grey Wolf for 14
-426.25 mob_death Grey Wolf dies!
-427.75 mob_death Rampaging Boar appears!
-428.50 player_attack SimAlly1 hits Rampaging Boar for 16
-429.50 player_attack SimAlly2 hits Rampaging Boar for 14
-430.00 player_attack SimAlly0 hits Rampaging Boar for 16
-430.00 mob_attack Rampaging Boar hits you for 8
-430.50 player_attack You hit Rampaging Boar for 98
-430.50 mob_death Rampaging Boar dies!
-432.00 mob_death Rampaging Boar appears!
-433.25 player_crit SimAlly1 hits Rampaging Boar for 31 (CRIT!)
-433.75 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
-434.50 player_attack SimAlly0 hits Rampaging Boar for 16
-434.50 mob_death Rampaging Boar dies!
-436.00 mob_death Grey Wolf appears!
-438.75 player_attack SimAlly1 hits Rampaging Boar for 16
-439.00 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
-439.75 player_attack SimAlly0 hits Rampaging Boar for 16
-440.00 player_death SimAlly0 goes down!
-440.50 player_crit You hit Rampaging Boar for 196 (CRIT!)
-440.50 mob_death Rampaging Boar dies!
-442.00 mob_death Kobold Miner appears!
-445.50 player_attack SimAlly1 hits Grey Wolf for 16
-445.50 player_attack SimAlly2 hits Grey Wolf for 14
-447.00 player_attack SimAlly2 hits Grey Wolf for 14
-447.00 mob_death Grey Wolf dies!
-448.50 mob_death Rampaging Boar appears!
-451.50 player_attack SimAlly1 hits Kobold Miner for 16
-452.00 player_respawn SimAlly0 gets back up.
+330.75 player_attack You hit Rampaging Boar for 69
+331.00 player_attack SimAlly2 hits Rampaging Boar for 14
+331.00 mob_death Rampaging Boar dies!
+332.50 mob_death Rampaging Boar appears!
+333.25 player_attack SimAlly1 hits ★ Grey Wolf for 16
+334.25 player_crit SimAlly0 hits ★ Grey Wolf for 31 (CRIT!)
+334.50 player_attack SimAlly2 hits ★ Grey Wolf for 14
+335.00 player_crit SimAlly1 hits ★ Grey Wolf for 31 (CRIT!)
+335.00 mob_attack ★ Grey Wolf hits you for 16
+335.50 player_attack You hit ★ Grey Wolf for 69
+336.00 player_attack SimAlly0 hits ★ Grey Wolf for 16
+336.00 player_attack SimAlly2 hits ★ Grey Wolf for 14
+336.75 player_attack SimAlly1 hits ★ Grey Wolf for 16
+337.00 mob_attack ★ Grey Wolf hits you for 16
+337.50 player_crit SimAlly2 hits ★ Grey Wolf for 28 (CRIT!)
+337.75 player_attack SimAlly0 hits ★ Grey Wolf for 16
+337.75 mob_death ★ Grey Wolf dies!
+339.25 mob_death Kobold Miner appears!
+340.25 player_attack SimAlly1 hits Kobold Miner for 16
+340.50 player_crit SimAlly2 hits Kobold Miner for 28 (CRIT!)
+341.00 player_attack SimAlly0 hits Kobold Miner for 16
+341.50 player_attack You hit Kobold Miner for 69
+341.50 mob_death Kobold Miner dies!
+343.00 mob_death Kobold Miner appears!
+345.75 player_attack SimAlly1 hits Kobold Miner for 16
+345.75 player_attack SimAlly2 hits Kobold Miner for 14
+346.50 player_attack SimAlly0 hits Kobold Miner for 16
+347.25 player_attack SimAlly2 hits Kobold Miner for 14
+347.25 mob_attack Kobold Miner hits you for 13
+347.50 player_attack You hit Kobold Miner for 69
+347.50 mob_death Kobold Miner dies!
+349.00 mob_death Rampaging Boar appears!
+352.50 player_attack SimAlly1 hits Rampaging Boar for 16
+353.25 player_attack SimAlly0 hits Rampaging Boar for 16
+353.75 player_attack SimAlly2 hits Rampaging Boar for 14
+354.25 player_attack SimAlly1 hits Rampaging Boar for 16
+354.25 player_death SimAlly0 goes down!
+354.75 player_attack You hit Rampaging Boar for 69
+355.25 player_attack SimAlly2 hits Rampaging Boar for 14
+355.25 mob_death Rampaging Boar dies!
+356.75 mob_death Kobold Miner appears!
+360.25 player_attack SimAlly1 hits Rampaging Boar for 16
+361.00 player_attack SimAlly2 hits Rampaging Boar for 14
+361.50 mob_attack Rampaging Boar hits you for 14
+362.00 player_attack You hit Rampaging Boar for 71
+362.25 player_attack SimAlly1 hits Rampaging Boar for 16
+362.50 player_attack SimAlly2 hits Rampaging Boar for 14
+363.25 mob_attack Rampaging Boar hits you for 14
+364.00 player_attack SimAlly1 hits Rampaging Boar for 16
+364.00 mob_death Rampaging Boar dies!
+365.50 mob_death ★ Elite: ★ Rampaging Boar appears!
+366.25 player_respawn SimAlly0 gets back up.
+366.75 player_attack SimAlly2 hits Kobold Miner for 14
+368.25 player_attack SimAlly1 hits Kobold Miner for 16
+368.25 player_attack SimAlly2 hits Kobold Miner for 14
+368.50 player_attack SimAlly0 hits Kobold Miner for 16
+368.75 mob_attack Kobold Miner hits you for 13
+369.00 player_attack You hit Kobold Miner for 71
+369.00 mob_death Kobold Miner dies!
+369.50 mob_attack Kobold Miner joins the fight!
+370.50 mob_death Kobold Miner appears!
+370.50 mob_attack Kobold Miner joins the fight!
+373.00 player_crit SimAlly2 hits ★ Rampaging Boar for 28 (CRIT!)
+373.25 player_attack SimAlly1 hits ★ Rampaging Boar for 16
+373.50 player_attack SimAlly0 hits ★ Rampaging Boar for 16
+374.50 player_crit You hit ★ Rampaging Boar for 143 (CRIT!)
+374.50 player_attack SimAlly2 hits ★ Rampaging Boar for 14
+375.00 player_attack SimAlly1 hits ★ Rampaging Boar for 16
+375.25 player_attack SimAlly0 hits ★ Rampaging Boar for 16
+375.75 mob_attack ★ Rampaging Boar hits you for 25
+376.00 player_attack SimAlly2 hits ★ Rampaging Boar for 14
+377.00 player_attack You hit ★ Rampaging Boar for 71
+377.00 player_attack SimAlly0 hits ★ Rampaging Boar for 16
+377.00 player_attack SimAlly1 hits ★ Rampaging Boar for 16
+377.25 mob_attack Kobold Miner hits you for 13
+377.50 player_attack SimAlly2 hits ★ Rampaging Boar for 14
+377.50 player_death SimAlly0 goes down!
+378.75 player_attack SimAlly1 hits ★ Rampaging Boar for 16
+379.00 player_crit SimAlly2 hits ★ Rampaging Boar for 28 (CRIT!)
+379.00 mob_death ★ Rampaging Boar dies!
+379.50 mob_attack Kobold Miner hits you for 13
+380.50 mob_death Kobold Miner appears!
+380.50 player_attack SimAlly1 hits Kobold Miner for 16
+380.50 player_attack SimAlly2 hits Kobold Miner for 14
+381.50 player_attack You hit Kobold Miner for 69
+382.00 player_attack SimAlly2 hits Kobold Miner for 14
+382.00 mob_death Kobold Miner dies!
+382.25 player_attack SimAlly1 hits Kobold Miner for 16
+383.50 mob_death Grey Wolf appears!
+383.50 player_crit SimAlly2 hits Kobold Miner for 28 (CRIT!)
+384.00 player_attack SimAlly1 hits Kobold Miner for 16
+384.50 player_attack You hit Kobold Miner for 69
+384.50 mob_death Kobold Miner dies!
+386.00 mob_death Kobold Miner appears!
+387.75 player_crit SimAlly2 hits Grey Wolf for 28 (CRIT!)
+388.75 player_crit SimAlly1 hits Grey Wolf for 31 (CRIT!)
+389.25 player_attack SimAlly2 hits Grey Wolf for 14
+389.50 player_respawn SimAlly0 gets back up.
+389.50 player_attack You hit Grey Wolf for 69
+389.50 mob_death Grey Wolf dies!
+391.00 mob_death Kobold Miner appears!
+393.50 player_attack SimAlly1 hits Kobold Miner for 16
+393.75 player_attack SimAlly2 hits Kobold Miner for 14
+394.25 player_attack SimAlly0 hits Kobold Miner for 16
+394.75 player_attack You hit Kobold Miner for 69
+394.75 mob_death Kobold Miner dies!
+396.25 mob_death Kobold Miner appears!
+397.75 player_attack SimAlly1 hits Kobold Miner for 16
+397.75 player_attack SimAlly2 hits Kobold Miner for 14
+398.50 player_attack SimAlly0 hits Kobold Miner for 16
+399.25 player_attack SimAlly2 hits Kobold Miner for 14
+399.25 mob_attack Kobold Miner hits you for 13
+399.50 player_attack You hit Kobold Miner for 69
+399.50 mob_death Kobold Miner dies!
+399.50 level_up ★ Level Up! Now level 6!
+401.00 mob_death Rampaging Boar appears!
+403.00 player_attack SimAlly1 hits Kobold Miner for 16
+403.75 player_attack SimAlly0 hits Kobold Miner for 16
+404.25 player_attack SimAlly2 hits Kobold Miner for 14
+404.75 player_attack SimAlly1 hits Kobold Miner for 16
+405.00 mob_attack Kobold Miner hits you for 13
+405.25 player_attack You hit Kobold Miner for 69
+405.25 mob_death Kobold Miner dies!
+406.75 mob_death Grey Wolf appears!
+408.25 player_attack SimAlly0 hits Grey Wolf for 16
+408.50 player_attack SimAlly2 hits Grey Wolf for 14
+409.50 player_attack SimAlly1 hits Grey Wolf for 16
+409.75 mob_attack Grey Wolf hits you for 8
+410.00 player_attack SimAlly2 hits Grey Wolf for 14
+410.25 player_attack You hit Grey Wolf for 69
+410.25 mob_death Grey Wolf dies!
+411.75 mob_death Rampaging Boar appears!
+413.00 player_attack SimAlly0 hits Rampaging Boar for 16
+414.00 player_attack SimAlly1 hits Rampaging Boar for 16
+414.25 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
+414.75 player_attack SimAlly0 hits Rampaging Boar for 16
+414.75 mob_attack Rampaging Boar hits you for 14
+415.25 player_attack You hit Rampaging Boar for 69
+415.25 mob_death Rampaging Boar dies!
+416.75 mob_death Kobold Miner appears!
+417.25 player_attack SimAlly1 hits Kobold Miner for 16
+417.25 player_attack SimAlly2 hits Kobold Miner for 14
+418.00 player_attack SimAlly0 hits Kobold Miner for 16
+418.75 player_attack SimAlly2 hits Kobold Miner for 14
+418.75 mob_attack Kobold Miner hits you for 13
+419.00 player_attack You hit Kobold Miner for 69
+419.00 mob_death Kobold Miner dies!
+420.50 mob_death ★ Elite: ★ Grey Wolf appears!
+421.75 player_attack SimAlly1 hits Rampaging Boar for 16
+422.50 player_attack SimAlly0 hits Rampaging Boar for 16
+423.00 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
+423.50 player_attack SimAlly1 hits Rampaging Boar for 16
+424.00 player_attack You hit Rampaging Boar for 69
+424.00 mob_death Rampaging Boar dies!
+425.50 mob_death Rampaging Boar appears!
+427.75 player_attack SimAlly0 hits ★ Grey Wolf for 16
+428.00 player_attack SimAlly2 hits ★ Grey Wolf for 14
+429.00 player_attack SimAlly1 hits ★ Grey Wolf for 16
+429.25 mob_attack ★ Grey Wolf hits you for 15
+429.50 player_attack SimAlly2 hits ★ Grey Wolf for 14
+429.75 player_attack You hit ★ Grey Wolf for 73
+429.75 player_attack SimAlly0 hits ★ Grey Wolf for 16
+430.75 player_attack SimAlly1 hits ★ Grey Wolf for 16
+431.00 player_attack SimAlly2 hits ★ Grey Wolf for 14
+431.25 mob_attack ★ Grey Wolf hits you for 15
+431.25 player_death You have been slain! Respawning in 3s...
+434.25 player_respawn You rise from the grave...
+435.75 mob_death Kobold Miner appears!
+437.25 mob_death Rampaging Boar appears!
+438.75 mob_death Kobold Miner appears!
+439.75 player_attack SimAlly0 hits Kobold Miner for 16
+440.25 mob_death Rampaging Boar appears!
+440.75 player_attack SimAlly1 hits Kobold Miner for 16
+440.75 player_attack SimAlly2 hits Kobold Miner for 14
+441.50 player_attack SimAlly0 hits Kobold Miner for 16
+441.75 mob_attack Kobold Miner hits you for 13
+442.00 player_attack You hit Kobold Miner for 73
+442.00 mob_death Kobold Miner dies!
+443.50 mob_death Grey Wolf appears!
+443.75 mob_attack Grey Wolf joins the fight!
+445.50 player_attack SimAlly2 hits Rampaging Boar for 14
+445.75 player_attack SimAlly1 hits Rampaging Boar for 16
+446.50 player_attack SimAlly0 hits Rampaging Boar for 16
+447.00 player_attack SimAlly2 hits Rampaging Boar for 14
+447.50 player_attack You hit Rampaging Boar for 116
+447.50 mob_death Rampaging Boar dies!
+447.75 player_attack SimAlly1 hits Grey Wolf for 16
+448.50 player_attack SimAlly0 hits Grey Wolf for 16
+448.75 player_attack SimAlly2 hits Grey Wolf for 14
+449.00 mob_death Kobold Miner appears!
+449.50 player_death SimAlly1 goes down!
+450.00 player_attack You hit Grey Wolf for 116
+450.00 mob_death Grey Wolf dies!
+451.50 mob_death Grey Wolf appears!
 452.75 player_attack SimAlly2 hits Kobold Miner for 14
-453.25 player_attack SimAlly1 hits Kobold Miner for 16
-453.50 mob_attack Kobold Miner hits you for 7
-453.75 player_attack You hit Kobold Miner for 104
-453.75 mob_death Kobold Miner dies!
-453.75 mob_attack Rampaging Boar spots you and charges!
-455.25 mob_death Rampaging Boar appears!
-455.25 player_attack SimAlly0 hits Rampaging Boar for 16
-455.75 player_attack SimAlly2 hits Rampaging Boar for 14
-456.75 player_attack SimAlly1 hits Rampaging Boar for 16
-457.00 player_attack SimAlly0 hits Rampaging Boar for 16
-457.25 player_attack SimAlly2 hits Rampaging Boar for 14
-457.25 mob_death Rampaging Boar dies!
-458.75 mob_death Kobold Miner appears!
-462.00 player_attack SimAlly1 hits Rampaging Boar for 16
-462.25 player_attack SimAlly0 hits Rampaging Boar for 16
-462.25 player_attack SimAlly2 hits Rampaging Boar for 14
-463.25 player_attack You hit Rampaging Boar for 104
-463.25 mob_death Rampaging Boar dies!
-464.75 mob_death Grey Wolf appears!
-464.75 mob_attack Grey Wolf joins the fight!
-467.50 player_attack SimAlly1 hits Kobold Miner for 16
-467.50 player_attack SimAlly2 hits Kobold Miner for 14
-467.75 player_attack SimAlly0 hits Kobold Miner for 16
-469.00 player_crit SimAlly2 hits Kobold Miner for 28 (CRIT!)
-469.00 mob_death Kobold Miner dies!
-469.25 player_attack SimAlly1 hits Grey Wolf for 16
-469.75 player_attack SimAlly0 hits Grey Wolf for 16
-470.50 mob_death Kobold Miner appears!
-470.50 player_attack SimAlly2 hits Grey Wolf for 14
-470.50 mob_death Grey Wolf dies!
-472.00 mob_death ★ Elite: ★ Grey Wolf appears!
-474.75 player_attack SimAlly1 hits Rampaging Boar for 16
-475.25 player_attack SimAlly0 hits Rampaging Boar for 16
-475.75 player_attack SimAlly2 hits Rampaging Boar for 14
-476.75 player_attack You hit Rampaging Boar for 104
-476.75 mob_death Rampaging Boar dies!
-483.25 mob_death Grey Wolf appears!
-485.50 player_attack SimAlly1 hits ★ Grey Wolf for 16
-485.75 player_attack SimAlly0 hits ★ Grey Wolf for 16
-486.00 player_crit SimAlly2 hits ★ Grey Wolf for 28 (CRIT!)
-487.25 player_attack SimAlly1 hits ★ Grey Wolf for 16
-487.25 mob_attack ★ Grey Wolf hits you for 8
-487.50 player_attack SimAlly0 hits ★ Grey Wolf for 16
-487.50 player_attack SimAlly2 hits ★ Grey Wolf for 14
-487.75 player_attack You hit ★ Grey Wolf for 104
-487.75 mob_death ★ Grey Wolf dies!
-489.25 mob_death Grey Wolf appears!
-493.50 player_attack SimAlly1 hits Grey Wolf for 16
-493.50 player_attack SimAlly2 hits Grey Wolf for 14
-493.75 player_attack SimAlly0 hits Grey Wolf for 16
-493.75 mob_death Grey Wolf dies!
-495.25 mob_death Rampaging Boar appears!
-497.75 player_attack SimAlly2 hits Kobold Miner for 14
-498.00 player_attack SimAlly1 hits Kobold Miner for 16
-498.25 player_attack SimAlly0 hits Kobold Miner for 16
-498.50 mob_attack Kobold Miner hits you for 7
-498.75 player_attack You hit Kobold Miner for 104
-498.75 mob_death Kobold Miner dies!
-500.25 mob_death Rampaging Boar appears!
-501.50 player_attack SimAlly2 hits Grey Wolf for 14
-502.00 player_attack SimAlly1 hits Grey Wolf for 16
-502.25 player_attack SimAlly0 hits Grey Wolf for 16
-502.25 mob_death Grey Wolf dies!
-503.75 mob_death Kobold Miner appears!
-504.75 player_attack SimAlly2 hits Rampaging Boar for 14
-505.50 player_attack SimAlly0 hits Rampaging Boar for 16
-505.75 player_attack SimAlly1 hits Rampaging Boar for 16
-505.75 mob_attack Rampaging Boar hits you for 8
-506.25 player_attack You hit Rampaging Boar for 104
-506.25 mob_death Rampaging Boar dies!
-507.75 mob_death Rampaging Boar appears!
-509.00 player_attack SimAlly2 hits Kobold Miner for 14
-510.00 player_attack SimAlly0 hits Kobold Miner for 16
-510.25 player_crit SimAlly1 hits Kobold Miner for 31 (CRIT!)
-510.25 mob_death Kobold Miner dies!
-511.75 mob_death Kobold Miner appears!
-514.25 player_attack SimAlly2 hits Rampaging Boar for 14
-515.25 player_attack SimAlly0 hits Rampaging Boar for 16
-515.50 player_attack SimAlly1 hits Rampaging Boar for 16
-515.75 player_attack SimAlly2 hits Rampaging Boar for 14
-516.25 player_attack You hit Rampaging Boar for 104
-516.25 mob_death Rampaging Boar dies!
+453.00 player_attack SimAlly0 hits Kobold Miner for 16
+454.25 player_attack SimAlly2 hits Kobold Miner for 14
+454.50 mob_attack Kobold Miner hits you for 13
+454.75 player_crit You hit Kobold Miner for 233 (CRIT!)
+454.75 mob_death Kobold Miner dies!
+456.25 mob_death Kobold Miner appears!
+458.50 player_attack SimAlly0 hits Kobold Miner for 16
+459.50 player_crit SimAlly2 hits Kobold Miner for 28 (CRIT!)
+460.25 player_attack SimAlly0 hits Kobold Miner for 16
+460.50 mob_attack Kobold Miner hits you for 13
+460.75 player_crit You hit Kobold Miner for 233 (CRIT!)
+460.75 mob_death Kobold Miner dies!
+461.50 player_respawn SimAlly1 gets back up.
+462.25 mob_death Kobold Miner appears!
+465.75 player_attack SimAlly2 hits Kobold Miner for 14
+466.75 player_attack SimAlly0 hits Kobold Miner for 16
+467.25 player_attack SimAlly1 hits Kobold Miner for 16
+467.25 player_attack SimAlly2 hits Kobold Miner for 14
+467.50 mob_attack Kobold Miner hits you for 13
+467.75 player_attack You hit Kobold Miner for 116
+467.75 mob_death Kobold Miner dies!
+469.25 mob_death Rampaging Boar appears!
+470.75 player_attack SimAlly0 hits Grey Wolf for 16
+471.00 player_attack SimAlly2 hits Grey Wolf for 14
+471.25 player_crit SimAlly1 hits Grey Wolf for 31 (CRIT!)
+471.75 mob_attack Grey Wolf hits you for 8
+472.25 player_attack You hit Grey Wolf for 116
+472.25 mob_death Grey Wolf dies!
+473.75 mob_death Grey Wolf appears!
+473.75 mob_attack Grey Wolf joins the fight!
+476.00 player_attack SimAlly2 hits Rampaging Boar for 14
+476.25 player_attack SimAlly0 hits Rampaging Boar for 16
+476.50 player_attack SimAlly1 hits Rampaging Boar for 16
+477.50 player_attack SimAlly2 hits Rampaging Boar for 14
+477.50 mob_attack Rampaging Boar hits you for 14
+478.00 player_attack You hit Rampaging Boar for 116
+478.00 mob_death Rampaging Boar dies!
+478.25 player_attack SimAlly0 hits Grey Wolf for 16
+478.50 player_attack SimAlly1 hits Grey Wolf for 16
+479.25 player_attack SimAlly2 hits Grey Wolf for 14
+479.50 mob_death Rampaging Boar appears!
+480.00 player_attack SimAlly0 hits Grey Wolf for 16
+480.00 mob_attack Grey Wolf hits you for 8
+480.50 player_attack You hit Grey Wolf for 116
+480.50 mob_death Grey Wolf dies!
+482.00 mob_death Kobold Miner appears!
+483.50 player_attack SimAlly1 hits Rampaging Boar for 16
+483.75 player_attack SimAlly2 hits Rampaging Boar for 14
+484.75 player_attack SimAlly0 hits Rampaging Boar for 16
+485.25 player_attack SimAlly1 hits Rampaging Boar for 16
+485.25 player_attack SimAlly2 hits Rampaging Boar for 14
+485.25 mob_attack Rampaging Boar hits you for 14
+485.75 player_attack You hit Rampaging Boar for 116
+485.75 mob_death Rampaging Boar dies!
+487.25 mob_death Grey Wolf appears!
+490.75 player_attack SimAlly0 hits Kobold Miner for 16
+491.00 player_attack SimAlly2 hits Kobold Miner for 14
+491.25 player_attack SimAlly1 hits Kobold Miner for 16
+492.25 player_attack You hit Kobold Miner for 116
+492.25 mob_death Kobold Miner dies!
+493.75 mob_death Kobold Miner appears!
+497.75 player_attack SimAlly2 hits Grey Wolf for 14
+498.00 player_attack SimAlly0 hits Grey Wolf for 16
+498.25 player_attack SimAlly1 hits Grey Wolf for 16
+499.25 player_attack SimAlly2 hits Grey Wolf for 14
+499.25 mob_attack Grey Wolf hits you for 8
+499.75 player_attack You hit Grey Wolf for 116
+499.75 mob_death Grey Wolf dies!
+501.25 mob_death Kobold Miner appears!
+503.75 player_attack SimAlly0 hits Kobold Miner for 16
+504.00 player_attack SimAlly1 hits Kobold Miner for 16
+504.75 player_attack SimAlly2 hits Kobold Miner for 14
+505.50 player_attack SimAlly0 hits Kobold Miner for 16
+506.00 player_attack You hit Kobold Miner for 116
+506.00 mob_death Kobold Miner dies!
+507.50 mob_death Kobold Miner appears!
+508.25 player_attack SimAlly1 hits Kobold Miner for 16
+508.50 player_attack SimAlly2 hits Kobold Miner for 14
+509.50 player_attack SimAlly0 hits Kobold Miner for 16
+510.00 player_attack SimAlly1 hits Kobold Miner for 16
+510.00 player_attack SimAlly2 hits Kobold Miner for 14
+510.50 player_attack You hit Kobold Miner for 116
+510.50 mob_death Kobold Miner dies!
+512.00 mob_death Grey Wolf appears!
+514.75 player_crit SimAlly0 hits Kobold Miner for 31 (CRIT!)
+515.00 player_attack SimAlly2 hits Kobold Miner for 14
+515.25 player_attack SimAlly1 hits Kobold Miner for 16
+516.25 player_attack You hit Kobold Miner for 116
+516.25 mob_death Kobold Miner dies!
 517.75 mob_death Rampaging Boar appears!
-519.50 player_crit SimAlly0 hits Kobold Miner for 31 (CRIT!)
-519.50 player_attack SimAlly1 hits Kobold Miner for 16
-519.50 player_attack SimAlly2 hits Kobold Miner for 14
-519.50 mob_death Kobold Miner dies!
-521.00 mob_death Rampaging Boar appears!
-524.25 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
-524.50 player_attack SimAlly0 hits Rampaging Boar for 16
-524.50 player_attack SimAlly1 hits Rampaging Boar for 16
-524.75 mob_attack Rampaging Boar hits you for 8
-525.25 player_attack You hit Rampaging Boar for 104
-525.25 mob_death Rampaging Boar dies!
-526.75 mob_death Kobold Miner appears!
-531.00 player_attack SimAlly2 hits Grey Wolf for 14
-531.50 player_attack SimAlly0 hits Grey Wolf for 16
-531.75 player_attack SimAlly1 hits Grey Wolf for 16
-531.75 mob_death Grey Wolf dies!
-533.25 mob_death Grey Wolf appears!
-534.50 player_attack SimAlly2 hits Kobold Miner for 14
-535.00 player_attack SimAlly0 hits Kobold Miner for 16
-535.25 player_attack SimAlly1 hits Kobold Miner for 16
-536.00 player_crit You hit Kobold Miner for 209 (CRIT!)
-536.00 mob_death Kobold Miner dies!
-537.50 mob_death ★ Elite: ★ Rampaging Boar appears!
-540.25 player_attack SimAlly2 hits Grey Wolf for 14
-541.00 player_attack SimAlly0 hits Grey Wolf for 16
-541.25 player_attack SimAlly1 hits Grey Wolf for 16
-541.25 mob_death Grey Wolf dies!
-542.75 mob_death Kobold Miner appears!
-545.00 player_attack SimAlly2 hits Rampaging Boar for 14
-546.00 player_crit SimAlly0 hits Rampaging Boar for 31 (CRIT!)
-546.00 player_attack SimAlly1 hits Rampaging Boar for 16
-546.25 mob_attack Rampaging Boar hits you for 8
-546.50 player_attack SimAlly2 hits Rampaging Boar for 14
-546.50 mob_death Rampaging Boar dies!
-548.00 mob_death Kobold Miner appears!
-551.75 player_attack SimAlly0 hits Kobold Miner for 16
-551.75 player_attack SimAlly1 hits Kobold Miner for 16
-552.00 player_attack SimAlly2 hits Kobold Miner for 14
-552.75 player_death SimAlly0 goes down!
-553.00 player_attack You hit Kobold Miner for 104
-553.00 mob_death Kobold Miner dies!
-554.50 mob_death Kobold Miner appears!
-557.50 player_attack SimAlly2 hits Rampaging Boar for 14
-557.75 player_attack SimAlly1 hits Rampaging Boar for 16
-558.75 mob_attack Rampaging Boar hits you for 8
-559.00 player_attack SimAlly2 hits Rampaging Boar for 14
-559.25 player_attack You hit Rampaging Boar for 123
-559.25 mob_death Rampaging Boar dies!
-560.75 mob_death Rampaging Boar appears!
-562.75 player_attack SimAlly1 hits Kobold Miner for 16
-563.75 player_attack SimAlly2 hits Kobold Miner for 14
-564.50 player_attack SimAlly1 hits Kobold Miner for 16
-564.75 player_respawn SimAlly0 gets back up.
-564.75 player_crit You hit Kobold Miner for 246 (CRIT!)
-564.75 mob_death Kobold Miner dies!
-566.25 mob_death Grey Wolf appears!
-569.75 player_attack SimAlly2 hits Kobold Miner for 14
-570.75 player_attack SimAlly1 hits Kobold Miner for 16
-571.00 player_crit SimAlly0 hits Kobold Miner for 31 (CRIT!)
-571.00 mob_death Kobold Miner dies!
-572.50 mob_death Grey Wolf appears!
-575.50 player_attack SimAlly2 hits Grey Wolf for 14
-576.75 player_attack SimAlly0 hits Grey Wolf for 16
-576.75 player_attack SimAlly1 hits Grey Wolf for 16
-576.75 mob_death Grey Wolf dies!
-578.25 mob_death Kobold Miner appears!
-579.75 player_attack SimAlly2 hits Rampaging Boar for 14
-581.00 player_attack SimAlly0 hits Rampaging Boar for 16
-581.25 player_attack SimAlly1 hits Rampaging Boar for 16
-581.25 player_attack SimAlly2 hits Rampaging Boar for 14
-581.75 player_attack You hit Rampaging Boar for 123
-581.75 mob_death Rampaging Boar dies!
+519.25 player_attack SimAlly2 hits Rampaging Boar for 14
+519.50 player_attack SimAlly0 hits Rampaging Boar for 16
+519.75 player_attack SimAlly1 hits Rampaging Boar for 16
+520.75 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
+520.75 mob_attack Rampaging Boar hits you for 13
+521.25 player_attack You hit Rampaging Boar for 116
+521.25 mob_death Rampaging Boar dies!
+522.75 mob_death Rampaging Boar appears!
+524.75 player_attack SimAlly0 hits Grey Wolf for 16
+525.00 player_attack SimAlly1 hits Grey Wolf for 16
+525.75 player_attack SimAlly2 hits Grey Wolf for 14
+526.50 player_attack SimAlly0 hits Grey Wolf for 16
+527.00 player_attack You hit Grey Wolf for 116
+527.00 mob_death Grey Wolf dies!
+528.50 mob_death Rampaging Boar appears!
+532.25 player_attack SimAlly1 hits Rampaging Boar for 16
+532.50 player_attack SimAlly2 hits Rampaging Boar for 14
+533.50 player_attack SimAlly0 hits Rampaging Boar for 16
+534.00 player_attack SimAlly1 hits Rampaging Boar for 16
+534.00 player_attack SimAlly2 hits Rampaging Boar for 14
+534.00 player_death SimAlly1 goes down!
+534.50 player_attack You hit Rampaging Boar for 116
+534.50 mob_death Rampaging Boar dies!
+536.00 mob_death Rampaging Boar appears!
+536.00 mob_attack Rampaging Boar joins the fight!
+540.75 player_crit SimAlly0 hits Rampaging Boar for 31 (CRIT!)
+541.00 player_attack SimAlly2 hits Rampaging Boar for 14
+541.75 mob_attack Rampaging Boar hits you for 13
+542.25 player_attack You hit Rampaging Boar for 116
+542.25 mob_death Rampaging Boar dies!
+542.75 player_attack SimAlly2 hits Rampaging Boar for 14
+543.00 player_attack SimAlly0 hits Rampaging Boar for 16
+543.75 mob_death Kobold Miner appears!
+544.25 player_attack SimAlly2 hits Rampaging Boar for 14
+544.75 player_attack You hit Rampaging Boar for 116
+544.75 mob_death Rampaging Boar dies!
+546.00 player_respawn SimAlly1 gets back up.
+546.25 mob_death Kobold Miner appears!
+549.50 player_crit SimAlly0 hits Kobold Miner for 31 (CRIT!)
+550.50 player_attack SimAlly2 hits Kobold Miner for 14
+551.25 player_attack SimAlly0 hits Kobold Miner for 16
+551.25 player_attack SimAlly1 hits Kobold Miner for 16
+551.50 mob_attack Kobold Miner hits you for 12
+551.75 player_attack You hit Kobold Miner for 116
+551.75 mob_death Kobold Miner dies!
+553.25 mob_death Rampaging Boar appears!
+556.00 player_attack SimAlly2 hits Kobold Miner for 14
+557.00 player_attack SimAlly0 hits Kobold Miner for 16
+557.00 player_attack SimAlly1 hits Kobold Miner for 16
+557.50 player_attack SimAlly2 hits Kobold Miner for 14
+558.00 player_attack You hit Kobold Miner for 116
+558.00 mob_death Kobold Miner dies!
+559.50 mob_death Kobold Miner appears!
+562.50 player_attack SimAlly0 hits Rampaging Boar for 16
+562.50 player_attack SimAlly1 hits Rampaging Boar for 16
+562.75 player_attack SimAlly2 hits Rampaging Boar for 14
+564.00 player_attack You hit Rampaging Boar for 116
+564.00 mob_death Rampaging Boar dies!
+565.50 mob_death Rampaging Boar appears!
+567.50 player_attack SimAlly1 hits Kobold Miner for 16
+567.50 player_attack SimAlly2 hits Kobold Miner for 14
+567.75 player_attack SimAlly0 hits Kobold Miner for 16
+569.00 player_attack SimAlly2 hits Kobold Miner for 14
+569.25 player_death SimAlly0 goes down!
+569.50 player_attack You hit Kobold Miner for 116
+569.50 mob_death Kobold Miner dies!
+571.00 mob_death Rampaging Boar appears!
+573.00 player_attack SimAlly1 hits Rampaging Boar for 16
+574.00 player_attack SimAlly2 hits Rampaging Boar for 14
+574.75 player_attack SimAlly1 hits Rampaging Boar for 16
+574.75 mob_attack Rampaging Boar hits you for 13
+575.25 player_attack You hit Rampaging Boar for 116
+575.25 mob_death Rampaging Boar dies!
+576.75 mob_death Kobold Miner appears!
+579.00 player_attack SimAlly2 hits Rampaging Boar for 14
+580.00 player_attack SimAlly1 hits Rampaging Boar for 16
+580.50 player_crit SimAlly2 hits Rampaging Boar for 28 (CRIT!)
+581.00 player_attack You hit Rampaging Boar for 116
+581.00 mob_death Rampaging Boar dies!
+581.25 player_respawn SimAlly0 gets back up.
+582.50 mob_death Rampaging Boar appears!
+585.75 player_attack SimAlly1 hits Kobold Miner for 16
+586.00 player_attack SimAlly2 hits Kobold Miner for 14
+586.75 player_attack SimAlly0 hits Kobold Miner for 16
+587.25 player_attack You hit Kobold Miner for 116
+587.25 mob_death Kobold Miner dies!
+587.75 mob_attack Kobold Miner joins the fight!
+588.75 mob_death Rampaging Boar appears!
+590.25 player_attack SimAlly1 hits Rampaging Boar for 16
+590.25 player_attack SimAlly2 hits Rampaging Boar for 14
+591.25 player_attack SimAlly0 hits Rampaging Boar for 16
+591.75 player_attack SimAlly2 hits Rampaging Boar for 14
+591.75 mob_attack Rampaging Boar hits you for 13
+592.25 player_attack You hit Rampaging Boar for 116
+592.25 mob_death Rampaging Boar dies!
+592.50 player_attack SimAlly1 hits Kobold Miner for 16
+593.25 player_crit SimAlly0 hits Kobold Miner for 31 (CRIT!)
+593.50 player_attack SimAlly2 hits Kobold Miner for 14
+593.75 mob_death Grey Wolf appears!
+594.25 player_attack SimAlly1 hits Kobold Miner for 16
+594.50 mob_attack Kobold Miner hits you for 12
+594.75 player_attack You hit Kobold Miner for 116
+594.75 mob_death Kobold Miner dies!
+596.25 mob_death Kobold Miner appears!
+598.00 player_attack SimAlly0 hits Grey Wolf for 16
+598.00 player_attack SimAlly2 hits Grey Wolf for 14
+599.00 player_attack SimAlly1 hits Grey Wolf for 16
+599.50 player_attack SimAlly2 hits Grey Wolf for 14
+600.00 player_crit You hit Grey Wolf for 233 (CRIT!)
+600.00 mob_death Grey Wolf dies!
 
 ## warrior untalented | seed=2
 0.25 mob_death Rampaging Boar appears!
@@ -9329,742 +9442,751 @@
 5.25 mob_death Rampaging Boar dies!
 6.75 mob_death Rampaging Boar appears!
 9.25 player_attack SimAlly2 hits Grey Wolf for 15
-9.75 mob_attack Grey Wolf hits you for 8
+9.75 mob_attack Grey Wolf hits you for 11
 10.00 player_attack SimAlly0 hits Grey Wolf for 16
 10.00 player_attack SimAlly1 hits Grey Wolf for 16
-10.00 mob_death Grey Wolf dies!
-11.50 mob_death Grey Wolf appears!
+10.25 player_attack You hit Grey Wolf for 63
+10.25 mob_death Grey Wolf dies!
+11.75 mob_death Kobold Miner appears!
 13.50 player_attack SimAlly2 hits Rampaging Boar for 15
-14.25 mob_attack Rampaging Boar hits you for 12
-14.50 player_attack SimAlly0 hits Rampaging Boar for 16
-14.50 player_attack SimAlly1 hits Rampaging Boar for 16
-14.75 player_attack You hit Rampaging Boar for 63
-14.75 mob_death Rampaging Boar dies!
-21.25 mob_death Kobold Miner appears!
-23.25 player_attack SimAlly2 hits Kobold Miner for 15
-24.75 player_attack SimAlly0 hits Kobold Miner for 16
-24.75 player_attack SimAlly1 hits Kobold Miner for 16
-25.00 player_attack You hit Kobold Miner for 63
-25.00 mob_death Kobold Miner dies!
-26.50 mob_death Grey Wolf appears!
-28.50 player_attack SimAlly2 hits Grey Wolf for 15
-30.00 mob_attack Grey Wolf hits you for 8
-30.25 player_attack SimAlly0 hits Grey Wolf for 16
-30.25 player_attack SimAlly1 hits Grey Wolf for 16
-30.25 mob_death Grey Wolf dies!
-30.25 level_up ★ Level Up! Now level 2!
-31.75 mob_death Kobold Miner appears!
-32.25 player_attack SimAlly2 hits Grey Wolf for 15
-34.00 player_attack SimAlly0 hits Grey Wolf for 16
-34.00 player_attack SimAlly1 hits Grey Wolf for 16
-34.00 mob_death Grey Wolf dies!
-35.50 mob_death Kobold Miner appears!
-37.25 player_attack SimAlly2 hits Kobold Miner for 15
-39.00 player_attack SimAlly2 hits Kobold Miner for 15
-39.25 player_attack SimAlly0 hits Kobold Miner for 16
-39.25 player_attack SimAlly1 hits Kobold Miner for 16
-39.25 mob_death Kobold Miner dies!
-40.75 mob_death Kobold Miner appears!
-43.25 player_attack SimAlly2 hits Kobold Miner for 15
-43.75 player_attack SimAlly0 hits Kobold Miner for 16
-43.75 player_attack SimAlly1 hits Kobold Miner for 16
-43.75 mob_attack Kobold Miner hits you for 12
-44.00 player_attack You hit Kobold Miner for 75
-44.00 mob_death Kobold Miner dies!
-45.50 mob_death Grey Wolf appears!
-48.25 player_attack SimAlly2 hits Rampaging Boar for 15
-49.00 player_attack SimAlly0 hits Rampaging Boar for 16
-49.00 player_attack SimAlly1 hits Rampaging Boar for 16
-49.25 player_attack You hit Rampaging Boar for 75
-49.25 mob_death Rampaging Boar dies!
-50.75 mob_death Grey Wolf appears!
-50.75 mob_attack Grey Wolf joins the fight!
-53.00 player_crit SimAlly2 hits Kobold Miner for 31 (CRIT!)
-54.25 player_attack SimAlly0 hits Kobold Miner for 16
-54.25 player_attack SimAlly1 hits Kobold Miner for 16
-54.25 mob_death Kobold Miner dies!
-55.00 player_crit SimAlly2 hits Grey Wolf for 31 (CRIT!)
-55.75 mob_death Rampaging Boar appears!
-56.25 player_attack SimAlly0 hits Grey Wolf for 16
-56.25 mob_death Grey Wolf dies!
-57.75 mob_death Kobold Miner appears!
-60.00 player_attack SimAlly1 hits Rampaging Boar for 16
-60.50 player_attack SimAlly2 hits Rampaging Boar for 15
-61.75 mob_attack Rampaging Boar hits you for 12
-62.00 player_attack SimAlly0 hits Rampaging Boar for 16
-62.25 player_attack You hit Rampaging Boar for 75
-62.25 mob_death Rampaging Boar dies!
-63.75 mob_death Rampaging Boar appears!
-64.75 player_attack SimAlly1 hits Kobold Miner for 16
-64.75 player_attack SimAlly2 hits Kobold Miner for 15
-66.75 player_attack SimAlly0 hits Kobold Miner for 16
-66.75 player_attack SimAlly2 hits Kobold Miner for 15
-66.75 mob_death Kobold Miner dies!
-68.25 mob_death Rampaging Boar appears!
-70.75 player_attack SimAlly1 hits Grey Wolf for 16
-72.25 player_attack SimAlly2 hits Grey Wolf for 15
-72.75 player_attack SimAlly0 hits Grey Wolf for 16
-72.75 mob_death Grey Wolf dies!
-74.25 mob_death Rampaging Boar appears!
-75.00 player_attack SimAlly1 hits Rampaging Boar for 16
-76.00 player_attack SimAlly2 hits Rampaging Boar for 15
-76.50 mob_attack Rampaging Boar hits you for 12
-76.75 player_attack SimAlly0 hits Rampaging Boar for 16
-77.00 player_attack You hit Rampaging Boar for 75
-77.00 mob_death Rampaging Boar dies!
-78.50 mob_death Kobold Miner appears!
-80.50 player_attack SimAlly1 hits Rampaging Boar for 16
-81.00 player_attack SimAlly2 hits Rampaging Boar for 15
-82.00 player_attack SimAlly0 hits Rampaging Boar for 16
-82.50 player_attack You hit Rampaging Boar for 75
-82.50 mob_death Rampaging Boar dies!
-83.00 mob_attack Rampaging Boar joins the fight!
-84.00 mob_death Rampaging Boar appears!
-86.50 player_attack SimAlly1 hits Kobold Miner for 16
-86.75 player_attack SimAlly2 hits Kobold Miner for 15
-88.25 player_attack SimAlly0 hits Kobold Miner for 16
-88.50 mob_attack Kobold Miner hits you for 12
-88.75 player_attack You hit Kobold Miner for 75
-88.75 mob_death Kobold Miner dies!
-88.75 level_up ★ Level Up! Now level 3!
-89.00 player_attack SimAlly1 hits Rampaging Boar for 16
-89.00 player_attack SimAlly2 hits Rampaging Boar for 15
-90.25 mob_death Grey Wolf appears!
-90.75 player_attack SimAlly0 hits Rampaging Boar for 16
-90.75 player_attack SimAlly2 hits Rampaging Boar for 15
-90.75 mob_attack Rampaging Boar hits you for 12
-91.25 player_crit You hit Rampaging Boar for 151 (CRIT!)
-91.25 mob_death Rampaging Boar dies!
-92.75 mob_death Rampaging Boar appears!
-94.25 player_attack SimAlly1 hits Rampaging Boar for 16
-95.50 player_attack SimAlly2 hits Rampaging Boar for 15
-96.00 player_attack SimAlly0 hits Rampaging Boar for 16
-96.50 player_attack You hit Rampaging Boar for 76
-96.50 mob_death Rampaging Boar dies!
-98.00 mob_death Kobold Miner appears!
-98.00 mob_attack Kobold Miner joins the fight!
-101.75 player_attack SimAlly1 hits Rampaging Boar for 16
-102.50 player_attack SimAlly2 hits Rampaging Boar for 15
-103.50 player_attack SimAlly0 hits Rampaging Boar for 16
-103.50 mob_attack Rampaging Boar hits you for 12
-104.00 player_attack You hit Rampaging Boar for 76
-104.00 mob_death Rampaging Boar dies!
-104.25 player_attack SimAlly1 hits Kobold Miner for 16
-104.50 player_attack SimAlly2 hits Kobold Miner for 15
-105.50 mob_death ★ Elite: ★ Grey Wolf appears!
-105.75 player_attack SimAlly0 hits Kobold Miner for 16
-106.25 player_crit SimAlly1 hits Kobold Miner for 32 (CRIT!)
-106.25 mob_death Kobold Miner dies!
-107.75 mob_death Kobold Miner appears!
-109.25 player_attack SimAlly2 hits ★ Grey Wolf for 15
-110.50 player_attack SimAlly0 hits ★ Grey Wolf for 16
-111.00 player_attack SimAlly1 hits ★ Grey Wolf for 16
-111.00 player_attack SimAlly2 hits ★ Grey Wolf for 15
-111.25 player_attack You hit ★ Grey Wolf for 76
-111.25 mob_death ★ Grey Wolf dies!
-112.75 mob_death Rampaging Boar appears!
-115.50 player_attack SimAlly0 hits Grey Wolf for 16
-115.50 player_attack SimAlly2 hits Grey Wolf for 15
-116.00 player_attack SimAlly1 hits Grey Wolf for 16
-116.00 mob_death Grey Wolf dies!
-117.50 mob_death Kobold Miner appears!
-120.50 player_attack SimAlly2 hits Kobold Miner for 15
-120.75 player_attack SimAlly0 hits Kobold Miner for 16
-121.25 player_attack SimAlly1 hits Kobold Miner for 16
-121.50 player_attack You hit Kobold Miner for 88
-121.50 mob_death Kobold Miner dies!
-123.00 mob_death Grey Wolf appears!
-126.00 player_attack SimAlly2 hits Kobold Miner for 15
-126.75 player_attack SimAlly0 hits Kobold Miner for 16
-127.25 player_attack SimAlly1 hits Kobold Miner for 16
-127.50 player_attack You hit Kobold Miner for 88
-127.50 mob_death Kobold Miner dies!
-129.00 mob_death Kobold Miner appears!
-129.75 player_attack SimAlly2 hits Grey Wolf for 15
-130.50 player_attack SimAlly0 hits Grey Wolf for 16
-131.00 player_attack SimAlly1 hits Grey Wolf for 16
-131.00 mob_death Grey Wolf dies!
-132.50 mob_death Grey Wolf appears!
-133.25 player_attack SimAlly2 hits Rampaging Boar for 15
-134.25 player_attack SimAlly0 hits Rampaging Boar for 16
-134.50 mob_attack Rampaging Boar hits you for 12
-134.75 player_crit SimAlly1 hits Rampaging Boar for 32 (CRIT!)
-135.00 player_attack You hit Rampaging Boar for 88
-135.00 mob_death Rampaging Boar dies!
-135.50 mob_attack Kobold Miner joins the fight!
-136.50 mob_death Kobold Miner appears!
-137.75 player_attack SimAlly2 hits Grey Wolf for 15
-139.25 player_attack SimAlly0 hits Grey Wolf for 16
-139.50 player_attack SimAlly2 hits Grey Wolf for 15
-139.50 mob_death Grey Wolf dies!
-139.75 player_attack SimAlly1 hits Kobold Miner for 16
-141.00 mob_death Grey Wolf appears!
-141.25 player_attack SimAlly2 hits Kobold Miner for 15
-141.50 player_attack SimAlly0 hits Kobold Miner for 16
-141.75 mob_attack Kobold Miner hits you for 11
-142.00 player_attack You hit Kobold Miner for 94
-142.00 mob_death Kobold Miner dies!
-143.50 mob_death Rampaging Boar appears!
-144.50 player_attack SimAlly1 hits Grey Wolf for 16
-145.75 player_attack SimAlly2 hits Grey Wolf for 15
-146.25 player_attack SimAlly0 hits Grey Wolf for 16
-146.25 mob_death Grey Wolf dies!
-147.75 mob_death ★ Elite: ★ Rampaging Boar appears!
-149.25 player_attack SimAlly1 hits Rampaging Boar for 16
-150.00 player_attack SimAlly2 hits Rampaging Boar for 15
-150.50 player_attack SimAlly0 hits Rampaging Boar for 16
-150.50 mob_attack Rampaging Boar hits you for 12
-151.00 player_attack You hit Rampaging Boar for 94
-151.00 mob_death Rampaging Boar dies!
-152.50 mob_death Rampaging Boar appears!
-154.00 player_attack SimAlly1 hits Kobold Miner for 16
-154.50 player_attack SimAlly2 hits Kobold Miner for 15
-155.50 player_attack SimAlly0 hits Kobold Miner for 16
-156.00 player_attack You hit Kobold Miner for 94
-156.00 mob_death Kobold Miner dies!
-157.50 mob_death Grey Wolf appears!
-160.25 player_attack SimAlly1 hits Rampaging Boar for 16
-160.25 player_attack SimAlly2 hits Rampaging Boar for 15
-161.75 player_attack SimAlly0 hits Rampaging Boar for 16
-162.00 player_crit SimAlly2 hits Rampaging Boar for 31 (CRIT!)
-162.00 mob_death Rampaging Boar dies!
-163.50 mob_death Kobold Miner appears!
-166.50 player_crit SimAlly1 hits ★ Rampaging Boar for 32 (CRIT!)
-168.00 player_attack SimAlly0 hits ★ Rampaging Boar for 16
-168.00 player_attack SimAlly2 hits ★ Rampaging Boar for 15
-168.00 mob_attack ★ Rampaging Boar hits you for 21
-168.50 player_crit You hit ★ Rampaging Boar for 189 (CRIT!)
-168.50 mob_death ★ Rampaging Boar dies!
-191.50 proc ⚔️ Crafted Coarse Crude Weapon Oil!
-193.00 mob_death Grey Wolf appears!
-195.25 player_attack SimAlly1 hits Kobold Miner for 16
-196.25 player_attack SimAlly2 hits Kobold Miner for 15
-196.75 player_attack SimAlly0 hits Kobold Miner for 16
-197.00 mob_attack Kobold Miner hits you for 11
-197.25 player_attack You hit Kobold Miner for 94
-197.25 mob_death Kobold Miner dies!
-198.75 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
-205.00 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 16
-205.50 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
-206.25 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 16
-207.00 player_attack You hit [BOSS] Elder Meadow Beast for 94
-207.00 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 16
-207.25 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
-207.50 mob_attack [BOSS] Elder Meadow Beast hits you for 108
-208.50 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 16
-209.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
-209.25 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 16
-209.50 player_attack You hit [BOSS] Elder Meadow Beast for 94
-210.50 player_death SimAlly0 goes down!
-211.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
-211.50 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 16
-212.00 player_attack You hit [BOSS] Elder Meadow Beast for 94
-212.00 mob_death [BOSS] Elder Meadow Beast dies!
-212.00 level_up ★ Level Up! Now level 4!
-212.00 level_up ★ Level Up! Now level 5!
-213.50 mob_death Grey Wolf appears!
-215.00 mob_death Kobold Miner appears!
-216.50 mob_death Grey Wolf appears!
-216.75 player_attack SimAlly2 hits Grey Wolf for 16
-217.75 player_attack SimAlly1 hits Grey Wolf for 16
-218.00 mob_death Rampaging Boar appears!
-218.25 player_attack You hit Grey Wolf for 95
-218.25 mob_death Grey Wolf dies!
-219.75 mob_death Grey Wolf appears!
-220.75 player_crit SimAlly2 hits Rampaging Boar for 31 (CRIT!)
-222.25 player_attack SimAlly1 hits Rampaging Boar for 16
-222.25 mob_attack Rampaging Boar hits you for 11
-222.50 player_respawn SimAlly0 gets back up.
-222.50 player_attack SimAlly2 hits Rampaging Boar for 16
-222.75 player_attack You hit Rampaging Boar for 95
-222.75 mob_death Rampaging Boar dies!
-223.25 mob_attack Grey Wolf joins the fight!
-224.25 mob_death Kobold Miner appears!
-227.25 player_attack SimAlly1 hits Grey Wolf for 16
-227.25 player_attack SimAlly2 hits Grey Wolf for 16
-227.50 player_attack SimAlly0 hits Grey Wolf for 16
-227.50 mob_death Grey Wolf dies!
-229.00 mob_death Rampaging Boar appears!
-229.50 player_attack SimAlly2 hits Grey Wolf for 16
-229.50 mob_attack Grey Wolf hits you for 7
-229.75 player_attack SimAlly0 hits Grey Wolf for 16
-229.75 player_attack SimAlly1 hits Grey Wolf for 16
-229.75 mob_death Grey Wolf dies!
-231.25 mob_death Kobold Miner appears!
-234.75 player_attack SimAlly2 hits Kobold Miner for 16
-235.25 player_attack SimAlly0 hits Kobold Miner for 16
-235.25 player_attack SimAlly1 hits Kobold Miner for 16
-235.50 player_crit You hit Kobold Miner for 190 (CRIT!)
-235.50 mob_death Kobold Miner dies!
-237.00 mob_death Grey Wolf appears!
-240.00 player_attack SimAlly2 hits Kobold Miner for 16
-241.00 player_attack SimAlly0 hits Kobold Miner for 16
-241.00 player_attack SimAlly1 hits Kobold Miner for 16
-241.00 mob_attack Kobold Miner hits you for 11
-241.25 player_attack You hit Kobold Miner for 95
-241.25 mob_death Kobold Miner dies!
-242.75 mob_death Rampaging Boar appears!
-243.75 player_attack SimAlly2 hits Grey Wolf for 16
-245.00 mob_attack Grey Wolf hits you for 7
-245.25 player_attack SimAlly0 hits Grey Wolf for 16
-245.25 player_crit SimAlly1 hits Grey Wolf for 33 (CRIT!)
-245.25 mob_death Grey Wolf dies!
-246.75 mob_death Rampaging Boar appears!
-248.50 player_attack SimAlly2 hits Rampaging Boar for 16
-250.00 player_attack SimAlly0 hits Rampaging Boar for 16
-250.00 player_attack SimAlly1 hits Rampaging Boar for 16
-250.00 mob_attack Rampaging Boar hits you for 12
-250.50 player_attack You hit Rampaging Boar for 95
-250.50 mob_death Rampaging Boar dies!
-252.00 mob_death Rampaging Boar appears!
-254.75 player_attack SimAlly2 hits Rampaging Boar for 16
-256.50 player_attack SimAlly0 hits Rampaging Boar for 16
-256.50 player_attack SimAlly1 hits Rampaging Boar for 16
-256.50 player_crit SimAlly2 hits Rampaging Boar for 31 (CRIT!)
-256.50 mob_death Rampaging Boar dies!
-258.00 mob_death Rampaging Boar appears!
-261.50 player_attack SimAlly2 hits Rampaging Boar for 16
-261.75 mob_attack Rampaging Boar hits you for 12
-262.00 player_attack SimAlly0 hits Rampaging Boar for 16
-262.00 player_attack SimAlly1 hits Rampaging Boar for 16
-262.25 player_attack You hit Rampaging Boar for 95
-262.25 mob_death Rampaging Boar dies!
-263.75 mob_death Kobold Miner appears!
-265.75 player_crit SimAlly2 hits Rampaging Boar for 31 (CRIT!)
-266.50 mob_attack Rampaging Boar hits you for 12
-266.75 player_attack SimAlly0 hits Rampaging Boar for 16
-266.75 player_attack SimAlly1 hits Rampaging Boar for 16
-267.00 player_attack You hit Rampaging Boar for 95
-267.00 mob_death Rampaging Boar dies!
-268.50 mob_death Grey Wolf appears!
-270.00 player_attack SimAlly2 hits Kobold Miner for 16
-271.50 player_attack SimAlly0 hits Kobold Miner for 16
-271.50 player_crit SimAlly1 hits Kobold Miner for 33 (CRIT!)
-271.50 mob_death Kobold Miner dies!
-273.00 mob_death Kobold Miner appears!
-275.00 player_attack SimAlly2 hits Rampaging Boar for 16
-276.25 player_attack SimAlly0 hits Rampaging Boar for 16
-276.25 player_attack SimAlly1 hits Rampaging Boar for 16
-276.75 player_attack You hit Rampaging Boar for 95
-276.75 mob_death Rampaging Boar dies!
-278.25 mob_death Rampaging Boar appears!
-279.75 player_attack SimAlly2 hits Kobold Miner for 16
-281.50 player_attack SimAlly0 hits Kobold Miner for 16
-281.50 player_attack SimAlly1 hits Kobold Miner for 16
-281.50 player_attack SimAlly2 hits Kobold Miner for 16
-281.50 mob_death Kobold Miner dies!
-282.00 mob_attack Grey Wolf joins the fight!
-283.00 mob_death Kobold Miner appears!
-286.50 player_attack SimAlly2 hits Rampaging Boar for 16
-286.75 mob_attack Rampaging Boar hits you for 12
-287.00 player_attack SimAlly0 hits Rampaging Boar for 16
-287.00 player_attack SimAlly1 hits Rampaging Boar for 16
-287.25 player_attack You hit Rampaging Boar for 95
-287.25 mob_death Rampaging Boar dies!
-288.50 player_attack SimAlly2 hits Grey Wolf for 16
-288.75 mob_death Rampaging Boar appears!
-289.50 player_crit SimAlly0 hits Grey Wolf for 33 (CRIT!)
-289.50 mob_death Grey Wolf dies!
-291.00 mob_death ★ Elite: ★ Kobold Miner appears!
-292.75 player_attack SimAlly1 hits Kobold Miner for 16
-293.75 player_attack SimAlly2 hits Kobold Miner for 16
-294.75 player_attack SimAlly0 hits Kobold Miner for 16
-295.00 player_attack You hit Kobold Miner for 95
-295.00 mob_death Kobold Miner dies!
-296.50 mob_death ★ Elite: ★ Grey Wolf appears!
-298.50 player_attack SimAlly1 hits Kobold Miner for 16
-299.00 player_attack SimAlly2 hits Kobold Miner for 16
-300.25 player_attack SimAlly0 hits Kobold Miner for 16
-300.50 player_attack SimAlly1 hits Kobold Miner for 16
-300.50 mob_death Kobold Miner dies!
-302.00 mob_death Rampaging Boar appears!
-302.00 mob_attack Rampaging Boar joins the fight!
-304.25 player_attack SimAlly2 hits ★ Grey Wolf for 16
-305.75 player_attack SimAlly0 hits ★ Grey Wolf for 16
-306.00 player_attack SimAlly1 hits ★ Grey Wolf for 16
-306.00 player_attack SimAlly2 hits ★ Grey Wolf for 16
-306.25 player_attack You hit ★ Grey Wolf for 95
-306.25 mob_death ★ Grey Wolf dies!
-307.75 mob_death Rampaging Boar appears!
-308.00 player_attack SimAlly2 hits Rampaging Boar for 16
-308.25 player_attack SimAlly0 hits Rampaging Boar for 16
-308.50 player_attack SimAlly1 hits Rampaging Boar for 16
-308.75 player_attack You hit Rampaging Boar for 95
-308.75 mob_death Rampaging Boar dies!
-310.25 mob_death Rampaging Boar appears!
-312.25 player_attack SimAlly2 hits Rampaging Boar for 16
-312.75 player_attack SimAlly0 hits Rampaging Boar for 16
-312.75 mob_attack Rampaging Boar hits you for 10
-313.00 player_attack SimAlly1 hits Rampaging Boar for 16
-313.25 player_attack You hit Rampaging Boar for 95
-313.25 mob_death Rampaging Boar dies!
-314.75 mob_death Grey Wolf appears!
-316.75 player_attack SimAlly2 hits Rampaging Boar for 16
-317.75 player_attack SimAlly0 hits Rampaging Boar for 16
-317.75 mob_attack Rampaging Boar hits you for 10
-318.00 player_attack SimAlly1 hits Rampaging Boar for 16
-318.25 player_attack You hit Rampaging Boar for 95
-318.25 mob_death Rampaging Boar dies!
-319.75 mob_death Rampaging Boar appears!
-321.50 player_attack SimAlly2 hits Grey Wolf for 16
-322.75 player_attack SimAlly0 hits Grey Wolf for 16
-323.00 player_attack SimAlly1 hits Grey Wolf for 16
-323.00 mob_death Grey Wolf dies!
-324.50 mob_death Rampaging Boar appears!
-326.00 player_attack SimAlly2 hits ★ Kobold Miner for 16
-327.50 player_attack SimAlly0 hits ★ Kobold Miner for 16
-327.75 player_crit SimAlly1 hits ★ Kobold Miner for 33 (CRIT!)
-327.75 player_attack SimAlly2 hits ★ Kobold Miner for 16
-327.75 mob_attack ★ Kobold Miner hits you for 16
-328.00 player_attack You hit ★ Kobold Miner for 95
-328.00 mob_death ★ Kobold Miner dies!
-329.50 mob_death Kobold Miner appears!
-333.25 player_attack SimAlly0 hits Rampaging Boar for 16
-333.25 player_attack SimAlly2 hits Rampaging Boar for 16
-333.50 player_attack SimAlly1 hits Rampaging Boar for 16
-333.75 player_attack You hit Rampaging Boar for 95
-333.75 mob_death Rampaging Boar dies!
-335.25 mob_death Grey Wolf appears!
-339.25 player_attack SimAlly2 hits Kobold Miner for 16
-339.75 player_attack SimAlly0 hits Kobold Miner for 16
-340.00 player_attack SimAlly1 hits Kobold Miner for 16
-340.25 player_attack You hit Kobold Miner for 95
-340.25 mob_death Kobold Miner dies!
-341.75 mob_death Kobold Miner appears!
-343.50 player_attack SimAlly2 hits Grey Wolf for 16
-344.50 player_attack SimAlly0 hits Grey Wolf for 16
-344.75 player_attack SimAlly1 hits Grey Wolf for 16
-344.75 mob_death Grey Wolf dies!
-346.25 mob_death Rampaging Boar appears!
-348.25 player_attack SimAlly2 hits Kobold Miner for 16
-349.25 player_attack SimAlly0 hits Kobold Miner for 16
-349.50 player_attack SimAlly1 hits Kobold Miner for 16
-349.75 player_death SimAlly0 goes down!
-350.00 player_attack You hit Kobold Miner for 95
-350.00 mob_death Kobold Miner dies!
-350.50 mob_attack Rampaging Boar joins the fight!
-351.50 mob_death Kobold Miner appears!
-351.50 mob_attack Kobold Miner joins the fight!
-354.75 player_attack SimAlly2 hits Rampaging Boar for 16
-356.25 mob_attack Kobold Miner hits you for 9
-356.25 player_death You have been slain! Respawning in 3s...
-359.25 player_respawn You rise from the grave...
-360.75 mob_death Grey Wolf appears!
-362.25 mob_death Grey Wolf appears!
-363.75 mob_death Grey Wolf appears!
-364.50 player_attack SimAlly1 hits Grey Wolf for 16
-364.75 player_respawn SimAlly0 gets back up.
-364.75 player_attack SimAlly2 hits Grey Wolf for 16
-365.25 mob_death Rampaging Boar appears!
-366.25 mob_attack Grey Wolf hits you for 6
-366.50 player_attack SimAlly2 hits Grey Wolf for 16
-366.50 mob_death Grey Wolf dies!
-368.00 mob_death Kobold Miner appears!
-369.75 player_attack SimAlly0 hits Rampaging Boar for 16
-369.75 player_attack SimAlly1 hits Rampaging Boar for 16
-371.25 player_crit SimAlly2 hits Rampaging Boar for 31 (CRIT!)
-371.50 mob_attack Rampaging Boar hits you for 9
-372.00 player_attack You hit Rampaging Boar for 95
-372.00 mob_death Rampaging Boar dies!
-373.50 mob_death Rampaging Boar appears!
-375.25 player_attack SimAlly0 hits Grey Wolf for 16
-375.25 player_attack SimAlly1 hits Grey Wolf for 16
-376.25 player_crit SimAlly2 hits Grey Wolf for 31 (CRIT!)
-376.25 mob_death Grey Wolf dies!
-377.75 mob_death Grey Wolf appears!
-380.50 player_attack SimAlly0 hits Rampaging Boar for 16
-380.50 player_attack SimAlly1 hits Rampaging Boar for 16
-381.00 player_attack SimAlly2 hits Rampaging Boar for 16
-381.25 mob_attack Rampaging Boar hits you for 9
-381.75 player_attack You hit Rampaging Boar for 95
-381.75 mob_death Rampaging Boar dies!
-383.25 mob_death Grey Wolf appears!
-386.75 player_attack SimAlly1 hits Grey Wolf for 16
-387.00 player_attack SimAlly0 hits Grey Wolf for 16
-387.25 player_attack SimAlly2 hits Grey Wolf for 16
-387.25 mob_death Grey Wolf dies!
-388.75 mob_death Kobold Miner appears!
-391.25 player_attack SimAlly1 hits Grey Wolf for 16
-391.25 player_attack SimAlly2 hits Grey Wolf for 16
-391.50 player_attack SimAlly0 hits Grey Wolf for 16
-391.50 mob_death Grey Wolf dies!
-393.00 mob_death Kobold Miner appears!
-395.75 player_attack SimAlly2 hits Kobold Miner for 16
-396.00 player_attack SimAlly0 hits Kobold Miner for 16
-396.25 player_attack SimAlly1 hits Kobold Miner for 16
-396.25 mob_attack Kobold Miner hits you for 9
-396.50 player_attack You hit Kobold Miner for 95
-396.50 mob_death Kobold Miner dies!
-398.00 mob_death Rampaging Boar appears!
-400.75 player_attack SimAlly2 hits Kobold Miner for 16
-401.50 player_attack SimAlly0 hits Kobold Miner for 16
-401.75 player_attack SimAlly1 hits Kobold Miner for 16
-402.00 player_attack You hit Kobold Miner for 139
-402.00 mob_death Kobold Miner dies!
-403.50 mob_death Grey Wolf appears!
-404.50 player_attack SimAlly2 hits Grey Wolf for 16
-405.75 player_attack SimAlly0 hits Grey Wolf for 16
-406.00 player_attack SimAlly1 hits Grey Wolf for 16
-406.00 mob_death Grey Wolf dies!
-407.50 mob_death Rampaging Boar appears!
-408.75 player_attack SimAlly2 hits Grey Wolf for 16
-410.00 player_attack SimAlly0 hits Grey Wolf for 16
-410.00 player_attack SimAlly1 hits Grey Wolf for 16
-410.00 mob_death Grey Wolf dies!
-411.50 mob_death Rampaging Boar appears!
-413.00 player_attack SimAlly2 hits Rampaging Boar for 16
-414.25 mob_attack Rampaging Boar hits you for 9
-414.50 player_attack SimAlly0 hits Rampaging Boar for 16
-414.50 player_attack SimAlly1 hits Rampaging Boar for 16
-414.75 player_attack You hit Rampaging Boar for 139
-414.75 mob_death Rampaging Boar dies!
-414.75 level_up ★ Level Up! Now level 6!
-416.25 mob_death Rampaging Boar appears!
-417.00 player_attack SimAlly2 hits Rampaging Boar for 16
-418.75 player_attack SimAlly0 hits Rampaging Boar for 16
-418.75 player_attack SimAlly2 hits Rampaging Boar for 16
-418.75 mob_attack Rampaging Boar hits you for 9
-419.00 player_attack SimAlly1 hits Rampaging Boar for 16
-419.25 player_attack You hit Rampaging Boar for 139
-419.25 mob_death Rampaging Boar dies!
-420.75 mob_death Grey Wolf appears!
-422.75 player_attack SimAlly2 hits Rampaging Boar for 16
-423.25 player_attack SimAlly0 hits Rampaging Boar for 16
-423.25 mob_attack Rampaging Boar hits you for 9
-423.50 player_attack SimAlly1 hits Rampaging Boar for 16
-423.75 player_attack You hit Rampaging Boar for 139
-423.75 mob_death Rampaging Boar dies!
-425.25 mob_death Grey Wolf appears!
-428.00 player_attack SimAlly2 hits Grey Wolf for 16
-428.75 player_attack SimAlly0 hits Grey Wolf for 16
-428.75 mob_attack Grey Wolf hits you for 6
-429.00 player_attack SimAlly1 hits Grey Wolf for 16
-429.00 mob_death Grey Wolf dies!
-430.50 mob_death Rampaging Boar appears!
-432.50 player_attack SimAlly2 hits Grey Wolf for 16
-433.50 player_attack SimAlly0 hits Grey Wolf for 16
-433.50 player_attack SimAlly1 hits Grey Wolf for 16
-433.50 mob_death Grey Wolf dies!
-435.00 mob_death Rampaging Boar appears!
-436.50 player_attack SimAlly2 hits Rampaging Boar for 16
-437.50 mob_attack Rampaging Boar hits you for 9
-437.75 player_attack SimAlly0 hits Rampaging Boar for 16
-437.75 player_attack SimAlly1 hits Rampaging Boar for 16
-438.00 player_crit You hit Rampaging Boar for 278 (CRIT!)
-438.00 mob_death Rampaging Boar dies!
-439.50 mob_death Grey Wolf appears!
-440.75 player_attack SimAlly2 hits Rampaging Boar for 16
-442.25 player_attack SimAlly0 hits Rampaging Boar for 16
-442.25 mob_attack Rampaging Boar hits you for 9
-442.50 player_attack SimAlly1 hits Rampaging Boar for 16
-442.50 player_attack SimAlly2 hits Rampaging Boar for 16
-442.75 player_attack You hit Rampaging Boar for 139
-442.75 mob_death Rampaging Boar dies!
-444.25 mob_death Kobold Miner appears!
-446.25 player_attack SimAlly0 hits Grey Wolf for 16
-446.25 player_attack SimAlly2 hits Grey Wolf for 16
-446.25 mob_attack Grey Wolf hits you for 6
-446.50 player_attack SimAlly1 hits Grey Wolf for 16
-446.50 mob_death Grey Wolf dies!
-446.50 mob_attack Rampaging Boar spots you and charges!
-448.00 mob_death Rampaging Boar appears!
-449.50 player_attack SimAlly2 hits Rampaging Boar for 16
-449.75 player_attack SimAlly0 hits Rampaging Boar for 16
-449.75 mob_attack Rampaging Boar hits you for 9
-450.00 player_attack SimAlly1 hits Rampaging Boar for 16
-450.25 player_attack You hit Rampaging Boar for 139
-450.25 mob_death Rampaging Boar dies!
-451.75 mob_death Rampaging Boar appears!
-454.50 player_attack SimAlly2 hits Rampaging Boar for 16
-455.25 player_attack SimAlly0 hits Rampaging Boar for 16
-455.25 player_attack SimAlly1 hits Rampaging Boar for 16
-455.25 mob_attack Rampaging Boar hits you for 9
-455.75 player_attack You hit Rampaging Boar for 139
-455.75 mob_death Rampaging Boar dies!
-457.25 mob_death Rampaging Boar appears!
-460.75 player_attack SimAlly2 hits Kobold Miner for 16
-462.00 player_attack SimAlly0 hits Kobold Miner for 16
-462.00 player_attack SimAlly1 hits Kobold Miner for 16
-462.50 player_crit You hit Kobold Miner for 278 (CRIT!)
-462.50 mob_death Kobold Miner dies!
-464.00 mob_death Grey Wolf appears!
-466.25 player_attack SimAlly2 hits Rampaging Boar for 16
-467.75 player_attack SimAlly0 hits Rampaging Boar for 16
-468.00 player_attack SimAlly1 hits Rampaging Boar for 16
-468.00 mob_attack Rampaging Boar hits you for 9
-468.25 player_attack SimAlly2 hits Rampaging Boar for 16
-468.50 player_attack You hit Rampaging Boar for 139
-468.50 mob_death Rampaging Boar dies!
-470.00 mob_death Rampaging Boar appears!
-473.00 player_attack SimAlly0 hits Grey Wolf for 16
-473.00 player_attack SimAlly2 hits Grey Wolf for 16
-473.25 player_attack SimAlly1 hits Grey Wolf for 16
-473.25 mob_death Grey Wolf dies!
-474.75 mob_death Kobold Miner appears!
-477.50 player_attack SimAlly2 hits Kobold Miner for 16
-477.75 player_attack SimAlly0 hits Kobold Miner for 16
-478.00 player_attack SimAlly1 hits Kobold Miner for 16
-478.00 mob_attack Kobold Miner hits you for 9
-478.25 player_attack You hit Kobold Miner for 139
-478.25 mob_death Kobold Miner dies!
-479.75 mob_death Rampaging Boar appears!
-481.25 player_attack SimAlly2 hits Rampaging Boar for 16
-482.00 player_attack SimAlly0 hits Rampaging Boar for 16
-482.00 player_attack SimAlly1 hits Rampaging Boar for 16
-482.00 mob_attack Rampaging Boar hits you for 9
-482.50 player_crit You hit Rampaging Boar for 278 (CRIT!)
-482.50 mob_death Rampaging Boar dies!
-484.00 mob_death Rampaging Boar appears!
-486.50 player_attack SimAlly2 hits Rampaging Boar for 16
-487.75 player_attack SimAlly0 hits Rampaging Boar for 16
-487.75 player_crit SimAlly1 hits Rampaging Boar for 33 (CRIT!)
-487.75 mob_death Rampaging Boar dies!
-489.25 mob_death ★ Elite: ★ Grey Wolf appears!
-492.25 player_attack SimAlly2 hits Rampaging Boar for 16
-493.25 player_attack SimAlly0 hits Rampaging Boar for 16
-493.25 mob_attack Rampaging Boar hits you for 9
-493.50 player_attack SimAlly1 hits Rampaging Boar for 16
-493.75 player_attack You hit Rampaging Boar for 139
-493.75 mob_death Rampaging Boar dies!
-495.25 mob_death Kobold Miner appears!
-496.50 player_attack SimAlly2 hits ★ Grey Wolf for 16
-498.00 player_attack SimAlly0 hits ★ Grey Wolf for 16
-498.00 mob_attack ★ Grey Wolf hits you for 10
-498.25 player_attack SimAlly1 hits ★ Grey Wolf for 16
-498.25 player_attack SimAlly2 hits ★ Grey Wolf for 16
-498.50 player_attack You hit ★ Grey Wolf for 139
-498.50 mob_death ★ Grey Wolf dies!
-500.00 mob_death Kobold Miner appears!
-503.50 player_attack SimAlly2 hits Kobold Miner for 16
-503.75 player_attack SimAlly0 hits Kobold Miner for 16
-504.00 player_attack SimAlly1 hits Kobold Miner for 16
-504.25 player_attack You hit Kobold Miner for 139
-504.25 mob_death Kobold Miner dies!
-504.75 mob_attack Kobold Miner joins the fight!
-505.75 mob_death Kobold Miner appears!
-509.00 player_attack SimAlly2 hits Kobold Miner for 16
-509.75 player_attack SimAlly0 hits Kobold Miner for 16
-509.75 player_attack SimAlly1 hits Kobold Miner for 16
-510.00 mob_attack Kobold Miner hits you for 8
-510.25 player_attack You hit Kobold Miner for 139
-510.25 mob_death Kobold Miner dies!
-511.25 player_crit SimAlly2 hits Kobold Miner for 31 (CRIT!)
-511.75 mob_death Kobold Miner appears!
-512.25 player_attack SimAlly0 hits Kobold Miner for 16
-512.25 player_attack SimAlly1 hits Kobold Miner for 16
-512.25 mob_death Kobold Miner dies!
-513.75 mob_death Rampaging Boar appears!
-516.25 player_attack SimAlly2 hits Kobold Miner for 16
-517.25 player_attack SimAlly0 hits Kobold Miner for 16
-517.50 player_attack SimAlly1 hits Kobold Miner for 16
-517.75 player_attack You hit Kobold Miner for 139
+14.75 player_attack SimAlly0 hits Rampaging Boar for 16
+14.75 player_attack SimAlly1 hits Rampaging Boar for 16
+15.00 player_attack You hit Rampaging Boar for 63
+15.25 player_attack SimAlly2 hits Rampaging Boar for 15
+16.25 mob_attack Rampaging Boar hits you for 17
+17.00 player_attack SimAlly0 hits Rampaging Boar for 16
+17.00 mob_death Rampaging Boar dies!
+28.50 mob_death ★ Elite: ★ Rampaging Boar appears!
+30.00 player_attack SimAlly1 hits Kobold Miner for 16
+30.25 player_attack SimAlly2 hits Kobold Miner for 15
+32.00 player_attack SimAlly0 hits Kobold Miner for 16
+32.00 player_attack SimAlly2 hits Kobold Miner for 15
+32.00 mob_attack Kobold Miner hits you for 16
+32.25 player_attack You hit Kobold Miner for 63
+32.25 mob_death Kobold Miner dies!
+32.25 level_up ★ Level Up! Now level 2!
+33.75 mob_death Rampaging Boar appears!
+34.25 player_attack SimAlly1 hits ★ Rampaging Boar for 16
+35.75 player_attack SimAlly2 hits ★ Rampaging Boar for 15
+36.00 player_attack SimAlly0 hits ★ Rampaging Boar for 16
+36.00 mob_attack ★ Rampaging Boar hits you for 30
+36.25 player_attack SimAlly1 hits ★ Rampaging Boar for 16
+36.50 player_attack You hit ★ Rampaging Boar for 63
+37.50 player_attack SimAlly2 hits ★ Rampaging Boar for 15
+38.25 player_attack SimAlly0 hits ★ Rampaging Boar for 16
+38.50 player_attack SimAlly1 hits ★ Rampaging Boar for 16
+39.00 player_attack You hit ★ Rampaging Boar for 63
+39.25 player_attack SimAlly2 hits ★ Rampaging Boar for 15
+39.50 mob_attack ★ Rampaging Boar hits you for 30
+40.50 player_attack SimAlly0 hits ★ Rampaging Boar for 16
+40.75 player_attack SimAlly1 hits ★ Rampaging Boar for 16
+41.25 player_attack SimAlly2 hits ★ Rampaging Boar for 15
+41.50 player_attack You hit ★ Rampaging Boar for 63
+42.75 player_attack SimAlly0 hits ★ Rampaging Boar for 16
+43.00 player_attack SimAlly1 hits ★ Rampaging Boar for 16
+43.00 player_crit SimAlly2 hits ★ Rampaging Boar for 31 (CRIT!)
+43.00 mob_death ★ Rampaging Boar dies!
+44.50 mob_death Kobold Miner appears!
+49.75 player_crit SimAlly2 hits Rampaging Boar for 31 (CRIT!)
+50.00 player_attack SimAlly0 hits Rampaging Boar for 16
+50.00 mob_attack Rampaging Boar hits you for 17
+50.25 player_attack SimAlly1 hits Rampaging Boar for 16
+50.50 player_attack You hit Rampaging Boar for 63
+51.50 player_attack SimAlly2 hits Rampaging Boar for 15
+51.50 mob_death Rampaging Boar dies!
+53.00 mob_death Grey Wolf appears!
+54.50 player_attack SimAlly0 hits Kobold Miner for 16
+54.75 player_attack SimAlly1 hits Kobold Miner for 16
+55.75 player_attack SimAlly2 hits Kobold Miner for 15
+56.50 player_attack You hit Kobold Miner for 63
+56.75 player_attack SimAlly0 hits Kobold Miner for 16
+56.75 mob_death Kobold Miner dies!
+58.25 mob_death Grey Wolf appears!
+59.50 player_attack SimAlly1 hits Rampaging Boar for 16
+60.25 player_attack SimAlly2 hits Rampaging Boar for 15
+61.25 player_attack SimAlly0 hits Rampaging Boar for 16
+61.50 player_attack You hit Rampaging Boar for 63
+61.75 player_attack SimAlly1 hits Rampaging Boar for 16
+62.00 player_attack SimAlly2 hits Rampaging Boar for 15
+62.00 mob_death Rampaging Boar dies!
+63.50 mob_death Kobold Miner appears!
+67.50 player_attack SimAlly0 hits Grey Wolf for 16
+67.75 player_attack SimAlly2 hits Grey Wolf for 15
+68.00 player_attack SimAlly1 hits Grey Wolf for 16
+68.50 player_attack You hit Grey Wolf for 63
+68.50 mob_death Grey Wolf dies!
+70.00 mob_death Rampaging Boar appears!
+72.75 player_attack SimAlly2 hits Kobold Miner for 15
+73.00 player_attack SimAlly0 hits Kobold Miner for 16
+73.50 player_attack SimAlly1 hits Kobold Miner for 16
+74.00 player_attack You hit Kobold Miner for 63
+74.50 player_attack SimAlly2 hits Kobold Miner for 15
+74.50 mob_death Kobold Miner dies!
+75.00 mob_attack Grey Wolf joins the fight!
+76.00 mob_death Kobold Miner appears!
+77.25 player_attack SimAlly0 hits Rampaging Boar for 16
+77.75 player_attack SimAlly1 hits Rampaging Boar for 16
+78.75 player_attack SimAlly2 hits Rampaging Boar for 15
+79.25 player_attack You hit Rampaging Boar for 63
+79.50 player_attack SimAlly0 hits Rampaging Boar for 16
+80.00 player_attack SimAlly1 hits Rampaging Boar for 16
+80.00 mob_death Rampaging Boar dies!
+80.75 player_attack SimAlly2 hits Grey Wolf for 15
+81.50 mob_death Rampaging Boar appears!
+81.75 player_attack SimAlly0 hits Grey Wolf for 16
+82.00 mob_attack Grey Wolf hits you for 10
+82.25 player_attack SimAlly1 hits Grey Wolf for 16
+82.50 player_attack You hit Grey Wolf for 63
+82.50 mob_death Grey Wolf dies!
+84.00 mob_death Grey Wolf appears!
+86.00 player_attack SimAlly2 hits Kobold Miner for 15
+87.50 player_attack SimAlly0 hits Kobold Miner for 16
+87.75 player_attack SimAlly2 hits Kobold Miner for 15
+88.00 player_attack SimAlly1 hits Kobold Miner for 16
+88.00 player_death SimAlly0 goes down!
+88.25 player_attack You hit Kobold Miner for 63
+88.25 mob_death Kobold Miner dies!
+88.25 level_up ★ Level Up! Now level 3!
+89.75 mob_death Grey Wolf appears!
+93.00 player_attack SimAlly2 hits Grey Wolf for 15
+93.75 player_attack SimAlly1 hits Grey Wolf for 16
+94.00 player_attack You hit Grey Wolf for 63
+94.00 mob_death Grey Wolf dies!
+95.50 mob_death Kobold Miner appears!
+99.25 player_attack SimAlly2 hits Kobold Miner for 15
+100.00 player_respawn SimAlly0 gets back up.
+100.00 player_crit SimAlly1 hits Kobold Miner for 32 (CRIT!)
+100.25 mob_attack Kobold Miner hits you for 15
+100.50 player_attack You hit Kobold Miner for 66
+100.50 mob_death Kobold Miner dies!
+102.00 mob_death Rampaging Boar appears!
+105.00 player_attack SimAlly2 hits Grey Wolf for 15
+106.00 player_attack SimAlly0 hits Grey Wolf for 16
+106.25 player_attack SimAlly1 hits Grey Wolf for 16
+106.25 mob_attack Grey Wolf hits you for 10
+106.75 player_attack You hit Grey Wolf for 66
+106.75 mob_death Grey Wolf dies!
+108.25 mob_death Kobold Miner appears!
+110.00 player_attack SimAlly2 hits Rampaging Boar for 15
+111.50 player_attack SimAlly0 hits Rampaging Boar for 16
+111.75 player_attack SimAlly1 hits Rampaging Boar for 16
+111.75 player_attack SimAlly2 hits Rampaging Boar for 15
+111.75 mob_attack Rampaging Boar hits you for 16
+112.25 player_attack You hit Rampaging Boar for 67
+113.50 player_attack SimAlly2 hits Rampaging Boar for 15
+113.50 mob_death Rampaging Boar dies!
+115.00 mob_death Grey Wolf appears!
+115.75 player_attack SimAlly0 hits Kobold Miner for 16
+116.00 player_attack SimAlly1 hits Kobold Miner for 16
+117.50 player_attack SimAlly2 hits Kobold Miner for 15
+118.00 player_attack You hit Kobold Miner for 67
+118.00 mob_death Kobold Miner dies!
+119.50 mob_death Rampaging Boar appears!
+120.75 player_attack SimAlly0 hits Grey Wolf for 16
+121.00 player_attack SimAlly1 hits Grey Wolf for 16
+122.00 player_attack SimAlly2 hits Grey Wolf for 15
+123.00 player_attack You hit Grey Wolf for 67
+123.00 mob_death Grey Wolf dies!
+124.50 mob_death Kobold Miner appears!
+127.00 player_attack SimAlly0 hits Kobold Miner for 16
+127.00 player_attack SimAlly1 hits Kobold Miner for 16
+127.75 player_attack SimAlly2 hits Kobold Miner for 15
+129.00 player_attack SimAlly0 hits Kobold Miner for 16
+129.25 player_attack You hit Kobold Miner for 84
+129.25 mob_death Kobold Miner dies!
+130.75 mob_death Kobold Miner appears!
+133.25 player_crit SimAlly1 hits Rampaging Boar for 32 (CRIT!)
+133.50 player_attack SimAlly2 hits Rampaging Boar for 15
+135.00 mob_attack Rampaging Boar hits you for 16
+135.25 player_attack SimAlly0 hits Rampaging Boar for 16
+135.25 player_attack SimAlly2 hits Rampaging Boar for 15
+135.50 player_attack You hit Rampaging Boar for 84
+135.50 mob_death Rampaging Boar dies!
+137.00 mob_death Rampaging Boar appears!
+139.75 player_attack SimAlly1 hits Rampaging Boar for 16
+141.50 player_attack SimAlly2 hits Rampaging Boar for 15
+141.50 mob_attack Rampaging Boar hits you for 16
+141.75 player_attack SimAlly0 hits Rampaging Boar for 16
+142.00 player_attack You hit Rampaging Boar for 84
+142.00 player_attack SimAlly1 hits Rampaging Boar for 16
+142.00 mob_death Rampaging Boar dies!
+143.50 mob_death Grey Wolf appears!
+145.75 player_attack SimAlly2 hits Rampaging Boar for 15
+146.25 player_attack SimAlly0 hits Rampaging Boar for 16
+146.50 player_attack SimAlly1 hits Rampaging Boar for 16
+146.75 player_attack You hit Rampaging Boar for 84
+147.50 player_attack SimAlly2 hits Rampaging Boar for 15
+147.50 mob_death Rampaging Boar dies!
+149.00 mob_death ★ Elite: ★ Grey Wolf appears!
+151.00 player_attack SimAlly0 hits Grey Wolf for 16
+151.00 player_attack SimAlly1 hits Grey Wolf for 16
+151.75 player_attack SimAlly2 hits Grey Wolf for 15
+152.50 player_attack You hit Grey Wolf for 84
+152.50 mob_death Grey Wolf dies!
+154.00 mob_death Grey Wolf appears!
+157.25 player_attack SimAlly0 hits Kobold Miner for 16
+157.50 player_attack SimAlly1 hits Kobold Miner for 16
+157.75 player_crit SimAlly2 hits Kobold Miner for 31 (CRIT!)
+158.75 mob_attack Kobold Miner hits you for 15
+159.00 player_attack You hit Kobold Miner for 86
+159.00 mob_death Kobold Miner dies!
+160.50 mob_death Kobold Miner appears!
+163.00 player_attack SimAlly0 hits ★ Grey Wolf for 16
+163.25 player_crit SimAlly1 hits ★ Grey Wolf for 32 (CRIT!)
+163.25 player_attack SimAlly2 hits ★ Grey Wolf for 15
+164.25 mob_attack ★ Grey Wolf hits you for 18
+164.75 player_attack You hit ★ Grey Wolf for 86
+165.00 player_attack SimAlly2 hits ★ Grey Wolf for 15
+165.25 player_attack SimAlly0 hits ★ Grey Wolf for 16
+165.50 player_attack SimAlly1 hits ★ Grey Wolf for 16
+166.75 player_attack SimAlly2 hits ★ Grey Wolf for 15
+167.25 player_attack You hit ★ Grey Wolf for 86
+167.25 mob_death ★ Grey Wolf dies!
+168.75 mob_death Rampaging Boar appears!
+170.50 player_attack SimAlly0 hits Grey Wolf for 16
+170.75 player_attack SimAlly1 hits Grey Wolf for 16
+171.50 player_attack SimAlly2 hits Grey Wolf for 15
+172.00 player_death SimAlly0 goes down!
+172.50 player_attack You hit Grey Wolf for 88
+172.50 mob_death Grey Wolf dies!
+174.00 mob_death Kobold Miner appears!
+175.75 player_attack SimAlly1 hits Rampaging Boar for 16
+176.25 player_attack SimAlly2 hits Rampaging Boar for 15
+177.25 mob_attack Rampaging Boar hits you for 16
+177.75 player_attack You hit Rampaging Boar for 88
+178.00 player_attack SimAlly1 hits Rampaging Boar for 16
+178.00 mob_death Rampaging Boar dies!
+179.50 mob_death Kobold Miner appears!
+182.25 player_attack SimAlly2 hits Kobold Miner for 15
+184.00 player_respawn SimAlly0 gets back up.
+184.00 player_attack SimAlly1 hits Kobold Miner for 16
+184.00 player_attack SimAlly2 hits Kobold Miner for 15
+184.00 mob_attack Kobold Miner hits you for 15
+184.25 player_attack You hit Kobold Miner for 88
+184.25 mob_death Kobold Miner dies!
+185.75 mob_death Rampaging Boar appears!
+190.75 player_crit SimAlly2 hits Kobold Miner for 31 (CRIT!)
+191.00 player_attack SimAlly0 hits Kobold Miner for 16
+191.25 player_attack SimAlly1 hits Kobold Miner for 16
+191.25 mob_attack Kobold Miner hits you for 15
+191.50 player_attack You hit Kobold Miner for 88
+191.50 mob_death Kobold Miner dies!
+191.50 level_up ★ Level Up! Now level 4!
+193.00 mob_death Kobold Miner appears!
+195.75 player_attack SimAlly2 hits Kobold Miner for 15
+196.50 player_attack SimAlly0 hits Kobold Miner for 16
+196.75 player_attack SimAlly1 hits Kobold Miner for 16
+197.00 player_attack You hit Kobold Miner for 88
+197.00 mob_death Kobold Miner dies!
+198.50 mob_death Grey Wolf appears!
+201.75 player_attack SimAlly2 hits Kobold Miner for 15
+203.00 player_attack SimAlly0 hits Kobold Miner for 16
+203.00 player_attack SimAlly1 hits Kobold Miner for 16
+203.25 mob_attack Kobold Miner hits you for 15
+203.50 player_attack You hit Kobold Miner for 88
+203.50 mob_death Kobold Miner dies!
+205.00 mob_death Kobold Miner appears!
+207.50 player_attack SimAlly2 hits Kobold Miner for 15
+209.00 player_attack SimAlly0 hits Kobold Miner for 16
+209.00 player_attack SimAlly1 hits Kobold Miner for 16
+209.25 player_attack SimAlly2 hits Kobold Miner for 15
+209.50 player_attack You hit Kobold Miner for 88
+209.50 mob_death Kobold Miner dies!
+211.00 mob_death Kobold Miner appears!
+214.25 player_attack SimAlly2 hits Kobold Miner for 15
+214.50 player_attack SimAlly0 hits Kobold Miner for 16
+214.50 player_attack SimAlly1 hits Kobold Miner for 16
+214.75 mob_attack Kobold Miner hits you for 15
+215.00 player_attack You hit Kobold Miner for 88
+215.00 mob_death Kobold Miner dies!
+228.00 proc ⚔️ Crafted Coarse Crude Weapon Oil!
+229.50 mob_death Grey Wolf appears!
+233.50 player_attack SimAlly2 hits Rampaging Boar for 15
+234.00 player_attack SimAlly0 hits Rampaging Boar for 16
+234.25 player_attack SimAlly1 hits Rampaging Boar for 16
+234.75 player_crit You hit Rampaging Boar for 176 (CRIT!)
+234.75 mob_death Rampaging Boar dies!
+236.25 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+242.25 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
+243.25 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 16
+243.50 player_crit SimAlly1 hits [BOSS] Elder Meadow Beast for 32 (CRIT!)
+244.00 player_attack You hit [BOSS] Elder Meadow Beast for 88
+244.25 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
+244.50 mob_attack [BOSS] Elder Meadow Beast hits you for 149
+244.50 player_death You have been slain! Respawning in 3s...
+247.50 player_respawn You rise from the grave...
+249.00 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+250.00 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 16
+250.00 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 16
+250.50 player_crit SimAlly2 hits [BOSS] Elder Meadow Beast for 31 (CRIT!)
+251.50 player_attack You hit [BOSS] Elder Meadow Beast for 88
+252.00 mob_attack [BOSS] Elder Meadow Beast hits you for 149
+252.25 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 16
+252.25 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 16
+252.25 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
+254.00 player_attack You hit [BOSS] Elder Meadow Beast for 88
+254.00 player_crit SimAlly2 hits [BOSS] Elder Meadow Beast for 31 (CRIT!)
+254.50 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 16
+254.50 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 16
+255.00 mob_attack [BOSS] Elder Meadow Beast hits you for 149
+255.00 player_death You have been slain! Respawning in 3s...
+258.00 player_respawn You rise from the grave...
+259.50 mob_death ⚠ BOSS: [BOSS] Elder Meadow Beast appears!
+260.25 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
+261.00 player_attack SimAlly0 hits [BOSS] Elder Meadow Beast for 16
+261.25 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 16
+262.00 player_attack You hit [BOSS] Elder Meadow Beast for 88
+262.25 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
+262.50 player_death SimAlly0 goes down!
+263.50 player_crit SimAlly1 hits [BOSS] Elder Meadow Beast for 32 (CRIT!)
+264.00 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
+264.50 player_attack You hit [BOSS] Elder Meadow Beast for 88
+265.50 player_attack SimAlly1 hits [BOSS] Elder Meadow Beast for 16
+265.75 player_attack SimAlly2 hits [BOSS] Elder Meadow Beast for 15
+265.75 mob_death [BOSS] Elder Meadow Beast dies!
+265.75 level_up ★ Level Up! Now level 5!
+267.25 mob_death Grey Wolf appears!
+268.75 mob_death Grey Wolf appears!
+270.25 mob_death Rampaging Boar appears!
+271.75 mob_death Grey Wolf appears!
+272.00 player_attack SimAlly2 hits Grey Wolf for 16
+272.25 player_attack SimAlly1 hits Grey Wolf for 16
+272.25 mob_attack Grey Wolf hits you for 9
+272.75 player_attack You hit Grey Wolf for 91
+272.75 mob_death Grey Wolf dies!
+274.25 mob_death Grey Wolf appears!
+274.50 player_respawn SimAlly0 gets back up.
+277.00 player_attack SimAlly2 hits Rampaging Boar for 16
+277.75 player_attack SimAlly1 hits Rampaging Boar for 16
+277.75 player_death SimAlly1 goes down!
+278.00 player_attack SimAlly0 hits Rampaging Boar for 16
+278.25 player_attack You hit Rampaging Boar for 91
+278.25 mob_death Rampaging Boar dies!
+279.75 mob_death Kobold Miner appears!
+282.25 player_attack SimAlly2 hits Grey Wolf for 16
+283.25 mob_attack Grey Wolf hits you for 9
+283.50 player_attack SimAlly0 hits Grey Wolf for 16
+283.75 player_attack You hit Grey Wolf for 91
+283.75 mob_death Grey Wolf dies!
+285.25 mob_death Kobold Miner appears!
+287.25 player_attack SimAlly2 hits Kobold Miner for 16
+289.00 player_attack SimAlly0 hits Kobold Miner for 16
+289.00 player_attack SimAlly2 hits Kobold Miner for 16
+289.00 mob_attack Kobold Miner hits you for 14
+289.25 player_attack You hit Kobold Miner for 91
+289.25 mob_death Kobold Miner dies!
+289.75 player_respawn SimAlly1 gets back up.
+290.75 mob_death Rampaging Boar appears!
+294.25 player_attack SimAlly2 hits Grey Wolf for 16
+294.50 mob_attack Grey Wolf hits you for 9
+294.75 player_attack SimAlly0 hits Grey Wolf for 16
+294.75 player_attack SimAlly1 hits Grey Wolf for 16
+295.00 player_attack You hit Grey Wolf for 91
+295.00 mob_death Grey Wolf dies!
+296.50 mob_death Rampaging Boar appears!
+299.00 mob_attack Rampaging Boar spots you and charges!
+300.50 player_attack SimAlly2 hits Rampaging Boar for 16
+301.25 mob_attack Rampaging Boar hits you for 13
+301.50 player_attack SimAlly0 hits Rampaging Boar for 16
+301.50 player_attack SimAlly1 hits Rampaging Boar for 16
+301.75 player_attack You hit Rampaging Boar for 91
+301.75 mob_death Rampaging Boar dies!
+302.75 player_attack SimAlly2 hits Rampaging Boar for 16
+303.25 mob_death Rampaging Boar appears!
+303.75 player_attack SimAlly0 hits Rampaging Boar for 16
+304.00 player_attack SimAlly1 hits Rampaging Boar for 16
+304.25 player_attack You hit Rampaging Boar for 91
+304.25 mob_death Rampaging Boar dies!
+305.75 mob_death Grey Wolf appears!
+308.75 player_attack SimAlly2 hits Rampaging Boar for 16
+310.25 player_crit SimAlly0 hits Rampaging Boar for 33 (CRIT!)
+310.50 player_attack SimAlly1 hits Rampaging Boar for 16
+310.50 player_attack SimAlly2 hits Rampaging Boar for 16
+310.75 player_attack You hit Rampaging Boar for 91
+310.75 mob_death Rampaging Boar dies!
+311.25 mob_attack Grey Wolf joins the fight!
+312.25 mob_death Rampaging Boar appears!
+314.25 mob_attack Rampaging Boar spots you and charges!
+316.25 player_attack SimAlly2 hits Kobold Miner for 16
+316.50 player_attack SimAlly0 hits Kobold Miner for 16
+316.75 player_attack SimAlly1 hits Kobold Miner for 16
+316.75 mob_attack Kobold Miner hits you for 12
+317.00 player_attack You hit Kobold Miner for 91
+317.00 mob_death Kobold Miner dies!
+317.00 mob_attack Grey Wolf hits you for 8
+318.25 player_attack SimAlly2 hits Grey Wolf for 16
+318.50 mob_death Grey Wolf appears!
+318.75 mob_attack Rampaging Boar hits you for 13
+319.00 player_attack SimAlly0 hits Grey Wolf for 16
+319.00 player_attack SimAlly1 hits Grey Wolf for 16
+319.00 mob_attack Grey Wolf hits you for 8
+319.50 player_attack You hit Grey Wolf for 91
+319.50 mob_death Grey Wolf dies!
+320.50 player_attack SimAlly2 hits Rampaging Boar for 16
+321.00 mob_death Rampaging Boar appears!
+321.50 player_attack SimAlly0 hits Rampaging Boar for 16
+321.50 player_attack SimAlly1 hits Rampaging Boar for 16
+321.50 mob_attack Rampaging Boar hits you for 13
+322.00 player_crit You hit Rampaging Boar for 183 (CRIT!)
+322.00 mob_death Rampaging Boar dies!
+323.50 mob_death Kobold Miner appears!
+325.00 player_attack SimAlly2 hits Grey Wolf for 16
+326.25 player_attack SimAlly0 hits Grey Wolf for 16
+326.50 player_attack SimAlly1 hits Grey Wolf for 16
+326.50 mob_attack Grey Wolf hits you for 8
+326.75 player_attack SimAlly2 hits Grey Wolf for 16
+327.00 player_attack You hit Grey Wolf for 148
+327.00 mob_death Grey Wolf dies!
+328.50 mob_death Grey Wolf appears!
+332.00 player_attack SimAlly0 hits Kobold Miner for 16
+332.00 player_attack SimAlly2 hits Kobold Miner for 16
+332.25 player_crit SimAlly1 hits Kobold Miner for 33 (CRIT!)
+332.50 mob_attack Kobold Miner hits you for 12
+332.75 player_attack You hit Kobold Miner for 148
+332.75 mob_death Kobold Miner dies!
+334.25 mob_death Kobold Miner appears!
+337.00 player_attack SimAlly2 hits Grey Wolf for 16
+337.50 player_attack SimAlly0 hits Grey Wolf for 16
+337.75 player_attack SimAlly1 hits Grey Wolf for 16
+337.75 mob_attack Grey Wolf hits you for 8
+338.25 player_attack You hit Grey Wolf for 148
+338.25 mob_death Grey Wolf dies!
+339.75 mob_death Rampaging Boar appears!
+342.00 player_attack SimAlly2 hits Grey Wolf for 16
+342.75 player_attack SimAlly0 hits Grey Wolf for 16
+342.75 player_attack SimAlly1 hits Grey Wolf for 16
+343.00 mob_attack Grey Wolf hits you for 8
+343.50 player_attack You hit Grey Wolf for 148
+343.50 mob_death Grey Wolf dies!
+344.00 mob_attack Rampaging Boar joins the fight!
+345.00 mob_death Grey Wolf appears!
+345.00 mob_attack Grey Wolf joins the fight!
+347.00 player_attack SimAlly2 hits Kobold Miner for 16
+348.25 player_attack SimAlly0 hits Kobold Miner for 16
+348.25 player_attack SimAlly1 hits Kobold Miner for 16
+348.75 player_crit SimAlly2 hits Kobold Miner for 31 (CRIT!)
+349.00 player_attack You hit Kobold Miner for 146
+349.00 mob_death Kobold Miner dies!
+349.75 mob_attack Grey Wolf hits you for 7
+350.50 mob_death Rampaging Boar appears!
+350.50 player_attack SimAlly0 hits Rampaging Boar for 16
+350.75 player_attack SimAlly1 hits Rampaging Boar for 16
+350.75 player_crit SimAlly2 hits Rampaging Boar for 31 (CRIT!)
+351.00 mob_attack Rampaging Boar hits you for 12
+351.50 player_attack You hit Rampaging Boar for 146
+351.50 mob_death Rampaging Boar dies!
+352.75 player_attack SimAlly2 hits Grey Wolf for 16
+353.00 mob_death Rampaging Boar appears!
+353.00 player_attack SimAlly0 hits Grey Wolf for 16
+353.25 player_attack SimAlly1 hits Grey Wolf for 16
+353.50 mob_attack Grey Wolf hits you for 7
+354.00 player_crit You hit Grey Wolf for 293 (CRIT!)
+354.00 mob_death Grey Wolf dies!
+355.50 mob_death Grey Wolf appears!
+357.25 player_attack SimAlly2 hits Rampaging Boar for 16
+357.75 player_attack SimAlly0 hits Rampaging Boar for 16
+358.00 player_attack SimAlly1 hits Rampaging Boar for 16
+358.25 mob_attack Rampaging Boar hits you for 12
+358.75 player_attack You hit Rampaging Boar for 146
+358.75 mob_death Rampaging Boar dies!
+360.25 mob_death Kobold Miner appears!
+362.50 player_attack SimAlly2 hits Grey Wolf for 16
+363.50 player_attack SimAlly0 hits Grey Wolf for 16
+363.50 player_attack SimAlly1 hits Grey Wolf for 16
+364.00 mob_attack Grey Wolf hits you for 7
+364.25 player_attack SimAlly2 hits Grey Wolf for 16
+364.50 player_attack You hit Grey Wolf for 146
+364.50 mob_death Grey Wolf dies!
+365.00 mob_attack Rampaging Boar joins the fight!
+366.00 mob_death Rampaging Boar appears!
+369.00 player_attack SimAlly0 hits Kobold Miner for 16
+369.00 player_attack SimAlly1 hits Kobold Miner for 16
+369.25 player_attack SimAlly2 hits Kobold Miner for 16
+370.00 player_attack You hit Kobold Miner for 146
+370.00 mob_death Kobold Miner dies!
+371.25 player_attack SimAlly0 hits Rampaging Boar for 16
+371.25 player_attack SimAlly2 hits Rampaging Boar for 16
+371.50 mob_death Grey Wolf appears!
+371.50 player_attack SimAlly1 hits Rampaging Boar for 16
+372.00 mob_attack Rampaging Boar hits you for 12
+372.50 player_attack You hit Rampaging Boar for 146
+372.50 mob_death Rampaging Boar dies!
+372.50 level_up ★ Level Up! Now level 6!
+374.00 mob_death Grey Wolf appears!
+375.50 player_attack SimAlly2 hits Rampaging Boar for 16
+375.75 player_attack SimAlly0 hits Rampaging Boar for 16
+376.00 player_attack SimAlly1 hits Rampaging Boar for 16
+377.00 player_attack You hit Rampaging Boar for 146
+377.00 mob_death Rampaging Boar dies!
+378.50 mob_death Rampaging Boar appears!
+381.25 player_attack SimAlly2 hits Grey Wolf for 16
+382.00 player_attack SimAlly0 hits Grey Wolf for 16
+382.25 player_attack SimAlly1 hits Grey Wolf for 16
+383.00 player_attack SimAlly2 hits Grey Wolf for 16
+383.25 player_attack You hit Grey Wolf for 146
+383.25 mob_death Grey Wolf dies!
+384.75 mob_death Rampaging Boar appears!
+388.00 player_attack SimAlly0 hits Rampaging Boar for 16
+388.00 player_attack SimAlly1 hits Rampaging Boar for 16
+388.50 player_attack SimAlly2 hits Rampaging Boar for 16
+388.75 mob_attack Rampaging Boar hits you for 12
+389.25 player_attack You hit Rampaging Boar for 146
+389.25 mob_death Rampaging Boar dies!
+390.75 mob_death Rampaging Boar appears!
+390.75 mob_attack Rampaging Boar joins the fight!
+394.00 player_attack SimAlly0 hits Rampaging Boar for 16
+394.00 player_attack SimAlly1 hits Rampaging Boar for 16
+394.00 player_attack SimAlly2 hits Rampaging Boar for 16
+394.75 player_death SimAlly0 goes down!
+395.25 player_crit You hit Rampaging Boar for 293 (CRIT!)
+395.25 mob_death Rampaging Boar dies!
+396.25 player_attack SimAlly2 hits Rampaging Boar for 16
+396.50 player_attack SimAlly1 hits Rampaging Boar for 16
+396.75 mob_death Rampaging Boar appears!
+397.75 player_attack You hit Rampaging Boar for 146
+397.75 mob_death Rampaging Boar dies!
+399.25 mob_death Rampaging Boar appears!
+401.00 player_attack SimAlly2 hits Rampaging Boar for 16
+401.75 player_attack SimAlly1 hits Rampaging Boar for 16
+402.50 mob_attack Rampaging Boar hits you for 12
+402.75 player_attack SimAlly2 hits Rampaging Boar for 16
+403.00 player_attack You hit Rampaging Boar for 146
+403.00 mob_death Rampaging Boar dies!
+404.50 mob_death Rampaging Boar appears!
+406.00 player_attack SimAlly1 hits Rampaging Boar for 16
+406.50 player_attack SimAlly2 hits Rampaging Boar for 16
+406.75 player_respawn SimAlly0 gets back up.
+406.75 mob_attack Rampaging Boar hits you for 12
+407.25 player_attack You hit Rampaging Boar for 146
+407.25 mob_death Rampaging Boar dies!
+408.75 mob_death Grey Wolf appears!
+411.50 player_attack SimAlly1 hits Rampaging Boar for 16
+411.75 player_attack SimAlly2 hits Rampaging Boar for 16
+412.25 player_attack SimAlly0 hits Rampaging Boar for 16
+413.00 player_attack You hit Rampaging Boar for 146
+413.00 mob_death Rampaging Boar dies!
+413.00 mob_attack Grey Wolf spots you and charges!
+413.25 mob_attack Grey Wolf joins the fight!
+414.50 mob_death Kobold Miner appears!
+415.25 player_attack SimAlly1 hits Grey Wolf for 16
+415.25 player_attack SimAlly2 hits Grey Wolf for 16
+416.00 player_attack SimAlly0 hits Grey Wolf for 16
+416.25 mob_attack Grey Wolf hits you for 7
+416.75 player_attack You hit Grey Wolf for 146
+416.75 mob_death Grey Wolf dies!
+417.25 player_attack SimAlly2 hits Grey Wolf for 16
+417.75 player_attack SimAlly1 hits Grey Wolf for 16
+418.25 mob_death Rampaging Boar appears!
+418.50 player_attack SimAlly0 hits Grey Wolf for 16
+418.75 mob_attack Grey Wolf hits you for 7
+419.00 player_attack SimAlly2 hits Grey Wolf for 16
+419.25 player_attack You hit Grey Wolf for 146
+419.25 mob_death Grey Wolf dies!
+420.75 mob_death Kobold Miner appears!
+424.00 player_attack SimAlly1 hits Kobold Miner for 16
+424.75 player_attack SimAlly0 hits Kobold Miner for 16
+424.75 player_attack SimAlly2 hits Kobold Miner for 16
+425.50 player_attack You hit Kobold Miner for 146
+425.50 mob_death Kobold Miner dies!
+427.00 mob_death Kobold Miner appears!
+429.25 player_attack SimAlly1 hits Rampaging Boar for 16
+429.50 player_attack SimAlly2 hits Rampaging Boar for 16
+430.00 player_attack SimAlly0 hits Rampaging Boar for 16
+430.25 mob_attack Rampaging Boar hits you for 12
+430.75 player_crit You hit Rampaging Boar for 293 (CRIT!)
+430.75 mob_death Rampaging Boar dies!
+441.25 mob_attack Kobold Miner joins the fight!
+442.25 mob_death Rampaging Boar appears!
+444.75 player_attack SimAlly1 hits Kobold Miner for 16
+445.00 player_attack SimAlly2 hits Kobold Miner for 16
+445.50 player_attack SimAlly0 hits Kobold Miner for 16
+446.50 player_attack You hit Kobold Miner for 146
+446.50 mob_death Kobold Miner dies!
+447.00 player_attack SimAlly2 hits Kobold Miner for 16
+447.25 player_attack SimAlly1 hits Kobold Miner for 16
+448.00 mob_death ★ Elite: ★ Grey Wolf appears!
+448.00 player_attack SimAlly0 hits Kobold Miner for 16
+448.75 player_attack SimAlly2 hits Kobold Miner for 16
+449.00 player_attack You hit Kobold Miner for 146
+449.00 mob_death Kobold Miner dies!
+449.50 mob_attack Rampaging Boar joins the fight!
+450.50 mob_death Kobold Miner appears!
+451.75 player_attack SimAlly1 hits ★ Grey Wolf for 16
+452.50 player_attack SimAlly0 hits ★ Grey Wolf for 16
+452.75 player_attack SimAlly2 hits ★ Grey Wolf for 16
+453.00 player_death SimAlly1 goes down!
+453.50 player_attack You hit ★ Grey Wolf for 146
+454.50 player_attack SimAlly2 hits ★ Grey Wolf for 16
+454.75 player_attack SimAlly0 hits ★ Grey Wolf for 16
+456.00 player_attack You hit ★ Grey Wolf for 146
+456.00 mob_death ★ Grey Wolf dies!
+456.75 player_attack SimAlly2 hits Rampaging Boar for 16
+457.25 player_attack SimAlly0 hits Rampaging Boar for 16
+457.50 mob_death Grey Wolf appears!
+458.00 mob_attack Rampaging Boar hits you for 12
+458.00 player_death You have been slain! Respawning in 3s...
+461.00 player_respawn You rise from the grave...
+462.50 mob_death Grey Wolf appears!
+464.00 mob_death Kobold Miner appears!
+465.50 mob_death Kobold Miner appears!
+467.00 mob_death Kobold Miner appears!
+467.25 player_attack SimAlly2 hits Grey Wolf for 16
+468.00 player_respawn SimAlly1 gets back up.
+468.00 player_attack SimAlly0 hits Grey Wolf for 16
+468.75 mob_attack Grey Wolf hits you for 7
+469.00 player_attack SimAlly2 hits Grey Wolf for 16
+469.25 player_crit You hit Grey Wolf for 293 (CRIT!)
+469.25 mob_death Grey Wolf dies!
+470.75 mob_death ★ Elite: ★ Grey Wolf appears!
+472.75 player_attack SimAlly1 hits Kobold Miner for 16
+473.00 player_attack SimAlly0 hits Kobold Miner for 16
+473.50 player_attack SimAlly2 hits Kobold Miner for 16
+474.00 mob_attack Kobold Miner hits you for 12
+474.25 player_attack You hit Kobold Miner for 146
+474.25 mob_death Kobold Miner dies!
+475.75 mob_death Grey Wolf appears!
+479.50 player_attack SimAlly1 hits ★ Grey Wolf for 16
+479.75 player_attack SimAlly0 hits ★ Grey Wolf for 16
+479.75 player_attack SimAlly2 hits ★ Grey Wolf for 16
+481.00 player_attack You hit ★ Grey Wolf for 146
+481.75 player_attack SimAlly1 hits ★ Grey Wolf for 16
+481.75 player_crit SimAlly2 hits ★ Grey Wolf for 31 (CRIT!)
+482.00 player_attack SimAlly0 hits ★ Grey Wolf for 16
+482.00 mob_death ★ Grey Wolf dies!
+483.50 mob_death Grey Wolf appears!
+485.75 player_attack SimAlly2 hits Grey Wolf for 16
+486.25 player_attack SimAlly0 hits Grey Wolf for 16
+486.25 player_attack SimAlly1 hits Grey Wolf for 16
+486.50 player_attack You hit Grey Wolf for 144
+486.50 mob_death Grey Wolf dies!
+488.00 mob_death Grey Wolf appears!
+490.25 player_attack SimAlly2 hits Kobold Miner for 16
+491.00 player_attack SimAlly0 hits Kobold Miner for 16
+491.25 player_attack SimAlly1 hits Kobold Miner for 16
+491.25 mob_attack Kobold Miner hits you for 12
+491.50 player_attack You hit Kobold Miner for 144
+491.50 mob_death Kobold Miner dies!
+493.00 mob_death Rampaging Boar appears!
+495.25 player_attack SimAlly2 hits Grey Wolf for 16
+496.50 player_attack SimAlly0 hits Grey Wolf for 16
+496.50 player_crit SimAlly1 hits Grey Wolf for 33 (CRIT!)
+496.50 mob_attack Grey Wolf hits you for 8
+497.00 player_attack You hit Grey Wolf for 144
+497.00 mob_death Grey Wolf dies!
+498.50 mob_death Grey Wolf appears!
+500.25 player_attack SimAlly2 hits Grey Wolf for 16
+502.00 player_attack SimAlly0 hits Grey Wolf for 16
+502.00 player_attack SimAlly1 hits Grey Wolf for 16
+502.25 player_attack SimAlly2 hits Grey Wolf for 16
+502.50 player_attack You hit Grey Wolf for 144
+502.50 mob_death Grey Wolf dies!
+504.00 mob_death Grey Wolf appears!
+506.50 player_attack SimAlly2 hits Grey Wolf for 16
+506.75 player_attack SimAlly0 hits Grey Wolf for 16
+506.75 player_attack SimAlly1 hits Grey Wolf for 16
+507.25 player_attack You hit Grey Wolf for 144
+507.25 mob_death Grey Wolf dies!
+508.75 mob_death Kobold Miner appears!
+510.50 player_attack SimAlly2 hits Grey Wolf for 16
+511.25 player_attack SimAlly0 hits Grey Wolf for 16
+511.25 player_attack SimAlly1 hits Grey Wolf for 16
+511.25 mob_attack Grey Wolf hits you for 8
+511.75 player_attack You hit Grey Wolf for 144
+511.75 mob_death Grey Wolf dies!
+513.25 mob_death Grey Wolf appears!
+516.00 player_attack SimAlly2 hits Kobold Miner for 16
+517.00 player_attack SimAlly0 hits Kobold Miner for 16
+517.25 player_attack SimAlly1 hits Kobold Miner for 16
+517.50 player_death SimAlly0 goes down!
+517.75 player_crit You hit Kobold Miner for 288 (CRIT!)
 517.75 mob_death Kobold Miner dies!
-519.25 mob_death Grey Wolf appears!
-520.75 player_attack SimAlly2 hits Kobold Miner for 16
-522.25 player_attack SimAlly0 hits Kobold Miner for 16
-522.50 player_attack SimAlly1 hits Kobold Miner for 16
-522.50 player_attack SimAlly2 hits Kobold Miner for 16
-522.50 mob_death Kobold Miner dies!
-524.00 mob_death Rampaging Boar appears!
-525.75 player_attack SimAlly2 hits Grey Wolf for 16
-526.00 player_attack SimAlly0 hits Grey Wolf for 16
-526.25 player_attack SimAlly1 hits Grey Wolf for 16
-526.25 mob_death Grey Wolf dies!
-527.75 mob_death Kobold Miner appears!
-530.75 player_attack SimAlly2 hits Rampaging Boar for 16
-531.00 player_attack SimAlly0 hits Rampaging Boar for 16
-531.00 player_attack SimAlly1 hits Rampaging Boar for 16
-531.00 mob_attack Rampaging Boar hits you for 9
-531.50 player_attack You hit Rampaging Boar for 139
-531.50 mob_death Rampaging Boar dies!
-533.00 mob_death Kobold Miner appears!
-535.75 player_attack SimAlly2 hits Kobold Miner for 16
-536.50 player_attack SimAlly0 hits Kobold Miner for 16
-536.50 player_attack SimAlly1 hits Kobold Miner for 16
-537.00 player_attack You hit Kobold Miner for 139
-537.00 mob_death Kobold Miner dies!
-538.50 mob_death Grey Wolf appears!
-540.75 player_attack SimAlly2 hits Kobold Miner for 16
-541.75 player_attack SimAlly0 hits Kobold Miner for 16
-542.00 player_attack SimAlly1 hits Kobold Miner for 16
-542.50 player_attack You hit Kobold Miner for 139
-542.50 mob_death Kobold Miner dies!
-544.00 mob_death Rampaging Boar appears!
-544.50 player_attack SimAlly2 hits Rampaging Boar for 16
-546.00 player_attack SimAlly0 hits Rampaging Boar for 16
-546.25 player_attack SimAlly1 hits Rampaging Boar for 16
-546.25 player_attack SimAlly2 hits Rampaging Boar for 16
-546.75 player_attack You hit Rampaging Boar for 139
-546.75 mob_death Rampaging Boar dies!
-547.25 mob_attack Rampaging Boar joins the fight!
-548.25 mob_death Grey Wolf appears!
-551.75 player_attack SimAlly0 hits Rampaging Boar for 16
-551.75 player_attack SimAlly2 hits Rampaging Boar for 16
-552.00 player_attack SimAlly1 hits Rampaging Boar for 16
-552.00 player_death SimAlly0 goes down!
-552.50 player_attack You hit Rampaging Boar for 139
-552.50 mob_death Rampaging Boar dies!
-553.75 player_attack SimAlly2 hits Rampaging Boar for 16
-554.00 mob_death Rampaging Boar appears!
-554.25 player_attack SimAlly1 hits Rampaging Boar for 16
-555.00 player_attack You hit Rampaging Boar for 139
-555.00 mob_death Rampaging Boar dies!
-556.50 mob_death Rampaging Boar appears!
-558.00 player_attack SimAlly2 hits Grey Wolf for 16
-559.00 player_attack SimAlly1 hits Grey Wolf for 16
-559.25 mob_attack Grey Wolf hits you for 5
-559.75 player_attack You hit Grey Wolf for 139
-559.75 mob_death Grey Wolf dies!
-561.25 mob_death Kobold Miner appears!
-564.00 player_respawn SimAlly0 gets back up.
-564.25 player_attack SimAlly2 hits Grey Wolf for 16
-565.75 player_attack SimAlly1 hits Grey Wolf for 16
-566.00 player_crit SimAlly2 hits Grey Wolf for 31 (CRIT!)
-566.00 mob_death Grey Wolf dies!
-567.50 mob_death Rampaging Boar appears!
-569.00 player_attack SimAlly0 hits Kobold Miner for 16
-570.75 player_attack SimAlly1 hits Kobold Miner for 16
-570.75 player_attack SimAlly2 hits Kobold Miner for 16
-571.00 mob_attack Kobold Miner hits you for 8
-571.25 player_attack You hit Kobold Miner for 139
-571.25 mob_death Kobold Miner dies!
-572.75 mob_death Rampaging Boar appears!
-574.75 player_attack SimAlly0 hits Rampaging Boar for 16
-576.00 player_attack SimAlly2 hits Rampaging Boar for 16
-576.50 player_attack SimAlly1 hits Rampaging Boar for 16
-577.00 player_attack You hit Rampaging Boar for 139
-577.00 mob_death Rampaging Boar dies!
-578.50 mob_death Grey Wolf appears!
-578.50 mob_attack Grey Wolf joins the fight!
-580.75 player_attack SimAlly0 hits Rampaging Boar for 16
-581.50 player_attack SimAlly2 hits Rampaging Boar for 16
-582.25 player_attack SimAlly1 hits Rampaging Boar for 16
-582.50 mob_attack Rampaging Boar hits you for 9
-583.00 player_attack You hit Rampaging Boar for 139
-583.00 mob_death Rampaging Boar dies!
-583.25 player_attack SimAlly0 hits Grey Wolf for 16
-583.50 player_attack SimAlly2 hits Grey Wolf for 16
-584.50 mob_death Kobold Miner appears!
-584.75 player_crit SimAlly1 hits Grey Wolf for 33 (CRIT!)
-584.75 mob_death Grey Wolf dies!
-586.25 mob_death Rampaging Boar appears!
-586.25 mob_attack Rampaging Boar joins the fight!
-590.00 player_attack SimAlly0 hits Kobold Miner for 16
-590.00 player_attack SimAlly2 hits Kobold Miner for 16
-591.50 player_attack SimAlly1 hits Kobold Miner for 16
-591.75 player_attack You hit Kobold Miner for 139
-591.75 mob_death Kobold Miner dies!
-592.25 player_attack SimAlly0 hits Rampaging Boar for 16
-592.25 player_attack SimAlly2 hits Rampaging Boar for 16
-593.25 mob_death Grey Wolf appears!
-594.00 player_attack SimAlly1 hits Rampaging Boar for 16
-594.00 player_attack SimAlly2 hits Rampaging Boar for 16
-594.25 player_attack You hit Rampaging Boar for 139
-594.25 mob_death Rampaging Boar dies!
-595.75 mob_death Kobold Miner appears!
-596.75 player_attack SimAlly0 hits Grey Wolf for 16
-598.00 player_attack SimAlly2 hits Grey Wolf for 16
-598.50 player_attack SimAlly1 hits Grey Wolf for 16
-598.50 mob_death Grey Wolf dies!
-600.00 mob_death Grey Wolf appears!
+519.25 mob_death Rampaging Boar appears!
+522.50 player_attack SimAlly2 hits Grey Wolf for 16
+524.00 player_attack SimAlly1 hits Grey Wolf for 16
+524.25 mob_attack Grey Wolf hits you for 8
+524.50 player_attack SimAlly2 hits Grey Wolf for 16
+524.75 player_attack You hit Grey Wolf for 144
+524.75 mob_death Grey Wolf dies!
+526.25 mob_death Kobold Miner appears!
+529.50 player_respawn SimAlly0 gets back up.
+530.00 player_attack SimAlly1 hits Rampaging Boar for 16
+530.00 player_attack SimAlly2 hits Rampaging Boar for 16
+530.75 player_attack You hit Rampaging Boar for 144
+530.75 mob_death Rampaging Boar dies!
+532.25 mob_death Kobold Miner appears!
+537.25 player_attack SimAlly0 hits Kobold Miner for 16
+537.50 player_attack SimAlly2 hits Kobold Miner for 16
+538.00 player_attack SimAlly1 hits Kobold Miner for 16
+538.50 mob_attack Kobold Miner hits you for 12
+538.75 player_attack You hit Kobold Miner for 144
+538.75 mob_death Kobold Miner dies!
+540.25 mob_death Grey Wolf appears!
+544.75 player_attack SimAlly2 hits Rampaging Boar for 16
+545.00 player_attack SimAlly0 hits Rampaging Boar for 16
+545.75 player_attack SimAlly1 hits Rampaging Boar for 16
+546.00 mob_attack Rampaging Boar hits you for 13
+546.50 player_attack You hit Rampaging Boar for 144
+546.50 mob_death Rampaging Boar dies!
+548.00 mob_death Rampaging Boar appears!
+552.50 player_crit SimAlly2 hits Kobold Miner for 31 (CRIT!)
+553.25 player_attack SimAlly0 hits Kobold Miner for 16
+554.00 player_attack SimAlly1 hits Kobold Miner for 16
+554.50 player_attack SimAlly2 hits Kobold Miner for 16
+554.75 player_crit You hit Kobold Miner for 288 (CRIT!)
+554.75 mob_death Kobold Miner dies!
+556.25 mob_death Grey Wolf appears!
+560.00 player_attack SimAlly0 hits Rampaging Boar for 16
+560.50 player_attack SimAlly1 hits Rampaging Boar for 16
+560.75 player_attack SimAlly2 hits Rampaging Boar for 16
+561.50 player_attack You hit Rampaging Boar for 144
+561.50 mob_death Rampaging Boar dies!
+563.00 mob_death ★ Elite: ★ Kobold Miner appears!
+566.25 player_attack SimAlly0 hits Grey Wolf for 16
+566.50 player_attack SimAlly2 hits Grey Wolf for 16
+566.75 player_attack SimAlly1 hits Grey Wolf for 16
+567.75 player_attack You hit Grey Wolf for 144
+567.75 mob_death Grey Wolf dies!
+569.25 mob_death Grey Wolf appears!
+569.25 mob_attack Grey Wolf joins the fight!
+571.75 player_attack SimAlly0 hits Grey Wolf for 16
+571.75 player_attack SimAlly2 hits Grey Wolf for 16
+572.50 player_attack SimAlly1 hits Grey Wolf for 16
+573.00 mob_attack Grey Wolf hits you for 8
+573.50 player_crit You hit Grey Wolf for 288 (CRIT!)
+573.50 mob_death Grey Wolf dies!
+573.75 player_attack SimAlly2 hits Grey Wolf for 16
+574.25 player_attack SimAlly0 hits Grey Wolf for 16
+575.00 mob_death Rampaging Boar appears!
+575.00 player_attack SimAlly1 hits Grey Wolf for 16
+575.50 mob_attack Grey Wolf hits you for 8
+575.75 player_attack SimAlly2 hits Grey Wolf for 16
+576.00 player_attack You hit Grey Wolf for 144
+576.00 mob_death Grey Wolf dies!
+577.50 mob_death Grey Wolf appears!
+579.00 player_attack SimAlly0 hits Rampaging Boar for 16
+579.75 player_attack SimAlly1 hits Rampaging Boar for 16
+580.00 player_attack SimAlly2 hits Rampaging Boar for 16
+580.25 mob_attack Rampaging Boar hits you for 12
+580.75 player_crit You hit Rampaging Boar for 295 (CRIT!)
+580.75 mob_death Rampaging Boar dies!
+582.25 mob_death Grey Wolf appears!
+584.00 player_attack SimAlly0 hits Grey Wolf for 16
+584.50 player_attack SimAlly1 hits Grey Wolf for 16
+584.50 player_attack SimAlly2 hits Grey Wolf for 16
+585.75 player_attack You hit Grey Wolf for 148
+585.75 mob_death Grey Wolf dies!
+587.25 mob_death Kobold Miner appears!
+589.75 player_attack SimAlly0 hits Grey Wolf for 16
+589.75 player_attack SimAlly2 hits Grey Wolf for 16
+590.25 player_attack SimAlly1 hits Grey Wolf for 16
+591.50 player_attack You hit Grey Wolf for 148
+591.50 mob_death Grey Wolf dies!
+593.00 mob_death Grey Wolf appears!
+596.00 player_attack SimAlly2 hits Kobold Miner for 16
+596.25 player_attack SimAlly0 hits Kobold Miner for 16
+597.00 player_attack SimAlly1 hits Kobold Miner for 16
+598.00 player_attack SimAlly2 hits Kobold Miner for 16
+598.00 mob_attack Kobold Miner hits you for 11
+598.25 player_attack You hit Kobold Miner for 154
+598.25 mob_death Kobold Miner dies!
 
