@@ -1330,6 +1330,7 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
     id: `mob_${++mobInstanceSeq}`,
     templateId: template.id,
     name,
+    baseName: template.name,
     currentHp: Math.round(template.hp * hpMult * circuitMult * partyHpMult),
     maxHp:     Math.round(template.hp * hpMult * circuitMult * partyHpMult),
     // dmgMult belongs on damage, not on the swing interval. It used to be applied to

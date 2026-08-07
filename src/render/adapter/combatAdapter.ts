@@ -1575,7 +1575,7 @@ export class WorldSceneController {
       this.mobPlacedDx = this.mobApproachDx * mag
       this.mobPlacedDy = this.mobApproachDy * mag
 
-      const wantedMobSprite = resolveMobSprite(mob.name)
+      const wantedMobSprite = resolveMobSprite(mob.baseName ?? mob.name)
       if (!this.mob) {
         const sprite = this.spriteCache[wantedMobSprite] ??
           (isMonsterSprite(wantedMobSprite) ? this.rigs.mobBeast : this.rigs.mobHumanoid)
@@ -1685,7 +1685,7 @@ export class WorldSceneController {
         alive.add(m.id)
         let rec = this.otherMobEnts.get(m.id)
         if (!rec || !rec.e.active) {
-          const spriteId = resolveMobSprite(m.name)
+          const spriteId = resolveMobSprite(m.baseName ?? m.name)
           const sprite = this.spriteCache[spriteId] ??
             (isMonsterSprite(spriteId) ? this.rigs!.mobBeast : this.rigs!.mobHumanoid)
           // Place on walkable ground near its spawn offset, then keep that world spot.
@@ -4120,6 +4120,7 @@ export class WorldSceneController {
       id: `ambient_mob_${a.grp}`,
       templateId: 'ambient' as MobInstance['templateId'],
       name: 'Beast',
+      baseName: 'Beast',
       attackAccum: 0,
       currentHp: maxHp, maxHp,
       damage: Math.round(3 + lvl * 1.1),

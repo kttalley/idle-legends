@@ -33,15 +33,23 @@ export type Temperament =
   /** Never comes to you. You walk to the lair. */
   | 'lair'
 
-export function isRangedMob(mob: Pick<MobInstance, 'name'>): boolean {
-  return RANGED_RE.test(mob.name.toLowerCase())
+// Both read `baseName`, never `name`. The display name carries a tier prefix (`★ `,
+// `[BOSS] `) and behaviour must not depend on presentation — today these regexes happen
+// to survive a prefix because they are unanchored searches, but that is luck rather than
+// design, and one anchored pattern or one prefix starting with a matching word would
+// silently change which mobs charge you. `?? mob.name` keeps callers that only have a
+// display name working.
+export function isRangedMob(mob: Pick<MobInstance, 'name'> & { baseName?: string }): boolean {
+  return RANGED_RE.test((mob.baseName ?? mob.name).toLowerCase())
 }
 
-export function temperamentOf(mob: Pick<MobInstance, 'name' | 'isBoss'>): Temperament {
+export function temperamentOf(
+  mob: Pick<MobInstance, 'name' | 'isBoss'> & { baseName?: string },
+): Temperament {
   // Bosses never charge, whatever they are called — a lair encounter that walks out to
   // meet you in a corridor stops reading as a climax.
   if (mob.isBoss) return 'lair'
-  return AGGRESSIVE_RE.test(mob.name.toLowerCase()) ? 'predator' : 'territorial'
+  return AGGRESSIVE_RE.test((mob.baseName ?? mob.name).toLowerCase()) ? 'predator' : 'territorial'
 }
 
 // ── Aggro ranges, in tiles ────────────────────────────────────────────────────

@@ -161,6 +161,7 @@ export function makeMob(seed: number, level: number, name = 'Sim Beast'): MobIns
     id: `sim_mob_${seed}`,
     templateId: 'sim' as MobInstance['templateId'],
     name,
+    baseName: name,
     attackAccum: 0,
     currentHp: maxHp,
     maxHp,

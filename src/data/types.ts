@@ -561,7 +561,22 @@ export interface MobInstance {
   /** Unique per spawned instance — several mobs of the same template coexist. */
   id: string
   templateId: MobId
+  /** Display name, tier prefix and all: `★ Grey Wolf`, `[BOSS] Elder Meadow Beast`. */
   name: string
+  /**
+   * The template's own name, with no tier prefix.
+   *
+   * Anything DERIVED from a mob's identity must read this rather than `name`, because the
+   * prefix is presentation and derivations are not. `resolveMobSprite` keys off
+   * `strHash(name) % pool.length`, so `★ Grey Wolf` and `Grey Wolf` hash differently and
+   * an elite rendered as a different creature entirely from the trash version of itself —
+   * the tier badge silently reassigned the body. Temperament matches on the name too, so
+   * any future prefix could have changed whether a mob charges you.
+   *
+   * Optional at the type level would have been kinder to old saves, but mobs are session
+   * state (`rehydrateState` clears them), so a required field costs no migration.
+   */
+  baseName: string
   currentHp: number
   maxHp: number
   damage: number
