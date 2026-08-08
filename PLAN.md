@@ -1063,8 +1063,8 @@ building this, and fix the `pointer-events` bug above first or the leave button 
 
 ### C5 — N-sided combat
 
-> **STATUS 2026-08-05 — stages 0 through 4 are DONE. Read this box before the section
-> below it, which is now partly historical.**
+> **STATUS 2026-08-08 — stages 0–6 are DONE, and C6 shipped with them. Read this box
+> before the section below it, which is now largely historical.**
 >
 > The owner decided to UNIFY (the section's open question), and the work was re-staged
 > against a verified inventory. Stages shipped:
@@ -1190,7 +1190,29 @@ building this, and fix the `pointer-events` bug above first or the leave button 
 > warrior-only answer still leaves mages, rogues and warlocks facing doubled incoming
 > damage with unchanged outgoing.
 >
-> **Then:** 5 (dead fields, ability layer), 6b (cleave + raise the ceiling), 7 (C6). Note
+> **Stage 6 is ON (2026-08-08).** `MAX_MELEE_ATTACKERS` is **3**, not 1. Three things had
+> to land together before the ceiling could rise, because the earlier failure was
+> asymmetry — more things hitting the hero, nothing new hitting back:
+> - **`splash`**, an ability effect carried as a buff and spent by the swing that uses it.
+>   All four classes have an AoE capstone now; The Whirling finally does what its
+>   description always claimed.
+> - **Auto-cast.** NOTHING called `activateAbility` except a finger on a button, so an
+>   unattended hero never used the action bar at all. Fires the longest-cooldown ready
+>   ability — "lowest ready slot" was tried first and starved slots 2 and 3 completely,
+>   because slot 1 is a short-cooldown filler that is ready almost every tick.
+> - **Social aggro.** Four mobs on a 4,096-tile torus are never near each other, so splash
+>   at radius 3.5 caught NOBODY across a full trace while the same run at radius 64 caught
+>   77. Every AoE talent would have landed on empty ground.
+>
+> Measured: 2 attackers before the offensive half was +28.6% parity error and a collapse;
+> 3 now is +6.6% with all invariants holding. 4 holds too, at +9.5%, but sits on the band's
+> edge.
+>
+> **Stage 5's ability layer is therefore done** (auto-cast, Reaping Arc). What remains of 5
+> is only the dead-field tidy-up: `procState.openerUsed`, and the per-target proc MAP that
+> stage 3 deliberately deferred until a second simultaneous target existed. One now does.
+>
+> **Then:** 5's remaining tidy-up. Note
 > that **stage 6 is the same work as Track C2 in `.planning/world-systems-plan.md`**
 > ("multiple concurrent enemies") — one job described in two documents. Whichever one is
 > executed, update both. Track C2's stated blocker there ("the store models exactly one
@@ -1263,7 +1285,34 @@ targets multiplies the unseeded rolls per tick, so N-sided work in the store mak
 determinism debt strictly worse before it gets better. Lift the procs into `combat.ts`
 first.
 
-### C6 — elite scaling and unique drops
+### C6 — elite scaling and unique drops — SHIPPED 2026-08-08
+
+> Both halves are in; the traps below are recorded as they were found, and most turned out
+> to be stale or were closed on the way past.
+>
+> - **Party scaling.** Mobs scale with party size (health 0.35/ally, damage 0.15, rewards
+>   on their own much smaller 0.07). Measured: a 3-party was +27.9% gold and **-78.5%
+>   deaths** — free power. Now +20.8% and -40.9%. Paying rewards at the full health
+>   multiplier was tried and gave **+204% gold**: throughput here is spawn-limited, not
+>   damage-limited, so reward-per-kill multiplies income almost directly.
+> - **The "party power has no data path" trap was STALE.** C4 moved `allies` onto
+>   GameState and `spawnMob` already receives the state. No boundary was broken.
+> - **Uniques.** Twelve authored boss drops (`data/uniques.ts`), each with an "Equip:" line
+>   that changes the idle loop rather than a number, its own accent ramp on palette slots
+>   13–15, and protection from every disposal path. `Item.protected` and the guards for it
+>   landed FIRST, before any unique existed, because losing the first one a player earns is
+>   not a bug you get to fix afterwards.
+> - **The unique preference is strong but not absolute** (`UNIQUE_POWER_EDGE` 1.5). Making
+>   it absolute rots the hero: a level-8 unique occupies its slot for the rest of the run.
+>   Offline parity caught that at 15.5%.
+> - **Item level still comes from the player, not the mob** — that trap is unaddressed.
+> - **`offline.ts` duplicating the drop roll** is CLOSED: `OfflineRates` now carries
+>   `eliteKills` and the projection reproduces the tier mix. Before it, idling returned
+>   4.9% lower mean rarity per drop than watching the same hour.
+> - **The two kill handlers** are closed by a corpse sweep that pays out anything at zero,
+>   whatever killed it.
+
+### C6 — elite scaling and unique drops (original plan, for the traps)
 
 Depends on C3's answer (party power is only meaningful once the party has power) and on
 C5 (a scaled elite that still fights 1v1 is just a bigger health bar). Introducing a
