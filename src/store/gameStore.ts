@@ -3962,9 +3962,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // renderer rebinding to it looked like the monster teleporting (measured at 13–19
       // tiles in one frame). Keep the commitment so idle can resume the same fight.
       lastEngagedMobId: s.targetMobId ?? s.lastEngagedMobId,
-      targetMobId: null,
-      currentMob: null,
-      activeDoTs: [],
+      // The TARGET SURVIVES. Owner's call, and the right one: losing what you were
+      // fighting because you stepped left is not what "taking control" means in this
+      // genre, and it left the hero standing next to an enemy with no relationship to it.
+      //
+      // The reason it used to be dropped was the auto-WALK, not the target itself — the
+      // adapter's closing branch marched the hero back in, measured as 18s of that after a
+      // keypress. That branch is now gated on control mode, so the commitment can persist
+      // without the legs following it. Auto-attacking what you are targeting is correct;
+      // being walked somewhere you did not ask for is not.
     }))
     resetCombatAccumulators()
   },

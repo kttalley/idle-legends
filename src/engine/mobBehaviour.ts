@@ -84,10 +84,29 @@ export function aggroRadiusFor(mob: Pick<MobInstance, 'name' | 'isBoss'>): numbe
 // shrinks toward zero on approach, considered it adjacent and let it fire. On screen that is an
 // enemy attacking you from across the map — which is exactly what it looked like.
 //
-// A melee reach slightly beyond the renderer's hold, so a brawler parked at its gap is
-// genuinely in range rather than a hair outside it and twitching between the two.
-export const MELEE_ATTACK_RANGE = 2.2
-/** A caster's reach — owner's call, 2.5× melee. */
+// The reach must clear the renderer's RESTING distance, and the first cut at 2.2 did not.
+//
+// The adapter holds a brawler at `MELEE_GAP_TILES` (2) along a DIAGONAL, so the distance
+// it actually settles at is `√2 × 2 ≈ 2.83` — measured in the running game at a flat 2.80,
+// frozen across ten seconds while the hit count sat still beside it. Every melee mob was
+// therefore parked permanently a fraction outside its own attack range.
+//
+// Nothing exposed it while the hero was on auto-pilot, because the auto-pilot walks in and
+// closes the gap. Under MANUAL control nobody closes it: the player is not walking, and a
+// lair boss never pursues by design — so the two stand there at 2.8 tiles forever. That is
+// the "they crowd me and never attack" report, exactly.
+//
+// 3.0 clears the diagonal hold with room to spare, and keeps the ratio the owner asked for.
+export const MELEE_ATTACK_RANGE = 3.0
+/**
+ * A caster's reach — owner's call, 2.5× melee.
+ *
+ * The ratio and the geometry agree, which is the reason to keep it as a multiplier rather
+ * than a second literal: 7.5 clears the ranged diagonal hold (`√2 × RANGED_GAP_TILES` =
+ * 7.07) by the same margin 3.0 clears the melee one (2.83). Change `MELEE_ATTACK_RANGE`
+ * and both stay correct; bake the number and the next gap tweak silently strands casters
+ * the way it just stranded brawlers.
+ */
 export const RANGED_ATTACK_RANGE = MELEE_ATTACK_RANGE * 2.5
 
 /**

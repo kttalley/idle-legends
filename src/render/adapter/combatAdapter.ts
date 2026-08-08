@@ -2314,6 +2314,11 @@ export class WorldSceneController {
       }
     } else if (
       !this.townMode && !this.playerLunge.active && !this.mobEngaged && !this.mobAggressive &&
+      // NOT while the player is driving. Keeping a target through manual control is
+      // correct — you should not lose what you were fighting because you stepped left —
+      // but this branch walks the hero out to that target, and doing it under manual is
+      // the "manual mode still autowalks" complaint. The target persists; the legs do not.
+      this.lastControlMode !== 'manual' &&
       this.mob && this.showMob && this.mobAnchorX !== null && this.mobAnchorY !== null
     ) {
       // Closing on an encounter: the hero walks out to the waiting enemy. The store
