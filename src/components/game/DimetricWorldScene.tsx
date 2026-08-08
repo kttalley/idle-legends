@@ -59,6 +59,18 @@ export function DimetricWorldScene() {
       // reads to a probe as "the world is empty" while the real one renders fine.
       if (import.meta.env.DEV) {
         ;(window as unknown as { __ilScene?: WorldSceneController }).__ilScene = controller
+        // ...and a way to read the STORE. There is deliberately no `window.__ilStore`, and
+        // a probe must never reach for `await import(...)` — Vite serves HMR'd modules
+        // under distinct URLs, so a dynamic import can hand back a separate instance with
+        // its own freshly-initialised state (that produced a completely convincing false
+        // negative once already).
+        //
+        // Reading it off the scene closes a real gap: the renderer's coordinates carry PAD
+        // and the manual-mode visual offset, so a probe measuring entity positions can see
+        // a mob standing ON the hero while the simulation has it fourteen tiles away. The
+        // only way to tell those apart is to look at what the store actually holds.
+        ;(window as unknown as { __ilState?: () => unknown }).__ilState =
+          () => useGameStore.getState()
       }
     })
 
