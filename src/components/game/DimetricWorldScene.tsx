@@ -150,6 +150,14 @@ export function DimetricWorldScene() {
       if (e.repeat) return
       if (isTyping(e.target)) return
       const k = e.key
+      // Tab cycles targets, the way it has in this genre for twenty years. Preventing the
+      // default matters: otherwise the browser moves focus to the next control and the
+      // second press lands on a HUD button instead of the world.
+      if (k === 'Tab') {
+        e.preventDefault()
+        useGameStore.getState().cycleTarget()
+        return
+      }
       if (k === ' ' || k.startsWith('Arrow')) e.preventDefault()
       controller.setKey(k, true)
       // Movement / jump counts as taking manual control of the hero.

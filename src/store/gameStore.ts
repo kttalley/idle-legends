@@ -1500,9 +1500,29 @@ function placeInWorld(
   }
 }
 
-/** How many enemies populate a zone at once. The boss fights alone — a lair should not
- *  be a crowd, and it keeps the climactic encounter reading as one. */
-const MOB_POPULATION = 4
+/**
+ * How many REAL enemies populate a zone at once. The boss fights alone — a lair should not
+ * be a crowd, and it keeps the climactic encounter reading as one.
+ *
+ * Raised from 4 because four mobs across 4,096 tiles is not a populated world: what the
+ * player actually saw nearby was often the decorative pair from an ambient skirmish, and
+ * a monster you cannot fight standing where a monster should be is the wrong lesson to
+ * teach in a game about fighting monsters.
+ *
+ * Measured rather than picked. 9 was tried first and is too many — it broke settled
+ * offline parity (11.0%, band is ±10%) and pushed the party's gold advantage from its
+ * tuned +20.8% to +43.5%:
+ *
+ *   pop   settled parity   solo gold/30m   party delta      verdict
+ *   4     5.9%             1,091           +20.8% / -40.9%  sparse
+ *   6     3.3%             1,661           +24.7% / -28.6%  chosen
+ *   9     11.0% FAIL       1,709           +43.5% / -25.3%  breaks parity
+ *
+ * 6 is denser AND measures better than 4 on parity, which is the useful surprise: a hero
+ * with something always nearby has a steadier rate, and a steadier rate is exactly what
+ * the offline projection replays.
+ */
+const MOB_POPULATION = 6
 /** How close a mob must be to swing, in tiles. Was an unnamed 1.5 on the engaged
  *  target's check; naming it matters now that the whole pack tests against it, because
  *  two different reaches would mean bystanders that hit from outside the fight. */
@@ -1550,6 +1570,9 @@ const SPLASH_RADIUS = 3.5
 /** How close a mob must be to an already-angry one to join in, in tiles. Wider than
  *  `SPLASH_RADIUS` so a pack that gathers is a pack an AoE can actually catch. */
 const SOCIAL_AGGRO_RADIUS = 7
+/** How far Tab will look for something to target, in tiles. Comfortably past melee and
+ *  splash so the key can set up a fight, well short of the zone so the cycle stays usable. */
+const TAB_TARGET_RANGE = 12
 
 /**
  * Consume one stack of a `splash` buff and report the damage it carries.
@@ -1759,6 +1782,8 @@ interface GameActions {
   dismissQuestReward: (questId: string) => void
   engageTarget: () => void
   setTarget: (mobId: string) => void
+  /** Tab: cycle the targetable enemies within reach, nearest first. */
+  cycleTarget: () => void
 }
 
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
@@ -4055,6 +4080,37 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     get().bumpManualInput()
     set({ targetMobId: mobId, currentMob: mob, activeDoTs: mob.dots, mobMapOffset: mob.offset })
     resetCombatAccumulators()
+  },
+
+  /**
+   * Tab through the enemies you could actually reach.
+   *
+   * Ordered by distance and cycled from wherever you are, so pressing it repeatedly walks
+   * outward and wraps — the behaviour every player already has in their fingers from the
+   * genre. Bounded by `TAB_TARGET_RANGE` rather than the whole zone: a cycle that includes
+   * something forty tiles away is a cycle you cannot use, and the point of the key is to
+   * pick between the things actually around you.
+   *
+   * Skips the dead and honours the same guards as tapping, since this IS tapping by
+   * another input.
+   */
+  cycleTarget: () => {
+    const s = get()
+    if (!s.isAlive || s.gameMode !== 'combat') return
+    const reachable = s.mobs
+      .filter(m => m.currentHp > 0
+        && Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) <= TAB_TARGET_RANGE)
+      // Distance, then id — a stable order, so the cycle does not reshuffle under the
+      // player as bodies drift by fractions of a tile.
+      .sort((a, b) => {
+        const da = a.offset.dx ** 2 + a.offset.dy ** 2
+        const db = b.offset.dx ** 2 + b.offset.dy ** 2
+        return da - db || (a.id < b.id ? -1 : 1)
+      })
+    if (!reachable.length) return
+    const at = reachable.findIndex(m => m.id === s.targetMobId)
+    const next = reachable[(at + 1) % reachable.length]
+    if (next.id !== s.targetMobId) get().setTarget(next.id)
   },
 
   engageTarget: () => {
