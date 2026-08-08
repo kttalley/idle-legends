@@ -846,6 +846,75 @@ export function runLootFidelity(): Violation[] {
   return out
 }
 
+/**
+ * Does an enemy attack a hero who has not attacked it?
+ *
+ * Every other gate here runs the hero on auto-pilot, so the entire MANUAL path is
+ * unmeasured — and manual control deliberately holds `targetMobId` at null so the player
+ * can move freely. The tick's no-target branch returns before the whole combat section,
+ * which meant mobs noticed the hero, walked over, and then stood there for as long as the
+ * player held the wheel. Reported from play; invisible to the suite.
+ *
+ * Driven through the real store rather than a browser: the CDP probe measures RENDERER
+ * distances, which carry PAD and the visual offset and are not the coordinates the melee
+ * check uses. That mismatch made a hero standing visually on top of a mob read as 14
+ * tiles away from it.
+ */
+export function runManualAggro(): Violation[] {
+  const out: Violation[] = []
+  const store = useGameStore
+  if (typeof __setSeed === 'function') __setSeed(7)
+  store.getState().initGame('warrior', 'human')
+
+  // Let the world populate, then take manual control — which clears the target.
+  for (let i = 0; i < 200; i++) store.getState().tick(0.25)
+  useGameStore.setState({ controlMode: 'manual', targetMobId: null, currentMob: null })
+
+  // Stand an aggroed mob ON the hero, in the STORE's own coordinates.
+  const s0 = store.getState()
+  const mob = s0.mobs[0]
+  if (!mob) {
+    out.push({ tick: 0, minute: 0, rule: 'manual aggro', detail: 'no mob spawned to test with' })
+    return out
+  }
+  // A sentinel NAME, so the assertion can attribute swings to this mob and no other.
+  // Counting every `mob_attack` was too loose: two stray swings landed even with the fix
+  // reverted — from some other mob the hero brushed against — and "any swing at all"
+  // therefore passed on broken code. Only `name` is touched; behaviour derives from
+  // `baseName`, so temperament and sprite are unaffected.
+  const SENTINEL = 'Probe Sentinel'
+  useGameStore.setState({
+    mobs: s0.mobs.map((m, i) => i === 0
+      ? { ...m, name: SENTINEL, aggro: true, pos: { ...s0.playerMapPos }, offset: { dx: 0, dy: 0 } }
+      : m),
+  })
+
+  // Count SWINGS, not health.
+  //
+  // A health delta was the first cut and it was too blunt to discriminate: without the
+  // fix the hero still lost 20 points over the window — a lingering DoT, nothing to do
+  // with being attacked — and "lost any health at all" passed. `mob_attack` entries are
+  // the exact property under test, and they went 0 -> many.
+  useGameStore.setState({ combatLog: [] })
+  for (let i = 0; i < 80; i++) {
+    store.getState().tick(0.25)
+    // Hold manual: the timeout would otherwise hand control back and the auto-pilot
+    // would engage, which is the very thing being held out of the test.
+    useGameStore.setState({ controlMode: 'manual', manualIdleTimer: 15 })
+  }
+  const st = store.getState()
+  const swings = st.combatLog
+    .filter(e => e.type === 'mob_attack' && e.message.includes(SENTINEL)).length
+  if (swings === 0) {
+    out.push({
+      tick: 0, minute: 0, rule: 'an enemy attacks an unengaged hero',
+      detail: `held manual for 20s with an aggroed mob standing on the hero and it never `
+            + `swung once; mobs=${st.mobs.length}, target=${st.targetMobId}, alive=${st.isAlive}`,
+    })
+  }
+  return out
+}
+
 export function runSaveMigration(): Violation[] {
   const out: Violation[] = []
   const store = useGameStore

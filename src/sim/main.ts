@@ -2,7 +2,7 @@
 // `node tools/sim/run.mjs [--minutes N] [--advance] [--sell] [--step S] [--class C]`.
 
 import {
-  runScenario, runSweep, runInvariants, runSaveMigration, runOfflineParity, runLootFidelity,
+  runScenario, runSweep, runInvariants, runSaveMigration, runOfflineParity, runLootFidelity, runManualAggro,
   formatReport, formatSweep, formatParity, MEAN_TOLERANCE,
   type ScenarioOpts, type Violation,
 } from './econSim'
@@ -115,6 +115,15 @@ if (process.argv.includes('--parity')) {
     failed++
     process.stdout.write('  FAIL  loot fidelity\n')
     for (const v of loot) process.stdout.write(`          [${v.rule}] ${v.detail}\n`)
+  }
+
+  const manual = runManualAggro()
+  if (manual.length === 0) {
+    process.stdout.write("  ok    manual aggro — enemies attack a hero who has not engaged them\n")
+  } else {
+    failed++
+    process.stdout.write("  FAIL  manual aggro\n")
+    for (const v of manual) process.stdout.write(`          [${v.rule}] ${v.detail}\n`)
   }
 
   const migration = runSaveMigration()

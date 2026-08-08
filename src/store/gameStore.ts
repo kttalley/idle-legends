@@ -2467,7 +2467,19 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // target, this branch is the one manual mode runs through constantly. The same
     // omission froze every mob's patrol and every aggro check for as long as the hero had
     // nothing targeted.
-    if (!currentMob) {
+    // ── ...unless something is already on you ────────────────────────────────
+    // A mob does not need the hero's permission to attack. This branch returns before the
+    // entire combat section, and manual control deliberately holds `targetMobId` at null
+    // so the player can move freely — so in manual mode enemies noticed the hero, walked
+    // all the way over, and then stood there indefinitely. `tickWorld` runs in here, which
+    // is why they approached; nothing that swings does.
+    //
+    // Offsets are last tick's (they are re-derived inside `tickWorld` below), which is the
+    // same one-tick lag every other engagement check here already accepts.
+    const packInMelee = isAlive && mobs.some(m =>
+      m.aggro && Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) < MELEE_RANGE)
+
+    if (!currentMob && !packInMelee) {
       const idle = tickWorld(state, controlMode, mobs, null, targetMobId, deltaSeconds)
       if (idle.logs.length) newLogs.push(...idle.logs)
       set({ mobs: idle.mobs, targetMobId: idle.targetMobId, currentMob: null,
