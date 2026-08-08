@@ -1,6 +1,6 @@
 import { CollapsiblePanel } from '../ui/CollapsiblePanel'
 import React, { useState } from 'react'
-import { useGameStore, rarityColor } from '../../store/gameStore'
+import { useGameStore, itemColor } from '../../store/gameStore'
 import { TooltipWrapper, ItemTooltipContent } from '../ui/Tooltip'
 import { DetailSheet, type SheetAction } from '../ui/DetailSheet'
 import { SpriteIcon } from '../ui/SpriteIcon'
@@ -30,7 +30,7 @@ function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
   equippedItem?: Item | null
   isEquipped?: boolean
 }) {
-  const color = rarityColor(item.rarity)
+  const color = itemColor(item)
   // Hover still gives a mouse user the instant read; the tap target underneath opens
   // the sheet, which is the only path a touch device has to the same information.
   return (
@@ -173,7 +173,7 @@ export function InventoryPanel() {
             </label>
             {SLOTS.map(slot => {
               const item = equipment[slot]
-              const color = item ? rarityColor(item.rarity) : '#3a2c10'
+              const color = item ? itemColor(item) : "#3a2c10"
               return (
                 <div key={slot} className="flex items-center gap-2 mb-1.5">
                   <div style={{
@@ -268,7 +268,7 @@ export function InventoryPanel() {
         open={!!inspected}
         onClose={() => setInspecting(null)}
         title={inspected && (
-          <span style={{ color: rarityColor(inspected.item.rarity) }}>{inspected.item.name}</span>
+          <span style={{ color: itemColor(inspected.item) }}>{inspected.item.name}</span>
         )}
         actions={inspected?.actions}
       >

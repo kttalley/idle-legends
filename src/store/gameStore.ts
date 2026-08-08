@@ -69,7 +69,7 @@ import { DEFAULT_COLORWAY, isColorwayUnlocked } from '../render/colorways'
 import { getPurchaseState } from '../monetization/purchases'
 import { emptyRates, accrueRates, projectOfflineProgress } from '../engine/offline'
 import { compileUpgrades, upgradeCost, UPGRADE_BY_ID, type UpgradeId } from '../data/upgrades'
-import { compileUniques } from '../data/uniques'
+import { compileUniques, UNIQUE_BY_ID } from '../data/uniques'
 import type { TownServiceKind } from '../data/townNpcs'
 
 // The slot currently loaded into the store — the target of every autosave. Null
@@ -561,12 +561,27 @@ function toSaveBlob(s: GameState): GameState {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+/**
+ * Monotonic id source for PRESENTATION objects — log lines and floating numbers.
+ *
+ * These used to mint ids with `Math.random()`, and the economy harness seeds `Math.random`
+ * globally. So every log line consumed a draw from the simulation's stream, which meant
+ * **adding a log line silently changed the whole run**: two extra lines announcing a unique
+ * drop moved settled offline parity from 5.7% to 13.3%, with no behavioural change
+ * whatsoever. Half an hour was spent looking for a regression that did not exist.
+ *
+ * Worse than the wasted time is the trap: it makes every measurement quietly sensitive to
+ * cosmetics, so a real regression and a new `console`-grade line are indistinguishable in
+ * the numbers. A counter is enough — these ids need to be unique, not unpredictable.
+ */
+let presentationSeq = 0
+
 function log(
   type: CombatLogEntry['type'],
   message: string,
   color?: string,
 ): CombatLogEntry {
-  return { id: `${Date.now()}_${Math.random().toString(36).slice(2,6)}`, timestamp: Date.now(), type, message, color }
+  return { id: `log_${++presentationSeq}`, timestamp: Date.now(), type, message, color }
 }
 
 function fn(
@@ -575,11 +590,15 @@ function fn(
    *  body rather than the hero's. Absent for the player's own damage. */
   allyKey?: string,
 ): FloatingNumber {
+  // Same rule as `log`: a floating number is presentation, so neither its id nor its
+  // scatter may draw from the simulation's stream. The jitter is derived from the counter
+  // instead — two irrationals give a spread with no visible period, and it costs no RNG.
+  const n = ++presentationSeq
   return {
-    id: `fn_${Date.now()}_${Math.random().toString(36).slice(2,5)}`,
+    id: `fn_${n}`,
     value, isCrit, isMobDamage, isDoT, color, allyKey,
-    x: 45 + (Math.random() - 0.5) * 22,
-    y: 40 + (Math.random() - 0.5) * 12,
+    x: 45 + ((n * 0.6180339887) % 1 - 0.5) * 22,
+    y: 40 + ((n * 0.4142135624) % 1 - 0.5) * 12,
     createdAt: Date.now(),
   }
 }
@@ -2637,7 +2656,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           // let a stamina gain raise the ceiling without healing them for free.
           rescored.currentHp = Math.min(rescored.maxHp, stats.currentHp)
           stats = rescored
-          newLogs.push(log('loot_item', `Equipped ${loot.item.name}`, rarityColor(loot.item.rarity)))
+          newLogs.push(log('loot_item', `Equipped ${loot.item.name}`, itemColor(loot.item)))
+        }
+        // A unique is the rarest thing in the run and it was scrolling past in the same
+        // colour as the afternoon's third legendary sword. Announce it once, loudly, with
+        // the line that says what it does — most of these drop while nobody is watching,
+        // so the combat log is where the player finds out it happened at all.
+        if (loot.item.uniqueId) {
+          const def = UNIQUE_BY_ID[loot.item.uniqueId]
+          newLogs.push(log('loot_item', `✦ ${loot.item.name} — a unique drop!`, UNIQUE_COLOR))
+          if (def) newLogs.push(log('loot_item', def.equipText, '#1eff00'))
         }
         inventory = placed.inventory
         gold += placed.sold + placed.salvaged
@@ -2650,7 +2678,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           newLogs.push(log('loot_item',
             `Bag full — salvaged ${placed.disposed.name} for ${placed.salvaged}g`, '#c8a100'))
         } else if (placed.outcome === 'bagged') {
-          newLogs.push(log('loot_item', `Looted: ${loot.item.name}`, rarityColor(loot.item.rarity)))
+          newLogs.push(log("loot_item", `Looted: ${loot.item.name}`, itemColor(loot.item)))
         }
       }
 
@@ -4052,4 +4080,20 @@ export function rarityColor(rarity: string): string {
     epic: '#a335ee', legendary: '#ff8000',
   }
   return map[rarity] ?? '#ffffff'
+}
+
+/** The tone reserved for an authored unique — one step warmer than legendary orange, so
+ *  the two are distinguishable side by side without inventing a colour nobody reads as
+ *  "rare". */
+export const UNIQUE_COLOR = '#e6cc80'
+
+/**
+ * What colour to write an item's NAME in.
+ *
+ * Uniques are minted legendary, so colouring by rarity alone made the rarest thing in the
+ * game look exactly like the third legendary sword of the afternoon. Everything that
+ * writes an item name should go through this rather than `rarityColor` directly.
+ */
+export function itemColor(item: Pick<Item, 'rarity'> & { uniqueId?: string }): string {
+  return item.uniqueId ? UNIQUE_COLOR : rarityColor(item.rarity)
 }

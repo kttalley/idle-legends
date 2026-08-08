@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react'
 import type { Item } from '../../data/types'
-import { rarityColor } from '../../store/gameStore'
+import { itemColor } from '../../store/gameStore'
+import { UNIQUE_BY_ID } from '../../data/uniques'
 
 // ── Item Tooltip ──────────────────────────────────────────────────────────────
 interface ItemTooltipProps {
@@ -34,7 +35,8 @@ function formatStat(key: string, val: number): string {
 }
 
 export function ItemTooltipContent({ item, equippedItem, hideName }: ItemTooltipProps) {
-  const color = rarityColor(item.rarity)
+  const color = itemColor(item)
+  const unique = item.uniqueId ? UNIQUE_BY_ID[item.uniqueId] : null
 
   return (
     <div className="rp-tooltip" style={{ fontSize: '0.7rem' }}>
@@ -69,8 +71,22 @@ export function ItemTooltipContent({ item, equippedItem, hideName }: ItemTooltip
           )
         })}
       </div>
+      {/* The "Equip:" line — the reason a unique is worth having, and until now the one
+          thing about it the player could not see. Green, under the stats, the way this
+          genre has always written it. */}
+      {unique && (
+        <div style={{
+          color: '#1eff00', fontSize: '0.65rem', lineHeight: 1.35,
+          borderTop: '1px solid #3a2c10', paddingTop: 4, marginBottom: 6,
+        }}>
+          {unique.equipText}
+        </div>
+      )}
       <div style={{ color: '#ffd700', fontSize: '0.65rem' }}>
-        Sells for {item.vendorValue}g
+        {/* A unique has no price because nothing will buy it — the drop ladder, the
+            factor and the Sell button all refuse. Saying so beats printing a number that
+            is never paid. */}
+        {item.protected ? 'Cannot be sold or salvaged' : `Sells for ${item.vendorValue}g`}
       </div>
     </div>
   )
