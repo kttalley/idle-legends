@@ -10,6 +10,7 @@ import { compileStats } from './combat'
 import { xpForLevel } from './progression'
 import { RACE_DEFINITIONS } from '../data/races'
 import { compileUpgrades } from './../data/upgrades'
+import { compileUniques } from '../data/uniques'
 
 export interface OfflineSummary {
   secondsElapsed: number
@@ -178,7 +179,10 @@ export function projectOfflineProgress(state: GameState, now: number): OfflineOu
   if (!rates || rates.seconds < OFFLINE_MIN_MEASURED_SECONDS) return null
 
   const fx = compileUpgrades(state.upgradeRanks)
-  const elapsed = calculateOfflineTime(state.lastTickTimestamp ?? now, fx.offlineHours)
+  // Meadowwarden extends the cap alongside the Long Watch upgrade — both are "the world
+  // keeps paying while you are away", so they add rather than compete.
+  const uniq = compileUniques(state.equipment)
+  const elapsed = calculateOfflineTime(state.lastTickTimestamp ?? now, fx.offlineHours + uniq.offlineHours)
   if (elapsed.secondsElapsed < OFFLINE_MIN_SECONDS) return null
 
   const secs = elapsed.secondsElapsed
@@ -259,7 +263,7 @@ export function projectOfflineProgress(state: GameState, now: number): OfflineOu
     },
     report: {
       secondsElapsed: secs,
-      cappedAtHours: elapsed.cappedAt === null ? null : OFFLINE_CAP_HOURS + fx.offlineHours,
+      cappedAtHours: elapsed.cappedAt === null ? null : OFFLINE_CAP_HOURS + fx.offlineHours + uniq.offlineHours,
       kills, gold: totalGold, xp: gainedXp,
       levelsGained: level - startLevel,
       itemsEquipped: equipped, itemsSold: sold, itemsBagged: bagged, itemsSalvaged: scrapped,

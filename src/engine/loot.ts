@@ -6,6 +6,7 @@ import {
   ITEM_DROP_CHANCE, GOLD_DROP_VARIANCE, SALVAGE_RATE, RARITY_ORDER,
 } from '../data/constants'
 import { isGearUpgrade } from './combat'
+import { UNIQUE_BY_BOSS, type UniqueDef } from '../data/uniques'
 
 export interface LootResult {
   gold: number
@@ -27,24 +28,52 @@ export const ELITE_DROP_CHANCE_MULT = 2
 export function rollLoot(
   mob: MobInstance, level: number, goldFindBonus: number,
   /** Standing-upgrade bonuses. Defaulted so callers that predate them are unchanged. */
-  fx: { goldFind?: number; dropChance?: number } = {},
+  fx: { goldFind?: number; dropChance?: number; eliteDropsAsBoss?: boolean } = {},
+  /** Unique ids the hero already owns, so a boss never drops a second copy of its own.
+   *  Defaulted, so every caller that predates uniques keeps its behaviour. */
+  ownedUniques: ReadonlySet<string> = new Set(),
 ): LootResult {
   // Gold
   const base = mob.goldMin + Math.random() * (mob.goldMax - mob.goldMin)
   const variance = 1 + (Math.random() * 2 - 1) * GOLD_DROP_VARIANCE
   const gold = Math.max(1, Math.round(base * variance * goldFindBonus * (fx.goldFind ?? 1)))
 
+  // ── The boss's own unique ─────────────────────────────────────────────────
+  // Authored, guaranteed, and only once. A named item from a named encounter is the
+  // whole shape being emulated here, and a boss that drops its signature piece on every
+  // kill would turn it into currency instead of a trophy.
+  const uniqueDef = mob.isBoss ? UNIQUE_BY_BOSS[mob.templateId] : undefined
+  if (uniqueDef && !ownedUniques.has(uniqueDef.id)) {
+    return { gold, item: makeUniqueItem(uniqueDef, level) }
+  }
+
   // Item
   let item: Item | null = null
   const baseChance = ITEM_DROP_CHANCE + (fx.dropChance ?? 0)
   const dropChance = mob.isElite ? baseChance * ELITE_DROP_CHANCE_MULT : mob.isBoss ? 1.0 : baseChance
   if (Math.random() < dropChance) {
-    const rarityBias = mob.isBoss ? BOSS_RARITY_BIAS : mob.isElite ? ELITE_RARITY_BIAS : 0
+    // Ironcrag Signet: elites roll on the BOSS table. The one unique that changes what
+    // the rest of the game drops rather than what the hero does.
+    const eliteBias = fx.eliteDropsAsBoss ? BOSS_RARITY_BIAS : ELITE_RARITY_BIAS
+    const rarityBias = mob.isBoss ? BOSS_RARITY_BIAS : mob.isElite ? eliteBias : 0
     const slot = ALL_SLOTS[Math.floor(Math.random() * ALL_SLOTS.length)]
     item = generateItem(slot, level, rarityBias)
   }
 
   return { gold, item }
+}
+
+/**
+ * Mint an authored unique at the level it dropped.
+ *
+ * Stats come from the normal legendary generator so the piece is genuinely competitive —
+ * `isGearUpgrade` prefers a unique outright, but an item that were also weak would make
+ * that preference feel like a punishment rather than a prize. Name, effect and protection
+ * are then stamped over the generated shell.
+ */
+export function makeUniqueItem(def: UniqueDef, level: number): Item {
+  const base = generateItem(def.slot, level, 0, 'legendary', def.name)
+  return { ...base, uniqueId: def.id, protected: true }
 }
 
 // ── The drop ladder ───────────────────────────────────────────────────────────

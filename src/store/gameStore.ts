@@ -69,6 +69,7 @@ import { DEFAULT_COLORWAY, isColorwayUnlocked } from '../render/colorways'
 import { getPurchaseState } from '../monetization/purchases'
 import { emptyRates, accrueRates, projectOfflineProgress } from '../engine/offline'
 import { compileUpgrades, upgradeCost, UPGRADE_BY_ID, type UpgradeId } from '../data/upgrades'
+import { compileUniques } from '../data/uniques'
 import type { TownServiceKind } from '../data/townNpcs'
 
 // The slot currently loaded into the store — the target of every autosave. Null
@@ -1298,7 +1299,10 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
     template = nonBoss[Math.floor(Math.random() * nonBoss.length)]
   }
 
-  const isElite = !canSpawnBoss && Math.random() < ELITE_SPAWN_CHANCE
+  // The Bloodfield Standard multiplies this. Champions seeking you out is a trade, not
+  // a buff: elites hit harder and drop better, and an unattended hero meets more of them.
+  const eliteChance = ELITE_SPAWN_CHANCE * compileUniques(state.equipment).eliteSpawnMult
+  const isElite = !canSpawnBoss && Math.random() < Math.min(1, eliteChance)
   const isBoss  = canSpawnBoss
   const hpMult  = isBoss ? BOSS_HP_MULTIPLIER  : isElite ? ELITE_HP_MULTIPLIER  : 1
   const dmgMult = isBoss ? BOSS_DAMAGE_MULTIPLIER : isElite ? ELITE_DAMAGE_MULTIPLIER : 1
@@ -1357,6 +1361,21 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
     dots: [],
     attackAccum: 0,
   }
+}
+
+/**
+ * Every unique the hero currently holds, worn or bagged.
+ *
+ * A boss checks this before dropping its own piece. Bagged counts as owned on purpose:
+ * dropping a second copy because the first is in the bag rather than on the body would
+ * turn a trophy into a farmable resource, which is the whole thing an authored unique is
+ * not supposed to be.
+ */
+function ownedUniqueIds(s: Pick<GameState, 'equipment' | 'inventory'>): Set<string> {
+  const out = new Set<string>()
+  for (const worn of Object.values(s.equipment)) if (worn?.uniqueId) out.add(worn.uniqueId)
+  for (const held of s.inventory) if (held?.uniqueId) out.add(held.uniqueId)
+  return out
 }
 
 /** Wrap a tile coordinate onto the 64×64 torus. */
@@ -2126,7 +2145,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // can be judged against its own upkeep rather than on vibes.
     let autoSold = 0
 
+    // What the hero's worn uniques add up to. Compiled once per tick rather than per
+    // consumer: it walks six slots and several branches read it. Ahead of `fx`, because
+    // one of its effects folds into the talent numbers below.
+    const uniq = compileUniques(state.equipment)
     const fx = compileTalentEffects(state.playerClass, talentAllocs)
+    // Thornvale Coil ADDS to Retaliation rather than replacing it: a talent and an item
+    // that both say "the damage comes back" should stack, not shadow one another.
+    if (uniq.thorns > 0) fx.thornsPct += uniq.thorns
     // Hoisted: both the level-up recompile and the auto-equip recompile need it.
     const racialPassive = RACE_DEFINITIONS[state.playerRace]?.racialPassive ?? {}
     const upg = compileUpgrades(state.upgradeRanks)
@@ -2195,7 +2221,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Frozen timer, the banked free crit and Second Wind, all shared with `fight.ts` now
     // (`advanceHeroUpkeep`). They were store-only, so an ambient hero or a duellist had
     // none of the three.
-    advanceHeroUpkeep(procState, fx, stats, deltaSeconds)
+    advanceHeroUpkeep(procState, fx, stats, deltaSeconds, uniq.reapingArcHaste)
 
     // ── Manual-mode idle fallback ─────────────────────────────────────────────
     // Only counts down in active combat; menus/travel/gathering/town are not "manual"
@@ -2464,7 +2490,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const registerKill = (victim: MobInstance | null = currentMob): boolean => {
       if (!victim || victim.currentHp > 0) return false
       const deadMob = victim
-      const loot = rollLoot(deadMob, level, stats.goldFindBonus, upg)
+      const loot = rollLoot(
+        deadMob, level,
+        stats.goldFindBonus,
+        { goldFind: upg.goldFind * uniq.goldFind,
+          dropChance: upg.dropChance + uniq.dropChance,
+          eliteDropsAsBoss: uniq.eliteDropsAsBoss },
+        ownedUniqueIds(state),
+      )
       gold += loot.gold
       killGoldThisTick += loot.gold
 
@@ -2799,13 +2832,19 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             // The capstones that grant this have always SAID so ("Battle Cry becomes a
             // whirlwind — it also bleeds everything it touches") and always been flavour
             // text over a damage mod. This is the sentence, executed.
-            const splashDmg = spendSplash(activeBuffs, hit.damage)
+            // A unique can splash with no buff at all — The Wyrm's Ember and The Maw's
+            // Hunger make it innate, which is what turns them into build items rather
+            // than stat sticks. The buff still wins when it is larger.
+            const buffSplash = spendSplash(activeBuffs, hit.damage)
+            const innate = uniq.innateSplash > 0 && hit.damage > 0
+              ? Math.max(1, Math.round(hit.damage * uniq.innateSplash)) : 0
+            const splashDmg = Math.max(buffSplash, innate)
             if (splashDmg > 0) {
               let struck = 0
               for (let i = 0; i < mobs.length; i++) {
                 const m = mobs[i]
                 if (m.id === currentMob!.id) continue
-                if (Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) > SPLASH_RADIUS) continue
+                if (Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) > SPLASH_RADIUS * uniq.splashRadiusMult) continue
                 mobs[i] = { ...m, currentHp: m.currentHp - splashDmg, aggro: true }
                 struck++
                 if (state.settings.showDamageNumbers) {
@@ -3137,7 +3176,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (isAlive) {
       // Nearest first, then capped: the mobs in the hero's face are the ones that get to
       // swing, and the ones behind them are waiting their turn rather than piling on.
-      const slots = MAX_MELEE_ATTACKERS - (currentMob && mobEngaged ? 1 : 0)
+      // Warplate of the Crossing and Cinderfall Mantle widen this. That is the
+      // risk/reward shape: more enemies land on you, but AoE catches more of them and the
+      // field clears faster — a genuine choice about what to wear before closing the tab.
+      const slots = MAX_MELEE_ATTACKERS + uniq.extraAttackers - (currentMob && mobEngaged ? 1 : 0)
       const pack = mobs
         .filter(m => m.aggro && m.id !== currentMob?.id)
         .sort((a, b) =>
@@ -3587,6 +3629,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const mod = castFx.abilityMods[abilityId] ?? emptyAbilityMod()
     /** Splash carried by a direct-damage ability, applied to the crowd at the end. */
     let boltSplash = 0
+    // `finishCast` runs outside `tick`, so it compiles its own copy rather than reading
+    // the tick's. Cheap, and the alternative is threading it through two call paths.
+    const uniq = compileUniques(s.equipment)
 
     // Echo — the arcane tree's signature. The ability resolves a SECOND time, at full
     // strength, for free. Rolled once here rather than per-effect so a multi-effect
@@ -3634,7 +3679,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (boltSplash > 0 && currentMob) {
       for (const m of s.mobs) {
         if (m.id === currentMob.id) continue
-        if (Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) > SPLASH_RADIUS) continue
+        if (Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) > SPLASH_RADIUS * uniq.splashRadiusMult) continue
         splashIds.add(m.id)
       }
       if (splashIds.size) {

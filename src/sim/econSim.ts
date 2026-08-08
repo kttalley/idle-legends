@@ -18,13 +18,14 @@ import {
   ELITE_SPAWN_CHANCE,
 } from '../data/constants'
 import type { ClassType, GameState, RaceType, TownId, ZoneId } from '../data/types'
-import { ZONE_ORDER } from '../data/zones'
+import { ZONE_ORDER, ZONES } from '../data/zones'
 import { canEnterZone, townForZone } from '../engine/zoneProgression'
 import { UPGRADES, upgradeCost } from '../data/upgrades'
 import { slotStorage } from '../store/saveSlots'
 import { projectOfflineProgress } from '../engine/offline'
 import { itemPower, generateItem } from '../data/items'
-import { ELITE_DROP_CHANCE_MULT, placeDrop } from '../engine/loot'
+import { ELITE_DROP_CHANCE_MULT, placeDrop, rollLoot } from '../engine/loot'
+import { UNIQUE_BY_BOSS } from '../data/uniques'
 import { joinParty, disbandParty } from '../engine/party'
 import { allocateSpec } from '../engine/ambient'
 import { mulberry32 } from '../engine/rng'
@@ -798,6 +799,49 @@ export function runLootFidelity(): Violation[] {
                             { ...dropCtx, contract: null } as never)
   if (bagCase.outcome === 'salvaged') {
     fail('a protected drop is never salvaged', 'a full bag scrapped a protected item')
+  }
+
+  // 4. Every zone boss drops its own unique, exactly once, and an idle hero WEARS it.
+  //
+  // Three ways this silently does nothing, all of them checked here rather than assumed:
+  // the boss never rolls it, a second kill farms a duplicate, or auto-equip declines it
+  // because `gearScore` prices stats and a unique's point is its effect. The last is the
+  // quiet one — an item that drops, survives the ladder and then sits in the bag forever
+  // is indistinguishable from an item that never dropped, in a game nobody is watching.
+  for (const zoneId of ZONE_ORDER) {
+    const def = UNIQUE_BY_BOSS[ZONES[zoneId].bossId]
+    if (!def) { fail('every boss has a unique', `${ZONES[zoneId].bossId} drops nothing named`); continue }
+
+    const boss = {
+      templateId: ZONES[zoneId].bossId, isBoss: true, isElite: false,
+      goldMin: 10, goldMax: 10, name: 'x', baseName: 'x',
+    } as unknown as Parameters<typeof rollLoot>[0]
+
+    const first = rollLoot(boss, 40, 1, {}, new Set())
+    if (first.item?.uniqueId !== def.id) {
+      fail('a boss drops its unique', `${def.name} did not drop from its own boss`)
+    }
+    // Owned once — a trophy, not a resource.
+    const second = rollLoot(boss, 40, 1, {}, new Set([def.id]))
+    if (second.item?.uniqueId === def.id) {
+      fail('a unique drops only once', `${def.name} dropped a second copy`)
+    }
+    // And an unattended hero puts it on, over a CONTEMPORARY ordinary piece.
+    //
+    // The rival used to be a level-200 legendary, which asserted "a unique beats anything
+    // ever" — the wrong property, and one whose absolute version rots the hero's gear for
+    // eighty levels. What has to hold is that a unique beats what the player would
+    // plausibly be wearing when it drops.
+    if (first.item) {
+      const rival = { ...generateItem(def.slot, 40, 0, 'epic'), vendorValue: 9999 }
+      const wornEq = { ...emptyEq, [def.slot]: rival } as never
+      const placed = placeDrop(first.item, wornEq, new Array(20).fill(null),
+                               { ...dropCtx, contract: null, autoEquip: true } as never)
+      if (placed.outcome !== 'equipped') {
+        fail('a unique is worn by an idle hero',
+          `${def.name} was ${placed.outcome} rather than equipped over an ordinary piece`)
+      }
+    }
   }
   return out
 }

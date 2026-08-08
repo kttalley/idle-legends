@@ -269,6 +269,14 @@ export function gearScore(
  * so a piece that trades armour for damage is judged on the net effect rather than on
  * whichever stat happens to be listed first.
  */
+/**
+ * How much stat advantage a unique is granted when competing with ordinary gear.
+ *
+ * At 1.5 the unique wins unless the rival carries half again its power. Not absolute:
+ * see the note inside `isGearUpgrade` for the measured reason.
+ */
+export const UNIQUE_POWER_EDGE = 1.5
+
 export function isGearUpgrade(
   item: Item,
   playerClass: ClassType,
@@ -277,11 +285,53 @@ export function isGearUpgrade(
   talentAllocs: Record<string, number>,
   racialPassive: StatBonuses = {},
 ): boolean {
-  const current = gearScore(playerClass, level, equipment, talentAllocs, racialPassive)
+  // A unique is worn over anything ordinary, whatever the stat comparison says.
+  //
+  // `gearScore` prices STATS, and a unique's point is its effect — an "Equip:" line that
+  // changes how the idle loop behaves. Those are invisible here, so a unique whose stat
+  // budget is merely competitive rather than dominant would score at or below the
+  // incumbent and an unattended hero would never put it on. That is the same silent
+  // failure as the drop ladder selling one: protected from destruction, and never worn,
+  // which in an idle game is indistinguishable from never having dropped.
+  //
+  // Only over NON-uniques, so two uniques in one slot still settle it on stats rather
+  // than on which happened to drop second.
+  //
+  // The preference is STRONG BUT NOT ABSOLUTE, and the difference is not cosmetic. An
+  // absolute rule was measured and it rots the hero: a unique picked up from the level-8
+  // boss occupies its slot for the rest of the run, no ordinary drop can ever displace
+  // it, and gear decays against level for eighty levels. Offline parity caught it at
+  // 15.5% against a ±10% band — the hero's real throughput sagging away from the rate
+  // that had been measured of them.
+  //
+  // So an ordinary piece takes the slot once it is decisively better. `UNIQUE_POWER_EDGE`
+  // is how much better: at 1.5 a unique holds its slot across a comfortable stretch of
+  // levelling and then yields to gear that has genuinely outgrown it, which is roughly
+  // how a good drop is supposed to age.
+  const current = equipment[item.slot]
+  if (item.protected !== current?.protected && (item.protected || current)) {
+    // Compare what each piece CONTRIBUTES, using the same class-aware scorer as everything
+    // else here — `itemPower` is deliberately not used for auto-equip (see the note above
+    // `gearScore`: it is class-blind, and a mage's plate is not a warrior's plate).
+    const bare = gearScore(
+      playerClass, level, { ...equipment, [item.slot]: null }, talentAllocs, racialPassive,
+    )
+    const withItem = gearScore(
+      playerClass, level, { ...equipment, [item.slot]: item }, talentAllocs, racialPassive,
+    ) - bare
+    const withCurrent = gearScore(
+      playerClass, level, { ...equipment, [item.slot]: current ?? null }, talentAllocs, racialPassive,
+    ) - bare
+    return item.protected
+      ? withItem * UNIQUE_POWER_EDGE >= withCurrent
+      : withItem >= withCurrent * UNIQUE_POWER_EDGE
+  }
+
+  const before = gearScore(playerClass, level, equipment, talentAllocs, racialPassive)
   const swapped = gearScore(
     playerClass, level, { ...equipment, [item.slot]: item }, talentAllocs, racialPassive,
   )
-  return swapped > current
+  return swapped > before
 }
 
 // ── Attack Resolution ─────────────────────────────────────────────────────────
@@ -470,6 +520,9 @@ export function advanceHeroUpkeep(
     'timedCritSeconds' | 'secondWindHpPerTick' | 'sweepingStrikesEnabled'>,
   hp: { currentHp: number; maxHp: number },
   dt: number,
+  /** Seconds off the Reaping Arc window, from worn uniques. Floored at a 5s cycle so no
+   *  amount of haste can make the window permanent. */
+  reapingArcHaste = 0,
 ): { healed: number } {
   // Frozen wears off on its own clock, whoever applied it.
   if (procState.mobFrozen) {
@@ -494,7 +547,7 @@ export function advanceHeroUpkeep(
     procState.reapingArcTimer = Math.max(0, procState.reapingArcTimer - dt)
     if (procState.reapingArcTimer <= 0 && procState.reapingArcCharges <= 0) {
       procState.reapingArcCharges = REAPING_ARC_CHARGES
-      procState.reapingArcTimer = REAPING_ARC_SECONDS
+      procState.reapingArcTimer = Math.max(5, REAPING_ARC_SECONDS - reapingArcHaste)
     }
   }
 

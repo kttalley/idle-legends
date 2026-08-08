@@ -442,6 +442,9 @@ export interface Item {
    * unique does. Optional, so every save and every existing item reads as unprotected.
    */
   protected?: boolean
+  /** Set on an authored unique — the join to `UNIQUE_BY_ID`, and what `compileUniques`
+   *  reads to find the "Equip:" effect. Absent on every procedural drop. */
+  uniqueId?: string
 }
 
 // ── The merchant contract ─────────────────────────────────────────────────────
