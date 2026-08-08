@@ -16,7 +16,7 @@ import { loadSprite, loadSpriteOrPlaceholder } from '../indexedSprite'
 import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeBoltRig, makeBurstRig, TILE_ANIMS, TILE, makeTownBuildings, TOWN_BUILDING } from '../placeholderArt'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { composePalette } from '../palette'
-import { heroPaletteId } from './heroWardrobe'
+import { heroPaletteId, type AccentKey } from './heroWardrobe'
 import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
 import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } from '../../engine/walkability'
 import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } from '../../data/townNpcs'
@@ -118,11 +118,27 @@ const RARITY_RANK: Record<Rarity, number> = {
 // patterns moved to `engine/mobBehaviour.ts` when the STORE started needing temperament
 // too — see the note there on why this is single-sourced rather than duplicated.
 
-function bestEquipmentRarity(state: GameState): Rarity {
+/**
+ * What the hero's accent band shows: their best rarity, or a worn unique.
+ *
+ * A unique OUTRANKS every rarity, because it is minted legendary and would otherwise be
+ * indistinguishable from any other legendary the hero has ever worn — the rarest thing in
+ * the run, wearing the same colour as the afternoon's third orange sword.
+ *
+ * With several uniques on, the WEAPON wins, then the first in slot order. Deterministic
+ * rather than "most recently equipped", so the same hero always looks the same; and the
+ * weapon because it is the piece the silhouette actually shows off.
+ */
+function bestEquipmentRarity(state: GameState): AccentKey {
+  const worn = Object.values(state.equipment).filter(Boolean) as Item[]
+  const uniques = worn.filter(i => i.uniqueId)
+  if (uniques.length) {
+    const pick = uniques.find(i => i.slot === 'weapon') ?? uniques[0]
+    return `unique:${pick.uniqueId}`
+  }
   let best: Rarity = 'common'
   let rank = -1
-  for (const item of Object.values(state.equipment)) {
-    if (!item) continue
+  for (const item of worn) {
     const r = RARITY_RANK[item.rarity]
     if (r > rank) { rank = r; best = item.rarity }
   }

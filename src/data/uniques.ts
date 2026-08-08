@@ -62,9 +62,14 @@ export interface UniqueDef {
   /** Player-facing "Equip:" line. Written as the item would read in a tooltip. */
   equipText: string
   effect: UniqueEffect
-  /** Palette id for the rendered drop. Rarity-as-palette is the renderer's premise, so a
-   *  unique's identity costs a registry row rather than an art asset. */
-  paletteId: string
+  /**
+   * The hero's accent band (palette slots 13-15) while this is worn.
+   *
+   * Rarity-as-palette is the renderer's premise and this is it paying off: slots 13-15
+   * ARE the itemization signal (`heroWardrobe`), so twelve visually distinct heroes cost
+   * twelve rows of colour and no art at all. Dark to light, like every other ramp here.
+   */
+  accent: [string, string, string]
 }
 
 /**
@@ -81,84 +86,84 @@ export const UNIQUES: UniqueDef[] = [
     name: 'Meadowwarden', slot: 'trinket',
     equipText: 'Equip: The wilds keep paying while you are away. +2 hours of offline progress.',
     effect: { kind: 'offlineHours', value: 2 },
-    paletteId: 'gear/unique/meadow',
+    accent: ['#2c4a1c', '#4c8030', '#7cc456'],
   },
   {
     id: 'uniq_tollkeepers_cut', bossId: 'bandit_warlord',
     name: "The Tollkeeper's Cut", slot: 'trinket',
     equipText: 'Equip: You take a bandit\'s share of everything you kill. +25% gold.',
     effect: { kind: 'goldFind', value: 1.25 },
-    paletteId: 'gear/unique/toll',
+    accent: ['#4a3a14', '#8a6c24', '#d4ac48'],
   },
   {
     id: 'uniq_gravecallers_lantern', bossId: 'death_arbiter',
     name: "The Gravecaller's Lantern", slot: 'trinket',
     equipText: 'Equip: The dead give up more than they meant to. +10% chance of a drop.',
     effect: { kind: 'dropChance', value: 0.10 },
-    paletteId: 'gear/unique/grave',
+    accent: ['#2a3a3c', '#4c6c70', '#84b4bc'],
   },
   {
     id: 'uniq_thornvale_coil', bossId: 'troll_warchief',
     name: 'Thornvale Coil', slot: 'chest',
     equipText: 'Equip: The jungle bites back. Returns 15% of the damage you take.',
     effect: { kind: 'thorns', value: 0.15 },
-    paletteId: 'gear/unique/thorn',
+    accent: ['#1c3c24', '#2e6c40', '#54ac6c'],
   },
   {
     id: 'uniq_wyrms_ember', bossId: 'flame_wyrm',
     name: "The Wyrm's Ember", slot: 'weapon',
     equipText: 'Equip: Every blow carries. Your attacks strike everything near you for 30%.',
     effect: { kind: 'innateSplash', value: 0.30 },
-    paletteId: 'gear/unique/ember',
+    accent: ['#5c1c08', '#a83c10', '#f47c24'],
   },
   {
     id: 'uniq_warplate_of_the_crossing', bossId: 'crossing_war_golem',
     name: 'Warplate of the Crossing', slot: 'chest',
     equipText: 'Equip: You hold ground others could not. One more enemy may engage you at once.',
     effect: { kind: 'extraAttackers', value: 1 },
-    paletteId: 'gear/unique/warplate',
+    accent: ['#2c2c34', '#565664', '#9098a8'],
   },
   {
     id: 'uniq_bloodfield_standard', bossId: 'bloodfield_warlord',
     name: 'The Bloodfield Standard', slot: 'trinket',
     equipText: 'Equip: Champions seek you out. Elites appear three times as often.',
     effect: { kind: 'eliteSpawnMult', value: 3 },
-    paletteId: 'gear/unique/standard',
+    accent: ['#54101c', '#94202c', '#d44450'],
   },
   {
     id: 'uniq_ironcrag_signet', bossId: 'ironcrag_overlord',
     name: 'Ironcrag Signet', slot: 'trinket',
     equipText: 'Equip: You loot champions as though they were kings.',
     effect: { kind: 'eliteDropsAsBoss' },
-    paletteId: 'gear/unique/signet',
+    accent: ['#4c3410', '#8c6018', '#d49c34'],
   },
   {
     id: 'uniq_hexlords_fang', bossId: 'venom_hexlord',
     name: "The Hexlord's Fang", slot: 'weapon',
     equipText: 'Equip: The venom spreads further. Splashed blows reach half again as far.',
     effect: { kind: 'splashRadiusMult', value: 1.5 },
-    paletteId: 'gear/unique/fang',
+    accent: ['#1c3c1c', '#2c7434', '#54c45c'],
   },
   {
     id: 'uniq_wardrum_helm', bossId: 'warsong_chieftain',
     name: 'Helm of the Wardrum', slot: 'helm',
     equipText: 'Equip: The drum never stops. Reaping Arc returns 10 seconds sooner.',
     effect: { kind: 'reapingArcHaste', value: 10 },
-    paletteId: 'gear/unique/wardrum',
+    accent: ['#4c2410', '#8c4418', '#d47c34'],
   },
   {
     id: 'uniq_cinderfall_mantle', bossId: 'cinder_dreadlord',
     name: 'Cinderfall Mantle', slot: 'chest',
     equipText: 'Equip: You stand in the middle of it. Two more enemies may engage you at once.',
     effect: { kind: 'extraAttackers', value: 2 },
-    paletteId: 'gear/unique/cinder',
+    accent: ['#3c1408', '#7c2c10', '#c45c24'],
   },
   {
     id: 'uniq_the_maws_hunger', bossId: 'maw_warlord',
     name: "The Maw's Hunger", slot: 'weapon',
     equipText: 'Equip: Everything within reach dies with the same blow. Attacks splash for 60%.',
     effect: { kind: 'innateSplash', value: 0.60 },
-    paletteId: 'gear/unique/maw',
+    accent: ['#2c0c34', '#5c1c70', '#a044c4'],
   },
 ]
 

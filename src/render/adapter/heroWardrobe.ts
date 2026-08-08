@@ -11,6 +11,7 @@ import type { ClassType, RaceType, FactionType, Rarity } from '../../data/types'
 import { composePalette } from '../palette'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { getColorway, DEFAULT_COLORWAY } from '../colorways'
+import { UNIQUE_BY_ID } from '../../data/uniques'
 
 // Race → skin base palette id. (tauren → hornborn rig palette; Track R rename is
 // display-only, the renderer just needs a palette id that exists.)
@@ -38,6 +39,27 @@ const FACTION_TRIM: Record<FactionType, Partial<Record<number, string>>> = {
   neutral:  { 9: '#3a3020', 10: '#5a4a2c', 11: '#7c663c', 12: '#9c854c' },
 }
 
+/** Resolve an accent key to its slot 13–15 overrides. Falls back to common, so an
+ *  unknown unique id degrades to a plain hero rather than an uncoloured one. */
+function accentsFor(key: AccentKey): Partial<Record<number, string>> {
+  if (key.startsWith('unique:')) {
+    const def = UNIQUE_BY_ID[key.slice('unique:'.length)]
+    if (def) return { 13: def.accent[0], 14: def.accent[1], 15: def.accent[2] }
+    return RARITY_ACCENTS.legendary
+  }
+  return RARITY_ACCENTS[key] ?? RARITY_ACCENTS.common
+}
+
+/**
+ * What drives the accent band: a rarity, or a specific unique.
+ *
+ * Slots 13–15 are the itemization signal, so a worn unique claiming them is the payoff
+ * the whole palette-as-content premise was built for — twelve visibly distinct heroes for
+ * twelve rows of colour and no new art. A unique is minted legendary, so without this it
+ * would look exactly like any other legendary the hero has ever worn.
+ */
+export type AccentKey = Rarity | `unique:${string}`
+
 /**
  * Compose (and lazily register + cache) the palette for a full hero look. Returns a
  * stable palette id the Scene can render directly.
@@ -46,7 +68,7 @@ export function heroPaletteId(
   playerClass: ClassType,
   race: RaceType,
   faction: FactionType,
-  rarity: Rarity = 'common',
+  rarity: AccentKey = 'common',
   colorway: string = DEFAULT_COLORWAY,
 ): string {
   // The colorway is part of the cache key, so an equipped skin is a distinct registered
@@ -59,7 +81,7 @@ export function heroPaletteId(
   const overrides: Partial<Record<number, string>> = {
     ...CLASS_TUNIC[playerClass],
     ...FACTION_TRIM[faction],
-    ...(RARITY_ACCENTS[rarity] ?? RARITY_ACCENTS.common),
+    ...accentsFor(rarity),
     // Last, so a purchased colorway wins over class/faction/rarity — that is the point
     // of buying it. It deliberately carries no slots 1–4, so race skin always survives.
     ...cw.overrides,
