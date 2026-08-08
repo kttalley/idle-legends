@@ -60,10 +60,19 @@ export function temperamentOf(
 // you have finished deciding whether to engage — that is what makes a wolf a threat and a
 // mushroom a landmark.
 
-export const AGGRO_PREDATOR = 8.5
-export const AGGRO_TERRITORIAL = 3.0
-/** A lair boss still defends itself once you are on top of it. */
-export const AGGRO_LAIR = 2.0
+// Raised hard, because the old numbers made the world passive. Territorial was 3.0 — you
+// had to walk almost on top of something before it noticed you, so mobs stood at 10-28
+// tiles ignoring the hero and only ever ONE was aggroed at a time. Measured in the running
+// game: five of six mobs `aggro:false` at every sample.
+//
+// That is what "enemies never initiate" is. The mobs that did engage attacked fine; the
+// problem was that nothing ever engaged. In this genre a monster you walk past notices you
+// and comes — being ignored by the world is the failure state, not the neutral one.
+export const AGGRO_PREDATOR = 12
+export const AGGRO_TERRITORIAL = 7
+/** A lair boss still defends itself once you are on top of it — but it should not be
+ *  possible to stand in a lair unnoticed either. */
+export const AGGRO_LAIR = 4
 
 export function aggroRadiusFor(mob: Pick<MobInstance, 'name' | 'isBoss'>): number {
   switch (temperamentOf(mob)) {
