@@ -47,7 +47,8 @@ import {
   findPath, getWalkMask, hasLineOfWalk, isWalkable, moveWithCollision, nearestWalkable,
 } from '../engine/walkability'
 import {
-  aggroRadiusFor, attackRangeOf, CHASE_SPEED, LEASH_DISTANCE, patrolRangeFor, PATROL_SPEED,
+  aggroRadiusFor, attackRangeOf, heroAttackRange, CHASE_SPEED, LEASH_DISTANCE,
+  patrolRangeFor, PATROL_SPEED,
   temperamentOf,
 } from '../engine/mobBehaviour'
 import {
@@ -2251,7 +2252,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const rawMobDist = Math.sqrt(mobOffset.dx ** 2 + mobOffset.dy ** 2)
     // A caster fires from its own reach; a brawler has to be on you. One number for both
     // meant the store called an archer adjacent while the renderer drew it five tiles out.
+    // Two ranges, because they answer two different questions. `mobEngaged` is whether
+    // the MOB can reach the hero; `heroInRange` is whether the HERO can reach it. Sharing
+    // one number meant a warrior swung at an archer from six tiles because the ARCHER had
+    // that reach.
     const mobEngaged = !!target && rawMobDist < attackRangeOf(target)
+    const heroInRange = !!target && rawMobDist < heroAttackRange(state.playerClass)
 
     // ── Tick down skill cooldowns ───────────────────────────────────────────
     for (const id of Object.keys(skillCooldowns)) {
@@ -2785,7 +2791,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Attacks on its own schedule alongside the hero. It exists so a Binding warlock's
     // damage does not stop the moment they stop pressing anything — which is the
     // fantasy, and happens to be exactly what an idle game wants.
-    if (fx.minionDps > 0 && mobEngaged && currentMob) {
+    if (fx.minionDps > 0 && heroInRange && currentMob) {
       accum.minion += deltaSeconds
       while (currentMob && accum.minion >= MINION_TICK_SECONDS) {
         accum.minion -= MINION_TICK_SECONDS
@@ -2818,7 +2824,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     }
 
     // ── Player attacks mob ───────────────────────────────────────────────────
-    if (mobEngaged) accum.player += deltaSeconds
+    if (heroInRange) accum.player += deltaSeconds
     else accum.player = 0  // reset during approach so first strike lands on arrival
     // WHILE, not IF. `gameLoop` caps a frame delta at 5 seconds (gameLoop.ts:17), and
     // resolving at most one swing per tick meant a backgrounded tab coming back — or any
@@ -2829,7 +2835,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     //
     // Bounded by CATCHUP_MAX_SWINGS so a pathological delta cannot spin the tick.
     let catchup = 0
-    while (mobEngaged && currentMob && accum.player >= stats.attackSpeedSeconds
+    while (heroInRange && currentMob && accum.player >= stats.attackSpeedSeconds
            && catchup++ < CATCHUP_MAX_SWINGS) {
       accum.player -= stats.attackSpeedSeconds
 
@@ -3012,7 +3018,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     //
     // Each swing is attributed on the floating number (`allyKey`), which is what lets the
     // renderer play the hit on that companion's body instead of the hero's.
-    if (mobEngaged && currentMob) {
+    if (heroInRange && currentMob) {
       for (const ally of allies) {
         if (ally.downedFor > 0 || !currentMob) continue
         ally.attackAccum += deltaSeconds

@@ -87,8 +87,25 @@ export function aggroRadiusFor(mob: Pick<MobInstance, 'name' | 'isBoss'>): numbe
 // A melee reach slightly beyond the renderer's hold, so a brawler parked at its gap is
 // genuinely in range rather than a hair outside it and twitching between the two.
 export const MELEE_ATTACK_RANGE = 2.2
-/** A caster's reach. Matches `RANGED_GAP_TILES` plus the same slack. */
-export const RANGED_ATTACK_RANGE = 5.7
+/** A caster's reach — owner's call, 2.5× melee. */
+export const RANGED_ATTACK_RANGE = MELEE_ATTACK_RANGE * 2.5
+
+/**
+ * How far the HERO can attack from.
+ *
+ * Separate from `attackRangeOf`, and the separation is the point. Both questions used to
+ * be answered by the TARGET's range, which meant fighting an archer let the hero hit it
+ * from the archer's reach — a melee warrior swinging an axe at something six tiles away,
+ * and a caster picking things off before they were on screen. "Can it hit me" and "can I
+ * hit it" are different questions and only ever shared an answer by accident.
+ *
+ * Casters throw; everyone else closes.
+ */
+export function heroAttackRange(playerClass: string): number {
+  return playerClass === 'mage' || playerClass === 'warlock'
+    ? RANGED_ATTACK_RANGE
+    : MELEE_ATTACK_RANGE
+}
 
 /** How far THIS mob can attack from. The single answer both the store and the renderer
  *  should ask, so neither can decide a mob is in range while the other draws it away. */
