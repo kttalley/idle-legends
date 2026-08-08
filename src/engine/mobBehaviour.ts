@@ -73,6 +73,29 @@ export function aggroRadiusFor(mob: Pick<MobInstance, 'name' | 'isBoss'>): numbe
   }
 }
 
+// ── How far a mob can hit you from ────────────────────────────────────────────
+//
+// There was one number, and it was the melee one: the store gated EVERY mob's swing on
+// 1.5 tiles regardless of what the mob was. That is wrong in both directions at once.
+//
+// The renderer already holds a caster at `RANGED_GAP_TILES` (5) and a brawler at
+// `MELEE_GAP_TILES` (2), so the two halves of the game disagreed about where a mob was
+// standing: an archer was drawn five tiles out while the store, whose engagement offset
+// shrinks toward zero on approach, considered it adjacent and let it fire. On screen that is an
+// enemy attacking you from across the map — which is exactly what it looked like.
+//
+// A melee reach slightly beyond the renderer's hold, so a brawler parked at its gap is
+// genuinely in range rather than a hair outside it and twitching between the two.
+export const MELEE_ATTACK_RANGE = 2.2
+/** A caster's reach. Matches `RANGED_GAP_TILES` plus the same slack. */
+export const RANGED_ATTACK_RANGE = 5.7
+
+/** How far THIS mob can attack from. The single answer both the store and the renderer
+ *  should ask, so neither can decide a mob is in range while the other draws it away. */
+export function attackRangeOf(mob: Pick<MobInstance, 'name'> & { baseName?: string }): number {
+  return isRangedMob(mob) ? RANGED_ATTACK_RANGE : MELEE_ATTACK_RANGE
+}
+
 /** How far a mob will wander from its home anchor while patrolling. Predators range
  *  wider — a territorial thing that strayed six tiles from its post is not territorial. */
 export function patrolRangeFor(mob: Pick<MobInstance, 'name' | 'isBoss'>): number {

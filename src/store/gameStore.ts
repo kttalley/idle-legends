@@ -47,7 +47,8 @@ import {
   findPath, getWalkMask, hasLineOfWalk, isWalkable, moveWithCollision, nearestWalkable,
 } from '../engine/walkability'
 import {
-  aggroRadiusFor, CHASE_SPEED, LEASH_DISTANCE, patrolRangeFor, PATROL_SPEED, temperamentOf,
+  aggroRadiusFor, attackRangeOf, CHASE_SPEED, LEASH_DISTANCE, patrolRangeFor, PATROL_SPEED,
+  temperamentOf,
 } from '../engine/mobBehaviour'
 import {
   INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
@@ -2223,7 +2224,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
     // Is the mob close enough to fight? (arrives from map edge over ~5s)
     const rawMobDist = Math.sqrt(mobOffset.dx ** 2 + mobOffset.dy ** 2)
-    const mobEngaged = !!target && rawMobDist < MELEE_RANGE
+    // A caster fires from its own reach; a brawler has to be on you. One number for both
+    // meant the store called an archer adjacent while the renderer drew it five tiles out.
+    const mobEngaged = !!target && rawMobDist < attackRangeOf(target)
 
     // ── Tick down skill cooldowns ───────────────────────────────────────────
     for (const id of Object.keys(skillCooldowns)) {
@@ -2477,7 +2480,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Offsets are last tick's (they are re-derived inside `tickWorld` below), which is the
     // same one-tick lag every other engagement check here already accepts.
     const packInMelee = isAlive && mobs.some(m =>
-      m.aggro && Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) < MELEE_RANGE)
+      m.aggro && Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) < attackRangeOf(m))
 
     if (!currentMob && !packInMelee) {
       const idle = tickWorld(state, controlMode, mobs, null, targetMobId, deltaSeconds)
@@ -3232,7 +3235,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         if (!m) continue
         // Out of reach: no swing and no banking. A mob that accrued while closing would
         // arrive owing the hero a burst, which reads as being ambushed by arithmetic.
-        if (Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) >= MELEE_RANGE) continue
+        if (Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) >= attackRangeOf(m)) continue
         m = { ...m, attackAccum: m.attackAccum + deltaSeconds }
         let packCatchup = 0
         while (isAlive && m.attackAccum >= m.attackSpeedSeconds
