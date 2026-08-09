@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../../../store/gameStore'
 import { ZONES } from '../../../data/zones'
-import { ZoneSelector } from '../ZoneSelector'
+import { ZoneTrack } from '../ZoneTrack'
+import { useDismissOnEscape } from '../../ui/useDismissable'
 import type { ZoneMap, TileType } from '../../../data/types'
 import { SpriteIcon } from '../../ui/SpriteIcon'
 
@@ -60,6 +61,7 @@ export function MinimapRadar() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const bakedRef  = useRef<{ zone: string; canvas: HTMLCanvasElement } | null>(null)
   const [mapOpen, setMapOpen] = useState(false)
+  useDismissOnEscape(mapOpen, () => setMapOpen(false))
 
   const zm = zoneMaps[currentZone]
   const zoneName = zoneNames[currentZone] ?? ZONES[currentZone]?.name ?? 'Unknown'
@@ -193,12 +195,15 @@ export function MinimapRadar() {
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
           }}
         >
-          <div onClick={e => e.stopPropagation()} style={{ width: 'min(340px, 92vw)' }}>
-            <ZoneSelector />
+          <div onClick={e => e.stopPropagation()} className="rp-glass" style={{ width: 'min(360px, 94vw)', padding: 10, borderRadius: 12 }}>
+            {/* The same subway track the left rail draws. There was a second, entirely
+                different zone UI living in here — a tall scrolling list — which meant two
+                renderings of one piece of state to keep in agreement. */}
+            <ZoneTrack collapsible={false} onTravel={() => setMapOpen(false)} />
             <button
               onClick={() => setMapOpen(false)}
               className="rp-button"
-              style={{ marginTop: 6, width: '100%', fontSize: '0.7rem' }}
+              style={{ marginTop: 8, width: '100%', fontSize: '0.7rem', minHeight: 40 }}
             >
               Close
             </button>

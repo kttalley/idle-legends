@@ -25,7 +25,8 @@ import { Animator } from '../animation'
 import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId, useScaffoldArt } from './fftaRoster'
 import { mulberry32, subStream, type Rng } from '../../engine/rng'
 import { deepestSpec } from '../../data/specs'
-import { AGGRESSIVE_RE, combatantOnlyWorldFields, isRangedMob } from '../../engine/mobBehaviour'
+import { AGGRESSIVE_RE, combatantOnlyWorldFields, isRangedMob, restGapFor,
+  MELEE_ATTACK_RANGE, RANGED_ATTACK_RANGE } from '../../engine/mobBehaviour'
 import { runFight, type FightEvent, type HeroCombatant } from '../../engine/fight'
 import {
   makeAmbientHero, pickBark, BARK_CHANCE, BARK_SECONDS, BARK_COOLDOWN_SECONDS,
@@ -72,7 +73,10 @@ const JUMP_HEIGHT = 16        // px lift at apex
 const SHAKE_DURATION = 0.26   // seconds a rumble decays over
 const DEATH_DURATION = 0.7    // seconds a slain mob plays death + fades before retiring
 const LUNGE_MAX = 1.35        // tiles; the attack lunge never exceeds this (no slingshot)
-const ENGAGE_DIST = 1.5       // mob "engaged" threshold (matches the store's mobEngaged)
+// The store's own melee reach, not a copy of it — this used to be a literal 1.5 with a
+// comment claiming it "matches the store's mobEngaged", and it stopped matching the first
+// time that number moved.
+const ENGAGE_DIST = MELEE_ATTACK_RANGE
 // Engagement gap from the player, in per-axis diagonal tiles. The store shrinks
 // mobMapOffset to 0 (mob on the player's tile); we instead hold the mob off by
 // this much once it has arrived. Melee is close enough to lunge; ranged stands
@@ -104,8 +108,12 @@ const MOB_MIN_CLOSE = 1.2      // tiles/sec floor
 const MOB_MAX_CLOSE = 6.0
 const BYSTANDER_SPEED = 3.4    // tiles/sec for an enemy walking in to take up station
 const MOB_SPAWN_FADE = 0.4     // seconds
-const MELEE_GAP_TILES = 2
-const RANGED_GAP_TILES = 5
+// DERIVED from the attack ranges, never set beside them. When these were independent
+// constants the adapter parked a brawler at √2 × 2 ≈ 2.83 while the store let it swing at
+// 2.2, so every melee mob rested permanently outside its own reach and simply never
+// attacked. Deriving makes that class of mismatch unrepresentable.
+const MELEE_GAP_TILES = restGapFor(MELEE_ATTACK_RANGE)
+const RANGED_GAP_TILES = restGapFor(RANGED_ATTACK_RANGE)
 
 // ── Mappings (display-only; internal ids untouched) ──────────────────────────
 

@@ -45,7 +45,7 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
     >
       <div className="mb-8 text-center">
         <h1 style={{
-          fontFamily: 'Cinzel Decorative, Cinzel, serif',
+          fontFamily: '"Cinzel Decorative", var(--font-display)',
           fontSize: 'clamp(1.8rem, 5vw, 3rem)',
           color: '#ffd700',
           textShadow: '0 0 20px rgba(200,161,0,0.5), 0 2px 4px rgba(0,0,0,0.9)',
@@ -85,7 +85,7 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
                 />
               </div>
 
-              <div className={`text-lg font-bold ${cls?.colorClass ?? ''}`} style={{ fontFamily: 'Cinzel, serif', lineHeight: 1.1 }}>
+              <div className={`text-lg font-bold ${cls?.colorClass ?? ''}`} style={{ fontFamily: 'var(--font-display)', lineHeight: 1.1 }}>
                 {s.playerName || 'The Wanderer'}
               </div>
               <div style={{ fontSize: '0.62rem', color: '#9d9d9d', marginTop: 2, marginBottom: 8 }}>
@@ -179,7 +179,7 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
           onClick={() => { if (!full) onCreate() }}
         >
           <div style={{ fontSize: '2.5rem', color: '#6a5228', lineHeight: 1 }}>＋</div>
-          <div style={{ fontFamily: 'Cinzel, serif', color: '#d4b896', fontSize: '0.85rem', marginTop: 8 }}>
+          <div style={{ fontFamily: 'var(--font-display)', color: '#d4b896', fontSize: '0.85rem', marginTop: 8 }}>
             New Character
           </div>
           <div style={{ fontSize: '0.58rem', color: '#666', marginTop: 6 }}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useGameStore } from './store/gameStore'
 import { startGameLoop, stopGameLoop } from './engine/gameLoop'
 import { CharacterCreate } from './components/game/CharacterCreate'
@@ -13,6 +13,7 @@ import { ChatPanel } from './components/game/ChatPanel'
 import { PlayerCard } from './components/game/PlayerCard'
 import { WhisperWindow } from './components/game/WhisperWindow'
 import { installViewportInsets } from './engine/viewportInsets'
+import { useDismissOnEscape } from './components/ui/useDismissable'
 import { QuestToast } from './components/game/QuestToast'
 import { OfflineReportToast } from './components/game/OfflineReportToast'
 import { slotStorage, getLastSlotId, setLastSlotId } from './store/saveSlots'
@@ -76,7 +77,11 @@ export default function App() {
   }, [loadSlot])
 
   const toggle = (p: MobilePanel) => setActivePanel(cur => cur === p ? null : p)
-  const close  = () => setActivePanel(null)
+  const close  = useCallback(() => setActivePanel(null), [])
+
+  // The drawers are menus, and menus close on Escape — the same contract the sheets, the
+  // target card and the fast-travel map already keep. See ui/useDismissable.
+  useDismissOnEscape(activePanel !== null, close)
 
   const refreshSlots = () => setSlots(slotStorage.list())
 
@@ -161,7 +166,10 @@ export default function App() {
           )}
         </div>
         <div className="rail-foot">
-          <ZoneTrack />
+          {/* Ordering a journey finishes what the drawer was opened for, so on a phone the
+              drawer gets out of the way and lets you watch it. `close()` is a no-op on
+              desktop, where the rail is permanent and nothing was covering anything. */}
+          <ZoneTrack onTravel={close} />
         </div>
       </div>
       <button

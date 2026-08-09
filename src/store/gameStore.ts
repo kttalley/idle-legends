@@ -47,7 +47,7 @@ import {
   findPath, getWalkMask, hasLineOfWalk, isWalkable, moveWithCollision, nearestWalkable,
 } from '../engine/walkability'
 import {
-  aggroRadiusFor, attackRangeOf, heroAttackRange, CHASE_SPEED, LEASH_DISTANCE,
+  aggroRadiusFor, attackRangeOf, heroAttackRange, MELEE_ATTACK_RANGE, CHASE_SPEED, LEASH_DISTANCE,
   patrolRangeFor, PATROL_SPEED,
   temperamentOf,
 } from '../engine/mobBehaviour'
@@ -982,7 +982,12 @@ function advancePlayerPosition(
     // Stop at conversational distance rather than standing on top of it — the renderer
     // holds an engagement gap for melee, and marching into the same tile undoes it.
     const d = torusDistance(here, goal)
-    if (d <= 1.2) {
+    // Stop INSIDE the hero's own reach, never outside it. This was a literal 1.2, which
+    // was fine while melee reach was 1.5 and silently fatal the moment the owner tightened
+    // it to 1.0: the hero walked to 1.2 tiles, stood there unable to swing, and online
+    // income collapsed hard enough that the harness reported idling out-earning playing by
+    // 123%. Derived now, so the approach can never again halt short of the blow.
+    if (d <= APPROACH_STOP_DIST) {
       if (goalId) unreachableFor.delete(goalId)
       return here
     }
@@ -1574,6 +1579,9 @@ const SOCIAL_AGGRO_RADIUS = 7
 /** How far Tab will look for something to target, in tiles. Comfortably past melee and
  *  splash so the key can set up a fight, well short of the zone so the cycle stays usable. */
 const TAB_TARGET_RANGE = 12
+/** How close the auto-pilot walks before it stops. Inside melee reach by construction —
+ *  see the note at the call site for what happens when it is not. */
+const APPROACH_STOP_DIST = MELEE_ATTACK_RANGE * 0.7
 
 /**
  * Consume one stack of a `splash` buff and report the damage it carries.

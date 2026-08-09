@@ -93,30 +93,36 @@ export function aggroRadiusFor(mob: Pick<MobInstance, 'name' | 'isBoss'>): numbe
 // shrinks toward zero on approach, considered it adjacent and let it fire. On screen that is an
 // enemy attacking you from across the map — which is exactly what it looked like.
 //
-// The reach must clear the renderer's RESTING distance, and the first cut at 2.2 did not.
+// Owner's call: a melee blow lands within ONE tile, a ranged one within two. Combat that
+// resolves across five or six tiles reads as attacking people from off screen, which is
+// what these replaced.
 //
-// The adapter holds a brawler at `MELEE_GAP_TILES` (2) along a DIAGONAL, so the distance
-// it actually settles at is `√2 × 2 ≈ 2.83` — measured in the running game at a flat 2.80,
-// frozen across ten seconds while the hit count sat still beside it. Every melee mob was
-// therefore parked permanently a fraction outside its own attack range.
+// ── These are the SOURCE OF TRUTH for how close a fight happens ──────────────
+// The renderer derives its hold distances from them (`MELEE_GAP_TILES` /
+// `RANGED_GAP_TILES` in combatAdapter), so a mob always comes to rest INSIDE its own
+// reach. That direction of dependency is the whole point and it is not decorative:
+// previously the two were independent constants, the adapter parked a brawler at a
+// DIAGONAL `√2 × 2 ≈ 2.83` while the store let it swing at 2.2, and every melee mob sat
+// permanently a fraction outside its own attack range. Measured live at a frozen 2.80
+// with the hit count frozen beside it. Auto-pilot hid it by walking the hero in; under
+// manual control nobody closes the gap and the two stand there forever.
 //
-// Nothing exposed it while the hero was on auto-pilot, because the auto-pilot walks in and
-// closes the gap. Under MANUAL control nobody closes it: the player is not walking, and a
-// lair boss never pursues by design — so the two stand there at 2.8 tiles forever. That is
-// the "they crowd me and never attack" report, exactly.
-//
-// 3.0 clears the diagonal hold with room to spare, and keeps the ratio the owner asked for.
-export const MELEE_ATTACK_RANGE = 3.0
+// So: change these numbers, and the renderer follows. Never hardcode a gap beside them.
+export const MELEE_ATTACK_RANGE = 1.0
+/** A caster's reach — owner's call, two tiles. */
+export const RANGED_ATTACK_RANGE = 2.0
+
 /**
- * A caster's reach — owner's call, 2.5× melee.
+ * Where the renderer should PARK a mob of each kind, as a per-axis gap.
  *
- * The ratio and the geometry agree, which is the reason to keep it as a multiplier rather
- * than a second literal: 7.5 clears the ranged diagonal hold (`√2 × RANGED_GAP_TILES` =
- * 7.07) by the same margin 3.0 clears the melee one (2.83). Change `MELEE_ATTACK_RANGE`
- * and both stay correct; bake the number and the next gap tweak silently strands casters
- * the way it just stranded brawlers.
+ * The adapter offsets diagonally and takes the magnitude as `√2 × gap`, so this divides
+ * the reach by √2 and then keeps 20% back — a body resting at 80% of its reach is
+ * comfortably inside it, rather than hovering on the boundary and flickering in and out
+ * of range as it drifts.
  */
-export const RANGED_ATTACK_RANGE = MELEE_ATTACK_RANGE * 2.5
+export function restGapFor(attackRange: number): number {
+  return (attackRange * 0.8) / Math.SQRT2
+}
 
 /**
  * How far the HERO can attack from.

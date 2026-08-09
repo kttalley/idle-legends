@@ -12,8 +12,8 @@ export const TILE_H = 16
 export const HALF_W = TILE_W / 2
 export const HALF_H = TILE_H / 2
 /** Pixels of vertical raise per elevation level. ~half a tile → a 2-level cliff is a
- *  readable ~9px face without overscaling the 32×16 diamond. */
-export const ELEV_PX = 8
+ *  readable ~10px rock face without overscaling the 32×16 diamond. */
+export const ELEV_PX = 10
 
 /** Tile-space → buffer-space (px). Tile (0,0)'s diamond top sits at (originX, 0). */
 export function tileToScreenX(tx: number, ty: number): number {
@@ -88,6 +88,63 @@ function slotCSS(palette: Palette, slot: number): string {
 function darken(css: string, k: number): string {
   const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(css)!
   return `rgb(${Math.round(+m[1] * k)},${Math.round(+m[2] * k)},${Math.round(+m[3] * k)})`
+}
+function lighten(css: string, k: number): string {
+  const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(css)!
+  const c = (n: number) => Math.min(255, Math.round(n * k))
+  return `rgb(${c(+m[1])},${c(+m[2])},${c(+m[3])})`
+}
+
+/** Deterministic hash → [0,1) for per-tile rock grain (no Date/Math.random). */
+function rockHash(a: number, b: number, c: number): number {
+  let x = (a * 374761393 + b * 668265263 + c * 1442695040) | 0
+  x = ((x ^ (x >>> 13)) * 1274126177) | 0
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296
+}
+
+interface Pt { x: number; y: number }
+
+/**
+ * Fill a cliff-face quad with a vertical light gradient (top edge catches light,
+ * base sits in shadow) plus fine sedimentary strata parallel to the top edge, so it
+ * reads as layered rock rather than a flat shaded slab. FFTA sells the same look
+ * with drawn cliff-tile art; this is the original procedural equivalent — shippable,
+ * no ripped pixels. Corners in draw order: top-left, top-right (along the diamond
+ * edge), bottom-right (base), bottom-left (base). `face` 0=lit SW, 1=shadowed SE —
+ * only seeds the per-band grain.
+ */
+function drawRockFace(
+  ctx: CanvasRenderingContext2D,
+  p0: Pt, p1: Pt, p2: Pt, p3: Pt,
+  baseColor: string, tx: number, ty: number, face: number,
+): void {
+  const faceH = p2.y - p1.y                 // = e (the face's vertical extent)
+  const top = Math.min(p0.y, p1.y)
+  const bot = Math.max(p2.y, p3.y)
+  const g = ctx.createLinearGradient(0, top, 0, bot)
+  g.addColorStop(0, lighten(baseColor, 1.18))
+  g.addColorStop(0.35, baseColor)
+  g.addColorStop(1, darken(baseColor, 0.7))
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y)
+  ctx.closePath(); ctx.fill()
+
+  // Fine strata following the top edge, offset down through the face. Deterministic
+  // shade + alpha variation per band reads as rock grain; ~3px cadence is fine enough
+  // to read as texture and coarse enough to survive at small zoom.
+  const strataLo = darken(baseColor, 0.82)
+  const strataHi = lighten(baseColor, 1.08)
+  ctx.lineWidth = 1
+  for (let d = 2; d < faceH; d += 3) {
+    const r = rockHash(tx, ty, face * 1000 + ((d / 3) | 0))
+    ctx.strokeStyle = r < 0.5 ? strataLo : strataHi
+    ctx.globalAlpha = 0.3 + r * 0.3
+    ctx.beginPath()
+    ctx.moveTo(p0.x, p0.y + d + 0.5); ctx.lineTo(p1.x, p1.y + d + 0.5)
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1
 }
 
 /**
@@ -175,16 +232,15 @@ export function bakeGround(
         const rx = dx + 32, ry = dy + 16
         const byBase = by + e        // base plane (h=0) bottom point
         const lyBase = ly + e, ryBase = ry + e
-        // Left (south-west) face — lit.
-        ctx.fillStyle = skirtLit
-        ctx.beginPath()
-        ctx.moveTo(lx, ly); ctx.lineTo(bx, by); ctx.lineTo(bx, byBase); ctx.lineTo(lx, lyBase)
-        ctx.closePath(); ctx.fill()
-        // Right (south-east) face — shadowed.
-        ctx.fillStyle = skirtShadow
-        ctx.beginPath()
-        ctx.moveTo(rx, ry); ctx.lineTo(bx, by); ctx.lineTo(bx, byBase); ctx.lineTo(rx, ryBase)
-        ctx.closePath(); ctx.fill()
+        // Cliff faces: textured rock (light gradient + sedimentary strata) instead of
+        // a flat shaded slab. The lit south-west / shadowed south-east split is kept
+        // via the base colours (skirtLit / skirtShadow). See drawRockFace above.
+        drawRockFace(ctx,
+          { x: lx, y: ly }, { x: bx, y: by }, { x: bx, y: byBase }, { x: lx, y: lyBase },
+          skirtLit, tx, ty, 0)
+        drawRockFace(ctx,
+          { x: rx, y: ry }, { x: bx, y: by }, { x: bx, y: byBase }, { x: rx, y: ryBase },
+          skirtShadow, tx, ty, 1)
 
         // Strata: a seam at each level boundary, so a face that drops several levels
         // at once reads as stacked terraces rather than one tall slab of flat colour.

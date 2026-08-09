@@ -15,11 +15,53 @@ export const PAD = 16
 export const PADDED_W = MAP_SIZE + 2 * PAD // 96
 
 // Per-tile elevation in "levels"; baked into the ground as raised diamonds + south-
-// face skirts so the flat torus reads with FFTA-style depth. feetY is height-aware
-// (see tilemap.bakeGround). At ELEV_PX=8 per level this gives up to 40px of relief —
-// 2.5 tile-heights, enough for a ridge to actually occlude what's behind it.
+// face rock cliffs so the flat torus reads with FFTA-style depth. feetY is height-aware
+// (see tilemap.bakeGround). At ELEV_PX=10 per level the global ceiling gives up to 60px
+// of relief — ~3.5 tile-heights, enough for a ridge to actually occlude what's behind it.
 // Elevation is presentation-only: nothing in the game logic reads it.
-export const MAX_ELEV = 5
+export const MAX_ELEV = 6
+
+// ── Biome elevation profiles ──────────────────────────────────────────────────
+// Each zone gets a heightmap character: a meadow rolls gently (low ceiling, smooth),
+// a peak zone builds literal mountains (tall ceiling, low gain so the field saturates
+// into flat plains + flat-topped mesas with abrupt cliffs between, high fractal detail
+// so those cliffs are jagged, not ruler-straight). The knobs:
+//   maxElev — integer ceiling (clamps the quantized plateau levels)
+//   gain    — divisor on the raw noise field. LOWER ⇒ the field saturates ⇒ more cells
+//             pin to the floor AND the ceiling ⇒ dramatic flat plains + tall mesas.
+//   exp     — plateauLevel exponent. HIGHER ⇒ biases toward the low plain (more ground
+//             to walk); LOWER ⇒ more highlands / taller features.
+//   detail  — weight on the high-frequency fractal octaves (rock grain, irregular
+//             cliff edges). LOWER ⇒ smooth rolling hills; HIGHER ⇒ jagged, noisy peaks.
+export interface BiomeElev { maxElev: number; gain: number; exp: number; detail: number }
+
+const GENTLE: BiomeElev   = { maxElev: 2, gain: 2.0, exp: 1.9, detail: 0.12 } // rolling, few cliffs
+const MID: BiomeElev      = { maxElev: 3, gain: 1.6, exp: 1.6, detail: 0.28 } // moderate hills + ridges
+const CRAGGY: BiomeElev   = { maxElev: 5, gain: 1.18, exp: 1.15, detail: 0.42 } // badlands: sharp cliffs
+const MESA: BiomeElev     = { maxElev: 5, gain: 1.22, exp: 1.3, detail: 0.34 } // flat-topped, steep sides
+const PEAK: BiomeElev     = { maxElev: 6, gain: 1.05, exp: 1.0, detail: 0.50 } // literal mountains
+const DRAMATIC: BiomeElev = { maxElev: 6, gain: 1.0, exp: 1.0, detail: 0.55 } // finale: maximum relief
+
+const BIOME_ELEVATION: Record<ZoneId, BiomeElev> = {
+  sunhollow_meadows:   GENTLE,   // meadow — small-mid elevation, mostly walkable
+  dustwind_plains:     { maxElev: 2, gain: 2.2, exp: 2.1, detail: 0.10 }, // plains — flattest
+  grimshade_forest:    MID,
+  thornvale_jungle:    { maxElev: 3, gain: 1.5, exp: 1.5, detail: 0.36 }, // dense, ridgy
+  ashfire_peaks:       PEAK,
+  shattered_crossing:  MID,
+  the_bloodfields:     { maxElev: 3, gain: 1.5, exp: 1.5, detail: 0.30 }, // war field, moderate
+  ironcrag_badlands:   CRAGGY,
+  venom_hollows:       { maxElev: 3, gain: 1.5, exp: 1.5, detail: 0.30 }, // swamp, low-mid
+  warsong_mesa:        MESA,
+  cinderfall_wastes:   { maxElev: 5, gain: 1.2, exp: 1.1, detail: 0.40 }, // volcanic rubble
+  the_maw_eternal:     DRAMATIC,
+}
+
+const DEFAULT_ELEV: BiomeElev = GENTLE
+
+function biomeElev(zoneId?: string): BiomeElev {
+  return (zoneId && (BIOME_ELEVATION as Record<string, BiomeElev>)[zoneId]) || DEFAULT_ELEV
+}
 
 // ── Tile-type → tileset frame index ───────────────────────────────────────────
 // Stable per-tile hash so grass gets texture variation and the wrapped border

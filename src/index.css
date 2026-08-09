@@ -367,22 +367,28 @@ h1, h2, h3, h4,
   .app-collapse-tab { display: none; }
 
   .app-log {
-    left: 0;
-    right: 0;
+    /* NOT full width. A 100%-wide feed is a curtain across the middle of the screen: this
+       is an idle game you watch, and the whole argument for keeping chat open while the
+       world runs collapses if chat is standing in front of the world. Two thirds, pinned
+       to the trailing edge — the same shape the whisper window has always had on desktop
+       — leaves a live column of map down the left, which is also the side the hero and
+       the unit frames sit on. */
+    left: auto;
+    right: calc(6px + var(--safe-r));
+    width: min(66%, 340px);
     /* Sits above the ACTION BAR, not just above the dock. The sheet is z-index 50 and the
        HUD layer is 20, so anchoring it at the dock put a chat panel directly on top of
        the primary controls — the action bar simply vanished behind it whenever chat was
        open. Reserving `--actionbar-h` keeps the controls reachable with chat up. */
     bottom: calc(var(--dock-h) + var(--safe-b) + var(--actionbar-h));
-    width: auto;
     height: min(38dvh, 300px);
     border-radius: 12px;
     z-index: 50;
-    /* Must clear its own bottom offset as well as its height, or the top edge of the
-       sheet stays visible above the dock while "closed". */
-    transform: translateY(calc(100% + var(--dock-h) + var(--safe-b) + var(--actionbar-h) + 8px));
+    /* Slides out sideways now that it is edge-anchored — a vertical exit from a panel
+       that does not span the screen reads as the panel falling out of the layout. */
+    transform: translateX(calc(100% + 10px));
   }
-  .app-log.panel-open { transform: translateY(0); }
+  .app-log.panel-open { transform: translateX(0); }
 
   .app-modepanel {
     width: calc(100vw - 12px);
@@ -1346,13 +1352,18 @@ h1, h2, h3, h4,
    on-screen keyboard shrinking the viewport does not leave the input off-screen. */
 @media (max-width: 899px) {
   .whisper-window {
-    /* Same rule as the chat sheet: never cover the action bar. And when the iOS keyboard
-       is up, sit on top of it — otherwise the field you are typing into is behind it. */
-    left: 0; right: 0;
+    /* Same rules as the chat sheet: never cover the action bar, never span the screen.
+       And when the iOS keyboard is up, sit on top of it — otherwise the field you are
+       typing into is behind it. */
+    left: auto;
+    right: calc(6px + var(--safe-r));
     /* With no keyboard, clear the action bar + dock. With a keyboard up, those are behind
        it anyway, so sit directly on top of the keyboard instead — whichever is larger. */
     bottom: max(calc(var(--dock-h) + var(--safe-b) + var(--actionbar-h)), var(--kb-inset));
-    width: auto; height: min(46dvh, 380px); max-height: min(46dvh, 380px);
+    /* Wider than the chat feed: this one has a text field and a Send button in a row, and
+       below ~260px the field stops being usable. */
+    width: min(76%, 360px);
+    height: min(46dvh, 380px); max-height: min(46dvh, 380px);
     border-radius: 12px;
     z-index: 300;
   }
@@ -1786,3 +1797,26 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   .zone-track-rail { scroll-behavior: auto; }
   .zone-stop-dot { transition: none; }
 }
+
+/* Fast-travel map. Same track, more room to draw it in — the modal is ~340px wide, so
+   the stops can be wide enough to hold a zone name on one line. */
+.zone-track-modal-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 2px 6px;
+  border-bottom: 1px solid rgba(200, 161, 0, 0.18);
+}
+.zone-track-modal-title {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ffd700;
+}
+.zone-track-modal-sub { margin-left: auto; font-size: 0.58rem; color: #8a8070; }
+.zone-track-standalone { --stop-w: 82px; }
+.zone-track-standalone .zone-stop-name { font-size: 0.55rem; }
+.zone-track-standalone .zone-track-status { font-size: 0.62rem; }
+.zone-track-standalone .zone-track-status-name { font-size: 0.74rem; }

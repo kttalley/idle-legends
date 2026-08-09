@@ -27,7 +27,15 @@ function segmentFill(idx: number, currentIdx: number, killFraction: number): num
   return killFraction
 }
 
-export function ZoneTrack() {
+export interface ZoneTrackProps {
+  /** Fold into a rail section with its own header. The map modal renders it bare. */
+  collapsible?: boolean
+  /** Called once a travel order has been accepted, so whatever popover is hosting this
+   *  track can dismiss itself — choosing a destination IS completing the task. */
+  onTravel?: (zoneId: ZoneId) => void
+}
+
+export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {}) {
   const {
     currentZone, unlockedZones, totalZoneKills, bossesDefeated, level,
     beginTravel, generatedZoneNames, gameMode, travelTarget,
@@ -58,17 +66,10 @@ export function ZoneTrack() {
   const toBoss     = Math.max(0, (zone?.unlockKills ?? 0) - kills)
   const killFrac   = bossDown ? 1 : Math.min(1, kills / Math.max(1, zone?.unlockKills ?? 1))
 
-  return (
-    <CollapsiblePanel
-      id="zones"
-      title="Zones"
-      headerRight={
-        <span style={{ fontSize: '0.55rem', color: '#8a8070' }}>
-          {zone ? `Lvl ${zone.levelRange[0]}–${zone.levelRange[1]}` : ''}
-        </span>
-      }
-    >
-      <div className="zone-track">
+  const levelRange = zone ? `Lvl ${zone.levelRange[0]}–${zone.levelRange[1]}` : ''
+
+  const track = (
+    <div className={`zone-track${collapsible ? '' : ' zone-track-standalone'}`}>
         <div className="zone-track-rail" ref={railRef}>
           {ZONE_ORDER.map((zoneId, idx) => {
             const z          = ZONES[zoneId]
@@ -124,7 +125,14 @@ export function ZoneTrack() {
                 title={tip}
                 aria-current={active ? 'true' : undefined}
                 disabled={!canEnter || isTraveling || active}
-                onClick={() => canEnter && !isTraveling && !active && beginTravel(zoneId as ZoneId)}
+                onClick={() => {
+                  if (!canEnter || isTraveling || active) return
+                  beginTravel(zoneId as ZoneId)
+                  // The order is given; the surface that was asking for it has no further
+                  // job. On a phone this is the difference between watching your hero
+                  // leave and staring at the menu you just used.
+                  onTravel?.(zoneId as ZoneId)
+                }}
               >
                 <span className="zone-stop-dot" aria-hidden>
                   {zBossDown ? '★' : bossReady ? '!' : ''}
@@ -152,6 +160,31 @@ export function ZoneTrack() {
           )}
         </div>
       </div>
+  )
+
+  // Bare inside the map modal. Collapsing is a RAIL affordance — it exists so a tall
+  // section cannot starve its neighbours in a shared column — and a modal that opens onto
+  // a collapsed header would just be broken. The two instances would also share one
+  // persisted id, so folding the rail's copy would silently fold the map's too.
+  if (!collapsible) {
+    return (
+      <div className="zone-track-modal">
+        <div className="zone-track-modal-head">
+          <span className="zone-track-modal-title">Zones</span>
+          <span className="zone-track-modal-sub">{levelRange}</span>
+        </div>
+        {track}
+      </div>
+    )
+  }
+
+  return (
+    <CollapsiblePanel
+      id="zones"
+      title="Zones"
+      headerRight={<span style={{ fontSize: '0.55rem', color: '#8a8070' }}>{levelRange}</span>}
+    >
+      {track}
     </CollapsiblePanel>
   )
 }

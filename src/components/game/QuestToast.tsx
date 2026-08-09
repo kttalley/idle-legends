@@ -59,7 +59,7 @@ export function QuestToast() {
 
         <div
           style={{
-            fontFamily: 'Cinzel, serif',
+            fontFamily: 'var(--font-display)',
             fontSize: '0.85rem',
             color: '#ffe9a8',
             marginBottom: 4,

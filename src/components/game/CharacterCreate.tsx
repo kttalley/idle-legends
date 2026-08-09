@@ -76,7 +76,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
           </button>
         )}
         <h1 style={{
-          fontFamily: 'Cinzel Decorative, Cinzel, serif',
+          fontFamily: '"Cinzel Decorative", var(--font-display)',
           fontSize: 'clamp(1.5rem, 5vw, 2.4rem)',
           color: '#ffd700',
           textShadow: '0 0 20px rgba(200,161,0,0.5), 0 2px 4px rgba(0,0,0,0.9)',
@@ -101,7 +101,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
             maxLength={28}
             className="flex-1 rp-panel"
             style={{
-              fontFamily: 'Cinzel, serif', color: '#ffe9a8', fontSize: '1rem',
+              fontFamily: 'var(--font-display)', color: '#ffe9a8', fontSize: '1rem',
               textAlign: 'center', padding: '6px 10px', background: 'rgba(0,0,0,0.4)',
             }}
           />
@@ -109,7 +109,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
           <div
             className="flex-1 rp-panel"
             style={{
-              fontFamily: 'Cinzel, serif', color: '#ffe9a8', fontSize: '1rem',
+              fontFamily: 'var(--font-display)', color: '#ffe9a8', fontSize: '1rem',
               textAlign: 'center', padding: '7px 10px', cursor: 'text',
             }}
             onClick={() => setEditing(true)}
@@ -133,7 +133,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
                 key={c.id}
                 className="rp-button flex-1"
                 style={{
-                  minWidth: 90, padding: '8px 6px', fontFamily: 'Cinzel, serif', fontSize: '0.8rem',
+                  minWidth: 90, padding: '8px 6px', fontFamily: 'var(--font-display)', fontSize: '0.8rem',
                   background: on ? 'linear-gradient(180deg, #6a5228, #4a3518)' : undefined,
                   borderColor: on ? '#ffd700' : undefined,
                 }}
@@ -211,7 +211,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
         className="rp-button mt-6"
         style={{
           width: '100%', maxWidth: 460, padding: '12px', fontSize: '0.95rem',
-          fontFamily: 'Cinzel, serif', letterSpacing: '0.08em',
+          fontFamily: 'var(--font-display)', letterSpacing: '0.08em',
           background: 'linear-gradient(180deg, #7a5f2c, #52401c)', borderColor: '#ffd700',
         }}
         onClick={begin}

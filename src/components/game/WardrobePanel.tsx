@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useGameStore } from '../../store/gameStore'
+import { useDismissOnEscape } from '../ui/useDismissable'
 import { HeroAvatar } from '../sprites/HeroAvatar'
 import { COLORWAYS, isColorwayUnlocked, FOUNDER_ENTITLEMENT } from '../../render/colorways'
 import {
@@ -24,6 +25,7 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
 
   const [iap, setIap] = useState<PurchaseState | null>(null)
   useEffect(() => subscribePurchases(setIap), [])
+  useDismissOnEscape(true, onClose)
   const active = iap?.active ?? new Set<string>()
   const owned = active.has(FOUNDER_ENTITLEMENT)
 
@@ -50,7 +52,7 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
-          <span style={{ fontFamily: "'Cinzel', serif", fontSize: '0.95rem', color: '#ffd700' }}>Wardrobe</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', color: '#ffd700' }}>Wardrobe</span>
           <button className="rp-button" onClick={onClose} style={{ padding: '8px 12px', minHeight: 34 }}>Close</button>
         </div>
 
@@ -66,7 +68,11 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
             return (
               <button
                 key={cw.id}
-                onClick={() => { if (unlocked) setColorway(cw.id) }}
+                // Equipping is what the wardrobe is FOR, so it also ends the visit — the
+                // hero you just re-dyed is behind this overlay, and leaving it up hides
+                // the only thing worth looking at. Re-tapping what is already equipped is
+                // not a change, so it does not count as finishing.
+                onClick={() => { if (unlocked && !isOn) { setColorway(cw.id); onClose() } }}
                 disabled={!unlocked}
                 title={unlocked ? cw.blurb : 'Included in the Founder Pack'}
                 style={{
@@ -100,7 +106,7 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
 
         {!owned && (
           <div style={{ marginTop: 14, padding: 12, borderRadius: 9, border: '1px solid #6b5020', background: 'rgba(30,22,8,0.6)' }}>
-            <div style={{ fontFamily: "'Cinzel', serif", fontSize: '0.78rem', color: '#ffd700', marginBottom: 4 }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.78rem', color: '#ffd700', marginBottom: 4 }}>
               Founder Pack
             </div>
             <p style={{ fontSize: '0.62rem', color: '#c8b890', margin: '0 0 10px', lineHeight: 1.5 }}>
