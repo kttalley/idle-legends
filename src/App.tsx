@@ -6,7 +6,8 @@ import { CharacterSelect } from './components/game/CharacterSelect'
 import { CombatView } from './components/game/CombatView'
 import { CharacterPanel } from './components/game/CharacterPanel'
 import { InventoryPanel } from './components/game/InventoryPanel'
-import { ZoneSelector } from './components/game/ZoneSelector'
+import { ZoneTrack } from './components/game/ZoneTrack'
+import { HeroBar } from './components/game/HeroBar'
 import { CombatLog } from './components/game/CombatLog'
 import { ChatPanel } from './components/game/ChatPanel'
 import { PlayerCard } from './components/game/PlayerCard'
@@ -132,24 +133,36 @@ export default function App() {
       <QuestToast />
       <OfflineReportToast />
 
-      {/* ── Left: zones + character ── */}
+      {/* ── Left: hero strip / character / zone track ──
+          Three bands, not one scrolling stack. The hero strip and the zone track are
+          navigation and stay pinned; only the character sheet — the section that grows
+          without bound as talents and stats accumulate — scrolls. The zone track sits at
+          the FOOT because it reads as the ground the hero is standing on, and because it
+          is now short enough that the sheet above it no longer has to be folded away. */}
       <div className={leftClass}>
         <button className="app-drawer-close" onClick={close} aria-label="Close">✕</button>
-        <ZoneSelector />
-        <CharacterPanel />
-        {SHOW_DEV_JUMP && (
-          <select
-            value={currentZone}
-            onChange={e => devJumpZone(e.target.value as typeof currentZone)}
-            title="DEV: jump to biome"
-            className="rp-button"
-            style={{ fontSize: '0.55rem', padding: '2px 4px' }}
-          >
-            {ZONE_ORDER.map(z => (
-              <option key={z} value={z}>{ZONES[z]?.name ?? z}</option>
-            ))}
-          </select>
-        )}
+        <div className="rail-head">
+          <HeroBar />
+        </div>
+        <div className="rail-body">
+          <CharacterPanel />
+          {SHOW_DEV_JUMP && (
+            <select
+              value={currentZone}
+              onChange={e => devJumpZone(e.target.value as typeof currentZone)}
+              title="DEV: jump to biome"
+              className="rp-button"
+              style={{ fontSize: '0.55rem', padding: '2px 4px' }}
+            >
+              {ZONE_ORDER.map(z => (
+                <option key={z} value={z}>{ZONES[z]?.name ?? z}</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="rail-foot">
+          <ZoneTrack />
+        </div>
       </div>
       <button
         className="app-collapse-tab left rp-glass"

@@ -11,7 +11,9 @@ body {
   margin: 0;
   background-color: #1a1510;
   color: #d4b896;
-  font-family: 'Cinzel', 'Palatino Linotype', serif;
+  /* Sans by default — see the type-system note by --font-display below. The serif is now
+     opt-IN for headings and labels, not the thing everything has to opt out of. */
+  font-family: var(--font-ui);
   height: 100dvh;
   overflow: hidden;
 }
@@ -35,11 +37,27 @@ body {
   --glass-border:    rgba(206, 170, 90, 0.34);
   --glass-hairline:  rgba(255, 232, 170, 0.22);
   --glass-shadow:    0 8px 32px rgba(0, 0, 0, 0.55);
-  /* Chat is the one place the branded display face actively hurts. Cinzel is small-caps
-     serif — lovely on headings, punishing for lowercase MMO chatter at 10px, which is
-     exactly what this text is. Chat and whispers opt out into the platform UI face and a
-     larger size; everything else keeps the brand. */
-  --font-chat: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* ── Type system ────────────────────────────────────────────────────────────
+     TWO faces, and the split is by ROLE, not by component.
+
+       --font-display  Cinzel. Headings, panel titles, button labels, hero and zone
+                       names. Short strings the eye lands on once.
+       --font-ui       Platform sans. Everything else — stats, numbers, tooltips,
+                       chat, body copy, anything you actually READ.
+
+     This started as chat opting out of Cinzel, then whispers, then the target card,
+     then the log tabs — each one a local patch to the same global problem. Cinzel is a
+     small-caps display serif: gorgeous on a title, unreadable as a 10px stat table, and
+     this UI is mostly 10px stat tables. So the default flipped. `body` is now sans and
+     the serif is applied deliberately, by the rules under "Display type" below.
+     Keeping the serif for chrome is what preserves the brand; keeping it for DATA is
+     what was costing legibility and horizontal space. */
+  --font-display: 'Cinzel', 'Palatino Linotype', Palatino, serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Legacy alias — chat was the first surface to defect, and its name is all over the
+     stylesheet. It is just the UI face now. */
+  --font-chat: var(--font-ui);
   /* Chat glass. Lighter tint and a HEAVIER blur than the standard panels: the point is to
      keep watching the idle game through the chat, so the world has to stay visible — but
      a busy, high-contrast, *moving* pixel scene will shred 12px text if it reads through
@@ -71,6 +89,29 @@ body {
 }
 .app-root[data-left-collapsed="true"]  { --rail-l: 26px; }
 .app-root[data-right-collapsed="true"] { --rail-r: 26px; }
+
+/* ── Display type ────────────────────────────────────────────────────────────
+   The complete list of things that keep the serif. If a rule is not here (or does not
+   set --font-display inline for a proper-noun heading), it is sans. Anything added to
+   this list should be a heading, a title, or a button label — never a run of text. */
+h1, h2, h3, h4,
+.rp-panel-header,
+.rp-button,
+.app-dock-btn,
+.app-log-tab,
+.sheet-title,
+.talent-modal-title,
+.talent-col-name,
+.chat-panel-title,
+.whisper-window-header .chat-meta-name,
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Sans is denser per character than Cinzel at the same size, which is the point — but
+   it also means the numbers in a stat table no longer line up on their own. Tabular
+   figures put that back, and cost nothing on the surfaces that have no digits. */
+.rp-glass, .app-modepanel, .sheet, .rp-tooltip { font-variant-numeric: tabular-nums; }
 
 .rp-glass {
   /* The sheen is what separates "glass" from "a dark box": a bright raking
@@ -159,8 +200,31 @@ body {
   /* The zone-chat panel occupies the foot of this column, so the rail may only grow to
      the space above it. */
   max-height: calc(100dvh - 58px - var(--log-h) - 20px);
+  /* The left rail scrolls in its MIDDLE, not as a whole — see `.rail-body`. */
+  overflow: hidden;
 }
 .app-sidebar-right { right: 10px; width: 250px; }
+
+/* ── Left rail: pinned head, scrolling body, pinned foot ─────────────────────
+   The hero identity strip (gold / Looks / Heroes) and the zone track are navigation:
+   they must be reachable without scrolling to find them, and the zone track in
+   particular is the thing you glance at constantly. So only the character sheet — the
+   one section that grows without bound — scrolls. */
+.rail-head, .rail-foot { flex: 0 0 auto; }
+.rail-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #4a3818 transparent;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.rail-foot { border-top: 1px solid rgba(200, 161, 0, 0.16); padding-top: 4px; }
 
 /* Desktop collapse — the world is the point, so it must be possible to clear the
    glass off it entirely without losing the panels for good. */
@@ -233,7 +297,7 @@ body {
   border: none;
   padding: 2px 0;
   cursor: pointer;
-  font-family: var(--font-chat);
+  font-family: var(--font-ui);
   font-size: 0.62rem;
   letter-spacing: 0.04em;
   color: #8a8070;
@@ -408,8 +472,8 @@ body {
    two chromes and kill the translucency the layout exists for, so nested panels
    drop their frame and become plain sections; a hairline separates stacked ones.
    The header keeps its gold type but loses its filled bar. */
-.app-sidebar-left  > .rp-panel,
-.app-sidebar-right > .rp-panel,
+.app-sidebar-left    .rp-panel,
+.app-sidebar-right   .rp-panel,
 .app-log           > .rp-panel,
 .app-modepanel     > .rp-panel {
   background: transparent;
@@ -417,13 +481,13 @@ body {
   border-radius: 0;
   box-shadow: none;
 }
-.app-sidebar-left > .rp-panel + .rp-panel {
+.rail-body > .rp-panel + .rp-panel {
   border-top: 1px solid rgba(200, 161, 0, 0.16);
   padding-top: 4px;
   margin-top: 2px;
 }
-.app-sidebar-left  > .rp-panel > .rp-panel-header,
-.app-sidebar-right > .rp-panel > .rp-panel-header,
+.app-sidebar-left    .rp-panel > .rp-panel-header,
+.app-sidebar-right   .rp-panel > .rp-panel-header,
 .app-log           > .rp-panel > .rp-panel-header {
   background: none;
   border-bottom: 1px solid rgba(200, 161, 0, 0.18);
@@ -522,7 +586,7 @@ body {
   border-right: 1px solid #2a2010;
   color: #6a5228;
   cursor: pointer;
-  font-family: 'Cinzel', serif;
+  font-family: var(--font-display);
   font-size: 0.5rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -563,7 +627,7 @@ body {
   border: 1px solid #6b5020;
   border-top-color: #9a7830;
   color: #ffd700;
-  font-family: 'Cinzel', serif;
+  font-family: var(--font-display);
   font-size: 0.7rem;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -626,7 +690,7 @@ body {
 .combat-log {
   /* Not `monospace` — the generic keyword resolves to Courier on macOS/iOS, which is
      cramped and low-contrast at this size. A UI sans reads far better for chat. */
-  font-family: var(--font-chat);
+  font-family: var(--font-ui);
   font-size: 0.78rem;
   line-height: 1.45;
   letter-spacing: 0.01em;
@@ -1210,7 +1274,7 @@ body {
    actual MMO. Desktop: a panel above the action bar, clear of the right rail.
    Mobile: a bottom sheet over the dock. */
 .whisper-window {
-  font-family: var(--font-chat);
+  font-family: var(--font-ui);
   font-size: 0.8rem;
   position: fixed;
   z-index: 300;                 /* over panels + dock, under the target card (400) */
@@ -1255,7 +1319,7 @@ body {
   background: rgba(0, 0, 0, 0.18);
 }
 .whisper-input {
-  font-family: var(--font-chat);
+  font-family: var(--font-ui);
   flex: 1 1 auto; min-width: 0;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid #4a3a1e; border-radius: 5px;
@@ -1267,7 +1331,7 @@ body {
 }
 .whisper-input:focus { border-color: #6a5030; }
 .whisper-send {
-  font-family: var(--font-chat);
+  font-family: var(--font-ui);
   background: #5a4020; border: 1px solid #6a5030; border-radius: 5px;
   color: #f4c84a; font-size: 0.66rem; padding: 0 12px;
   min-height: 36px; min-width: 56px; cursor: pointer;
@@ -1307,7 +1371,7 @@ body {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  font-family: var(--font-chat);
+  font-family: var(--font-ui);
   font-size: 0.8rem;
   color: #e6d5bd;
 }
@@ -1393,7 +1457,7 @@ body {
 }
 
 .chat-input {
-  font-family: var(--font-chat);
+  font-family: var(--font-ui);
   flex: 1 1 auto;
   min-width: 0;
   background: rgba(0, 0, 0, 0.4);
@@ -1409,7 +1473,7 @@ body {
 .chat-input:focus { border-color: #6a5030; }
 
 .chat-send {
-  font-family: var(--font-chat);
+  font-family: var(--font-ui);
   background: #5a4020;
   border: 1px solid #6a5030;
   border-radius: 5px;
@@ -1467,7 +1531,7 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
    The social UI is the most tap-dense surface in the game, so it uses the plain
    chat face at a readable size rather than the branded display face. */
 .player-card {
-  font-family: var(--font-chat);
+  font-family: var(--font-ui);
   border: 1px solid #6a5030;
   border-radius: 10px;
   padding: 10px;
@@ -1536,4 +1600,189 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
 }
 @media (prefers-reduced-motion: reduce) {
   .collapsible-chevron { transition: none; }
+}
+
+/* ── Left-rail hero strip ────────────────────────────────────────────────────
+   Gold, Looks and Heroes used to be jammed into the character sheet's header, beside
+   a generated hero name that is routinely 24 characters long — so the name wrapped
+   mid-word and the two buttons fought it for what was left of 232px. They are not
+   character-sheet controls anyway; they are account-level navigation. Lifting them to
+   their own strip at the top of the rail gives the name its full width back and puts
+   the gold count where the eye already goes first. */
+.hero-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 6px;
+  border-bottom: 1px solid rgba(200, 161, 0, 0.16);
+}
+.hero-bar-btn {
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  min-height: 30px;
+  border-radius: 6px;
+}
+/* Pushed to the trailing edge: it is a readout, not a control, and right-aligning it
+   keeps the digits in one column as the number grows. */
+.hero-bar-gold { margin-left: auto; }
+
+/* ── Zone track ──────────────────────────────────────────────────────────────
+   Was a vertical list of twelve fat rows — roughly 380px of the left rail, which meant
+   the zone list and the character sheet could never be open at once. It is a LINE of
+   twelve stops, though, so it is drawn as one: a subway map running left to right, with
+   the current zone centred between the one behind and the one ahead.
+
+   The whole track is still there and still scrolls, so fast travel to a distant zone
+   survives the redesign — but the default view costs ~90px instead of ~380px, and the
+   route reads at a glance: filled track behind you, hollow track ahead. */
+.zone-track {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 5px 0 2px;
+  --stop-w: 68px;
+}
+
+.zone-track-rail {
+  display: flex;
+  align-items: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-top: 2px;
+  /* Fade both ends rather than showing a scrollbar. A hard edge mid-name reads as a
+     rendering bug; a fade reads as "the line continues", which is the truth. */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+}
+.zone-track-rail::-webkit-scrollbar { display: none; }
+
+.zone-stop {
+  position: relative;
+  flex: 0 0 var(--stop-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.zone-stop:disabled { cursor: default; }
+
+/* The line itself. Each stop draws the segment to its RIGHT, so the track is exactly as
+   long as the stops and needs no separate rail element to stay in register with them.
+   `--seg` is the fraction of that segment already earned: 1 behind you, the boss-kill
+   progress on the segment you are standing on, 0 ahead. */
+.zone-stop::before,
+.zone-stop::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  height: 2px;
+  border-radius: 1px;
+}
+.zone-stop::before { width: 100%; background: #38301f; }
+.zone-stop::after  { width: calc(var(--seg, 0) * 100%); background: linear-gradient(90deg, #a8850c, #ffd700); }
+.zone-stop:last-child::before,
+.zone-stop:last-child::after { display: none; }
+
+.zone-stop-dot {
+  position: relative;
+  z-index: 1;
+  /* Every dot is the same 18px so the connecting line stays dead straight — the current
+     stop is called out with colour and a ring, never with a different diameter. */
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #4a3a1e;
+  background: #14100a;
+  color: #6a5f4a;
+  font-size: 0.5rem;
+  line-height: 1;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.zone-stop-name {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  font-size: 0.5rem;
+  line-height: 1.15;
+  text-align: center;
+  color: #857b6a;
+  word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.zone-stop.is-cleared .zone-stop-dot { border-color: #b8930d; background: #2b2210; color: #ffd700; }
+.zone-stop.is-cleared .zone-stop-name { color: #b09a72; }
+.zone-stop.is-open    .zone-stop-dot { border-color: #7a6534; }
+.zone-stop.is-open    .zone-stop-name { color: #a8967a; }
+.zone-stop.is-locked  { opacity: 0.45; }
+.zone-stop.is-current .zone-stop-dot {
+  border-color: #ffd700;
+  background: radial-gradient(circle, #6a5210 0%, #1a1408 80%);
+  color: #ffe9a8;
+  box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.18), 0 0 9px rgba(255, 215, 0, 0.5);
+}
+.zone-stop.is-current .zone-stop-name { color: #ffd700; font-weight: 700; }
+.zone-stop.is-target  .zone-stop-dot { border-color: #ff8800; box-shadow: 0 0 8px rgba(255, 136, 0, 0.55); }
+.zone-stop.is-target  .zone-stop-name { color: #ff9d33; }
+.zone-stop.is-bossready .zone-stop-dot { border-color: #ff8000; }
+
+.zone-stop:not(:disabled):hover .zone-stop-dot { border-color: #ffd700; }
+.zone-stop:not(:disabled):hover .zone-stop-name { color: #ffe9a8; }
+
+/* Caption under the map: the one zone whose numbers you actually want, spelled out. */
+.zone-track-status {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 2px;
+  min-width: 0;
+  font-size: 0.56rem;
+  color: #9a9080;
+}
+.zone-track-status-name {
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #ffd700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.zone-track-status-meta {
+  margin-left: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.zone-track-status-meta.is-ready { color: #ff9d33; font-weight: 700; }
+
+@media (pointer: coarse) {
+  /* The dots are the tap target, and 18px is not one — the stop column gives each of
+     them a full-height 68px strip to be hit with instead. */
+  .zone-stop { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zone-track-rail { scroll-behavior: auto; }
+  .zone-stop-dot { transition: none; }
 }

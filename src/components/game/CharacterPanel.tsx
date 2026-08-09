@@ -1,20 +1,16 @@
 import { CollapsiblePanel } from '../ui/CollapsiblePanel'
 import React, { useState } from 'react'
-import { WardrobePanel } from './WardrobePanel'
 import { useGameStore } from '../../store/gameStore'
 import { CLASS_DEFINITIONS } from '../../data/classes'
 import { xpForLevel } from '../../engine/progression'
-import { GoldDisplay } from '../ui/GoldDisplay'
 import { HealthBar } from '../ui/HealthBar'
 import { TalentTree } from './TalentTree'
 
 type Tab = 'stats' | 'talents'
 
 export function CharacterPanel() {
-  const [wardrobeOpen, setWardrobeOpen] = useState(false)
   const {
-    stats, level, xp, playerClass, gold, talentPoints, playerName, nameGenStatus,
-    returnToMenu,
+    stats, level, xp, playerClass, talentPoints, playerName, nameGenStatus,
   } = useGameStore()
   const classDef = CLASS_DEFINITIONS[playerClass]
   const xpNeeded = xpForLevel(level)
@@ -28,14 +24,15 @@ export function CharacterPanel() {
       id="character"
       grow
       title={
-        // Stacked, not inline: side by side with the gold chip and the Heroes button the
-        // hero's name had almost no width left and wrapped mid-word ("Rogue Z… the
-        // Vengeful"). A long generated name is the norm here, not the exception.
+        // Gold, Looks and Heroes used to share this header; they are account-level
+        // controls, not character-sheet ones, and they now live in `HeroBar` at the top
+        // of the rail. With the width back, the class and the hero's name fit on one
+        // line each — a long generated name is the norm here, not the exception.
         <span style={{ display: 'block', minWidth: 0 }}>
           <span className={classDef.colorClass}>{classDef.name}</span>
           {playerName && (
             <span style={{
-              display: 'block', fontSize: '0.55rem', color: '#d4b896', fontStyle: 'italic',
+              display: 'block', fontSize: '0.58rem', color: '#d4b896', fontStyle: 'italic',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {playerName}
@@ -45,35 +42,6 @@ export function CharacterPanel() {
             <span style={{ display: 'block', fontSize: '0.5rem', color: '#666' }}>Naming…</span>
           )}
         </span>
-      }
-      headerRight={
-        <>
-          <GoldDisplay gold={gold} />
-          {/* Was in a floating top bar that spanned the screen for the sake of two
-              controls. Gold already lived here; switching hero belongs with the hero. */}
-          <button
-            className="rp-button"
-            onClick={() => setWardrobeOpen(true)}
-            title="Wardrobe — cosmetic colourways"
-            style={{ fontSize: '0.62rem', padding: '8px 12px', minHeight: 34 }}
-          >
-            Looks
-          </button>
-          {/* Ejects the player out of their run, so it confirms first and is big enough
-              to be aimed at. At 0.55rem/2px it was a ~14px target sitting beside the gold
-              chip — one mis-tap ended the session — while the rest of the social UI was
-              raised to a 44pt minimum in the mobile pass. */}
-          <button
-            className="rp-button"
-            onClick={() => {
-              if (confirm('Return to character select?\n\nYour progress is saved.')) returnToMenu()
-            }}
-            title="Save and return to character select"
-            style={{ fontSize: '0.62rem', padding: '8px 12px', minHeight: 34 }}
-          >
-            Heroes
-          </button>
-        </>
       }
     >
 
@@ -156,8 +124,6 @@ export function CharacterPanel() {
 
         {tab === 'talents' && <TalentTree />}
       </div>
-
-      {wardrobeOpen && <WardrobePanel onClose={() => setWardrobeOpen(false)} />}
     </CollapsiblePanel>
   )
 }
