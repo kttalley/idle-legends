@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The rig: canonical 24x32 humanoid mannequin for Idle Legends, in the engine's
+// The rig: canonical 24x32 humanoid mannequin for Stillmarch, in the engine's
 // dimetric (2:1) 3/4 overhead camera — NOT a front elevation.
 //
 // This is the most load-bearing artifact in the sprite pipeline. It is:

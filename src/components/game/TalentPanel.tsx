@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useGameStore } from '../../store/gameStore'
 import { CLASS_DEFINITIONS } from '../../data/classes'
@@ -9,6 +9,7 @@ import { TALENT_POINT_MAX } from '../../data/constants'
 import type { SpecDefinition, TalentNodeDef, TalentEffectDef } from '../../data/types'
 import { SpriteIcon } from '../ui/SpriteIcon'
 import { useCoarsePointer } from '../ui/useLongPress'
+import { useDismissable } from '../ui/useDismissable'
 
 /**
  * The talent screen.
@@ -309,7 +310,7 @@ function SpecTree({ spec, allocs, unspent, geom, coarse, onLearn, onUnlearn, onI
                   }}>
                     <SpriteIcon talentId={t.id} emoji={t.icon} size={22} title={t.name} />
                   </span>
-                  <span className="talent-node-name" style={{ color: st === 'maxed' ? spec.accent : '#9d9d9d' }}>
+                  <span className="talent-node-name" style={{ color: st === 'maxed' ? spec.accent : 'var(--muted)' }}>
                     {t.name}
                   </span>
                   {/* Rank pips. "3/5" was a number to read; five dots is a quantity to
@@ -348,12 +349,8 @@ export function TalentPanel({ open, onClose }: { open: boolean; onClose: () => v
   const [activeSpec, setActiveSpec] = useState(0)
   const [inspected, setInspected] = useState<TalentNodeDef | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  const surface = useRef<HTMLDivElement>(null)
+  useDismissable(open, onClose, { ref: surface, closeOnOutside: true, trapFocus: true })
 
   if (!open) return null
 
@@ -367,8 +364,8 @@ export function TalentPanel({ open, onClose }: { open: boolean; onClose: () => v
 
   return createPortal(
     <>
-      <div className="sheet-scrim" onClick={onClose} />
-      <div className="talent-modal rp-glass-strong" role="dialog" aria-modal="true" aria-label="Talents">
+      <div className="sheet-scrim" />
+      <div ref={surface} className="talent-modal rp-glass-strong" role="dialog" aria-modal="true" aria-label="Talents">
         {/* ── Header ── */}
         <div className="talent-modal-head">
           <div>
@@ -469,7 +466,7 @@ export function TalentPanel({ open, onClose }: { open: boolean; onClose: () => v
                     className="rp-button"
                     onClick={() => allocateTalent(inspected.id)}
                     disabled={!gate?.ok}
-                    style={{ borderColor: '#c8a100', color: '#ffd700' }}
+                    style={{ borderColor: 'var(--gold-deep)', color: 'var(--gold)' }}
                   >
                     Learn
                   </button>

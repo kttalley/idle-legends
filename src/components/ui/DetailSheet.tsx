@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react'
+import React, { useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useDismissable } from './useDismissable'
 
 /**
  * The one place a thing gets explained and acted on.
@@ -37,26 +38,26 @@ interface DetailSheetProps {
 }
 
 const TONE: Record<string, React.CSSProperties> = {
-  primary: { borderColor: '#c8a100', color: '#ffd700', background: 'rgba(90,70,0,0.45)' },
+  primary: { borderColor: 'var(--gold-deep)', color: 'var(--gold)', background: 'rgba(90,70,0,0.45)' },
   default: {},
   danger:  { borderColor: '#8a3a2a', color: '#ff9a80', background: 'rgba(90,30,20,0.35)' },
 }
 
 export function DetailSheet({ open, onClose, title, children, actions = [] }: DetailSheetProps) {
-  // Escape closes, matching every other dismissible surface on desktop.
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  const surface = useRef<HTMLDivElement>(null)
+  // Escape, outside-press and the focus trap, all through the shared stack — so a sheet
+  // raised from inside another surface takes both the key and the pointer back from it.
+  // See ui/useDismissable.
+  useDismissable(open, onClose, { ref: surface, closeOnOutside: true, trapFocus: true })
 
   if (!open) return null
 
   return createPortal(
     <>
-      <div className="sheet-scrim" onClick={onClose} />
-      <div className="sheet rp-glass-strong" role="dialog" aria-modal="true">
+      {/* The scrim is decoration and a light-blocker now; dismissal comes from the stack,
+          which is the only place that knows whether this sheet is the frontmost one. */}
+      <div className="sheet-scrim" />
+      <div ref={surface} className="sheet rp-glass-strong" role="dialog" aria-modal="true">
         <div className="sheet-grip" aria-hidden="true" />
         {title && <div className="sheet-title">{title}</div>}
         <div className="sheet-body">{children}</div>

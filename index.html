@@ -11,7 +11,14 @@
     />
     <meta name="theme-color" content="#0b0906" />
     <!-- Fonts are self-hosted (src/fonts.css) — no CDN fetch on first launch. -->
-    <title>Idle Legends</title>
+    <!-- Inline SVG rather than a file: with no icon declared the browser probes
+         /favicon.ico on every load and 404s, which is noise in the console and a wasted
+         round trip on the web build. A data URI costs no request and ships nothing. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a1510'/%3E%3Cpath d='M16 4l3 15-3 4-3-4z' fill='%23d8dde3'/%3E%3Crect x='11' y='21' width='10' height='2.5' rx='1' fill='%23c8a100'/%3E%3Crect x='15' y='23' width='2' height='5' rx='1' fill='%23c8a100'/%3E%3C/svg%3E"
+    />
+    <title>Stillmarch</title>
   </head>
   <body>
     <div id="root"></div>

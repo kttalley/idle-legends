@@ -4,7 +4,7 @@
 // entity cache and the animator refer to a unit, and they long predate the original art.
 // They are not an art source. Art is resolved from a roster key at load time:
 //
-//   DEFAULT (and the only thing that can ever ship) — the original Idle Legends rigs in
+//   DEFAULT (and the only thing that can ever ship) — the original Stillmarch rigs in
 //   public/sprites/units/, via the ORIGINAL_SPRITE table below.
 //
 //   `?ffta`, DEV ONLY — the extracted FFTA scaffold under local-assets/ (gitignored,
@@ -113,7 +113,7 @@ export function isMonsterSprite(id: string): boolean {
 }
 
 // ── Roster key → original rig (the DEFAULT art path) ──────────────────────────
-// Every roster key resolves through here to an original Idle Legends rig in
+// Every roster key resolves through here to an original Stillmarch rig in
 // public/sprites/units/ — the zero-FFTA-pixel set (docs/art-direction.md). Multiple
 // roster keys collapse to one original archetype by design; variety comes from
 // race/gear/rarity palette swaps rather than from distinct sheets.

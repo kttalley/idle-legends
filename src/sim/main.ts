@@ -199,7 +199,7 @@ if (process.argv.includes('--parity')) {
     { label: 'warrior + party',    o: { playerClass: 'warrior', spendTalents: true, partySize: 3 } },
   ]
   const out: string[] = [
-    '# Idle Legends — STORE combat golden',
+    '# Stillmarch — STORE combat golden',
     '# Regenerate with: node tools/sim/combat.mjs --update',
     '# A diff here is a COMBAT BEHAVIOUR CHANGE in the store path. Read it before accepting.',
     '',

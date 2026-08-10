@@ -63,7 +63,7 @@ function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
 export function InventoryPanel() {
   const {
     inventory, equipment, equipItem, unequipItem, sellItem, sellAllCommon,
-    settings, setAutoEquip, setAutoAdvanceZones,
+    settings, setAutoEquip,
   } = useGameStore()
   const [activeTab, setActiveTab] = useState<'inventory' | 'equipment'>('equipment')
   const [inspecting, setInspecting] = useState<Inspecting>(null)
@@ -113,14 +113,14 @@ export function InventoryPanel() {
   return (
     <CollapsiblePanel id="inventory" title="Inventory" grow>
       {/* Tabs */}
-      <div className="flex border-b" style={{ borderColor: '#3a2c10' }}>
+      <div className="flex border-b" style={{ borderColor: 'var(--edge)' }}>
         {(['equipment', 'inventory'] as const).map(t => (
           <button
             key={t}
             className="rp-button flex-1"
             style={{
               background: activeTab === t ? 'rgba(200,161,0,0.15)' : undefined,
-              borderBottom: activeTab === t ? '2px solid #ffd700' : '2px solid transparent',
+              borderBottom: activeTab === t ? '2px solid var(--gold)' : '2px solid transparent',
               borderRadius: 0,
               textTransform: 'capitalize',
             }}
@@ -134,7 +134,7 @@ export function InventoryPanel() {
       <div className="flex-1 panel-scroll p-2">
         {activeTab === 'equipment' && (
           <div>
-            <div style={{ fontSize: '0.65rem', color: '#9d9d9d', marginBottom: 6 }}>
+            <div style={{ fontSize: '0.65rem', color: 'var(--muted)', marginBottom: 6 }}>
               Tap a piece to inspect it.
             </div>
             {/* Auto-equip is what makes an unattended hero get stronger at all, so it is
@@ -142,7 +142,7 @@ export function InventoryPanel() {
             <label
               style={{
                 display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8,
-                fontSize: '0.6rem', color: settings.autoEquip ? '#88ccaa' : '#9d9d9d',
+                fontSize: '0.6rem', color: settings.autoEquip ? 'var(--success)' : 'var(--muted)',
                 cursor: 'pointer', userSelect: 'none',
               }}
               title="Wear a drop the moment it beats what you have in that slot. The piece it replaces goes to your bag."
@@ -151,29 +151,17 @@ export function InventoryPanel() {
                 type="checkbox"
                 checked={settings.autoEquip !== false}
                 onChange={e => setAutoEquip(e.target.checked)}
-                style={{ accentColor: '#c8a100', width: 11, height: 11 }}
+                style={{ accentColor: 'var(--gold-deep)', width: 11, height: 11 }}
               />
               Auto-equip upgrades
             </label>
-            <label
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8,
-                fontSize: '0.6rem', color: settings.autoAdvanceZones ? '#88ccaa' : '#9d9d9d',
-                cursor: 'pointer', userSelect: 'none',
-              }}
-              title="Move on when the next zone opens, and fall back from one that proves too hard."
-            >
-              <input
-                type="checkbox"
-                checked={settings.autoAdvanceZones !== false}
-                onChange={e => setAutoAdvanceZones(e.target.checked)}
-                style={{ accentColor: '#c8a100', width: 11, height: 11 }}
-              />
-              Roam onward when ready
-            </label>
+            {/* "Roam onward when ready" used to sit here, under the bag, purely because
+                this is where the other auto-toggle lives. It is a ZONE setting — it
+                decides whether the hero advances along the track on its own — so it now
+                sits under the zone track in the left rail, next to the thing it acts on. */}
             {SLOTS.map(slot => {
               const item = equipment[slot]
-              const color = item ? itemColor(item) : "#3a2c10"
+              const color = item ? itemColor(item) : "var(--edge)"
               return (
                 <div key={slot} className="flex items-center gap-2 mb-1.5">
                   <div style={{
@@ -182,7 +170,7 @@ export function InventoryPanel() {
                     fontSize: '0.55rem',
                     color: '#666',
                     flexShrink: 0,
-                    fontFamily: 'monospace',
+                    letterSpacing: '0.06em',
                   }}>
                     {SLOT_LABEL[slot]}
                   </div>
@@ -197,7 +185,7 @@ export function InventoryPanel() {
                     <div
                       className="inventory-slot"
                       style={{
-                        width: 36, height: 36, border: '1px dashed #3a2c10',
+                        width: 36, height: 36, border: '1px dashed var(--edge)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         opacity: 0.28,
                       }}
@@ -222,7 +210,7 @@ export function InventoryPanel() {
         {activeTab === 'inventory' && (
           <div>
             <div className="flex justify-between items-center mb-2" style={{ fontSize: '0.65rem' }}>
-              <span style={{ color: full ? '#c8a100' : '#9d9d9d' }}>
+              <span style={{ color: full ? 'var(--gold-deep)' : 'var(--muted)' }}>
                 {used} / {inventory.length} slots
               </span>
               <button className="rp-button" style={{ fontSize: '0.6rem' }} onClick={sellAllCommon}>
@@ -232,7 +220,7 @@ export function InventoryPanel() {
             {/* A full bag no longer eats drops, but it does sell them cheap — say so
                 here rather than only in the combat log, which scrolls. */}
             {full && (
-              <div style={{ fontSize: '0.55rem', color: '#c8a100', marginBottom: 6 }}>
+              <div style={{ fontSize: '0.55rem', color: 'var(--gold-deep)', marginBottom: 6 }}>
                 Bag full — new drops are being salvaged for a fraction of their worth.
                 Buy slots from a town outfitter.
               </div>

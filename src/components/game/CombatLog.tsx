@@ -6,14 +6,14 @@ const EVENT_COLORS: Partial<Record<CombatLogEntry['type'], string>> = {
   player_attack:  '#88aaff',
   player_crit:    '#ffcc00',
   mob_attack:     '#ff8888',
-  player_death:   '#ff4444',
+  player_death:   'var(--danger)',
   player_respawn: '#aaaaff',
   mob_death:      '#ff6644',
   loot_item:      undefined, // color on the entry
-  loot_gold:      '#ffd700',
-  level_up:       '#ffd700',
+  loot_gold:      'var(--gold)',
+  level_up:       'var(--gold)',
   zone_change:    '#00ff88',
-  boss_spawn:     '#ff8000',
+  boss_spawn:     'var(--warn)',
 }
 
 function formatTime(ts: number): string {
@@ -38,7 +38,7 @@ export function CombatLog() {
           <div
             key={entry.id}
             style={{
-              color: entry.color ?? EVENT_COLORS[entry.type] ?? '#d4b896',
+              color: entry.color ?? EVENT_COLORS[entry.type] ?? 'var(--parchment)',
               padding: '1px 4px',
               borderBottom: '1px solid rgba(255,255,255,0.03)',
             }}

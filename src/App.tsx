@@ -13,24 +13,54 @@ import { ChatPanel } from './components/game/ChatPanel'
 import { PlayerCard } from './components/game/PlayerCard'
 import { WhisperWindow } from './components/game/WhisperWindow'
 import { installViewportInsets } from './engine/viewportInsets'
-import { useDismissOnEscape } from './components/ui/useDismissable'
+import { useDismissable } from './components/ui/useDismissable'
 import { QuestToast } from './components/game/QuestToast'
 import { OfflineReportToast } from './components/game/OfflineReportToast'
 import { slotStorage, getLastSlotId, setLastSlotId } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
 import { ZONES, ZONE_ORDER } from './data/zones'
 import { SpriteIcon } from './components/ui/SpriteIcon'
+import { formatGold } from './components/ui/GoldDisplay'
 
 const SHOW_DEV_JUMP = new URLSearchParams(window.location.search).has('dev')
 
-/** Compact gold for the dock chip — 1.2K / 46.7K / 3.4M. */
-function formatGold(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`
-  return String(n)
-}
+// ── One panel metaphor, both breakpoints ──────────────────────────────────────
+//
+// This used to be two independent state machines: `activePanel` (mobile drawers, closed
+// with a ✕) and `collapsed` (desktop rails, folded with a ‹/›). They were never mutually
+// exclusive, and `.rail-minimize` was not hidden below 900px, so a mobile drawer rendered
+// BOTH controls — and because `.app-sidebar-left.collapsed` (0,2,0) outranks the mobile
+// `.app-sidebar-left` rule (0,1,0), tapping ‹ inside a drawer applied `width: 34px` and
+// hid the body. The result was a 34px strip of empty glass that was still "open": scrim
+// up, dock button lit, content gone.
+//
+// Now there is one concept. A panel is EXTENDED or RETRACTED, it carries exactly one
+// control (minimize, in its own head), and what "retracted" looks like is the only thing
+// the breakpoint decides:
+//
+//   desktop — a 34px stub at the screen edge, with the restore arrow on it
+//   mobile  — off-screen entirely; the dock button IS the restore control
+//
+// So minimize and close stop being different verbs. There is no ✕ anywhere.
+type PanelId = 'hero' | 'log' | 'bag'
+type PanelState = Record<PanelId, boolean>
 
-type MobilePanel = 'left' | 'right' | 'log' | null
+const NARROW_QUERY = '(max-width: 899px)'
+const isNarrow = () =>
+  typeof window !== 'undefined' && window.matchMedia(NARROW_QUERY).matches
+
+/**
+ * Only the DEFAULT differs by width, not the model.
+ *
+ * On desktop the rails are furniture and start extended. On a phone they are overlays on
+ * top of the world, so starting them extended would open the app with the game hidden
+ * behind three panels.
+ */
+function defaultPanels(narrow: boolean): PanelState {
+  return narrow
+    ? { hero: false, log: false, bag: false }
+    : { hero: true, log: true, bag: true }
+}
 
 export default function App() {
   const initialized  = useGameStore(s => s.initialized)
@@ -40,14 +70,44 @@ export default function App() {
   const currentZone  = useGameStore(s => s.currentZone)
   const devJumpZone  = useGameStore(s => s.devJumpZone)
 
-  const [activePanel, setActivePanel] = useState<MobilePanel>(null)
-  // Desktop-only: fold a glass column off the world. Mobile uses `activePanel`
-  // drawers instead, and the CSS neutralises `collapsed` there.
-  const [collapsed, setCollapsed] = useState({ left: false, right: false })
+  const [panels, setPanels] = useState<PanelState>(() => defaultPanels(isNarrow()))
   const [logTab, setLogTab] = useState<'combat' | 'chat'>('chat')
+
+  // Crossing the breakpoint re-seeds the defaults. Without this, rotating a tablet from
+  // portrait to landscape carries the phone's "everything retracted" state into a desktop
+  // layout that has no dock to reopen anything from — the panels would be unreachable.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia(NARROW_QUERY)
+    const onChange = (e: MediaQueryListEvent) => setPanels(defaultPanels(e.matches))
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   // Publish the iOS keyboard height as --kb-inset so fixed panels can ride above it.
   useEffect(installViewportInsets, [])
+
+  // Publish the log panel's real height as --log-h.
+  //
+  // The left rail's max-height subtracts --log-h so the column stops where the chat
+  // panel starts. That number was hand-kept in :root at 220px, matching a `height` set
+  // in a different rule two hundred lines away — change one and the rail silently
+  // mis-sizes, either overlapping the chat or leaving a band of dead space above it.
+  // Measuring it means the coupling cannot drift. (Mobile ignores the variable: the rail
+  // is a drawer capped against the dock there, and the log is a floating sheet.)
+  const logRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = logRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const publish = () => {
+      const h = el.getBoundingClientRect().height
+      if (h > 0) document.documentElement.style.setProperty('--log-h', `${Math.round(h)}px`)
+    }
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    publish()
+    return () => ro.disconnect()
+  }, [initialized])
   const [slots, setSlots]   = useState<SaveSlotMeta[]>(() => slotStorage.list())
   // Show creation directly when there are no heroes yet; otherwise the select screen.
   const [creating, setCreating] = useState<boolean>(() => slotStorage.list().length === 0)
@@ -76,21 +136,54 @@ export default function App() {
     if (!loadSlot(last)) setLastSlotId(null)
   }, [loadSlot])
 
-  const toggle = (p: MobilePanel) => setActivePanel(cur => cur === p ? null : p)
-  const close  = useCallback(() => setActivePanel(null), [])
+  /**
+   * The only mutation. On a phone the panels are overlays stacked on one screen, so
+   * extending one retracts the rest; on desktop they are columns that coexist.
+   */
+  const toggle = useCallback((id: PanelId) => {
+    setPanels(cur => {
+      const next = !cur[id]
+      if (next && isNarrow()) return { ...defaultPanels(true), [id]: true }
+      return { ...cur, [id]: next }
+    })
+  }, [])
 
-  // The drawers are menus, and menus close on Escape — the same contract the sheets, the
-  // target card and the fast-travel map already keep. See ui/useDismissable.
-  useDismissOnEscape(activePanel !== null, close)
+  /** Retract everything. A no-op on desktop, where nothing is covering the world. */
+  const close = useCallback(() => {
+    setPanels(cur => (isNarrow() ? defaultPanels(true) : cur))
+  }, [])
+
+  // The drawers are menus and keep the same contract as every other surface — see
+  // ui/useDismissable. Registering them on the shared stack rather than hanging a handler
+  // on the scrim is what makes the nested case work: the wardrobe is PORTALLED out of the
+  // drawer that raised it, so a press inside the modal is geometrically outside the
+  // drawer, and a local handler would dismiss the drawer the moment you touched it.
+  //
+  // No focus trap. The dock sits below the scrim and stays tappable on purpose — a drawer
+  // here is a panel you switch away from, not a modal that owns the screen.
+  const heroDrawer = useRef<HTMLDivElement>(null)
+  const bagDrawer = useRef<HTMLDivElement>(null)
+  // Only relevant on a phone, where an extended panel is an overlay with a scrim. On
+  // desktop the rails are columns and `close` is a no-op, so registering them is harmless.
+  const narrow = isNarrow()
+  const openDrawer = narrow && panels.hero ? heroDrawer
+    : narrow && panels.bag ? bagDrawer
+    : undefined
+  useDismissable(openDrawer != null, close, { ref: openDrawer, closeOnOutside: true })
+  // Chat is the exception, and deliberately so: it has no scrim, because this is an idle
+  // game you watch and a scrim would grey out the world you are chatting about. Its
+  // "outside" is the world itself, handled on `.app-world` below — tapping the HUD while
+  // reading chat is using a control, not tapping away.
+  useDismissable(narrow && panels.log, close)
 
   const refreshSlots = () => setSlots(slotStorage.list())
 
-  const leftClass = ['app-sidebar-left rp-glass',
-    collapsed.left ? 'collapsed' : '',
-    activePanel === 'left' ? 'panel-open' : ''].filter(Boolean).join(' ')
-  const rightClass = ['app-sidebar-right rp-glass',
-    collapsed.right ? 'collapsed' : '',
-    activePanel === 'right' ? 'panel-open' : ''].filter(Boolean).join(' ')
+  // `panel-open` and `collapsed` are now strictly complementary — a panel always carries
+  // exactly one of them, at every breakpoint. (Both class names are kept: the UI suites
+  // key off `panel-open` as the "extended" marker, and `collapsed` already carries the
+  // desktop stub styling.)
+  const panelClass = (base: string, id: PanelId) =>
+    `${base} rp-glass ${panels[id] ? 'panel-open' : 'collapsed'}`
 
   useEffect(() => {
     if (initialized) {
@@ -127,11 +220,28 @@ export default function App() {
   return (
     <div
       className="app-root"
-      data-left-collapsed={String(collapsed.left)}
-      data-right-collapsed={String(collapsed.right)}
+      data-left-collapsed={String(!panels.hero)}
+      data-right-collapsed={String(!panels.bag)}
     >
       {/* The world, full-bleed. Everything below floats on top of it. */}
-      <div className="app-world">
+      {/* Tapping the world dismisses the chat sheet. Chat is the one panel with no
+          scrim — a scrim would grey out the world you are chatting about and swallow the
+          action bar — so "tap outside to close" has to come from the world itself. The
+          HUD is excluded: using an ability or opening the minimap while reading chat is
+          not tapping away from it.
+
+          The tap is NOT swallowed, so the hero still walks where you pointed. That is the
+          same call the target card makes (see PlayerCard) and the MMO convention: you
+          click away, your character goes there, and the thing you clicked away from
+          closes behind you. */}
+      <div
+        className="app-world"
+        onPointerDown={e => {
+          if (!(isNarrow() && panels.log)) return
+          if ((e.target as HTMLElement).closest('.hud-layer')) return
+          close()
+        }}
+      >
         <CombatView />
       </div>
 
@@ -144,10 +254,18 @@ export default function App() {
           without bound as talents and stats accumulate — scrolls. The zone track sits at
           the FOOT because it reads as the ground the hero is standing on, and because it
           is now short enough that the sheet above it no longer has to be folded away. */}
-      <div className={leftClass}>
-        <button className="app-drawer-close" onClick={close} aria-label="Close">✕</button>
+      <div ref={heroDrawer} className={panelClass('app-sidebar-left', 'hero')}>
         <div className="rail-head">
           <HeroBar />
+          <button
+            className="rail-minimize"
+            onClick={() => toggle('hero')}
+            title={panels.hero ? 'Minimize character panel' : 'Show character panel'}
+            aria-label={panels.hero ? 'Minimize character panel' : 'Show character panel'}
+            aria-expanded={panels.hero}
+          >
+            {panels.hero ? '‹' : '›'}
+          </button>
         </div>
         <div className="rail-body">
           <CharacterPanel />
@@ -172,34 +290,29 @@ export default function App() {
           <ZoneTrack onTravel={close} />
         </div>
       </div>
-      <button
-        className="app-collapse-tab left rp-glass"
-        onClick={() => setCollapsed(c => ({ ...c, left: !c.left }))}
-        title={collapsed.left ? 'Show character panel' : 'Hide character panel'}
-        aria-label={collapsed.left ? 'Show character panel' : 'Hide character panel'}
-      >
-        {collapsed.left ? '›' : '‹'}
-      </button>
-
       {/* ── Right: inventory ── */}
-      <div className={rightClass}>
-        <button className="app-drawer-close" onClick={close} aria-label="Close">✕</button>
-        <InventoryPanel />
+      <div ref={bagDrawer} className={panelClass('app-sidebar-right', 'bag')}>
+        <div className="rail-head">
+          <button
+            className="rail-minimize"
+            onClick={() => toggle('bag')}
+            title={panels.bag ? 'Minimize inventory' : 'Show inventory'}
+            aria-label={panels.bag ? 'Minimize inventory' : 'Show inventory'}
+            aria-expanded={panels.bag}
+          >
+            {panels.bag ? '›' : '‹'}
+          </button>
+        </div>
+        <div className="rail-body">
+          <InventoryPanel />
+        </div>
       </div>
-      <button
-        className="app-collapse-tab right rp-glass"
-        onClick={() => setCollapsed(c => ({ ...c, right: !c.right }))}
-        title={collapsed.right ? 'Show inventory' : 'Hide inventory'}
-        aria-label={collapsed.right ? 'Show inventory' : 'Hide inventory'}
-      >
-        {collapsed.right ? '‹' : '›'}
-      </button>
 
       {/* ── Combat log / zone chat ── */}
       {/* Two feeds share one slot: what happened TO you, and what the world is saying
-          around you. Tabs rather than a new layout region, so the mobile dock and the
-          collapse tabs keep working unchanged. */}
-      <div className={`app-log rp-glass${activePanel === 'log' ? ' panel-open' : ''}`}>
+          around you. The ladder briefly lived here as a third tab and was moved out — it is
+          a section with its own sub-views, not a feed, and this slot is a feed. */}
+      <div ref={logRef} className={`app-log rp-glass${panels.log ? ' panel-open' : ''}`}>
         <div className="app-log-tabs">
           <button
             className={`app-log-tab${logTab === 'combat' ? ' is-active' : ''}`}
@@ -224,22 +337,22 @@ export default function App() {
       {/* ── Mobile dock ── */}
       <div className="app-dock rp-glass-strong">
         <button
-          className={`app-dock-btn${activePanel === 'left' ? ' is-active' : ''}`}
-          onClick={() => toggle('left')}
+          className={`app-dock-btn${panels.hero ? ' is-active' : ''}`}
+          onClick={() => toggle('hero')}
         >
           <span className="app-dock-btn-icon"><SpriteIcon emoji="⚔" size={18} /></span>
           <span>Hero</span>
         </button>
         <button
-          className={`app-dock-btn${activePanel === 'log' ? ' is-active' : ''}`}
+          className={`app-dock-btn${panels.log ? ' is-active' : ''}`}
           onClick={() => toggle('log')}
         >
           <span className="app-dock-btn-icon"><SpriteIcon emoji="📜" size={18} /></span>
           <span>Log</span>
         </button>
         <button
-          className={`app-dock-btn${activePanel === 'right' ? ' is-active' : ''}`}
-          onClick={() => toggle('right')}
+          className={`app-dock-btn${panels.bag ? ' is-active' : ''}`}
+          onClick={() => toggle('bag')}
         >
           <span className="app-dock-btn-icon"><SpriteIcon ui="bag" size={18} /></span>
           {/* Gold rides the bag rather than occupying a bar across the top of the world:
@@ -253,7 +366,11 @@ export default function App() {
           you watch, and the whole point of a living-world chat feed is reading it WHILE
           the world runs. A scrim there greys out the world you're chatting about and
           blocks the action bar, which on a phone is most of the interface. */}
-      {activePanel && activePanel !== 'log' && <div className="app-backdrop" onClick={close} />}
+      {/* Scrim only — it dims the world and blocks stray taps, but dismissal comes from
+          the shared stack, which is the only thing that knows whether the drawer is still
+          the frontmost surface. */}
+      {/* Phone only — on desktop these are columns beside the world, not sheets over it. */}
+      {narrow && (panels.hero || panels.bag) && <div className="app-backdrop" />}
     </div>
   )
 }

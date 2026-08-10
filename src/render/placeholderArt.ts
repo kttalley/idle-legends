@@ -124,9 +124,13 @@ function humanoidAnimations(): AnimationSet {
   const dir = (o: number) => ({
     idle: { frames: [o + 0, o + 1], fps: 2, loop: true },
     walk: { frames: [o + 0, o + 1], fps: 6, loop: true },
-    attack: { frames: [o + 6, o + 7, o + 8], fps: 12, loop: false },
-    hit: { frames: [o + 9, o + 10], fps: 10, loop: false },
-    death: { frames: [o + 11, o + 12], fps: 6, loop: false },
+    // Slow-mo combat VFX, split by tempo (see MELEE_SCALE / FX_TIME_SCALE in
+    // combatAdapter.ts): the swing + recoil run at MELEE_SCALE (÷2, snappy) while death
+    // runs at FX_TIME_SCALE (÷4, a slow dramatic collapse). idle/walk stay fast so
+    // traversal & breathing don't feel sluggish.
+    attack: { frames: [o + 6, o + 7, o + 8], fps: 6, loop: false },
+    hit: { frames: [o + 9, o + 10], fps: 5, loop: false },
+    death: { frames: [o + 11, o + 12], fps: 1.5, loop: false },
   })
   const se = dir(0)
   const ne = dir(H_PER_FACING)
@@ -970,7 +974,7 @@ export function makeBoltRig(id = 'fx/bolt'): IndexedSprite {
     frameCount: 2,
     indices: p.data,
     anchor: { x: 5, y: 5 },
-    animations: { idle: anim([0, 1], 8, true), walk: anim([0, 1], 8, true), attack: anim([0, 1], 8, true), hit: anim([0, 1], 8, true) },
+    animations: { idle: anim([0, 1], 2, true), walk: anim([0, 1], 2, true), attack: anim([0, 1], 2, true), hit: anim([0, 1], 2, true) },
   }
 }
 
@@ -1013,8 +1017,8 @@ export function makeBurstRig(id = 'fx/burst'): IndexedSprite {
     animations: {
       idle: anim([0], 1, true),
       walk: anim([0], 1, true),
-      attack: anim([0, 1, 2, 3, 4], 16, false),
-      hit: anim([0, 1, 2, 3, 4], 16, false),
+      attack: anim([0, 1, 2, 3, 4], 4, false),   // ÷4 slow-mo impact ring (FX_TIME_SCALE)
+      hit: anim([0, 1, 2, 3, 4], 4, false),
     },
   }
 }

@@ -4,8 +4,8 @@ import type { CapacitorConfig } from '@capacitor/cli'
 // it there and here together, before the first upload — it cannot be changed afterwards
 // for a given app record.
 const config: CapacitorConfig = {
-  appId: 'com.idlelegends.game',
-  appName: 'Idle Legends',
+  appId: 'com.stillmarch.game',
+  appName: 'Stillmarch',
   // Vite's build output. Populate it with `npm run build:native`, NOT `npm run build`:
   // the web target hardcodes the /projects/idle-legends/ base, and iOS serves this
   // bundle from capacitor://localhost at the ROOT, so every asset would 404.

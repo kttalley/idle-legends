@@ -17,7 +17,7 @@ import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEnti
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { composePalette } from '../palette'
 import { heroPaletteId, type AccentKey } from './heroWardrobe'
-import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD } from './mapAdapter'
+import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD, loadFftaTerrain } from './mapAdapter'
 import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } from '../../engine/walkability'
 import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } from '../../data/townNpcs'
 import { PARTY_MAX } from '../../engine/party'
@@ -70,8 +70,28 @@ const AUTO_LERP_K = 6         // exp-approach rate for auto-follow (1/s); tracks
                               // store's drift/travel with a small steady-state lag
 const JUMP_DURATION = 0.55    // seconds, apex at the midpoint
 const JUMP_HEIGHT = 16        // px lift at apex
-const SHAKE_DURATION = 0.26   // seconds a rumble decays over
-const DEATH_DURATION = 0.7    // seconds a slain mob plays death + fades before retiring
+/** Combat-VFX slow-motion dials: hits run at 1/Nth speed so the juice reads instead of
+ *  flashing past. THREE knobs, because these three things want different tempos and
+ *  sharing one made improving any of them regress the others:
+ *  - MELEE_SCALE: the swing + lunge tempo. Melee is the beat you see most often in an
+ *    idle game — every auto-attack — so it has to stay snappy or the whole game reads
+ *    slow. At 2 it was drifting into sluggish; 1.35 keeps the weight without the drag.
+ *  - FX_TIME_SCALE: spell graphics (bolt travel, burst ring, charge) plus the shared
+ *    impact juice (particles, shake, hit-flash, hit-stop, death). Kept large — spells
+ *    are the rare, expensive beat and they earn the savour.
+ *  - FLOATER_SCALE: damage numbers, and NOTHING else. They used to ride FX_TIME_SCALE,
+ *    which meant slowing spells down to something juicy also stretched every damage
+ *    number to ~3.8 seconds — so numbers from four hits ago were still hanging in the
+ *    air, stacking into an unreadable column over the mob. A damage number is a read,
+ *    not a flourish: it needs to appear, be legible, and get out of the way.
+ *  Durations below are pre-multiplied by the relevant scale and per-second VFX rates are
+ *  divided by it. Movement (walk/idle/traversal/tap-flash) is NOT scaled, so the game
+ *  stays responsive while the hits land heavy. */
+const MELEE_SCALE = 1.35
+const FX_TIME_SCALE = 4
+const FLOATER_SCALE = 1
+const SHAKE_DURATION = 0.26 * FX_TIME_SCALE   // seconds a rumble decays over
+const DEATH_DURATION = 0.7 * FX_TIME_SCALE    // seconds a slain mob plays death + fades before retiring
 const LUNGE_MAX = 1.35        // tiles; the attack lunge never exceeds this (no slingshot)
 // The store's own melee reach, not a copy of it — this used to be a literal 1.5 with a
 // comment claiming it "matches the store's mobEngaged", and it stopped matching the first
@@ -173,7 +193,7 @@ const clamp = (v: number, lo: number, hi: number) => v < lo ? lo : v > hi ? hi :
 // immediately, and a full pool recycles the oldest entry (LRU) so new damage always
 // shows instead of piling up at full opacity.
 const FLOATER_POOL = 16
-const FLOATER_LIFE = 0.95
+const FLOATER_LIFE = 0.95 * FLOATER_SCALE
 interface Floater {
   el: HTMLDivElement
   t: number        // remaining seconds; <= 0 = free
@@ -204,6 +224,10 @@ interface PathState {
 /** Repath backoff once a goal is known unreachable. Long, because the answer will not
  *  change until the goal moves — and `goalMoved` forces a repath when it does. */
 const UNREACHABLE_RETRY_SECONDS = 2.5
+
+function newLunge(): Lunge {
+  return { active: false, t: 0, homeX: 0, homeY: 0, targetX: 0, targetY: 0 }
+}
 
 interface Lunge {
   active: boolean
@@ -706,7 +730,15 @@ export class WorldSceneController {
   // its own dedicated machinery (`this.mob`: approach anchor, bearing, routing, death
   // fade); these just stand in the world, depth-sorted and clickable, so the player has a
   // visible choice. World-anchored on spawn so they hold their ground as the hero moves.
-  private otherMobEnts = new Map<string, { e: Entity; wx: number; wy: number }>()
+  // `ranged` and `lunge` are here because a bystander now FIGHTS. It used to be true that
+  // "combat choreography belongs to the engaged target alone", which is why this record
+  // carried position and nothing else — but under manual control there is no engaged
+  // target, so that rule meant a whole pack beat on the hero in idle poses. Each body
+  // therefore needs to know how it attacks (throw or swing) and to own its own lunge, so
+  // three mobs swinging on three different clocks do not share one animation slot.
+  private otherMobEnts = new Map<string, {
+    e: Entity; wx: number; wy: number; ranged: boolean; lunge: Lunge
+  }>()
   /** Debounce so one splashed BURST plays one whirlwind, not one per enemy caught.
    *  Three rings and three screen shakes on a single frame read as a fault, not as force. */
   private splashRingCool = 0
@@ -830,7 +862,7 @@ export class WorldSceneController {
     const base = import.meta.env.BASE_URL
     const scaffold = `${base}local-assets/ffta-scaffold/`
     const ffaUnits = `${scaffold}ffta-units/`
-    // Art source. DEFAULT = the ORIGINAL Idle Legends rigs in public/sprites/units/,
+    // Art source. DEFAULT = the ORIGINAL Stillmarch rigs in public/sprites/units/,
     // resolved from the roster key via ORIGINAL_SPRITE. `?ffta` (DEV builds only) loads
     // the gitignored FFTA scaffold instead. Both fall back to the programmatic
     // placeholder if their file is missing. Entities are cached by the roster key in
@@ -869,6 +901,10 @@ export class WorldSceneController {
     // tileset set in the constructor. Traced tiles are indexed to our semantic slots, so
     // biome palettes still recolor them.
     this.tileset = scaffoldArt ? await loadSpriteOrPlaceholder(`${scaffold}tiles.json`, makeTileset) : makeTileset()
+    // `?ffta` dev mode: preload the cracked FFTA terrain elevation oracle (record-stream
+    // -> 16x16 height grid) so zoneMapToTileMap drives zone elevation from it. Dev-only;
+    // best-effort (no scaffold -> falls back to procedural plateauLevel).
+    if (scaffoldArt) await loadFftaTerrain(1)
     this.burstRig = makeBurstRig('fx/burst')
     this.boltRig = makeBoltRig('fx/bolt')
 
@@ -1003,7 +1039,7 @@ export class WorldSceneController {
     // the flash here also avoids stranding a dead target in 'fx/hitflash' forever — the
     // restore below is keyed on `this.mob`, which is already null once it's dying.
     if (!this.isDying(target)) {
-      if (target === this.mob) { this.mobFlashT = 0.13 } else { this.playerFlashT = 0.13 }
+      if (target === this.mob) { this.mobFlashT = 0.13 * FX_TIME_SCALE } else { this.playerFlashT = 0.13 * FX_TIME_SCALE }
       target.paletteId = 'fx/hitflash'
       target.animator.set('hit')
       target.animator.restart()
@@ -1434,7 +1470,7 @@ export class WorldSceneController {
       if (zm) {
         const palId = biomePaletteId(state.currentZone)
         this.ground = bakeGround(
-          zoneMapToTileMap(zm), this.tileset,
+          zoneMapToTileMap(zm, state.currentZone), this.tileset,
           palId, getPalette(palId),
           TILE_ANIMS, this.propSheet,
         )
@@ -1526,7 +1562,12 @@ export class WorldSceneController {
           // current for anything in it instead of assigning, and `advanceBystanders` walks
           // it there at BYSTANDER_SPEED, routed and collided like everything else. So the
           // fix is to reuse it rather than invent a second easing path.
-          this.otherMobEnts.set(this.mobId, { e: this.mob, wx: this.mob.tx, wy: this.mob.ty })
+          this.otherMobEnts.set(this.mobId, {
+            e: this.mob, wx: this.mob.tx, wy: this.mob.ty,
+            // Carry the reach across the handoff: the body that was just throwing bolts
+            // as your target must not start swinging its fists as a bystander.
+            ranged: this.mobIsRanged, lunge: newLunge(),
+          })
           this.arriving.add(this.mobId)
         } else {
           // It died. With a population, `currentMob` is refilled by auto-select on the
@@ -1540,7 +1581,7 @@ export class WorldSceneController {
           this.dyingMobs.push({ e, t: 0 })
           this.slainMob = e            // keep the killing blow's VFX target alive
           this.spawnBurst(e.tx, e.ty, 'spell/holy')
-          this.punch(2.6, 0.05)
+          this.punch(2.6, 0.05 * FX_TIME_SCALE)
           const dm = this.worldMid(e)
           const dc = fxColors('spell/holy')
           this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 1.7)
@@ -1647,7 +1688,7 @@ export class WorldSceneController {
         this.dyingMobs.push({ e, t: 0 })
         this.slainMob = e                   // let the killing blow's VFX still find it
         this.spawnBurst(e.tx, e.ty, 'spell/holy') // loot/impact pop
-        this.punch(2.6, 0.05)
+        this.punch(2.6, 0.05 * FX_TIME_SCALE)
         const dm = this.worldMid(e)
         const dc = fxColors('spell/holy')
         this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 1.7)
@@ -1732,9 +1773,13 @@ export class WorldSceneController {
           // (12–26 tiles) that appearing in place does not read as popping in.
           const e = this.scene.spawn(sprite, mobPaletteId(m), wx, wy)
           e.animator.set('idle')
-          rec = { e, wx, wy }
+          rec = { e, wx, wy, ranged: isRangedMob(m), lunge: newLunge() }
           this.otherMobEnts.set(m.id, rec)
         }
+        // Re-read every sync rather than only on spawn: a record can also arrive via the
+        // target→bystander handoff above, and a mob's template can be swapped underneath
+        // a pooled entity.
+        rec.ranged = isRangedMob(m)
         // ── Track the mob's ACTUAL position, every frame ────────────────────────
         // This used to pin the entity to `rec.wx/wy`, the station computed once at spawn.
         // That was right when a mob's offset never changed after it arrived; it is wrong
@@ -1760,6 +1805,17 @@ export class WorldSceneController {
           // Still walking in from beyond the horizon — keep the destination current so it
           // heads for where the mob now is rather than where it spawned.
           rec.wx = liveX; rec.wy = liveY
+        } else if (rec.lunge.active) {
+          // Mid-swing, so the lunge owns this body for its ~0.3s. Hard-assigning here
+          // would cancel the step forward on the very next store tick and leave the blow
+          // looking like a twitch. Slide the lunge's frame instead: shift home AND target
+          // by however far the simulation moved the mob, so the arc keeps its shape and
+          // the body still lands back on the truth when it finishes.
+          const sdx = liveX - rec.lunge.homeX, sdy = liveY - rec.lunge.homeY
+          rec.lunge.homeX = liveX; rec.lunge.homeY = liveY
+          rec.lunge.targetX += sdx; rec.lunge.targetY += sdy
+          rec.wx = liveX; rec.wy = liveY
+          this.faceToward(rec.e, this.player.tx, this.player.ty)
         } else {
           const pdx = liveX - rec.e.tx, pdy = liveY - rec.e.ty
           const moved = Math.hypot(pdx, pdy)
@@ -1895,14 +1951,14 @@ export class WorldSceneController {
     this.faceToward(this.player, target.tx, target.ty)
     // Impact: defender flashes + recoils + floater. A corpse keeps its death pose.
     if (!dying) {
-      this.mobFlashT = 0.13
+      this.mobFlashT = 0.13 * FX_TIME_SCALE
       target.paletteId = 'fx/hitflash'
       target.animator.set('hit')
       target.animator.restart()
     }
     if (fn.isCrit) this.spawnBurst(target.tx, target.ty, this.heroFxSchool)
     // Rumble scales with the hit: crits kick hard + a brief hit-stop; normal a nudge.
-    this.punch(fn.isCrit ? 3.6 : 1.3, fn.isCrit ? 0.05 : 0)
+    this.punch(fn.isCrit ? 3.6 : 1.3, fn.isCrit ? 0.05 * FX_TIME_SCALE : 0)
     // ── The blow, in the hero's own school ────────────────────────────────────
     // Every class used to throw the same steel-white spray and lunge into melee to do it,
     // so a warlock draining life and a warrior with an axe were indistinguishable, and a
@@ -1966,7 +2022,7 @@ export class WorldSceneController {
       this.faceToward(ally.e, target.tx, target.ty)
     }
     if (!dying) {
-      this.mobFlashT = 0.13
+      this.mobFlashT = 0.13 * FX_TIME_SCALE
       target.paletteId = 'fx/hitflash'
       target.animator.set('hit')
       target.animator.restart()
@@ -2057,25 +2113,59 @@ export class WorldSceneController {
     this.spawnFloater(target, `${fn.value}`, false, fn.color ?? '#aa88ff')
   }
 
+  /**
+   * Which body threw this blow, and the machinery to animate it with.
+   *
+   * `fn.mobId` names the attacker. It resolves to the engaged target when that is who
+   * swung, and otherwise to a bystander — which is the ordinary case under manual
+   * control, where there is no engaged target at all. Falls back to the engaged target
+   * for a blow that carries no id, so any FN minted before this field existed (a save
+   * mid-flight, an older harness) still animates the way it used to.
+   */
+  private mobAttacker(fn: FloatingNumber): { e: Entity; ranged: boolean; lunge: Lunge } | null {
+    if (fn.mobId) {
+      const rec = this.otherMobEnts.get(fn.mobId)
+      if (rec && rec.e.active && !this.isDying(rec.e)) {
+        return { e: rec.e, ranged: rec.ranged, lunge: rec.lunge }
+      }
+      // Named, but it is the engaged target rather than a bystander.
+      if (this.mob && this.mobId === fn.mobId) {
+        return { e: this.mob, ranged: this.mobIsRanged, lunge: this.mobLunge }
+      }
+      return null
+    }
+    return this.mob ? { e: this.mob, ranged: this.mobIsRanged, lunge: this.mobLunge } : null
+  }
+
   triggerMobAttack(fn: FloatingNumber): void {
-    if (!this.mob || !this.ground) return
-    this.faceToward(this.mob, this.player.tx, this.player.ty)
-    if (this.mobIsRanged) {
+    if (!this.ground) return
+    const src = this.mobAttacker(fn)
+    // The hero still recoils and still shows the number even when the attacker has no
+    // body to animate (killed by thorns on this very blow, or off-screen). This used to
+    // `return` on `!this.mob`, which in manual mode meant an entire pack landed hits with
+    // no floater, no flash and no rumble — damage with no evidence anywhere on screen.
+    if (!src) {
+      this.impactHit(this.player, 'fx/hitflash', 2.0)
+      this.spawnFloater(this.player, `-${fn.value}`, false, '#ff6666')
+      return
+    }
+    this.faceToward(src.e, this.player.tx, this.player.ty)
+    if (src.ranged) {
       // Ranged: stand-off cast — a traveling bolt that lands on the player (impactHit
       // fires the flash/recoil/rumble on arrival, not at cast time).
-      this.mob.animator.set('attack')
-      this.mob.animator.restart()
+      src.e.animator.set('attack')
+      src.e.animator.restart()
       const r = WorldSceneController.FX_RISE
       this.spawnBolt(
-        this.mob.tx - r, this.mob.ty - r,
+        src.e.tx - r, src.e.ty - r,
         this.player.tx - r, this.player.ty - r,
         'spell/shadow', this.player, 2.6,
       )
     } else {
       // Melee: lunge in and the hit lands immediately.
-      this.beginLunge(this.mobLunge, this.mob, this.player)
-      this.mob.animator.set('attack')
-      this.mob.animator.restart()
+      this.beginLunge(src.lunge, src.e, this.player)
+      src.e.animator.set('attack')
+      src.e.animator.restart()
       this.impactHit(this.player, 'fx/hitflash', 2.0)
     }
     this.spawnFloater(this.player, `-${fn.value}`, false, '#ff6666')
@@ -2235,6 +2325,15 @@ export class WorldSceneController {
     if (this.ambientLungeEntity) {
       this.advanceLunge(this.ambientLunge, this.ambientLungeEntity, dt)
       if (!this.ambientLunge.active) this.ambientLungeEntity = null
+    }
+    // Bystanders swing too, each on its own clock, so each owns its own lunge. The idle
+    // reset is theirs as well: nothing else ever put a bystander's animator back, so
+    // before this a one-shot 'attack' (or the 'hit' from the hero's splash) would hold
+    // its final frame forever and the body would stand there mid-pose.
+    for (const rec of this.otherMobEnts.values()) {
+      if (!rec.e.active || this.isDying(rec.e)) continue
+      if (rec.lunge.active) this.advanceLunge(rec.lunge, rec.e, dt)
+      if (rec.e.animator.finished && !rec.lunge.active) rec.e.animator.set('idle')
     }
 
     // Decay hit flashes → restore base palettes.
@@ -2489,12 +2588,12 @@ export class WorldSceneController {
     if (this.bolts.length) {
       for (let i = this.bolts.length - 1; i >= 0; i--) {
         const b = this.bolts[i]
-        b.t += dt * 5.5 // ~0.18s flight
+        b.t += (dt * 5.5) / FX_TIME_SCALE // ~0.18s flight at full speed; scaled for slow-mo
         if (b.t >= 1) {
           b.entity.active = false
           // Impact reaction on arrival (this is where a spell should *land* and feel
           // heavy) — flash/recoil the target, burst, rumble; else just a burst.
-          if (b.impact && b.impact.active) this.impactHit(b.impact, b.palette, b.mag, 0.05)
+          if (b.impact && b.impact.active) this.impactHit(b.impact, b.palette, b.mag, 0.05 * FX_TIME_SCALE)
           else this.spawnBurst(b.toX, b.toY, b.palette)
           this.bolts.splice(i, 1)
         } else {
@@ -2567,7 +2666,7 @@ export class WorldSceneController {
 
     // Particle FX over the world (bloom via additive compositing). Advanced on real
     // time so glows keep flowing through hit-stop.
-    this.updateParticles(realDt)
+    this.updateParticles(realDt / FX_TIME_SCALE)
     this.drawParticles()
 
     // Fallback glyphs for any node type without a tall-prop sprite (open world only).
@@ -2716,7 +2815,7 @@ export class WorldSceneController {
 
   private advanceLunge(l: Lunge, e: Entity, dt: number): void {
     if (!l.active) return
-    l.t += dt * 3.2
+    l.t += (dt * 3.2) / MELEE_SCALE
     const phase = l.t < 0.5 ? l.t * 2 : 2 - l.t * 2
     e.tx = l.homeX + (l.targetX - l.homeX) * 0.42 * phase
     e.ty = l.homeY + (l.targetY - l.homeY) * 0.42 * phase

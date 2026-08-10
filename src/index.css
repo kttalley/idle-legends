@@ -10,7 +10,7 @@
 body {
   margin: 0;
   background-color: #1a1510;
-  color: #d4b896;
+  color: var(--parchment);
   /* Sans by default — see the type-system note by --font-display below. The serif is now
      opt-IN for headings and labels, not the thing everything has to opt out of. */
   font-family: var(--font-ui);
@@ -29,7 +29,7 @@ body {
    readable underneath and opaque enough that 0.5rem text stays legible on top of
    a moving, high-contrast scene — the balance the alpha values below are chosen
    for. The warm hairline and gold border keep the parchment identity: this is
-   glass, but it is still Idle Legends and not a generic frosted card.        */
+   glass, but it is still Stillmarch and not a generic frosted card.        */
 :root {
   --glass-bg:        rgba(22, 18, 12, 0.55);
   --glass-bg-strong: rgba(14, 11, 7, 0.86);
@@ -58,16 +58,62 @@ body {
   /* Legacy alias — chat was the first surface to defect, and its name is all over the
      stylesheet. It is just the UI face now. */
   --font-chat: var(--font-ui);
+
+  /* ── Colour system ──────────────────────────────────────────────────────────
+     Named by ROLE, not by hue, for the same reason the type scale is: `var(--gold)`
+     appeared sixty times across a dozen components and `var(--muted)` twenty-four, so the
+     answer to "what colour is a secondary label" was whatever the last person copied.
+     A palette that only exists as copy-pasted literals cannot be adjusted, cannot be
+     themed, and drifts every time someone eyeballs a nearby value.
+
+     This covers CHROME only. Colour that is DATA keeps its literals and is deliberately
+     left alone: sprite palettes (render/, AvatarRenderer), minimap terrain, the ASCII
+     world map, per-zone `bgColor`, class colours and item rarity. Those are not styling
+     decisions, and several of them are painted into a canvas — where `var()` does not
+     resolve and would silently render transparent black. */
+
+  /* Gold — the brand accent, in four weights by job. */
+  --gold:         #ffd700;  /* headings, values, the active thing */
+  --gold-bright:  #ffe9a8;  /* gold text raised on a filled or hovered surface */
+  --gold-soft:    #c8a864;  /* quiet gold: idle icons, inactive chrome */
+  --gold-deep:    #c8a100;  /* gold as a RULE or border, never as body text */
+  --gold-warm:    #f4c84a;  /* gold on the chat surfaces, which run cooler */
+
+  /* Text. */
+  --parchment:    #d4b896;  /* body copy on glass */
+  --muted:        #9d9d9d;  /* labels and secondary text on neutral ground */
+  --muted-warm:   #8a8070;  /* the same role on the warm//glass surfaces */
+
+  /* Structure. */
+  --ink:          #1a1508;  /* deepest panel ground */
+  --ink-well:     #0a0805;  /* inset wells: bar tracks, scrollbar gutters */
+  --edge:         #3a2c10;  /* hairline between rows */
+  --edge-strong:  #6b5020;  /* panel border */
+  --edge-soft:    #6a5030;  /* border on the chat/whisper family */
+  --wood:         #4a3818;  /* raised fill: buttons, scrollbar thumbs */
+  --wood-lit:     #6a5228;  /* the same, hovered */
+
+  /* Status. */
+  --danger:       #ff4444;
+  --warn:         #ff8000;
+  --success:      #88ccaa;
   /* Chat glass. Lighter tint and a HEAVIER blur than the standard panels: the point is to
      keep watching the idle game through the chat, so the world has to stay visible — but
      a busy, high-contrast, *moving* pixel scene will shred 12px text if it reads through
      sharp. Blurring it harder is what buys the transparency; the tint alone cannot. */
   --chat-glass-bg:   rgba(17, 13, 8, 0.50);
   --chat-glass-blur: 24px;
-  --log-h:           220px;  /* zone-chat panel; the left rail reserves this much */
+  /* Height of the zone-chat panel; the left rail subtracts it so the column stops where
+     the chat starts. This value is only the pre-measurement fallback — App.tsx overwrites
+     it from a ResizeObserver on the panel itself, because a hand-kept copy of a height
+     declared elsewhere in this file drifts the first time either one is touched. */
+  --log-h:           220px;
   /* Vertical space the action bar + strike meter occupy above the mobile dock. The chat
-     sheet must stop short of this: the action bar is the primary interaction and a chat
-     panel is never allowed to cover it. */
+     sheet and the whisper window must stop short of this: the action bar is the primary
+     interaction and neither is ever allowed to cover it. This value is only the
+     pre-measurement fallback — ActionBar.tsx overwrites it from a ResizeObserver on the
+     bar itself, because a hardcoded guess goes stale the first time the bar changes
+     shape (it did, when the mode toggles gained captions). */
   --actionbar-h:     96px;
   /* Height of the on-screen keyboard, published by engine/viewportInsets.ts. 0 when no
      keyboard is up, and on every platform whose keyboard resizes the layout viewport. */
@@ -85,10 +131,19 @@ body {
      insets by these so it never slides under a glass column — and they collapse to
      0 when a column is folded away, giving the HUD the reclaimed space. */
   --rail-l: 252px;
-  --rail-r: 270px;
+  /* The radar column: 74px disc + its corner satellites overhanging 6px each side, plus
+     margin. The inventory rail and the bottom stack both reserve against it, so the
+     minimap can stay pinned to the corner without anything sliding under it. */
+  --radar-w: 96px;
+  /* Everything the right edge is spending: the radar column, then the inventory rail
+     flown out to its left (250px + a 10px gap). Derived rather than a second hand-kept
+     number, because that pair drifting apart is what puts the action bar under a panel. */
+  --rail-r: calc(var(--radar-w) + 260px);
 }
-.app-root[data-left-collapsed="true"]  { --rail-l: 26px; }
-.app-root[data-right-collapsed="true"] { --rail-r: 26px; }
+.app-root[data-left-collapsed="true"]  { --rail-l: 52px; }
+/* Retracted, the right rail is a 34px stub — but it still sits inboard of the radar, so
+   the space the HUD must keep clear is the stub PLUS the radar column. */
+.app-root[data-right-collapsed="true"] { --rail-r: calc(var(--radar-w) + 44px); }
 
 /* ── Display type ────────────────────────────────────────────────────────────
    The complete list of things that keep the serif. If a rule is not here (or does not
@@ -177,12 +232,15 @@ h1, h2, h3, h4,
 .app-sidebar-left,
 .app-sidebar-right {
   position: absolute;
-  top: 58px;
+  /* Flush to the top of the canvas. The old 58px was clearance for a top bar that no
+     longer exists — the world is full-bleed now — so it read as the rail floating
+     unanchored above the world rather than framing it. */
+  top: calc(8px + var(--safe-t));
   /* Height follows CONTENT, capped by the space available — not stretched between top
      and bottom. Anchoring both edges meant a rail whose sections were all collapsed
      still painted a full-height slab of glass over the world with nothing in it. */
   bottom: auto;
-  max-height: calc(100dvh - 58px - 12px);
+  max-height: calc(100dvh - 20px - var(--safe-t));
   z-index: 25;
   width: 232px;
   display: flex;
@@ -192,18 +250,21 @@ h1, h2, h3, h4,
   overflow-x: hidden;
   padding: 8px;
   scrollbar-width: thin;
-  scrollbar-color: #4a3818 transparent;
+  scrollbar-color: var(--wood) transparent;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
 }
 .app-sidebar-left  {
   left: 10px;
   /* The zone-chat panel occupies the foot of this column, so the rail may only grow to
      the space above it. */
-  max-height: calc(100dvh - 58px - var(--log-h) - 20px);
+  max-height: calc(100dvh - var(--log-h) - 28px - var(--safe-t));
   /* The left rail scrolls in its MIDDLE, not as a whole — see `.rail-body`. */
   overflow: hidden;
 }
-.app-sidebar-right { right: 10px; width: 250px; }
+/* Flies out to the LEFT of the radar rather than under it. `--radar-w` is the disc plus
+   its corner satellites plus the zone caption — reserved as a token so the two cannot
+   drift apart when the disc is resized. */
+.app-sidebar-right { right: calc(var(--radar-w) + var(--safe-r)); width: 250px; }
 
 /* ── Left rail: pinned head, scrolling body, pinned foot ─────────────────────
    The hero identity strip (gold / Looks / Heroes) and the zone track are navigation:
@@ -211,6 +272,35 @@ h1, h2, h3, h4,
    particular is the thing you glance at constantly. So only the character sheet — the
    one section that grows without bound — scrolls. */
 .rail-head, .rail-foot { flex: 0 0 auto; }
+.rail-head { display: flex; align-items: flex-start; gap: 4px; }
+.rail-head > .hero-bar { flex: 1 1 auto; min-width: 0; }
+/* The right rail has no hero strip, so its head is just the button. */
+.app-sidebar-right .rail-head { justify-content: flex-end; }
+
+/* Minimize. Sits in the rail's own header row rather than floating beside it. */
+.rail-minimize {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(206, 170, 90, 0.28);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--gold-soft);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.rail-minimize:hover {
+  color: var(--gold);
+  border-color: var(--gold-deep);
+  background: rgba(200, 161, 0, 0.14);
+}
+@media (pointer: coarse) { .rail-minimize { min-height: 34px; width: 30px; } }
 .rail-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -220,37 +310,35 @@ h1, h2, h3, h4,
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
-  scrollbar-color: #4a3818 transparent;
+  scrollbar-color: var(--wood) transparent;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 .rail-foot { border-top: 1px solid rgba(200, 161, 0, 0.16); padding-top: 4px; }
 
-/* Desktop collapse — the world is the point, so it must be possible to clear the
-   glass off it entirely without losing the panels for good. */
-.app-sidebar-left.collapsed  { transform: translateX(calc(-100% - 18px)); opacity: 0; pointer-events: none; }
-.app-sidebar-right.collapsed { transform: translateX(calc(100% + 18px));  opacity: 0; pointer-events: none; }
-
-.app-collapse-tab {
-  position: absolute;
-  top: 50%;
-  z-index: 26;
-  width: 16px;
-  height: 54px;
-  margin-top: -27px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: 8px;
-  color: #c8a864;
-  font-size: 0.6rem;
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s;
+/* Desktop collapse — the world is the point, so it must be possible to clear the glass
+   off it without losing the panels for good.
+   The rail now SHRINKS to its own minimize button instead of sliding off-screen. Sliding
+   away meant the control that brings it back could not live inside it, which is why there
+   used to be a separate tab floating in the world at `top: 50%` — a button belonging to
+   nothing, in a place with no relationship to the panel it governed. Keeping the head row
+   on screen lets the same button do both jobs, in the row it belongs to. */
+.app-sidebar-left.collapsed,
+.app-sidebar-right.collapsed {
+  width: 34px;
+  padding: 6px 5px;
+  overflow: hidden;
 }
-.app-collapse-tab:hover { color: #ffd700; }
-.app-collapse-tab.left  { left: 0; }
-.app-collapse-tab.right { right: 0; }
+/* The head — and therefore the restore arrow — deliberately survives. It is the ONLY way
+   back on desktop, where there is no dock. */
+.app-sidebar-left.collapsed  .rail-body,
+.app-sidebar-left.collapsed  .rail-foot,
+.app-sidebar-right.collapsed .rail-body,
+.app-sidebar-right.collapsed .rail-foot,
+.app-sidebar-left.collapsed  .hero-bar { display: none; }
+.app-sidebar-left.collapsed  .rail-head,
+.app-sidebar-right.collapsed .rail-head { border-bottom: none; padding: 0; }
+
 
 .app-log.rp-glass,
 .whisper-window {
@@ -300,23 +388,388 @@ h1, h2, h3, h4,
   font-family: var(--font-ui);
   font-size: 0.62rem;
   letter-spacing: 0.04em;
-  color: #8a8070;
+  color: var(--muted-warm);
   font-weight: 400;
   border-bottom: 1px solid transparent;
   transition: color 0.12s, border-color 0.12s;
 }
 
-.app-log-tab:hover { color: #c8a864; }
+.app-log-tab:hover { color: var(--gold-soft); }
 .app-log-tab.is-active {
-  color: #f4c84a;
+  color: var(--gold-warm);
   font-weight: 700;
-  border-bottom-color: #f4c84a;
+  border-bottom-color: var(--gold-warm);
 }
 
 .app-log-content {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+}
+
+/* Minimap satellites — the four controls tucked on the disc's corners (town, auto/manual,
+   zoom, map). Same glass as the action bar so the HUD reads as one material. */
+.minimap-sat {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  /* .hud-layer is click-through; controls must claim their own touches. */
+  pointer-events: auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(30, 26, 20, 0.72), rgba(14, 12, 8, 0.80));
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  backdrop-filter: blur(8px) saturate(160%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 6px rgba(0, 0, 0, 0.5);
+  color: var(--gold);
+  transition: transform 0.12s, border-color 0.15s, box-shadow 0.12s;
+}
+.minimap-sat:not(:disabled):active { transform: scale(0.92); }
+.minimap-sat:disabled { opacity: 0.35; cursor: default; }
+.minimap-sat[data-active="true"] {
+  border-color: hsl(44 70% 70% / 0.60);
+  box-shadow:
+    inset 0 1px 0 hsl(44 90% 88% / 0.40),
+    0 0 8px hsl(44 80% 50% / 0.35);
+}
+
+/* ── Action bar: stained glass ───────────────────────────────────────────────
+   The slots were opaque gradient chips with a 2px gold border — a WoW-shell look sitting
+   on top of a dimetric world it shared no material with. These read as panes of coloured
+   glass instead: the world blurs through them, each spell owns a hue, and the icon is
+   pressed INTO the pane rather than sitting on it.
+
+   Three layers make the glass, and all three are needed for it to read as glass rather
+   than as a translucent rectangle:
+     1. `backdrop-filter` — the world genuinely refracts through the pane. Saturation is
+        pushed past 1 because blurring alone greys out what is behind it.
+     2. A hue wash + a diagonal sheen, so the pane has its own colour and a light source.
+     3. A bright hairline on the top edge and a dark one on the bottom — the single
+        cheapest cue that a surface has thickness.
+
+   `--pane-hue` is set per slot from the ability id (see SkillBar), so a spell keeps the
+   same colour of glass for the life of a character without needing a school in the data. */
+.skill-slot {
+  --pane-hue: 42;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px;
+  overflow: hidden;
+  border-radius: 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  border: 1px solid hsl(var(--pane-hue) 60% 72% / 0.30);
+  background:
+    linear-gradient(150deg, hsl(var(--pane-hue) 80% 78% / 0.20) 0%, transparent 42%),
+    linear-gradient(180deg, hsl(var(--pane-hue) 65% 45% / 0.22), hsl(var(--pane-hue) 70% 22% / 0.30));
+  -webkit-backdrop-filter: blur(10px) saturate(190%);
+  backdrop-filter: blur(10px) saturate(190%);
+  box-shadow:
+    inset 0 1px 0 hsl(var(--pane-hue) 90% 88% / 0.38),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.42),
+    0 3px 10px rgba(0, 0, 0, 0.45);
+  transition: transform 0.12s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.12s, border-color 0.15s;
+}
+
+/* iOS-style press: the pane sinks rather than changing colour. */
+.skill-slot:not(:disabled):active {
+  transform: translateY(1px) scale(0.97);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.55),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.skill-slot:disabled {
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(12, 12, 18, 0.55), rgba(6, 6, 10, 0.62));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* The impression. A recessed well with the shadow at the TOP and the catchlight at the
+   bottom — the inverse of the pane's own lighting, which is what the eye reads as
+   "stamped in" rather than "raised". The icon takes a matching 1px light shadow so it
+   sits at the bottom of the well instead of floating over it. */
+.skill-slot-well {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: hsl(var(--pane-hue) 40% 12% / 0.45);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.62),
+    inset 0 -1px 0 hsl(var(--pane-hue) 80% 80% / 0.22);
+  z-index: 1;
+}
+.skill-slot-well > * {
+  filter: drop-shadow(0 1px 0 hsl(var(--pane-hue) 90% 85% / 0.30));
+}
+.skill-slot:disabled .skill-slot-well > * { filter: none; opacity: 0.45; }
+
+.skill-slot-name {
+  z-index: 1;
+  text-align: center;
+  line-height: 1.1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  color: var(--parchment);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+.skill-slot:disabled .skill-slot-name { color: var(--muted); text-shadow: none; }
+
+/* The mode toggles are the same material, one step quieter — they are not the primary
+   action, and matching the spell panes exactly would make five things compete. */
+.mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border-radius: 11px;
+  cursor: pointer;
+  touch-action: manipulation;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(28, 26, 34, 0.55), rgba(14, 13, 18, 0.62));
+  -webkit-backdrop-filter: blur(8px) saturate(150%);
+  backdrop-filter: blur(8px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  color: var(--muted-warm);
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.15s, color 0.15s;
+}
+.mode-btn:not(:disabled):active { transform: translateY(1px) scale(0.97); }
+.mode-btn.is-active {
+  border-color: hsl(44 70% 70% / 0.55);
+  color: var(--gold);
+  background:
+    linear-gradient(150deg, hsl(44 85% 78% / 0.22) 0%, transparent 45%),
+    linear-gradient(180deg, hsl(44 60% 40% / 0.30), hsl(44 65% 20% / 0.34));
+  box-shadow:
+    inset 0 1px 0 hsl(44 90% 88% / 0.40),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.42),
+    0 2px 8px hsl(44 80% 50% / 0.18);
+}
+.mode-btn:disabled { opacity: 0.35; cursor: default; }
+.mode-btn-label {
+  font-size: 7.5px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: inherit;
+}
+
+/* The bar itself is a single sheet of glass the panes sit on. */
+.actionbar-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  border-radius: 16px;
+  border: 1px solid var(--glass-hairline);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 4px 16px rgba(0, 0, 0, 0.4);
+  max-width: calc(100vw - 16px);
+}
+
+/* backdrop-filter is the whole effect; without it these panes are flat translucent
+   rectangles. Give the fallback enough opacity to stay legible over a moving world. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .skill-slot     { background: linear-gradient(180deg, hsl(var(--pane-hue) 45% 26%), hsl(var(--pane-hue) 50% 14%)); }
+  .mode-btn       { background: linear-gradient(180deg, rgba(28, 26, 34, 0.94), rgba(14, 13, 18, 0.96)); }
+  .actionbar-shell { background: var(--glass-bg-strong); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .skill-slot      { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(180deg, hsl(var(--pane-hue) 45% 24%), hsl(var(--pane-hue) 50% 13%)); }
+  .mode-btn        { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .actionbar-shell { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--glass-bg-strong); }
+}
+
+/* ── The ladder ──────────────────────────────────────────────────────────────
+   Cross-player leaderboard + duels, sharing the log slot as a third tab. Scrolls
+   inside its own box like the other two feeds, so the drawer geometry is unchanged. */
+/* Raised from the Looks/Ladder strip, so it is sized like the wardrobe modal beside it. */
+.ladder-modal {
+  width: min(380px, 94vw);
+  max-height: min(560px, 82dvh);
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.ladder {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-ui);
+  font-size: 0.66rem;
+}
+
+.ladder-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--edge-soft);
+}
+
+.ladder-tabs { display: flex; gap: 8px; }
+
+.ladder-tab {
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  padding: 2px 0;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: var(--muted-warm);
+  transition: color 0.12s, border-color 0.12s;
+}
+.ladder-tab:hover { color: var(--gold-soft); }
+.ladder-tab.is-active {
+  color: var(--gold-warm);
+  font-weight: 700;
+  border-bottom-color: var(--gold-warm);
+}
+
+.ladder-record { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+
+.ladder-tally {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  color: var(--parchment);
+  border-bottom: 1px solid var(--edge-soft);
+}
+.ladder-tally strong { color: var(--gold); }
+
+.ladder-rank.won  { color: var(--success); font-weight: 700; }
+.ladder-rank.lost { color: var(--danger);  font-weight: 700; }
+
+.ladder-refresh {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted-warm);
+  font-size: 0.8rem;
+  padding: 0 4px;
+}
+.ladder-refresh:hover:not(:disabled) { color: var(--gold); }
+.ladder-refresh:disabled { opacity: 0.5; cursor: default; }
+
+.ladder-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ladder-row {
+  display: grid;
+  /* rank | name (flexes) | meta | duel button — a fixed rank column keeps the names
+     left-aligned with each other rather than ragged against varying rank widths. */
+  grid-template-columns: 1.6rem 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--edge-fade);
+}
+
+.ladder-row.is-you {
+  background: var(--glass-bg);
+  border-left: 2px solid var(--gold-deep);
+}
+
+.ladder-rank {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ladder-name {
+  color: var(--parchment);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ladder-you {
+  color: var(--gold-soft);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ladder-meta {
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ladder-circuit { color: var(--gold-deep); }
+
+.ladder-duel-btn {
+  background: linear-gradient(180deg, var(--wood-lit), var(--wood));
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  color: var(--parchment);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.58rem;
+  padding: 2px 7px;
+}
+.ladder-duel-btn:hover:not(:disabled) { border-color: var(--gold-deep); }
+.ladder-duel-btn:disabled { opacity: 0.45; cursor: default; }
+
+.ladder-duel {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--edge-soft);
+  color: var(--parchment);
+}
+.ladder-duel.won strong  { color: var(--success); }
+.ladder-duel.lost strong { color: var(--danger); }
+.ladder-duel-detail { color: var(--muted); font-size: 0.6rem; }
+
+.ladder-note {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  color: var(--warn);
+  font-size: 0.6rem;
+}
+
+.ladder-empty {
+  padding: 14px 10px;
+  text-align: center;
+  color: var(--muted);
+}
+.ladder-empty p { margin: 0 0 4px; }
+.ladder-hint { color: var(--muted-warm); font-size: 0.58rem; }
+.ladder-empty code {
+  font-family: var(--font-chat);
+  color: var(--gold-deep);
 }
 
 /* Mode panels (travel / gathering / crafting / town) sit in the bottom stack, directly
@@ -328,13 +781,15 @@ h1, h2, h3, h4,
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: #4a3818 transparent;
+  scrollbar-color: var(--wood) transparent;
 }
 
 /* Hidden on desktop */
 .app-dock         { display: none; }
 .app-backdrop     { display: none; }
-.app-drawer-close { display: none; }
+/* `.app-drawer-close` is gone on purpose. It was the mobile ✕, a second dismissal verb
+   competing with the rail's minimize; one control, drawn once, is the whole point of the
+   current model. Nothing renders this class any more. */
 
 /* ── Mobile / tablet (< 900px) ───────────────────────────────────────────────
    Same world layer, same glass; the side columns become sheets that come up over
@@ -360,11 +815,29 @@ h1, h2, h3, h4,
   .app-sidebar-right { right: 0; border-right: none; border-top: none; border-bottom: none; transform: translateX(calc(100% + 4px));  opacity: 1; }
   .app-sidebar-left.panel-open,
   .app-sidebar-right.panel-open { transform: translateX(0); }
-  /* The desktop collapse state must not leak into the drawer transform. */
-  .app-sidebar-left.collapsed,
-  .app-sidebar-right.collapsed { opacity: 1; pointer-events: auto; }
 
-  .app-collapse-tab { display: none; }
+  /* ── "Retracted" means OFF-SCREEN here, not a stub ──
+     The desktop stub styling must not leak into a drawer. It used to: `.collapsed` is
+     0,2,0 and the `.app-sidebar-left` rule above is 0,1,0, so `width: 34px` won and hid
+     the body while the panel stayed open — a 34px strip of empty glass with the scrim up
+     and the dock button still lit. Restoring the drawer's own geometry here is what makes
+     one state model safe to share across both breakpoints: on a phone the panel keeps its
+     full width and simply sits off-screen, and the dock is the way back. */
+  .app-sidebar-left.collapsed,
+  .app-sidebar-right.collapsed {
+    opacity: 1;
+    pointer-events: auto;
+    width: min(330px, 90vw);
+    padding: 44px 10px 12px;
+    overflow: hidden;
+  }
+  .app-sidebar-left.collapsed  .rail-body,
+  .app-sidebar-left.collapsed  .rail-foot,
+  .app-sidebar-left.collapsed  .hero-bar,
+  .app-sidebar-right.collapsed .rail-body,
+  .app-sidebar-right.collapsed .rail-foot { display: flex; }
+  .app-sidebar-left.collapsed  .rail-head,
+  .app-sidebar-right.collapsed .rail-head { border-bottom: 1px solid var(--edge-soft); padding: 0; }
 
   .app-log {
     /* NOT full width. A 100%-wide feed is a curtain across the middle of the screen: this
@@ -421,23 +894,9 @@ h1, h2, h3, h4,
     border-bottom: none;
   }
 
-  .app-drawer-close {
-    display: flex;
-    position: absolute;
-    top: 8px;
-    right: 10px;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    background: rgba(0,0,0,0.35);
-    border: 1px solid #3a2c10;
-    color: #b09050;
-    cursor: pointer;
-    font-size: 0.85rem;
-    border-radius: 8px;
-    font-family: monospace;
-  }
+  /* Four dock buttons now instead of three. Labels shrink rather than the hit targets:
+     the buttons still stretch the full bar height, which is what keeps them thumb-sized. */
+  .app-dock-btn { font-size: 0.55rem; }
 }
 
 /* Text sits on a moving, high-contrast world. A tight shadow keeps every glass
@@ -457,10 +916,31 @@ h1, h2, h3, h4,
      world beneath stays tappable, and a scroll container here would have to claim those
      touches back and break tap-to-move across the whole top-left of the map. */
   max-height: calc(100% - 16px - var(--safe-t)); overflow: hidden; }
-.hud-tr { position: absolute; top: calc(8px + var(--safe-t)); right: calc(var(--rail-r) + var(--safe-r)); transition: right 0.28s cubic-bezier(0.4,0,0.2,1); }
-.hud-bottom { position: absolute; left: calc(var(--rail-l) + var(--safe-l)); right: calc(var(--rail-r) + var(--safe-r)); bottom: 0;
+/* The radar is FIXED to the top-right corner and does not move.
+   It used to be inset by `--rail-r`, so opening or closing the inventory slid the minimap
+   sideways — a fixed reference point drifting in response to an unrelated panel, in a game
+   whose whole loop is watching that reference point. The inventory now flies out to the
+   LEFT of the radar instead of displacing it (see `.app-sidebar-right`), which is why the
+   dependency and its transition are gone rather than merely retimed. */
+.hud-tr { position: absolute; top: calc(8px + var(--safe-t)); right: calc(8px + var(--safe-r)); }
+/* The bottom stack stays CENTRED ON THE WORLD and narrows symmetrically, rather than
+   being squeezed between the two rails.
+   Insetting by each rail independently meant the action bar and XP strip slid sideways
+   whenever a panel opened or closed — the primary controls drifting out from under your
+   hand in response to an unrelated panel, which is disorienting in a game you are meant to
+   sit and watch. Padding by the WIDER of the two rails keeps the centre line fixed at the
+   middle of the screen and costs only some width on the emptier side. `max()` is what
+   makes it symmetric; the safe-area insets ride along so a landscape notch is respected. */
+.hud-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-left:  max(calc(var(--rail-l) + var(--safe-l)), calc(var(--rail-r) + var(--safe-r)));
+  padding-right: max(calc(var(--rail-l) + var(--safe-l)), calc(var(--rail-r) + var(--safe-r)));
   display: flex; flex-direction: column; align-items: center; gap: 6px;
-  transition: left 0.28s cubic-bezier(0.4,0,0.2,1), right 0.28s cubic-bezier(0.4,0,0.2,1); }
+  transition: padding 0.28s cubic-bezier(0.4,0,0.2,1);
+}
 @media (max-width: 899px) {
   /* No persistent rails on mobile — the drawers are transient, so the HUD gets
      the full width and tucks above the dock. */
@@ -468,9 +948,14 @@ h1, h2, h3, h4,
   /* Nothing above them any more — the HUD starts at the top of the safe area. */
   .hud-tl { top: calc(8px + var(--safe-t)); }
   .hud-tr { top: calc(8px + var(--safe-t)); }
-  .hud-bottom { bottom: calc(var(--dock-h) + var(--safe-b)); }
-  /* Breathing room under the action bar so it is not welded to the XP strip. */
-  .hud-bottom { padding-bottom: 4px; }
+  .hud-bottom {
+    bottom: calc(var(--dock-h) + var(--safe-b));
+    /* Rails are transient drawers here, so the HUD takes the full width — but keep the
+       breathing room under the action bar so it is not welded to the XP strip. */
+    padding-left: var(--safe-l);
+    padding-right: var(--safe-r);
+    padding-bottom: 4px;
+  }
 }
 
 /* ── Panels nested inside glass ──────────────────────────────────────────────
@@ -541,8 +1026,8 @@ h1, h2, h3, h4,
   background: rgba(212, 184, 150, 0.35);
   margin: 2px auto 4px;
 }
-.sheet-title { font-size: 0.9rem; font-weight: 700; color: #ffd700; }
-.sheet-body  { font-size: 0.72rem; color: #d4b896; }
+.sheet-title { font-size: 0.9rem; font-weight: 700; color: var(--gold); }
+.sheet-body  { font-size: 0.72rem; color: var(--parchment); }
 .sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 .sheet-action { flex: 1 1 44%; min-height: 44px; font-size: 0.72rem; }
 .sheet-close  { min-height: 40px; opacity: 0.75; }
@@ -574,7 +1059,7 @@ h1, h2, h3, h4,
 .app-dock-gold {
   font-size: 0.55rem;
   font-weight: 700;
-  color: #ffd700;
+  color: var(--gold);
   letter-spacing: 0.02em;
   text-shadow: 0 1px 3px rgba(0,0,0,0.9);
 }
@@ -590,7 +1075,7 @@ h1, h2, h3, h4,
   background: none;
   border: none;
   border-right: 1px solid #2a2010;
-  color: #6a5228;
+  color: var(--wood-lit);
   cursor: pointer;
   font-family: var(--font-display);
   font-size: 0.5rem;
@@ -601,14 +1086,14 @@ h1, h2, h3, h4,
 }
 .app-dock-btn:last-child { border-right: none; }
 .app-dock-btn-icon { font-size: 1.1rem; line-height: 1; }
-.app-dock-btn:hover   { background: #1a1508; color: #c8a864; }
-.app-dock-btn.is-active { background: #1e1a08; color: #ffd700; }
+.app-dock-btn:hover   { background: var(--ink); color: var(--gold-soft); }
+.app-dock-btn.is-active { background: #1e1a08; color: var(--gold); }
 
 /* ── RPG UI Chrome ────────────────────────────────────────────────────────── */
 .rp-panel {
   background: linear-gradient(160deg, #2a2218 0%, #1e1a12 60%, #141008 100%);
-  border: 2px solid #6b5020;
-  border-top-color: #c8a100;
+  border: 2px solid var(--edge-strong);
+  border-top-color: var(--gold-deep);
   border-left-color: #9a7830;
   box-shadow:
     inset 0 1px 0 rgba(200,161,0,0.2),
@@ -617,22 +1102,22 @@ h1, h2, h3, h4,
 }
 
 .rp-panel-header {
-  background: linear-gradient(90deg, #3a2c10 0%, #4a3818 50%, #3a2c10 100%);
-  border-bottom: 1px solid #6b5020;
+  background: linear-gradient(90deg, var(--edge) 0%, var(--wood) 50%, var(--edge) 100%);
+  border-bottom: 1px solid var(--edge-strong);
   padding: 6px 12px;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #ffd700;
+  color: var(--gold);
   text-shadow: 0 1px 2px rgba(0,0,0,0.8);
 }
 
 .rp-button {
-  background: linear-gradient(180deg, #4a3818 0%, #2e2210 100%);
-  border: 1px solid #6b5020;
+  background: linear-gradient(180deg, var(--wood) 0%, #2e2210 100%);
+  border: 1px solid var(--edge-strong);
   border-top-color: #9a7830;
-  color: #ffd700;
+  color: var(--gold);
   font-family: var(--font-display);
   font-size: 0.7rem;
   font-weight: 600;
@@ -644,13 +1129,13 @@ h1, h2, h3, h4,
 }
 
 .rp-button:hover {
-  background: linear-gradient(180deg, #6a5228 0%, #4a3518 100%);
-  border-color: #c8a100;
+  background: linear-gradient(180deg, var(--wood-lit) 0%, #4a3518 100%);
+  border-color: var(--gold-deep);
   color: #ffe040;
 }
 
 .rp-button:active {
-  background: linear-gradient(180deg, #2e2210 0%, #4a3818 100%);
+  background: linear-gradient(180deg, #2e2210 0%, var(--wood) 100%);
   transform: translateY(1px);
 }
 
@@ -661,7 +1146,7 @@ h1, h2, h3, h4,
 
 /* ── Health / XP Bars ─────────────────────────────────────────────────────── */
 .bar-track {
-  background: #0a0805;
+  background: var(--ink-well);
   border: 1px solid #2a2010;
   border-radius: 2px;
   overflow: hidden;
@@ -686,11 +1171,11 @@ h1, h2, h3, h4,
 .bar-mob-hp   { background: linear-gradient(90deg, #7a1a00, #c43000); }
 
 /* ── Rarity Colors ────────────────────────────────────────────────────────── */
-.rarity-common    { color: #9d9d9d; }
+.rarity-common    { color: var(--muted); }
 .rarity-uncommon  { color: #1eff00; }
 .rarity-rare      { color: #0070dd; }
 .rarity-epic      { color: #a335ee; }
-.rarity-legendary { color: #ff8000; text-shadow: 0 0 8px rgba(255,128,0,0.6); }
+.rarity-legendary { color: var(--warn); text-shadow: 0 0 8px rgba(255,128,0,0.6); }
 
 /* ── Combat Log ───────────────────────────────────────────────────────────── */
 .combat-log {
@@ -702,12 +1187,12 @@ h1, h2, h3, h4,
   letter-spacing: 0.01em;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #4a3818 #0a0805;
+  scrollbar-color: var(--wood) var(--ink-well);
 }
 
 .combat-log::-webkit-scrollbar { width: 6px; }
-.combat-log::-webkit-scrollbar-track { background: #0a0805; }
-.combat-log::-webkit-scrollbar-thumb { background: #4a3818; border-radius: 3px; }
+.combat-log::-webkit-scrollbar-track { background: var(--ink-well); }
+.combat-log::-webkit-scrollbar-thumb { background: var(--wood); border-radius: 3px; }
 
 /* ── Loot Toast ───────────────────────────────────────────────────────────── */
 @keyframes loot-in {
@@ -731,7 +1216,9 @@ h1, h2, h3, h4,
 }
 
 .damage-float {
-  animation: float-up 1.2s ease-out forwards;
+  /* Matches FLOATER_SCALE in combatAdapter — the legacy CombatView path draws the same
+     number and must not read at a different tempo from the dimetric one. */
+  animation: float-up 0.95s ease-out forwards;
   pointer-events: none;
   font-weight: 700;
   font-size: 1.1rem;
@@ -741,15 +1228,15 @@ h1, h2, h3, h4,
 /* ── Inventory Grid ───────────────────────────────────────────────────────── */
 .inventory-slot {
   background: #0d0b07;
-  border: 1px solid #3a2c10;
+  border: 1px solid var(--edge);
   cursor: pointer;
   transition: border-color 0.1s;
   position: relative;
 }
 
 .inventory-slot:hover {
-  border-color: #c8a100;
-  background: #1a1508;
+  border-color: var(--gold-deep);
+  background: var(--ink);
 }
 
 .inventory-slot.occupied::after {
@@ -763,17 +1250,17 @@ h1, h2, h3, h4,
 .panel-scroll {
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #4a3818 #0a0805;
+  scrollbar-color: var(--wood) var(--ink-well);
 }
 .panel-scroll::-webkit-scrollbar { width: 5px; }
-.panel-scroll::-webkit-scrollbar-track { background: #0a0805; }
-.panel-scroll::-webkit-scrollbar-thumb { background: #4a3818; }
+.panel-scroll::-webkit-scrollbar-track { background: var(--ink-well); }
+.panel-scroll::-webkit-scrollbar-thumb { background: var(--wood); }
 
 /* ── Tooltip ──────────────────────────────────────────────────────────────── */
 .rp-tooltip {
-  background: linear-gradient(160deg, #1a1508 0%, #0d0b05 100%);
-  border: 1px solid #6b5020;
-  border-top-color: #c8a100;
+  background: linear-gradient(160deg, var(--ink) 0%, #0d0b05 100%);
+  border: 1px solid var(--edge-strong);
+  border-top-color: var(--gold-deep);
   box-shadow: 0 8px 24px rgba(0,0,0,0.9);
   padding: 8px 10px;
   min-width: 180px;
@@ -808,12 +1295,12 @@ h1, h2, h3, h4,
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  border: 2px solid #4a3818;
-  background: #1a1508;
+  border: 2px solid var(--wood);
+  background: var(--ink);
   transition: border-color 0.1s, transform 0.1s;
   user-select: none;
 }
-.skill-btn:hover:not(.on-cooldown) { border-color: #c8a100; transform: scale(1.05); }
+.skill-btn:hover:not(.on-cooldown) { border-color: var(--gold-deep); transform: scale(1.05); }
 .skill-btn:active:not(.on-cooldown) { transform: scale(0.97); }
 .skill-btn.on-cooldown { cursor: default; opacity: 0.7; }
 
@@ -832,14 +1319,14 @@ h1, h2, h3, h4,
   flex-direction: column;
   border-radius: 3px;
   font-size: 0.55rem;
-  font-family: monospace;
+  font-variant-numeric: tabular-nums;
   cursor: default;
   transition: opacity 0.2s;
 }
 
 /* ── Talent Tree ──────────────────────────────────────────────────────────── */
 .talent-node {
-  border: 2px solid #3a2c10;
+  border: 2px solid var(--edge);
   background: #0d0b07;
   cursor: pointer;
   transition: border-color 0.1s, background 0.1s, transform 0.1s;
@@ -850,9 +1337,9 @@ h1, h2, h3, h4,
   justify-content: center;
   text-align: center;
 }
-.talent-node:hover.available { border-color: #ffd700; background: #1a1508; transform: scale(1.06); }
-.talent-node.partial  { border-color: #6b5020; background: #140e05; }
-.talent-node.maxed    { border-color: #ffd700; background: #1e1800; box-shadow: 0 0 6px rgba(255,215,0,0.3); }
+.talent-node:hover.available { border-color: var(--gold); background: var(--ink); transform: scale(1.06); }
+.talent-node.partial  { border-color: var(--edge-strong); background: #140e05; }
+.talent-node.maxed    { border-color: var(--gold); background: #1e1800; box-shadow: 0 0 6px rgba(255,215,0,0.3); }
 .talent-node.locked   { opacity: 0.35; cursor: default; }
 .talent-node.available { border-color: #9a7830; }
 
@@ -904,9 +1391,9 @@ h1, h2, h3, h4,
   100% { opacity: 0; transform: scale(0.8); }
 }
 
-.avatar-attacking  { animation: attack-lunge 0.22s ease-out !important; }
+.avatar-attacking  { animation: attack-lunge 0.16s ease-out !important; }
 .avatar-spell-cast { animation: spell-cast 0.28s ease-out !important; }
-.avatar-hit        { animation: hit-recoil 0.30s ease-out !important; }
+.avatar-hit        { animation: hit-recoil 0.22s ease-out !important; }
 .avatar-dead       { animation: death-collapse 0.5s ease-in forwards !important; }
 
 /* ── Talents ──────────────────────────────────────────────────────────────────
@@ -956,7 +1443,7 @@ h1, h2, h3, h4,
 .talent-modal-title {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #ffd700;
+  color: var(--gold);
   letter-spacing: 0.04em;
 }
 .talent-modal-sub { font-size: 0.58rem; color: #8a8578; }
@@ -1176,7 +1663,7 @@ h1, h2, h3, h4,
   gap: 3px;
 }
 .talent-inspect-head { display: flex; align-items: center; gap: 6px; }
-.talent-inspect-name { font-size: 0.7rem; font-weight: 700; color: #ffd700; }
+.talent-inspect-name { font-size: 0.7rem; font-weight: 700; color: var(--gold); }
 .talent-inspect-rank { margin-left: auto; font-size: 0.55rem; color: #8a8578; }
 .talent-inspect-body { font-size: 0.62rem; color: #c4bcae; line-height: 1.4; }
 .talent-inspect-rows { display: flex; flex-wrap: wrap; gap: 2px 14px; }
@@ -1306,10 +1793,10 @@ h1, h2, h3, h4,
   flex: 0 0 auto;
 }
 .whisper-close {
-  background: none; border: none; color: #8a8070; cursor: pointer;
+  background: none; border: none; color: var(--muted-warm); cursor: pointer;
   font-size: 0.9rem; line-height: 1; padding: 4px 6px; min-width: 32px; min-height: 32px;
 }
-.whisper-close:hover { color: #ffd700; }
+.whisper-close:hover { color: var(--gold); }
 
 .whisper-window-body {
   flex: 1 1 auto; min-height: 0; overflow-y: auto;
@@ -1329,17 +1816,17 @@ h1, h2, h3, h4,
   flex: 1 1 auto; min-width: 0;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid #4a3a1e; border-radius: 5px;
-  color: #d4b896; padding: 7px 8px; outline: none;
+  color: var(--parchment); padding: 7px 8px; outline: none;
   /* 16px prevents iOS Safari from zooming the viewport when the field is focused —
      a zoom that does not undo itself and leaves the whole HUD oversized. */
   font-size: 16px;
   min-height: 36px;
 }
-.whisper-input:focus { border-color: #6a5030; }
+.whisper-input:focus { border-color: var(--edge-soft); }
 .whisper-send {
   font-family: var(--font-ui);
-  background: #5a4020; border: 1px solid #6a5030; border-radius: 5px;
-  color: #f4c84a; font-size: 0.66rem; padding: 0 12px;
+  background: #5a4020; border: 1px solid var(--edge-soft); border-radius: 5px;
+  color: var(--gold-warm); font-size: 0.66rem; padding: 0 12px;
   min-height: 36px; min-width: 56px; cursor: pointer;
 }
 
@@ -1399,7 +1886,7 @@ h1, h2, h3, h4,
 }
 
 .chat-panel-title {
-  color: #ffd700;
+  color: var(--gold);
   font-weight: 700;
   font-size: 0.82rem;
   letter-spacing: 0.02em;
@@ -1435,7 +1922,7 @@ h1, h2, h3, h4,
 
 .chat-bubble-system {
   background: rgba(50, 42, 18, 0.9);
-  border-color: #6a5030;
+  border-color: var(--edge-soft);
   color: #d8b878;
 }
 
@@ -1474,21 +1961,21 @@ h1, h2, h3, h4,
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid #4a3a1e;
   border-radius: 5px;
-  color: #d4b896;
+  color: var(--parchment);
   padding: 5px 8px;
   outline: none;
   font-size: 16px;
   min-height: 32px;
 }
 
-.chat-input:focus { border-color: #6a5030; }
+.chat-input:focus { border-color: var(--edge-soft); }
 
 .chat-send {
   font-family: var(--font-ui);
   background: #5a4020;
-  border: 1px solid #6a5030;
+  border: 1px solid var(--edge-soft);
   border-radius: 5px;
-  color: #f4c84a;
+  color: var(--gold-warm);
   font-size: 0.66rem;
   padding: 0 10px;
   min-height: 32px;
@@ -1543,7 +2030,7 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
    chat face at a readable size rather than the branded display face. */
 .player-card {
   font-family: var(--font-ui);
-  border: 1px solid #6a5030;
+  border: 1px solid var(--edge-soft);
   border-radius: 10px;
   padding: 10px;
   background: rgba(18, 14, 6, 0.97);
@@ -1590,13 +2077,13 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   cursor: pointer;
   min-height: 32px;
 }
-.collapsible-toggle:hover .collapsible-title { color: #ffd700; }
+.collapsible-toggle:hover .collapsible-title { color: var(--gold); }
 .collapsible-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .collapsible-chevron {
   flex: 0 0 auto;
   font-size: 0.6rem;
   line-height: 1;
-  color: #c8a100;
+  color: var(--gold-deep);
   transition: transform 0.18s ease;
 }
 .collapsible-chevron.is-collapsed { transform: rotate(-90deg); }
@@ -1666,10 +2153,17 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   padding-top: 2px;
+  /* `proximity`, not `mandatory`: the track is also positioned programmatically (centre
+     the current stop), and mandatory snapping fights that at the clamped ends — zone one
+     has nothing behind it, so its centred position does not exist. */
+  scroll-snap-type: x proximity;
   /* Fade both ends rather than showing a scrollbar. A hard edge mid-name reads as a
-     rendering bug; a fade reads as "the line continues", which is the truth. */
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+     rendering bug; a fade reads as "the line continues", which is the truth — and the
+     ramp has to be wide enough to dissolve a partly-visible LABEL, not just soften the
+     border, or the stop at the edge just looks like a word cut in half. */
+  --edge-fade: 26px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--edge-fade), #000 calc(100% - var(--edge-fade)), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 var(--edge-fade), #000 calc(100% - var(--edge-fade)), transparent 100%);
 }
 .zone-track-rail::-webkit-scrollbar { display: none; }
 
@@ -1687,6 +2181,7 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   cursor: pointer;
   font-family: var(--font-ui);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  scroll-snap-align: center;
 }
 .zone-stop:disabled { cursor: default; }
 
@@ -1704,7 +2199,7 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   border-radius: 1px;
 }
 .zone-stop::before { width: 100%; background: #38301f; }
-.zone-stop::after  { width: calc(var(--seg, 0) * 100%); background: linear-gradient(90deg, #a8850c, #ffd700); }
+.zone-stop::after  { width: calc(var(--seg, 0) * 100%); background: linear-gradient(90deg, #a8850c, var(--gold)); }
 .zone-stop:last-child::before,
 .zone-stop:last-child::after { display: none; }
 
@@ -1742,24 +2237,24 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   -webkit-box-orient: vertical;
 }
 
-.zone-stop.is-cleared .zone-stop-dot { border-color: #b8930d; background: #2b2210; color: #ffd700; }
+.zone-stop.is-cleared .zone-stop-dot { border-color: #b8930d; background: #2b2210; color: var(--gold); }
 .zone-stop.is-cleared .zone-stop-name { color: #b09a72; }
 .zone-stop.is-open    .zone-stop-dot { border-color: #7a6534; }
 .zone-stop.is-open    .zone-stop-name { color: #a8967a; }
 .zone-stop.is-locked  { opacity: 0.45; }
 .zone-stop.is-current .zone-stop-dot {
-  border-color: #ffd700;
+  border-color: var(--gold);
   background: radial-gradient(circle, #6a5210 0%, #1a1408 80%);
-  color: #ffe9a8;
+  color: var(--gold-bright);
   box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.18), 0 0 9px rgba(255, 215, 0, 0.5);
 }
-.zone-stop.is-current .zone-stop-name { color: #ffd700; font-weight: 700; }
+.zone-stop.is-current .zone-stop-name { color: var(--gold); font-weight: 700; }
 .zone-stop.is-target  .zone-stop-dot { border-color: #ff8800; box-shadow: 0 0 8px rgba(255, 136, 0, 0.55); }
 .zone-stop.is-target  .zone-stop-name { color: #ff9d33; }
-.zone-stop.is-bossready .zone-stop-dot { border-color: #ff8000; }
+.zone-stop.is-bossready .zone-stop-dot { border-color: var(--warn); }
 
-.zone-stop:not(:disabled):hover .zone-stop-dot { border-color: #ffd700; }
-.zone-stop:not(:disabled):hover .zone-stop-name { color: #ffe9a8; }
+.zone-stop:not(:disabled):hover .zone-stop-dot { border-color: var(--gold); }
+.zone-stop:not(:disabled):hover .zone-stop-name { color: var(--gold-bright); }
 
 /* Caption under the map: the one zone whose numbers you actually want, spelled out. */
 .zone-track-status {
@@ -1775,7 +2270,7 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   font-family: var(--font-display);
   font-size: 0.66rem;
   font-weight: 700;
-  color: #ffd700;
+  color: var(--gold);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1813,10 +2308,203 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #ffd700;
+  color: var(--gold);
 }
-.zone-track-modal-sub { margin-left: auto; font-size: 0.58rem; color: #8a8070; }
+.zone-track-modal-sub { margin-left: auto; font-size: 0.58rem; color: var(--muted-warm); }
 .zone-track-standalone { --stop-w: 82px; }
+.zone-track-standalone .zone-track-rail { --edge-fade: 34px; }
 .zone-track-standalone .zone-stop-name { font-size: 0.55rem; }
 .zone-track-standalone .zone-track-status { font-size: 0.62rem; }
 .zone-track-standalone .zone-track-status-name { font-size: 0.74rem; }
+
+/* "Roam onward when ready" — the hero's standing order for the track above it. */
+.zone-track-auto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px 2px;
+  font-size: 0.58rem;
+  color: var(--muted-warm);
+  cursor: pointer;
+  user-select: none;
+  min-height: 26px;
+}
+.zone-track-auto[data-on="true"] { color: var(--success); }
+.zone-track-auto input { accent-color: var(--gold-deep); width: 12px; height: 12px; flex: 0 0 auto; }
+@media (pointer: coarse) {
+  .zone-track-auto { min-height: 40px; }
+  .zone-track-auto input { width: 16px; height: 16px; }
+}
+
+/* ── Objective tracker ─────────────────────────────────────────────────────────
+   Top-right under the minimap, where this genre has trained people to look. The HUD
+   layer is click-through, so only the header claims pointer events. */
+.hud-tr-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.objective-tracker {
+  width: 172px;
+  max-width: 44vw;
+  padding: 5px 7px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(206, 170, 90, 0.26);
+  background: rgba(14, 11, 7, 0.62);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+  backdrop-filter: blur(10px) saturate(130%);
+  font-family: var(--font-ui);
+  /* Sits over a moving, high-contrast world; the tint alone cannot hold a contrast floor. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+  font-variant-numeric: tabular-nums;
+}
+
+.objective-tracker-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  /* The one interactive part of a click-through layer. */
+  pointer-events: auto;
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  min-height: 22px;
+}
+.objective-tracker-head:hover .objective-title { color: var(--gold-bright); }
+/* Wraps to two lines rather than truncating. A zone name is the subject of the sentence —
+   "Clear Sunhollow …" is not a usable objective, and at 152px the ellipsis was the norm. */
+.objective-title {
+  min-width: 0;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.objective-chevron {
+  flex: 0 0 auto;
+  font-size: 0.55rem;
+  line-height: 1.5;
+  color: var(--gold-deep);
+  transition: transform 0.18s ease;
+}
+.objective-chevron.is-collapsed { transform: rotate(-90deg); }
+
+.objective-body { margin-top: 5px; }
+
+
+.objective-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 0.58rem;
+  line-height: 1.35;
+  color: var(--parchment);
+}
+.objective-row + .objective-row { margin-top: 3px; }
+.objective-tick { flex: 0 0 auto; width: 10px; color: var(--gold-deep); font-size: 0.6rem; }
+.objective-text { min-width: 0; flex: 1 1 auto; }
+.objective-count { flex: 0 0 auto; color: var(--muted-warm); font-size: 0.55rem; }
+.objective-count.is-ready { color: var(--warn); font-weight: 700; text-transform: uppercase; }
+
+/* Done stays legible rather than being greyed into mush — a completed objective is
+   information ("that part is behind me"), not noise. */
+.objective-row.is-done { color: var(--muted-warm); }
+.objective-row.is-done .objective-tick { color: var(--success); }
+.objective-row.is-done .objective-text { text-decoration: line-through; text-decoration-color: rgba(212, 184, 150, 0.4); }
+/* Not yet reachable — visible on purpose, so the shape of the zone reads from minute one. */
+.objective-row.is-locked { opacity: 0.55; }
+
+.objective-meter {
+  height: 3px;
+  margin: 4px 0 5px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.objective-meter > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #a8850c, var(--gold));
+  transition: width 0.3s ease-out;
+}
+
+.objective-warn {
+  margin-top: 4px;
+  font-size: 0.52rem;
+  color: #d8a06a;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 899px) {
+  /* Narrower on a phone: the tracker must not reach into the middle of the world, which
+     is the part the player is actually watching. */
+  .objective-tracker { width: 152px; padding: 4px 6px 5px; }
+}
+@media (pointer: coarse) {
+  .objective-tracker-head { min-height: 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .objective-chevron, .objective-meter > i { transition: none; }
+}
+
+/* ── Class blurb on character create ───────────────────────────────────────────
+   The first real decision the game asks for, previously made from a name and a colour
+   swatch. Fixed min-height so switching class does not make the whole form jump — the
+   four descriptions differ by about a line. */
+.create-class-blurb {
+  margin-top: 7px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(206, 170, 90, 0.2);
+  background: rgba(0, 0, 0, 0.28);
+  /* Holds the longest blurb at the narrowest supported width, so switching class does not
+     shift the Race and Faction rows under the thumb. Measured, not guessed: the four
+     descriptions are written to a similar length for exactly this reason. */
+  min-height: 68px;
+}
+.create-class-blurb p {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: var(--parchment);
+}
+.create-class-stat {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-warm);
+}
+.create-class-stat b { font-weight: 700; }
+
+/* Level chip in the character-panel header. Reads as a rank badge rather than another
+   word in the title, so "24 Warrior" parses at a glance instead of as a sentence. */
+.char-level {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(200, 161, 0, 0.16);
+  border: 1px solid rgba(206, 170, 90, 0.4);
+  color: var(--gold);
+  font-family: var(--font-ui);
+  font-size: 0.58rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  vertical-align: 1px;
+}

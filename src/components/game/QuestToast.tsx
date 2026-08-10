@@ -39,7 +39,7 @@ export function QuestToast() {
         className="rp-panel"
         style={{
           padding: '10px 12px',
-          borderColor: '#ffd700',
+          borderColor: 'var(--gold)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.9), 0 0 16px rgba(255,215,0,0.15)',
         }}
       >
@@ -50,7 +50,7 @@ export function QuestToast() {
               fontSize: '0.55rem',
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
-              color: '#ffd700',
+              color: 'var(--gold)',
             }}
           >
             Quest Complete
@@ -61,7 +61,7 @@ export function QuestToast() {
           style={{
             fontFamily: 'var(--font-display)',
             fontSize: '0.85rem',
-            color: '#ffe9a8',
+            color: 'var(--gold-bright)',
             marginBottom: 4,
           }}
         >
@@ -97,7 +97,7 @@ export function QuestToast() {
           {canTravel && (
             <button
               className="rp-button flex-1"
-              style={{ fontSize: '0.62rem', background: 'linear-gradient(180deg, #6a5228, #4a3518)' }}
+              style={{ fontSize: '0.62rem', background: 'linear-gradient(180deg, var(--wood-lit), #4a3518)' }}
               onClick={() => claimQuestReward(activeQuest.id)}
             >
               Venture Onward
@@ -105,7 +105,7 @@ export function QuestToast() {
           )}
           <button
             className="rp-button"
-            style={{ fontSize: '0.6rem', color: canTravel ? '#a09080' : '#ffe9a8', flex: canTravel ? undefined : 1 }}
+            style={{ fontSize: '0.6rem', color: canTravel ? '#a09080' : 'var(--gold-bright)', flex: canTravel ? undefined : 1 }}
             onClick={() => dismissQuestReward(activeQuest.id)}
           >
             {canTravel ? 'Stay' : 'Keep Hunting'}

@@ -48,7 +48,7 @@ export function GatheringPanel() {
         <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>
           {prof.gatheringName}
         </div>
-        <div style={{ fontSize: '0.7rem', color: '#d4b896', marginTop: 1 }}>
+        <div style={{ fontSize: '0.7rem', color: 'var(--parchment)', marginTop: 1 }}>
           <SpriteIcon emoji={prof.gatherIcon} size={16} /> {prof.gatherVerb} — {zoneName}
         </div>
         <div style={{ fontSize: '0.6rem', color: '#aaa', marginTop: 1 }}>
@@ -103,13 +103,13 @@ export function GatheringPanel() {
                   borderRadius: 4,
                   padding: '2px 5px',
                   fontSize: '0.6rem',
-                  color: qty > 0 ? '#d4b896' : '#444',
+                  color: qty > 0 ? 'var(--parchment)' : '#444',
                   display: 'flex', alignItems: 'center', gap: 3,
                 }}
               >
                 <SpriteIcon emoji={m.icon} size={14} title={m.name} />
                 <span>{m.name}</span>
-                <span style={{ color: qty > 0 ? '#ffd700' : '#444', fontWeight: 600 }}>×{qty}</span>
+                <span style={{ color: qty > 0 ? 'var(--gold)' : '#444', fontWeight: 600 }}>×{qty}</span>
                 {qty > 0 && (
                   <span style={{ color: qc, fontSize: '0.52rem' }}>{QUALITY_LABEL[q]}</span>
                 )}

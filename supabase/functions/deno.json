@@ -1,0 +1,16 @@
+{
+  "//": [
+    "Deno config for the Edge Functions only. It is scoped to supabase/functions/ and has",
+    "no effect on the Vite app build.",
+    "",
+    "sloppy-imports lets Deno resolve the game's extensionless relative imports (`./rng`,",
+    "`../data/classes`), which Vite resolves natively and stock Deno rejects. Without it,",
+    "`import { runFight } from '../../../src/engine/fight'` fails at deploy time.",
+    "",
+    "This is what allows the duel resolver to import the game's REAL combat code instead of",
+    "a reimplementation that could drift from it. Six runtime modules resolve through here:",
+    "engine/fight, engine/combat, engine/rng, data/classes, data/specs, data/constants."
+  ],
+  "unstable": ["sloppy-imports"],
+  "imports": {}
+}

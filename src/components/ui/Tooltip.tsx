@@ -51,14 +51,14 @@ export function ItemTooltipContent({ item, equippedItem, hideName }: ItemTooltip
       <div style={{ color, marginBottom: 6, textTransform: 'capitalize', fontSize: '0.65rem' }}>
         {item.rarity}
       </div>
-      <div style={{ borderTop: '1px solid #3a2c10', paddingTop: 4, marginBottom: 6 }}>
+      <div style={{ borderTop: '1px solid var(--edge)', paddingTop: 4, marginBottom: 6 }}>
         {Object.entries(item.statBonuses).map(([key, val]) => {
           if (val === undefined || val === 0) return null
           const diff = equippedItem ? (val as number) - ((equippedItem.statBonuses as any)[key] ?? 0) : null
-          const diffColor = diff === null ? '#d4b896' : diff > 0 ? '#1eff00' : diff < 0 ? '#ff4444' : '#d4b896'
+          const diffColor = diff === null ? 'var(--parchment)' : diff > 0 ? '#1eff00' : diff < 0 ? 'var(--danger)' : 'var(--parchment)'
           return (
             <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 1 }}>
-              <span style={{ color: '#9d9d9d' }}>{statLabel(key)}</span>
+              <span style={{ color: 'var(--muted)' }}>{statLabel(key)}</span>
               <span style={{ color: diffColor }}>
                 {formatStat(key, val as number)}
                 {diff !== null && diff !== 0 && (
@@ -77,12 +77,12 @@ export function ItemTooltipContent({ item, equippedItem, hideName }: ItemTooltip
       {unique && (
         <div style={{
           color: '#1eff00', fontSize: '0.65rem', lineHeight: 1.35,
-          borderTop: '1px solid #3a2c10', paddingTop: 4, marginBottom: 6,
+          borderTop: '1px solid var(--edge)', paddingTop: 4, marginBottom: 6,
         }}>
           {unique.equipText}
         </div>
       )}
-      <div style={{ color: '#ffd700', fontSize: '0.65rem' }}>
+      <div style={{ color: 'var(--gold)', fontSize: '0.65rem' }}>
         {/* A unique has no price because nothing will buy it — the drop ladder, the
             factor and the Sell button all refuse. Saying so beats printing a number that
             is never paid. */}

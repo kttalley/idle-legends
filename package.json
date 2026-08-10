@@ -1,5 +1,5 @@
 {
-  "name": "idle-legends",
+  "name": "stillmarch",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -7,10 +7,12 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test:ui": "node scripts/validate-design-tokens.mjs && node tools/uitest/run.mjs",
     "build:native": "BUILD_TARGET=native tsc && BUILD_TARGET=native vite build",
     "cap:sync": "npm run build:native && npx cap sync ios",
     "ios": "npm run cap:sync && npx cap open ios",
-    "icon": "node tools/spritegen/makeAppIcon.mjs"
+    "icon": "node tools/spritegen/makeAppIcon.mjs",
+    "lint:tokens": "node scripts/validate-design-tokens.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",

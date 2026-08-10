@@ -36,7 +36,7 @@ export function ThoughtBubble() {
         padding: '5px 8px',
         fontSize: '0.6rem',
         fontStyle: 'italic',
-        color: '#d4b896',
+        color: 'var(--parchment)',
         textAlign: 'center',
         lineHeight: 1.4,
         pointerEvents: 'none',

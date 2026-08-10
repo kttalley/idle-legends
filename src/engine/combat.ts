@@ -776,7 +776,7 @@ export function makePoisonDoT(dps: number): ActiveDoT {
 }
 
 export function makeCorruptionDoT(dps: number, amplified: boolean): ActiveDoT {
-  return { id: makeId(), sourceType: 'corruption', label: 'Corruption', icon: '💜', color: '#9b59d0',
+  return { id: makeId(), sourceType: 'corruption', label: 'Rot', icon: '💜', color: '#9b59d0',
     tickDamage: Math.max(1, Math.round(dps * 3 * (amplified ? 1.5 : 1))),
     totalTicks: 6, ticksRemaining: 6, tickIntervalSeconds: 3, tickAccum: 0 }
 }

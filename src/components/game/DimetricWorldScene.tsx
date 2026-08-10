@@ -3,6 +3,7 @@ import { useGameStore } from '../../store/gameStore'
 import { WorldSceneController, CSS_SCALE } from '../../render/adapter/combatAdapter'
 import { setSelectedHero } from '../../engine/selection'
 import { CombatDebugReadout } from './CombatDebugReadout'
+import { BossBeacon } from './BossBeacon'
 
 // Phase 2 host: one full-viewport dimetric canvas replacing the ASCII WorldMapView
 // strip + the side-by-side combat arena. The controller (combatAdapter) owns all
@@ -266,6 +267,7 @@ export function DimetricWorldScene() {
         }}
       />
       <div ref={floatersRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }} />
+      <BossBeacon />
       {import.meta.env.DEV && <CombatDebugReadout />}
     </div>
   )

@@ -4,6 +4,7 @@ import { getParty, isInParty, isInvitePending, invitePartyMember, leaveParty, su
 import { setWhisperTarget } from '../../engine/whisper'
 import { runDuel } from '../../engine/duel'
 import { useGameStore } from '../../store/gameStore'
+import { useDismissable } from '../ui/useDismissable'
 import { ZONES } from '../../data/zones'
 
 // The target card — what you get for tapping another player in the world.
@@ -29,23 +30,12 @@ export function PlayerCard() {
   const ref = useRef<HTMLDivElement>(null)
 
   // Dismiss on outside tap or Escape — a card you cannot get rid of is worse than no card.
-  useEffect(() => {
-    if (!sel) return
-    const onDown = (e: PointerEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) clearSelectedHero()
-    }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') clearSelectedHero() }
-    // Capture phase so this runs before the canvas handler. Note it does NOT stop the
-    // event: a tap on open ground still issues a move order, which is how targeting works
-    // in an MMO — you click away and your character goes there. If that turns out to feel
-    // wrong on touch, `stopPropagation()` here makes the dismiss purely a dismiss.
-    window.addEventListener('pointerdown', onDown, true)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('pointerdown', onDown, true)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [sel])
+  //
+  // No focus trap: this is a popover over a live world, not a modal. Trapping Tab here
+  // would strand the keyboard on a card that appears from a tap and vanishes on the next
+  // one. Outside-press still does not stop the event, so a tap on open ground issues its
+  // move order as well — see the note in ui/useDismissable.
+  useDismissable(sel != null, clearSelectedHero, { ref, closeOnOutside: true })
 
   const playerName = useGameStore(s => s.playerName)
   const currentZone = useGameStore(s => s.currentZone)
@@ -117,7 +107,7 @@ export function PlayerCard() {
           title="Close"
           aria-label="Close"
           className="player-card-close"
-          style={{ background: 'none', border: 'none', color: '#8a8070', cursor: 'pointer' }}
+          style={{ background: 'none', border: 'none', color: 'var(--muted-warm)', cursor: 'pointer' }}
         >✕</button>
       </div>
 
@@ -148,8 +138,8 @@ function CardButton({ onClick, label, disabled, hint }: {
       style={{
         width: '100%', textAlign: 'left',
         background: disabled ? 'rgba(60,48,32,0.5)' : '#5a4020',
-        border: '1px solid #6a5030', borderRadius: 6,
-        color: disabled ? '#8a8070' : '#f4c84a',
+        border: '1px solid var(--edge-soft)', borderRadius: 6,
+        color: disabled ? 'var(--muted-warm)' : 'var(--gold-warm)',
         // Height is owned by `.player-card-btn` in index.css so the coarse-pointer rule
         // can lift it to 44pt. An inline `minHeight` here would win the cascade and
         // silently cap every button at the mouse size on touch devices — which is exactly

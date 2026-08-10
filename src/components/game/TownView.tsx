@@ -25,14 +25,14 @@ import { SpriteIcon } from '../ui/SpriteIcon'
 
 const FACTION_COLOR: Record<string, string> = {
   alliance: '#6699ff',
-  horde:    '#ff4444',
+  horde:    'var(--danger)',
   neutral:  '#ddaa44',
 }
 
 const TYPE_COLOR: Record<string, string> = {
   friendly: '#44ff88',
   neutral:  '#ddaa44',
-  hostile:  '#ff4444',
+  hostile:  'var(--danger)',
 }
 
 /** Shared frame: who you are talking to, what they said, then their business. */
@@ -41,10 +41,10 @@ function NpcPanel({ id, children }: { id: keyof typeof TOWN_NPC_BY_ID; children:
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#ffd700' }}>{npc.role}</span>
-        <span style={{ fontSize: '0.58rem', color: '#d4b896', fontStyle: 'italic' }}>{npc.name}</span>
+        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--gold)' }}>{npc.role}</span>
+        <span style={{ fontSize: '0.58rem', color: 'var(--parchment)', fontStyle: 'italic' }}>{npc.name}</span>
       </div>
-      <div style={{ fontSize: '0.55rem', color: '#9d9d9d', fontStyle: 'italic' }}>
+      <div style={{ fontSize: '0.55rem', color: 'var(--muted)', fontStyle: 'italic' }}>
         “{npc.greeting}”
       </div>
       {children}
@@ -66,7 +66,7 @@ export function TownView() {
   if (!town) return null
 
   const displayName    = generatedTownNames[currentTown] ?? town.name
-  const factionColor   = FACTION_COLOR[town.faction] ?? '#d4b896'
+  const factionColor   = FACTION_COLOR[town.faction] ?? 'var(--parchment)'
   const typeColor      = TYPE_COLOR[town.type] ?? '#888'
   const hostileToPlayer = isTownHostileToPlayer(currentTown, playerFaction)
   const trades         = town.services.includes('vendor')
@@ -105,7 +105,7 @@ export function TownView() {
 
       {/* ── Nobody nearby: the town is the interface ─────────────────────────── */}
       {!activeTownNpc && (
-        <div style={{ fontSize: '0.58rem', color: '#9d9d9d' }}>
+        <div style={{ fontSize: '0.58rem', color: 'var(--muted)' }}>
           Walk up to someone to do business.
           <span style={{ color: '#7a6a4a', fontStyle: 'italic' }}>
             {' '}Tap a name in the square to go to them.
@@ -146,7 +146,7 @@ export function TownView() {
             >
               {bagMaxed ? 'Bag maxed' : `Buy a slot — ${slotCost.toLocaleString()}g`}
             </button>
-            <span style={{ fontSize: '0.55rem', color: '#9d9d9d' }}>
+            <span style={{ fontSize: '0.55rem', color: 'var(--muted)' }}>
               {capacity} slots{!bagMaxed && ` · ${BAG_SLOTS_MAX_PURCHASED - slotsBought} more available`}
             </span>
           </div>
@@ -173,7 +173,7 @@ export function TownView() {
                 >
                   Retain — {contractCost.toLocaleString()}g
                 </button>
-                <span style={{ fontSize: '0.55rem', color: '#9d9d9d' }}>
+                <span style={{ fontSize: '0.55rem', color: 'var(--muted)' }}>
                   then {upkeepPct}% of what they move
                 </span>
               </div>
@@ -186,10 +186,10 @@ export function TownView() {
           ) : (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.58rem', color: merchantContract.lapsed ? '#ff8844' : '#88ccaa' }}>
+                <span style={{ fontSize: '0.58rem', color: merchantContract.lapsed ? '#ff8844' : 'var(--success)' }}>
                   {merchantContract.lapsed ? 'Idle — upkeep unpaid' : 'On retainer'}
                 </span>
-                <span style={{ fontSize: '0.52rem', color: '#9d9d9d' }}>
+                <span style={{ fontSize: '0.52rem', color: 'var(--muted)' }}>
                   earned {totalAutoSold.toLocaleString()}g · upkeep {totalUpkeepPaid.toLocaleString()}g ·{' '}
                   <span style={{ color: contractNet >= 0 ? '#44ff88' : '#ff6666' }}>
                     net {contractNet >= 0 ? '+' : ''}{contractNet.toLocaleString()}g
@@ -205,7 +205,7 @@ export function TownView() {
                 </button>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.52rem', color: '#9d9d9d' }}>Sells below:</span>
+                <span style={{ fontSize: '0.52rem', color: 'var(--muted)' }}>Sells below:</span>
                 {(RARITY_ORDER as readonly Rarity[]).map(r => {
                   const active = merchantContract.threshold === r
                   return (
@@ -254,7 +254,7 @@ export function TownView() {
                 >
                   {u.name}{rank > 0 && <span style={{ opacity: 0.8 }}> ·{rank}</span>}
                 </button>
-                <span style={{ fontSize: '0.5rem', color: '#9d9d9d' }}>
+                <span style={{ fontSize: '0.5rem', color: 'var(--muted)' }}>
                   {u.description} — {cost.toLocaleString()}g
                 </span>
               </div>

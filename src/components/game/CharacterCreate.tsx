@@ -30,7 +30,8 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
   const effectiveFaction = raceFaction === 'neutral' ? neutralSide : raceFaction
   const name             = customName ?? generatePlayerNameFallback(nameSeed, cls)
 
-  const allowedRaces = CLASS_DEFINITIONS[cls].allowedRaces
+  const classDef = CLASS_DEFINITIONS[cls]
+  const allowedRaces = classDef.allowedRaces
 
   function pickClass(c: ClassType) {
     setCls(c)
@@ -78,7 +79,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
         <h1 style={{
           fontFamily: '"Cinzel Decorative", var(--font-display)',
           fontSize: 'clamp(1.5rem, 5vw, 2.4rem)',
-          color: '#ffd700',
+          color: 'var(--gold)',
           textShadow: '0 0 20px rgba(200,161,0,0.5), 0 2px 4px rgba(0,0,0,0.9)',
           letterSpacing: '0.1em',
         }}>
@@ -101,7 +102,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
             maxLength={28}
             className="flex-1 rp-panel"
             style={{
-              fontFamily: 'var(--font-display)', color: '#ffe9a8', fontSize: '1rem',
+              fontFamily: 'var(--font-display)', color: 'var(--gold-bright)', fontSize: '1rem',
               textAlign: 'center', padding: '6px 10px', background: 'rgba(0,0,0,0.4)',
             }}
           />
@@ -109,7 +110,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
           <div
             className="flex-1 rp-panel"
             style={{
-              fontFamily: 'var(--font-display)', color: '#ffe9a8', fontSize: '1rem',
+              fontFamily: 'var(--font-display)', color: 'var(--gold-bright)', fontSize: '1rem',
               textAlign: 'center', padding: '7px 10px', cursor: 'text',
             }}
             onClick={() => setEditing(true)}
@@ -124,7 +125,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
 
       {/* ── Class ── */}
       <div className="mt-4" style={{ width: '100%', maxWidth: 460 }}>
-        <div style={{ fontSize: '0.6rem', color: '#9d9d9d', letterSpacing: '0.15em', marginBottom: 6 }}>CLASS</div>
+        <div style={{ fontSize: '0.6rem', color: 'var(--muted)', letterSpacing: '0.15em', marginBottom: 6 }}>CLASS</div>
         <div className="flex gap-2 flex-wrap">
           {Object.values(CLASS_DEFINITIONS).map(c => {
             const on = c.id === cls
@@ -134,8 +135,8 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
                 className="rp-button flex-1"
                 style={{
                   minWidth: 90, padding: '8px 6px', fontFamily: 'var(--font-display)', fontSize: '0.8rem',
-                  background: on ? 'linear-gradient(180deg, #6a5228, #4a3518)' : undefined,
-                  borderColor: on ? '#ffd700' : undefined,
+                  background: on ? 'linear-gradient(180deg, var(--wood-lit), #4a3518)' : undefined,
+                  borderColor: on ? 'var(--gold)' : undefined,
                 }}
                 onClick={() => pickClass(c.id as ClassType)}
               >
@@ -144,11 +145,23 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
             )
           })}
         </div>
+        {/* What the class actually plays like.
+            `ClassDefinition.description` has existed since the classes were written and
+            was rendered nowhere — so the first real decision the game asks of you was made
+            from a name and a colour swatch. The primary stat rides along because it is the
+            one mechanical fact that changes how the class feels to play, and it is
+            otherwise not discoverable until the character sheet exists. */}
+        <div className="create-class-blurb">
+          <p>{classDef.description}</p>
+          <span className="create-class-stat">
+            Primary stat · <b className={classDef.colorClass}>{classDef.primaryStat}</b>
+          </span>
+        </div>
       </div>
 
       {/* ── Race ── */}
       <div className="mt-3" style={{ width: '100%', maxWidth: 460 }}>
-        <div style={{ fontSize: '0.6rem', color: '#9d9d9d', letterSpacing: '0.15em', marginBottom: 6 }}>RACE</div>
+        <div style={{ fontSize: '0.6rem', color: 'var(--muted)', letterSpacing: '0.15em', marginBottom: 6 }}>RACE</div>
         <div className="flex gap-2 flex-wrap">
           {allowedRaces.map(rid => {
             const r = RACE_DEFINITIONS[rid]
@@ -159,8 +172,8 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
                 className="rp-button"
                 style={{
                   padding: '7px 10px', fontSize: '0.75rem',
-                  background: on ? 'linear-gradient(180deg, #6a5228, #4a3518)' : undefined,
-                  borderColor: on ? '#ffd700' : undefined,
+                  background: on ? 'linear-gradient(180deg, var(--wood-lit), #4a3518)' : undefined,
+                  borderColor: on ? 'var(--gold)' : undefined,
                 }}
                 onClick={() => setRace(rid)}
                 title={r.racialPassiveLabel}
@@ -177,7 +190,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
 
       {/* ── Faction (toggle only for neutral races) ── */}
       <div className="mt-3" style={{ width: '100%', maxWidth: 460 }}>
-        <div style={{ fontSize: '0.6rem', color: '#9d9d9d', letterSpacing: '0.15em', marginBottom: 6 }}>FACTION</div>
+        <div style={{ fontSize: '0.6rem', color: 'var(--muted)', letterSpacing: '0.15em', marginBottom: 6 }}>FACTION</div>
         {raceFaction === 'neutral' ? (
           <div className="flex gap-2">
             {(['alliance', 'horde'] as FactionType[]).map(f => {
@@ -212,7 +225,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
         style={{
           width: '100%', maxWidth: 460, padding: '12px', fontSize: '0.95rem',
           fontFamily: 'var(--font-display)', letterSpacing: '0.08em',
-          background: 'linear-gradient(180deg, #7a5f2c, #52401c)', borderColor: '#ffd700',
+          background: 'linear-gradient(180deg, #7a5f2c, #52401c)', borderColor: 'var(--gold)',
         }}
         onClick={begin}
       >

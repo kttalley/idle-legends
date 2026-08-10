@@ -132,7 +132,7 @@ async function main(): Promise<void> {
   canvas.height = vh
   ctx.imageSmoothingEnabled = false
 
-  // Assets. DEFAULT = the ORIGINAL Idle Legends rigs (public/sprites/units/) resolved via
+  // Assets. DEFAULT = the ORIGINAL Stillmarch rigs (public/sprites/units/) resolved via
   // ORIGINAL_SPRITE; `?ffta` loads the gitignored scaffold instead (dev builds only —
   // the harness is itself dev-only). Both fall back to the committed programmatic placeholder.
   const base = import.meta.env.BASE_URL
@@ -154,7 +154,7 @@ async function main(): Promise<void> {
   const tileset = makeTileset()
   const propSheet = makePropSheet()
   document.getElementById('artpath')!.textContent =
-    scaffoldArt ? 'art: FFTA dev scaffold (?ffta)' : 'art: original Idle Legends sprites'
+    scaffoldArt ? 'art: FFTA dev scaffold (?ffta)' : 'art: original Stillmarch sprites'
 
   // Ground: auto-exported FFTA field map if present, else the programmatic tileset.
   // The FFTA assets are 8×8 tiles with per-cell palette banks; we recolor the sheet

@@ -4,6 +4,7 @@ import {
   entityKey, getWhisperTarget, isWhisperBusy, sendWhisper, setWhisperTarget, subscribeWhisperTarget,
 } from '../../engine/whisper'
 import { useGameStore } from '../../store/gameStore'
+import { useDismissOnEscape } from '../ui/useDismissable'
 import { ZONES } from '../../data/zones'
 
 // A whisper conversation, in its own floating window.
@@ -58,10 +59,8 @@ export function WhisperWindow() {
     if (!target) return
     const coarse = window.matchMedia?.('(pointer: coarse)').matches
     if (!coarse) requestAnimationFrame(() => inputRef.current?.focus())
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [target, close])
+  }, [target])
+  useDismissOnEscape(target != null, close)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -97,7 +96,7 @@ export function WhisperWindow() {
 
       <div className="whisper-window-body">
         {thread.length === 0 && (
-          <div style={{ color: '#8a8070', fontSize: '0.78rem', padding: '6px 2px' }}>
+          <div style={{ color: 'var(--muted-warm)', fontSize: '0.78rem', padding: '6px 2px' }}>
             Say something to {target.name}.
           </div>
         )}
@@ -148,7 +147,7 @@ function WhisperRow({ m }: { m: ChatMessage }) {
       <div style={{
         maxWidth: '82%',
         background: mine ? 'rgba(90,64,32,0.85)' : 'rgba(40,34,22,0.9)',
-        border: `1px solid ${mine ? '#6a5030' : '#4a3a1e'}`,
+        border: `1px solid ${mine ? 'var(--edge-soft)' : '#4a3a1e'}`,
         borderRadius: 8,
         padding: '6px 9px',
         color: mine ? '#f7e3b8' : '#ecd8ec',

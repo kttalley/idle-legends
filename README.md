@@ -1,4 +1,4 @@
-# Idle Legends
+# Stillmarch
 
 A browser-based idle RPG with ASCII world exploration, generative pixel avatars, talent trees, and class-based professions. The game runs entirely in the browser with no server required — progress is saved automatically to `localStorage`.
 
@@ -6,7 +6,7 @@ A browser-based idle RPG with ASCII world exploration, generative pixel avatars,
 
 ## Overview
 
-Idle Legends is a fantasy idle RPG built with React and TypeScript. Your champion explores a procedurally-generated world map, fighting monsters, gathering resources, crafting consumables, and growing stronger through a talent tree system. Combat, gathering, and crafting all happen automatically once you set your preferred mode — you watch, react, and make strategic decisions about where to go and how to build your character.
+Stillmarch is a fantasy idle RPG built with React and TypeScript. Your champion explores a procedurally-generated world map, fighting monsters, gathering resources, crafting consumables, and growing stronger through a talent tree system. Combat, gathering, and crafting all happen automatically once you set your preferred mode — you watch, react, and make strategic decisions about where to go and how to build your character.
 
 ---
 

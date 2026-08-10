@@ -7,7 +7,7 @@ guardrail that is a launch blocker.
 
 ## Mission
 
-Produce original, production-ready unit sprites for Idle Legends in the engine's authored
+Produce original, production-ready unit sprites for Stillmarch in the engine's authored
 format, replacing the FFTA dev scaffold before launch (PLAN.md:186).
 
 ## Hard constraints (from the engine, not negotiable)

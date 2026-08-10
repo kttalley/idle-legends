@@ -65,7 +65,7 @@ export function CraftingPanel() {
         <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>
           {prof.craftingName}
         </div>
-        <div style={{ fontSize: '0.65rem', color: '#d4b896', marginTop: 1 }}>
+        <div style={{ fontSize: '0.65rem', color: 'var(--parchment)', marginTop: 1 }}>
           <SpriteIcon emoji={prof.craftIcon} size={16} /> Choose a recipe
         </div>
         <div style={{ fontSize: '0.52rem', color: '#5a564e', marginTop: 1 }}>
@@ -98,11 +98,11 @@ export function CraftingPanel() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: '0.65rem', color: isActive ? '#ffd700' : '#d4b896' }}>
+                <span style={{ fontSize: '0.65rem', color: isActive ? 'var(--gold)' : 'var(--parchment)' }}>
                   <SpriteIcon emoji={r.output.icon} size={16} title={r.output.name} /> {r.name}
                   {gear && (
                     <span style={{
-                      fontSize: '0.45rem', color: '#c8a864', border: '1px solid #6a5a2a',
+                      fontSize: '0.45rem', color: 'var(--gold-soft)', border: '1px solid #6a5a2a',
                       borderRadius: 3, padding: '0 3px', marginLeft: 4, verticalAlign: 'middle',
                     }}>
                       GEAR
@@ -124,7 +124,7 @@ export function CraftingPanel() {
                       return (
                         <span
                           key={inp.materialId}
-                          style={{ marginRight: 6, color: have >= inp.qty ? '#88aa33' : '#ff4444' }}
+                          style={{ marginRight: 6, color: have >= inp.qty ? '#88aa33' : 'var(--danger)' }}
                         >
                           <SpriteIcon emoji={m.icon} size={13} title={m.name} /> {m.name} {have}/{inp.qty}
                           {have > 0 && (
@@ -134,7 +134,7 @@ export function CraftingPanel() {
                       )
                     })}
                   </div>
-                  <div style={{ fontSize: '0.55rem', color: '#ffd700' }}>{effLabel(r)}</div>
+                  <div style={{ fontSize: '0.55rem', color: 'var(--gold)' }}>{effLabel(r)}</div>
                   {gear && q && !qualityAtLeast(q, 'superior') && (
                     <div style={{ fontSize: '0.5rem', color: '#8a7a4a', marginTop: 2 }}>
                       Work the vein for Superior stock and the hero will auto-forge this.

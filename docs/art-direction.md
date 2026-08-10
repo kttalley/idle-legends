@@ -1,4 +1,4 @@
-# Idle Legends — Rebrand Art Direction & Production Plan
+# Stillmarch — Rebrand Art Direction & Production Plan
 
 Fresh sprite set inspired by the reference form · zero FFTA pixels · zero code changes.
 
@@ -10,6 +10,22 @@ collisions against the repo.
 
 **Headline decisions (highest confidence first):**
 
+- **Game title (decided 2026-08-09):** **Stillmarch** — *still* + *march*, a column that
+  never stops and never moves. It is this document's own "soldiers who have marched too far
+  to turn back", and it is also the idle mechanic stated as a name. "March" echoes The
+  Ashmarch without handing the title to either faction, since a two-faction game named
+  after one faction quietly declares a winner. It replaces "Idle Legends", which was taken.
+  App Store listing name is **`Stillmarch: Idle MMORPG`** (`store/LAUNCH.md` §4b).
+  Runners-up, all screened clean: *Dirgeholt*, *Lastmarch*, *Warhollow*.
+  > **Naming trap, learned the hard way.** The first pick, *Emberhold*, cleared the App
+  > Store and failed everywhere else — a Steam RPG shipping 2027, a RuneScape private
+  > server on our exact audience, and Critical Role lore. Worse, it came from this
+  > document's own core vocabulary: **`ash*` and `ember*` are the most saturated corner of
+  > fantasy game naming** (Ashbound: Crown of Sin, Ashbound Expanse, Ashen, Ashborn,
+  > Prophecy of Ashen, Warborne Above Ashes are all live on Steam). When naming anything
+  > player-facing and *ownable* — the game, a sequel, a major SKU — draw from the world's
+  > less contested register, and clear it against App Store, Steam, web and domain before
+  > proposing it. Trademark clearance is still owed and is a lawyer's job, not a grep's.
 - **World identity:** *The Lastlight Concord* (blue, forged, vertical) vs *The Ashmarch*
   (ember, scavenged, jagged); the tauren race displays as **Hornborn** (the palette
   registry already ships `race/hornborn`).
@@ -36,7 +52,7 @@ collisions against the repo.
 
 ### Tone
 
-Idle Legends is a long war remembered mid-fight: melancholy, weathered, dutiful — soldiers
+Stillmarch is a long war remembered mid-fight: melancholy, weathered, dutiful — soldiers
 who have marched too far to turn back. In pixels: a cool, dusk-leaning world palette with
 desaturated mid-tones; **saturation is spent, not ambient** — the only vivid notes on
 screen are faction trim (9–12) and the rarity/spell accent (13–15), so every bright pixel
@@ -1271,6 +1287,13 @@ Aurochsen / Broadhorn.
 
 Remaining aggregate (individually generic, monitor only): Troll Witch-Doctor, Troll
 Berserker, The Crossroads Market, The Maw Eternal / Maw Devourer.
+
+**Sweep re-run 2026-08-09 (source + bundle) caught two stragglers this table had missed:**
+`"The Hexlord's Fang"` → **`"The Hexcaller's Fang"`** (`uniques.ts:142` — the boss was
+renamed in the row above, the unique it drops was not), and the DoT label
+`'Corruption'` → **`'Rot'`** (`combat.ts:779`, rendered as a status chip; harmonizes with
+the *Quickened Rot* talent). Both were invisible to a source-only reading of §6.2, which is
+why the bundle grep is the authoritative one.
 
 ### 6.4 Grep list (submission sweep — exact strings; hits inside internal lowercase ids
 are expected and exempt)

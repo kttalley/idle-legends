@@ -2,7 +2,7 @@
 
 Phase 0 output. This document captures the *architecture* of a GBA-era tactics renderer —
 studied once from the reference decompilation — expressed in my own words, and translates it
-into a plan for a vanilla Canvas 2D renderer for Idle Legends. It is knowledge, not code: no
+into a plan for a vanilla Canvas 2D renderer for Stillmarch. It is knowledge, not code: no
 data tables, constants, palette values, symbol names, or assets are carried over from the
 reference. Where the reference only partially explains a mechanism, this spec says so and
 falls back to documented, public GBA hardware behavior.
@@ -144,7 +144,7 @@ patterns we care about:
 
 ### 2.2 How palette swaps produce unit and team variants
 
-This is the mechanism the entire Idle Legends art strategy is built on, so it's worth stating
+This is the mechanism the entire Stillmarch art strategy is built on, so it's worth stating
 precisely how the reference does it:
 
 - A unit's class-definition entry stores a **palette-set id** and a **slot/nibble** selecting
@@ -233,7 +233,7 @@ offscreen buffer, painter's-order entity sort, mobile-Safari performance budget.
   authored once, reused across characters."
 - **Per-part / per-frame anchors around a single feet-center origin**, so mirroring and depth
   sorting work (§1.4).
-- **Palette-swap as the variant engine** (§2.2, §5) — the core Idle Legends multiplier.
+- **Palette-swap as the variant engine** (§2.2, §5) — the core Stillmarch multiplier.
 - **Two-layer map + "prop can draw in front of unit" occlusion**, mapped to: ground baked into
   the static buffer; overhang/foreground props kept as depth-sorted entities so they can sort
   in front of units by screen-Y.
@@ -251,7 +251,7 @@ offscreen buffer, painter's-order entity sort, mobile-Safari performance budget.
 
 | Reference | Our simplification | Why it's safe |
 |---|---|---|
-| Elevation + per-cell height driving occlusion | **Flat maps, no elevation.** Depth = screen-Y only | Idle Legends' `ZoneMap` is already flat (`terrain`/`water`/`cliff` types, no height); we render "cliff" as a tile style, not a Z |
+| Elevation + per-cell height driving occlusion | **Flat maps, no elevation.** Depth = screen-Y only | Stillmarch' `ZoneMap` is already flat (`terrain`/`water`/`cliff` types, no height); we render "cliff" as a tile style, not a Z |
 | Multiple genuinely-distinct facing poses | **Two drawn facings, mirrored to four** | Hardware flip already did half of this in the reference; §1.3 |
 | Many animation states (attack/cast/jump/knockback/…) each with its own metasprite | **Four animations: idle / walk / attack / hit** | Matches the combat feed the game already exposes (`floatingNumbers` → attack/hit) and map traversal (walk) |
 | Paper-doll of many equipment layers | **Single weapon layer** over the body rig | Enough to *see* loot (weapon rig by item type, weapon palette by rarity) without paper-doll complexity |
@@ -317,7 +317,7 @@ primitives instead.
 ## 5. Our semantic palette-slot convention (OUR design, informed by the study)
 
 The reference proves variants are palette data (§2.2) but its slot meanings are ad hoc per
-character. Idle Legends turns that into a **fixed, semantic 16-slot contract** so *any* rig can
+character. Stillmarch turns that into a **fixed, semantic 16-slot contract** so *any* rig can
 express race, gear tier, elite status, and rarity without redrawing — and so the palette
 registry becomes the game's itemization taxonomy. This is our design; the study only tells us
 it will work.

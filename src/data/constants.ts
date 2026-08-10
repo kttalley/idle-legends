@@ -119,6 +119,23 @@ export const BOSS_DAMAGE_MULTIPLIER = 2.5
 export const ELITE_HP_MULTIPLIER = 3
 export const ELITE_DAMAGE_MULTIPLIER = 1.8
 
+/**
+ * How far above a zone you can be and still earn XP there — the grey-mob rule.
+ *
+ * Nothing capped levelling before this, and zone progress is gated on a BOSS kill rather
+ * than on level, so a player who stalls at a gate keeps farming trash and out-levels the
+ * entire game without moving forward. Measured on a stuck save: level 1592 while still in
+ * Ironcrag Badlands, a level 55–70 zone, on circuit 0 — every mob in the world dying
+ * before it was on screen.
+ *
+ * Compared against the TOP of the zone's level band, so a zone pays out for its whole
+ * range plus this much headroom and only then goes grey. Ironcrag (55–70) stops paying at
+ * 81, Cinderfall (85–100) at 111.
+ *
+ * This is the pressure that sends a stalled player at the boss instead of at more trash.
+ */
+export const GREY_LEVEL_GAP = 10
+
 // ── Party scaling ─────────────────────────────────────────────────────────────
 // A party used to be free power: measured at three companions, gold +27.9% and deaths
 // **-78.5%**. Survivability is a fine reason to bring friends; near-immunity is not, and

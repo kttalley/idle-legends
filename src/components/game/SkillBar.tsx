@@ -7,6 +7,21 @@ import { DetailSheet } from '../ui/DetailSheet'
 import { useLongPress } from '../ui/useLongPress'
 import type { ActiveAbilityDef } from '../../data/types'
 
+/**
+ * A stable hue per ability, so every spell owns a colour of glass.
+ *
+ * Hashed from the id rather than stored on `ActiveAbilityDef`: abilities have no school
+ * field, adding one would mean touching every ability definition and keeping a second
+ * table in agreement with the VFX colours, and the ids never change (they are save keys).
+ * Spread across the circle in 47° steps — coprime with 360, so neighbouring ids land far
+ * apart instead of in a gradient.
+ */
+function paneHue(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
+  return (Math.abs(h) * 47) % 360
+}
+
 interface SlotProps {
   ability: ActiveAbilityDef
   remaining: number
@@ -23,6 +38,7 @@ function SkillSlot({ ability, remaining, cooldown, lockedUntil, onActivate, onIn
   const pct = remaining > 0 ? remaining / Math.max(0.1, cooldown) : 0
   const onCd = remaining > 0
   const locked = lockedUntil !== null
+
   // 64px slots plus four mode toggles overflowed a 390px viewport, which is why the bar
   // was pressed against both edges. 56 still clears the touch minimum comfortably.
   const size = compact ? 56 : 64
@@ -53,36 +69,24 @@ function SkillSlot({ ability, remaining, cooldown, lockedUntil, onActivate, onIn
 
   return (
     <button
+      className="skill-slot"
       title={`${ability.name}\n${ability.description}\nCooldown: ${+cooldown.toFixed(1)}s — hold to inspect`}
       {...press}
       aria-label={`${ability.name}. Hold to inspect.`}
       disabled={onCd}
       style={{
-        position: 'relative',
         width: size,
         height: size,
-        background: onCd
-          ? 'linear-gradient(180deg, #1a1508, #0d0b05)'
-          : 'linear-gradient(180deg, #3a2c10, #1f1a08)',
-        border: `2px solid ${onCd ? '#3a2c10' : '#c8a118'}`,
-        borderRadius: 6,
-        cursor: onCd ? 'not-allowed' : 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 2,
-        padding: 4,
-        transition: 'border-color 0.15s',
-        overflow: 'hidden',
-        touchAction: 'manipulation',
-        WebkitTouchCallout: 'none',
+        // Each spell gets its own pane of glass. Derived from the id rather than added to
+        // the data: abilities carry no school, and hashing the id means a spell keeps the
+        // same colour forever without a migration or a table to maintain.
+        ['--pane-hue' as string]: paneHue(ability.id),
       }}
     >
       {/* Hold hint — small enough to ignore, present enough to invite the gesture. */}
       <span style={{
         position: 'absolute', top: 3, right: 4, width: 3, height: 3, borderRadius: 2,
-        background: onCd ? '#4a4030' : '#c8a864', opacity: 0.8, zIndex: 2,
+        background: onCd ? '#4a4030' : 'var(--gold-soft)', opacity: 0.8, zIndex: 2,
       }} />
       {/* Conic-gradient cooldown sweep overlay */}
       {onCd && (
@@ -101,23 +105,20 @@ function SkillSlot({ ability, remaining, cooldown, lockedUntil, onActivate, onIn
         />
       )}
 
-      {/* Icon — pixel sprite (falls back to the emoji glyph if unmapped) */}
-      <span style={{ zIndex: 1, opacity: onCd ? 0.5 : 1 }}>
-        <SpriteIcon emoji={ability.icon} size={compact ? 22 : 26} />
+      {/* Icon, pressed into the pane — the well supplies the impression, the sprite just
+          sits at the bottom of it. */}
+      <span
+        className="skill-slot-well"
+        style={{ width: compact ? 30 : 34, height: compact ? 30 : 34 }}
+      >
+        <SpriteIcon emoji={ability.icon} size={compact ? 20 : 23} />
       </span>
 
       {/* Name (truncated) */}
-      <span style={{
-        fontSize: compact ? '0.45rem' : '0.5rem',
-        color: onCd ? '#666' : '#d4b896',
-        textAlign: 'center',
-        lineHeight: 1.1,
-        maxWidth: size - 8,
-        overflow: 'hidden',
-        whiteSpace: 'nowrap',
-        textOverflow: 'ellipsis',
-        zIndex: 1,
-      }}>
+      <span
+        className="skill-slot-name"
+        style={{ fontSize: compact ? '0.45rem' : '0.5rem', maxWidth: size - 8 }}
+      >
         {ability.name}
       </span>
 
@@ -177,7 +178,7 @@ export function SkillBar({ embedded = false, compact = false }:
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <SpriteIcon emoji={inspected.icon} size={28} />
-            <span style={{ color: '#9d9d9d' }}>Cooldown {+cooldownOf(inspected).toFixed(1)}s
+            <span style={{ color: 'var(--muted)' }}>Cooldown {+cooldownOf(inspected).toFixed(1)}s
               {inspected.castTimeSeconds
                 ? ` · ${+(inspected.castTimeSeconds * (inspectedMod?.castTimeMult ?? 1)).toFixed(1)}s cast`
                 : ''}</span>

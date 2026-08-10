@@ -62,7 +62,7 @@ export function CraftResultToast() {
           </div>
         </div>
       </div>
-      <div style={{ fontSize: '0.55rem', color: '#d4b896', marginTop: 4 }}>
+      <div style={{ fontSize: '0.55rem', color: 'var(--parchment)', marginTop: 4 }}>
         {result.detail}
       </div>
       {result.kind === 'gear' && (

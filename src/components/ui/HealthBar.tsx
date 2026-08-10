@@ -26,8 +26,14 @@ export function HealthBar({ current, max, type = 'hp', showText = true, height =
           className="absolute inset-0 flex items-center justify-center"
           style={{
             fontSize: Math.max(9, height - 4),
-            fontFamily: 'monospace',
-            color: type === 'xp' ? '#ffd700' : 'rgba(255,255,255,0.9)',
+            // Was `monospace`, which resolves to Courier on macOS/iOS — thin, wide and
+            // low-contrast over a filled bar. The UI face with tabular figures keeps the
+            // digits in fixed columns (the only reason mono was here) and reads far
+            // better at 9–14px.
+            fontFamily: 'var(--font-ui)',
+            fontVariantNumeric: 'tabular-nums',
+            fontWeight: 600,
+            color: type === 'xp' ? 'var(--gold)' : 'rgba(255,255,255,0.9)',
             textShadow: '0 1px 2px rgba(0,0,0,0.9)',
             pointerEvents: 'none',
             letterSpacing: 0,

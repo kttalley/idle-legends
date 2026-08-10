@@ -1,6 +1,6 @@
 # spritegen — Windows rig setup
 
-Sprite generation pipeline for Idle Legends. Runs on the dual-3090 box; the rest of the
+Sprite generation pipeline for Stillmarch. Runs on the dual-3090 box; the rest of the
 repo is platform-agnostic. Architecture and decisions live in [CLAUDE.md](./CLAUDE.md) —
 read that first.
 

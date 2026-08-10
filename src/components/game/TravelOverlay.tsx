@@ -26,7 +26,7 @@ export function TravelOverlay() {
         <div style={{ fontSize: '0.55rem', color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>
           Traveling
         </div>
-        <div style={{ fontSize: '0.7rem', color: '#d4b896', marginTop: 2 }}>
+        <div style={{ fontSize: '0.7rem', color: 'var(--parchment)', marginTop: 2 }}>
           {goingRight ? '' : '← '}{fromName}
           <span style={{ color: '#555', margin: '0 5px' }}>→</span>
           {toName}{goingRight ? '' : ' →'}

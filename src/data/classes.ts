@@ -21,7 +21,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
   warrior: {
     id: 'warrior',
     name: 'Warrior',
-    description: 'A plate-armored bruiser. Steady damage, high health, built to endure — and the only class whose three paths are fully forged.',
+    description: 'A plate-armored bruiser. Steady damage, high health. Swing one huge weapon, refuse to fall, or carry two and no shield.',
     primaryStat: 'strength',
     colorClass: 'class-warrior',
     allowedRaces: ['human', 'dwarf', 'elf', 'orc', 'troll', 'tauren'],
@@ -129,7 +129,7 @@ export const CLASS_DEFINITIONS: Record<string, ClassDefinition> = {
   rogue: {
     id: 'rogue',
     name: 'Rogue',
-    description: 'Shadow daggers and lethal precision. Shadowed Edge spec: poisons, combo points, Dead Calm.',
+    description: 'Shadow daggers and lethal precision. Coat the blade and wait, fight dirty and fast, or strike once from somewhere you were not.',
     primaryStat: 'agility',
     colorClass: 'class-rogue',
     allowedRaces: ['human', 'dwarf', 'elf', 'gnome', 'orc', 'troll', 'goblin'],

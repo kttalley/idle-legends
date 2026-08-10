@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../../../store/gameStore'
 import { ZONES } from '../../../data/zones'
+import { ZONE_TOWN } from '../../../data/towns'
 import { ZoneTrack } from '../ZoneTrack'
-import { useDismissOnEscape } from '../../ui/useDismissable'
+import { useDismissable } from '../../ui/useDismissable'
 import type { ZoneMap, TileType } from '../../../data/types'
 import { SpriteIcon } from '../../ui/SpriteIcon'
 
@@ -57,11 +58,21 @@ export function MinimapRadar() {
   const zoneNames   = useGameStore(s => s.generatedZoneNames)
   const zoomLevel   = useGameStore(s => s.zoomLevel)
   const cycleZoom   = useGameStore(s => s.cycleZoom)
+  // Moved here from the action bar — see the satellites below.
+  const gameMode        = useGameStore(s => s.gameMode)
+  const enterTown       = useGameStore(s => s.enterTown)
+  const controlMode     = useGameStore(s => s.controlMode)
+  const manualIdleTimer = useGameStore(s => s.manualIdleTimer)
+  const setControlMode  = useGameStore(s => s.setControlMode)
+  const townId          = ZONE_TOWN[currentZone]
+  const isTraveling     = gameMode === 'traveling'
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const bakedRef  = useRef<{ zone: string; canvas: HTMLCanvasElement } | null>(null)
   const [mapOpen, setMapOpen] = useState(false)
-  useDismissOnEscape(mapOpen, () => setMapOpen(false))
+  const mapSurface = useRef<HTMLDivElement>(null)
+  useDismissable(mapOpen, () => setMapOpen(false),
+    { ref: mapSurface, closeOnOutside: true, trapFocus: true })
 
   const zm = zoneMaps[currentZone]
   const zoneName = zoneNames[currentZone] ?? ZONES[currentZone]?.name ?? 'Unknown'
@@ -136,6 +147,49 @@ export function MinimapRadar() {
             background: '#0a0e14',
           }}
         />
+        {/* ── Two satellites moved off the action bar ──
+            Town and the idle/manual toggle used to sit beside the spell panes, where they
+            made a five-button row that wrapped on a 390px phone and mixed two kinds of
+            control together. They belong here: the disc already carries map and zoom, and
+            all four are navigation/meta rather than "what am I doing right now". The disc
+            has four corners and was using two. */}
+        {townId && (
+          <button
+            className="minimap-sat"
+            onClick={() => !isTraveling && enterTown(townId)}
+            disabled={isTraveling}
+            title="Visit town"
+            aria-label="Visit town"
+            aria-pressed={gameMode === 'in_town'}
+            style={{ left: -6, top: -6 }}
+            data-active={gameMode === 'in_town' ? 'true' : 'false'}
+          >
+            <SpriteIcon emoji="🏠" size={15} />
+          </button>
+        )}
+        {/* Idle / manual control, with the countdown to auto-resume drawn as a sweep. */}
+        <button
+          className="minimap-sat"
+          onClick={() => setControlMode(controlMode === 'manual' ? 'idle' : 'manual')}
+          title={controlMode === 'manual'
+            ? `Manual control — ${Math.ceil(manualIdleTimer)}s until idle`
+            : 'Idle auto-pilot — tap to take manual control'}
+          aria-label={controlMode === 'manual' ? 'Manual control' : 'Idle auto-pilot'}
+          aria-pressed={controlMode === 'manual'}
+          style={{ right: -6, top: -6, overflow: 'hidden' }}
+          data-active={controlMode === 'manual' ? 'true' : 'false'}
+        >
+          {controlMode === 'manual' && (
+            <span style={{
+              position: 'absolute', inset: 0, borderRadius: '50%', pointerEvents: 'none',
+              background: `conic-gradient(from -90deg, rgba(0,0,0,0.72) ${(manualIdleTimer / 15) * 360}deg, transparent ${(manualIdleTimer / 15) * 360}deg)`,
+            }} />
+          )}
+          <span style={{ position: 'relative', zIndex: 1, display: 'flex' }}>
+            <SpriteIcon emoji={controlMode === 'manual' ? '🎮' : '🤖'} size={15} />
+          </span>
+        </button>
+
         {/* Map / fast-travel button, tucked on the disc edge (bottom-right) */}
         <button
           onClick={() => setMapOpen(true)}
@@ -145,8 +199,8 @@ export function MinimapRadar() {
             width: 28, height: 28, borderRadius: '50%',
             // .hud-layer is click-through; controls must claim their own touches.
             pointerEvents: 'auto',
-            border: '1px solid #6b5020', background: 'rgba(20,16,8,0.95)',
-            color: '#ffd700', fontSize: 12, cursor: 'pointer', lineHeight: '26px', padding: 0,
+            border: '1px solid var(--edge-strong)', background: 'rgba(20,16,8,0.95)',
+            color: 'var(--gold)', fontSize: 12, cursor: 'pointer', lineHeight: '26px', padding: 0,
           }}
         >
           <SpriteIcon ui="map" size={15} title="Zone map" />
@@ -159,8 +213,8 @@ export function MinimapRadar() {
             position: 'absolute', left: -6, bottom: -6,
             width: 28, height: 28, borderRadius: '50%',
             pointerEvents: 'auto',
-            border: '1px solid #6b5020', background: 'rgba(20,16,8,0.95)',
-            color: '#ffd700', fontSize: 12, cursor: 'pointer', lineHeight: '26px', padding: 0,
+            border: '1px solid var(--edge-strong)', background: 'rgba(20,16,8,0.95)',
+            color: 'var(--gold)', fontSize: 12, cursor: 'pointer', lineHeight: '26px', padding: 0,
           }}
         >
           <SpriteIcon ui="zoom" size={15} title="Zoom" />
@@ -168,8 +222,8 @@ export function MinimapRadar() {
           <span style={{
             position: 'absolute', right: -3, top: -3,
             minWidth: 11, height: 11, borderRadius: 6,
-            background: '#3a2c0e', border: '1px solid #6b5020',
-            color: '#ffe9a8', fontSize: 8, fontWeight: 700, lineHeight: '10px',
+            background: '#3a2c0e', border: '1px solid var(--edge-strong)',
+            color: 'var(--gold-bright)', fontSize: 8, fontWeight: 700, lineHeight: '10px',
             textAlign: 'center', padding: '0 1px',
           }}>
             {zoomLevel + 1}
@@ -186,7 +240,6 @@ export function MinimapRadar() {
 
       {mapOpen && (
         <div
-          onClick={() => setMapOpen(false)}
           style={{
             position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.6)',
             // Fixed positioning does not escape the click-through layer: without this the
@@ -195,7 +248,14 @@ export function MinimapRadar() {
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
           }}
         >
-          <div onClick={e => e.stopPropagation()} className="rp-glass" style={{ width: 'min(360px, 94vw)', padding: 10, borderRadius: 12 }}>
+          <div
+            ref={mapSurface}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Fast travel"
+            className="rp-glass"
+            style={{ width: 'min(360px, 94vw)', padding: 10, borderRadius: 12 }}
+          >
             {/* The same subway track the left rail draws. There was a second, entirely
                 different zone UI living in here — a tall scrolling list — which meant two
                 renderings of one piece of state to keep in agreement. */}

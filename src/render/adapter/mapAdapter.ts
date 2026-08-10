@@ -5,6 +5,7 @@
 import type { TileMapData } from '../types'
 import type { ZoneMap, ZoneId } from '../../data/types'
 import { TILE } from '../placeholderArt'
+import { useScaffoldArt } from './fftaRoster'
 
 export const MAP_SIZE = 64
 // Wrapped border tiles baked around the map. Must be ≥ the largest mob approach
@@ -99,28 +100,41 @@ function tileToFrame(type: string, x: number, y: number): number {
 
 // ── Elevation ─────────────────────────────────────────────────────────────────
 // Landform field: summed sines whose frequencies are all integer multiples of the
-// map period, so the heightmap is seamless across the 64-tile torus wrap. The high
+// map period, so the heightmap is seamless across the 64-tile torus wrap. The mid
 // octaves carry the weight here — a field built only from map-wide waves puts its
 // few slope changes ~32 tiles apart, so any viewport-sized window of it is flat no
 // matter how large the amplitude. Mixed anisotropic terms (3×5, 5×3) break up the
 // checkerboard symmetry that same-frequency sin(x)cos(y) products otherwise give.
 // Deterministic per tile — no Date/Math.random, so bakes are stable across reloads.
-function landformNoise(x: number, y: number): number {
+//
+// The field is returned RAW (no gain division). Each biome applies its own `gain`
+// in plateauLevel: a meadow divides by ~2 (the field rarely saturates → gentle
+// rolling, no cliffs), a peak zone divides by ~1.0 (the field pins to the floor AND
+// ceiling → flat plains + tall mesas with abrupt cliffs between). High-frequency
+// fractal octaves (11..31) are weighted by the biome `detail` knob so a meadow stays
+// smooth while a mountain zone gets jagged, noisy cliff edges instead of ruler-
+// straight ones. All octaves use integer frequencies, so the torus wrap stays seam.
+function landformNoise(x: number, y: number, detail = 0): number {
   const nx = (x / MAP_SIZE) * Math.PI * 2
   const ny = (y / MAP_SIZE) * Math.PI * 2
-  const n =
+  // Low/mid-frequency landform (seamless: every multiplier is an integer).
+  let n =
     Math.sin(nx * 1) * Math.cos(ny * 1) +
     Math.sin(nx * 2 + 1.3) * Math.cos(ny * 2) * 0.55 +
     Math.sin(nx * 3 - 0.4) * Math.cos(ny * 5 + 1.1) * 0.42 +
     Math.sin(nx * 5 + 0.7) * Math.cos(ny * 3 + 2.1) * 0.42 +
     Math.sin(nx * 8 + 2.2) * Math.cos(ny * 8 - 0.6) * 0.22
-  // Gain, not a normalization. Dividing by the sum of amplitudes (2.61) would be
-  // "correct" and useless: summed sines cluster near their mean, so the field would
-  // never approach ±1 and the top elevation bands would go unused — which is exactly
-  // why this map used to read flat. 1.4 is just inside the field's observed range
-  // (-1.94..1.59), so the tails clip: genuine flat plains at the bottom, flat mesa
-  // tops at the top, and the full 0..MAX_ELEV span in between.
-  return n / 1.4
+  // High-frequency fractal grain — rock texture + irregular cliff edges. Weighted
+  // by `detail` (0..~0.55): ~0 for a smooth meadow, ~0.5 for jagged peaks. Decaying
+  // amplitude per octave; anisotropic (different x/y freqs) avoids axis-aligned banding.
+  if (detail > 0) {
+    n +=
+      Math.sin(nx * 11 + 0.3) * Math.cos(ny * 11 + 1.7) * detail * 0.50 +
+      Math.sin(nx * 17 - 1.1) * Math.cos(ny * 13 + 0.6) * detail * 0.35 +
+      Math.sin(nx * 23 + 2.4) * Math.cos(ny * 19 - 0.9) * detail * 0.25 +
+      Math.sin(nx * 31 - 0.7) * Math.cos(ny * 29 + 1.2) * detail * 0.15
+  }
+  return n
 }
 
 /**
@@ -128,22 +142,25 @@ function landformNoise(x: number, y: number): number {
  * GBA-tactics maps read as *designed* because they're flat tables at integer heights
  * joined by abrupt one-level steps. An unquantized field just tilts every tile a
  * little differently and reads as noise, which is what this map used to do.
- * The exponent biases toward the low plain so highlands stay the exception and most
- * of the zone is flat ground to walk and fight on.
+ *
+ * The per-biome profile `p` shapes the field:
+ *   gain  — divisor on the raw field. LOWER ⇒ saturates ⇒ flat plains + tall mesas.
+ *   exp   — biases the histogram. HIGHER ⇒ more low plain to walk; LOWER ⇒ highlands.
+ *   maxElev — the integer ceiling (clamps the quantized levels).
  */
-function plateauLevel(x: number, y: number): number {
-  const t = Math.max(0, Math.min(1, (landformNoise(x, y) + 1) / 2))
-  return Math.max(0, Math.min(MAX_ELEV, Math.round(Math.pow(t, 1.6) * MAX_ELEV)))
+function plateauLevel(x: number, y: number, p: BiomeElev): number {
+  const t = Math.max(0, Math.min(1, (landformNoise(x, y, p.detail) / p.gain + 1) / 2))
+  return Math.max(0, Math.min(p.maxElev, Math.round(Math.pow(t, p.exp) * p.maxElev)))
 }
 
-function tileHeight(type: string, x: number, y: number): number {
-  const base = plateauLevel(x, y)
+function tileHeight(type: string, x: number, y: number, p: BiomeElev): number {
+  const base = plateauLevel(x, y, p)
   // Water sits one step below the land around it — a basin. Pinning it to a global
   // sea floor (the old behaviour) rings every inland pond with a full-height cliff
   // once the map has real relief.
   if (type === 'water') return Math.max(0, base - 1)
   // Rock and cliff read as outcrops: one step proud of the plateau they sit on.
-  if (type === 'cliff' || type === 'rock') return Math.min(MAX_ELEV, base + 1)
+  if (type === 'cliff' || type === 'rock') return Math.min(p.maxElev, base + 1)
   return base
 }
 
@@ -153,7 +170,44 @@ function tileHeight(type: string, x: number, y: number): number {
  * player-centered camera never hits a seam (see combatAdapter for placement).
  * `heights` is the same shape as `tiles` (per-buffer-tile elevation, wrapped).
  */
-export function zoneMapToTileMap(zm: ZoneMap): TileMapData {
+// ── FFTA terrain elevation override (DEV / `?ffta` only) ───────────────────────
+// The cracked FFTA elevation oracle (see ../ffta-decomp docs/system/map-format.md):
+// each map's entry+0x10 is a record stream expanding to a 16x16 {height=lo,type=hi}
+// grid. In `?ffta` dev mode we drive zone elevation from that grid instead of the
+// procedural plateauLevel, so the world's tiles rise into real FFTA height shapes
+// (cliffs/plateaus) through the existing bakeGround. Prod builds strip `useScaffoldArt`,
+// so this is dead code when shipped — the FFTA data is reference-only, never bundled.
+let fftaTerrain: Int16Array | null = null   // 256 raw heights (0..31), row-major 16x16
+let fftaMapId = 1
+
+export async function loadFftaTerrain(mapId = 1): Promise<void> {
+  if (!useScaffoldArt) return
+  fftaMapId = mapId
+  try {
+    const base = import.meta.env.BASE_URL
+    const res = await fetch(`${base}local-assets/ffta-scaffold/maps/${mapId}/terrain.json`)
+    if (!res.ok) return
+    const d = await res.json()
+    const rows: number[][] = d.height
+    if (!Array.isArray(rows) || rows.length !== 16) return
+    const a = new Int16Array(256)
+    for (let r = 0; r < 16; r++) for (let c = 0; c < 16; c++) a[r * 16 + c] = rows[r][c] | 0
+    fftaTerrain = a
+  } catch { /* scaffold absent or stale -> fall back to procedural */ }
+}
+
+// FFTA height 0..31 -> elevation level 0..MAX_ELEV. The zone game space is 64x64 and
+// wraps every 64; 64/4=16 so each FFTA terrain cell maps to a 4x4 block of zone tiles,
+// tiling the 16x16 grid exactly once with a clean wrap.
+function fftaLevelAt(gx: number, gy: number): number {
+  if (!fftaTerrain) return -1
+  const tx = (gx >> 2) & 15, ty = (gy >> 2) & 15
+  const h = fftaTerrain[ty * 16 + tx]
+  return Math.min(MAX_ELEV, Math.round((h * MAX_ELEV) / 31))
+}
+
+export function zoneMapToTileMap(zm: ZoneMap, zoneId?: string): TileMapData {
+  const p = biomeElev(zoneId)
   const tiles = new Uint8Array(PADDED_W * PADDED_W)
   const heights = new Uint8Array(PADDED_W * PADDED_W)
   // Flat props by game-tile coord (Phase D). Building the lookup by game coord and
@@ -169,7 +223,8 @@ export function zoneMapToTileMap(zm: ZoneMap): TileMapData {
       const tile = zm.tiles[gy]?.[gx]
       const i = by * PADDED_W + bx
       tiles[i] = tile ? tileToFrame(tile.type, gx, gy) : TILE.GRASS
-      heights[i] = tile ? tileHeight(tile.type, gx, gy) : plateauLevel(gx, gy)
+      const fl = useScaffoldArt ? fftaLevelAt(gx, gy) : -1
+      heights[i] = fl >= 0 ? fl : (tile ? tileHeight(tile.type, gx, gy, p) : plateauLevel(gx, gy, p))
       const artId = propByGame?.get(gy * MAP_SIZE + gx)
       if (artId !== undefined) props.push({ bx, by, artId })
     }

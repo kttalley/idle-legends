@@ -5,13 +5,14 @@
 // (idle_legends_save_v2) into slot 1 on first read.
 
 import type { GameState, ClassType, RaceType, FactionType, ZoneId } from '../data/types'
+import { mirrorSaves } from './storagePersistence'
 
 export const SAVES_KEY  = 'idle_legends_saves_v1'
 const LEGACY_KEY        = 'idle_legends_save_v2'
 /** Quarantine for a saves file we could not parse. Never written over. */
 const CORRUPT_KEY       = 'idle_legends_saves_corrupt'
 /** Slot the player was last in. Read on boot to resume without a menu round-trip. */
-const LAST_SLOT_KEY     = 'idle_legends_last_slot'
+export const LAST_SLOT_KEY = 'idle_legends_last_slot'
 export const MAX_SLOTS  = 5
 
 // Lightweight card data for the character-select screen — never carries the full
@@ -112,7 +113,13 @@ function readFile(): SavesFile {
  */
 function writeFile(file: SavesFile): boolean {
   try {
-    localStorage.setItem(SAVES_KEY, JSON.stringify(file))
+    const raw = JSON.stringify(file)
+    localStorage.setItem(SAVES_KEY, raw)
+    // Mirror the exact bytes we just committed. Debounced and fire-and-forget inside —
+    // see storagePersistence.ts. Deliberately AFTER the localStorage write and outside its
+    // failure path: the mirror is a backstop for the real save, never a substitute, and it
+    // must never be able to make a successful save look failed.
+    mirrorSaves(raw, getLastSlotId())
     lastSaveError = null
     return true
   } catch (e) {
@@ -135,6 +142,11 @@ export function setLastSlotId(id: string | null): void {
   try {
     if (id) localStorage.setItem(LAST_SLOT_KEY, id)
     else localStorage.removeItem(LAST_SLOT_KEY)
+    // Re-mirror so the pointer travels with the saves it points into. Without this a
+    // restored account resumes to whichever hero was current when the blob was last
+    // written, which after switching characters is the wrong one.
+    const raw = localStorage.getItem(SAVES_KEY)
+    if (raw) mirrorSaves(raw, id)
   } catch { /* non-fatal: worst case the player lands on character select */ }
 }
 

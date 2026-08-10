@@ -16,7 +16,7 @@ else and nothing ships until they clear.
 |---|---|---|---|---|
 | 1 | **Apple Developer Program enrolment** ($99/yr) | you | ~24–48h individual; longer for an org (needs a D-U-N-S number, which is itself days) | everything |
 | 2 | **Paid Applications Agreement** + banking + tax forms in App Store Connect | you | hours–days once enrolled; tax forms can bounce | *all* IAP — products cannot go live without it |
-| 3 | Create the app record in App Store Connect with bundle id **`com.idlelegends.game`** | you | minutes | upload |
+| 3 | Create the app record in App Store Connect as **Stillmarch**, bundle id **`com.stillmarch.game`** | you | minutes | upload |
 | 4 | RevenueCat account, iOS app, **entitlement id `founder`**, one offering, App Store Connect API key | you | ~1h | the IAP working at all |
 
 > The bundle id is set in `capacitor.config.ts`. It must match the App Store Connect record
@@ -64,6 +64,81 @@ the root, so a web build 404s every asset inside the WebView.
 
 The entire gate is `requiresEntitlement` in `src/render/colorways.ts`, checked by
 `isColorwayUnlocked()`. Adding a SKU means adding a colourway, nothing else.
+
+## 4b. Listing metadata — the name fields are NOT the same field
+
+The single most misread thing here: **the App Store listing name and the on-device app
+name are separate fields and do not have to match.** Almost no idle game ships them the
+same. `CFBundleDisplayName` is what sits under the icon on the home screen, where iOS
+truncates around 12 characters; the listing name is what Apple indexes for search.
+
+That is why the genre words go in the listing and *not* in the app: `Stillmarch: Idle
+MMORPG` under an icon renders as "Stillmarch…", which is strictly worse than "Stillmarch",
+while losing nothing in search — Apple indexes name + subtitle + keywords together, so the
+genre terms score from the listing name regardless of what the home screen says.
+
+| Field | Value | Limit |
+|---|---|---|
+| App Store listing name | `Stillmarch: Idle MMORPG` | 23/30 |
+| Subtitle | `Offline AFK RPG - Skill Trees` | 29/30 |
+| Keywords (hidden, comma-separated, no spaces) | `mmo,incremental,clicker,idler,auto,battler,tactics,fantasy,loot,pixel,progression,hero,quest,guild` | 98/100 |
+| `CFBundleDisplayName` / home screen | `Stillmarch` | — |
+| In-game title screen (`CharacterSelect.tsx`) | `Stillmarch` | — |
+
+### Why "Idle MMORPG" and not "Idle RPG" — the central ASO call
+
+Measured against the iTunes Search API on 2026-08-09, the two terms are not remotely the
+same fight:
+
+| `idle rpg` — the incumbents | ratings | `idle mmorpg` — the incumbents | ratings |
+|---|---|---|---|
+| RAID: Shadow Legends | 526,335 | IdleMMO – Online Idle RPG | 702 |
+| AFK Arena | 497,693 | Corah: Multiplayer Idle Game | 685 |
+| Mythic Heroes: Idle RPG | 48,260 | IdleArc: Idle MMORPG | 86 |
+| Legend of Slime: Idle RPG | 41,617 | Spell Crit: Idle MMORPG | 14 |
+
+Same audience, ~750× the competition. "Idle RPG" is unwinnable for a new indie; "idle
+mmorpg" has a #1 result at 702 ratings, which is a rankable target. **Prefer the MMORPG
+spelling over MMO** — Google autocomplete redirects every short form to the long one
+(`afk mmo`→`afk mmorpg`, `auto mmo`→`auto mmorpg`), and `best idle mmorpg` outranks
+`best idle mmo`.
+
+The subtitle carries **RPG** deliberately: "RPG" does not match as an independent token
+off "MMORPG", so without it in the subtitle the listing would not rank for plain RPG at
+all. It also carries "offline" (a real, distinct, high-volume term — honest here because
+core play needs no network) and "skill trees" rather than "talent trees", because the
+audience searches *skill tree*. Keep "talent tree" in the in-game UI, where the WoW-fluent
+player reads it as a signal.
+
+**Keywords omit `idle`, `mmorpg`, `rpg`, `afk`, `offline` and `skill`** — all already in
+the name or subtitle, and Apple indexes the three fields as one bag. `mmo` IS included:
+Apple tokenizes on word boundaries, so it does not match off "mmorpg".
+
+### The MMORPG claim has ONE prerequisite — do not ship without it
+
+> Apple **2.3.1**: *"marketing your app in a misleading way, such as by promoting content
+> or services that it does not actually offer… is grounds for removal of your app from the
+> App Store… and termination of your developer account."*
+>
+> Nine live listings use MMO/MMORPG with thin multiplayer and App Review is clearly not
+> screening for it, so this is a **low rejection risk but a real removal-and-backlash
+> risk**. The fix is cheap: **ship at least one genuinely shared server feature** — a real
+> cross-player leaderboard, a global chat channel, or a shared world-boss damage counter.
+> Any one makes the claim evidenceable rather than decorative. Every surviving example in
+> the niche has one.
+>
+> **Never present AI-simulated heroes as real players.** Ambient AI heroes are fine as
+> world texture; a leaderboard of fabricated "players" is the specific artifact that draws
+> both legal attention and review-bombing. Keep the living-world heroes clearly ambient and
+> keep the leaderboard genuinely real.
+>
+> **If the leaderboard slips, fall back to `Stillmarch - Idle RPG` in the title** and keep
+> MMORPG language in the description body only ("everything you love about an MMORPG,
+> without the time investment"), which is comparison rather than feature claim. Title
+> changes are cheap; a 2.3.1 removal is not.
+
+Also per 2.3.7, keep prices and terms out of the subtitle — no "Free", no "Ad-free",
+however tempting given the niche's competitors all lead with it.
 
 ## 5. Submission assets
 

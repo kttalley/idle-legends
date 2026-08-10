@@ -11,7 +11,7 @@ import type { IndexedSprite } from '../../render/types'
 
 const cache = new Map<string, Promise<IndexedSprite>>()
 
-/** Load (or reuse) a unit manifest by roster key. DEFAULT = the original Idle Legends rig
+/** Load (or reuse) a unit manifest by roster key. DEFAULT = the original Stillmarch rig
  *  (public/sprites/units/) resolved via ORIGINAL_SPRITE; under `?ffta` in a DEV build the
  *  key loads the FFTA scaffold instead. Both fall back to the generated humanoid rig if
  *  the file is missing. Cached by the passed roster key in either mode. */

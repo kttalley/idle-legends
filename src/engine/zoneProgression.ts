@@ -49,7 +49,7 @@ export function canEnterZone(
 }
 
 /**
- * Full per-zone progression snapshot. Used by ZoneSelector and unlock checks.
+ * Full per-zone progression snapshot. Used by ZoneTrack and unlock checks.
  * A zone is considered "unlocked" only when it can actually be entered.
  */
 export function getZoneProgression(

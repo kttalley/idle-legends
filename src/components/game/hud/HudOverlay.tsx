@@ -1,6 +1,7 @@
 import React from 'react'
 import { useGameStore } from '../../../store/gameStore'
 import { MinimapRadar } from './MinimapRadar'
+import { ObjectiveTracker } from './ObjectiveTracker'
 import { UnitFrames } from './UnitFrames'
 import { ActionBar } from './ActionBar'
 import { CraftResultToast } from '../CraftResultToast'
@@ -27,9 +28,14 @@ export function HudOverlay() {
   return (
     <div className="hud-layer">
       <div className="hud-tl"><UnitFrames /></div>
-      <div className="hud-tr"><MinimapRadar /></div>
-      {/* Craft reveal — under the minimap, out of the world's centre. Self-dismissing. */}
-      <div className="hud-tr" style={{ marginTop: 150, display: 'flex', justifyContent: 'flex-end' }}>
+      {/* One top-right column, in reading order: where you are, what you are doing, what
+          you just made. This used to be two `.hud-tr` layers with the second pushed down by
+          a hardcoded `marginTop: 150` guessed from the minimap's height — a number that
+          silently overlapped or floated the moment the minimap changed size. Stacking them
+          lets the layout do that arithmetic. */}
+      <div className="hud-tr hud-tr-stack">
+        <MinimapRadar />
+        <ObjectiveTracker />
         <CraftResultToast />
       </div>
       {/* Bottom stack: mode panel above the action bar, in ONE flow. Positioning them

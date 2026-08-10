@@ -26,11 +26,11 @@ import { useGameStore } from '../../../store/gameStore'
 const TEXT_SHADOW = '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 1px 3px rgba(0,0,0,0.9)'
 
 const ACTIVITY_COLOR: Record<string, string> = {
-  following: '#8a8070',
+  following: 'var(--muted-warm)',
   'moving in': '#c8a86a',
   fighting: '#ff9a6a',
   looting: '#7fbf7f',
-  idle: '#8a8070',
+  idle: 'var(--muted-warm)',
 }
 
 function hpGradient(frac: number): string {
@@ -144,7 +144,7 @@ export function PartyFrame() {
                 {speaker.spec ?? speaker.playerClass}
               </span>
               <span style={{
-                color: downed ? '#e08080' : (ACTIVITY_COLOR[activity] ?? '#8a8070'),
+                color: downed ? '#e08080' : (ACTIVITY_COLOR[activity] ?? 'var(--muted-warm)'),
                 flex: '0 0 auto',
               }}>
                 {activity}

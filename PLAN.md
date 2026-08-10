@@ -1,9 +1,77 @@
 # PLAN — Dimetric Graphics System
 
-Replace Idle Legends' procedural sprites, ASCII map, and emoji icons with a dimetric (2:1),
+Replace Stillmarch's procedural sprites, ASCII map, and emoji icons with a dimetric (2:1),
 palette-indexed, sprite-based renderer in the style of GBA-era tactics games — implemented
 natively in vanilla Canvas 2D. Game logic is untouched; this is a presentation-layer rebuild.
 Target: mobile Safari / iOS WebView, App Store via wrapper by late September.
+
+## Shipathon readiness — 2026-08-08 audit & reprioritized runway
+
+A six-dimension playability audit (core loop, combat, first-time UX, content depth,
+shipping readiness, differentiator) ran on 2026-08-08. **Headline: the systems are sound
+and most of this plan's named bugs are already fixed — what's left is the experience layer
+and the half-built differentiators, not more mechanics.** This is an engineer's game that
+hasn't yet found its reason-to-play for a stranger.
+
+| Dimension | Verdict | The one-line |
+|---|---|---|
+| Core idle loop | Decent-but-flawed | Idle promise delivered; a ~45-min content-flat stretch (lvl 5→10 in zone 1) + the `OFFLINE_MIN_MEASURED_SECONDS=120` gate can nullify a new player's first "come back richer" moment |
+| Combat | Decent-but-flawed | Juice is real (per-school VFX, hit-stop, floaters); nothing to *do* (auto-cast handles all), buffs/level-ups/companion-damage invisible in the world, bosses don't read as bigger |
+| First-time UX | Needs-work | No onboarding; quest toast fires only *after* completion (no objective tracker); five unlabeled action-bar icons; classes shown with no descriptions |
+| Content depth | Decent-but-thin | Days 1–3 compelling; the 12-uniques chase is exhaustible AND persists across circuit; LLM living-world off by default at ship; circuit adds difficulty, no new rewards |
+| Shipping | Nearly ship-ready | Most named bugs already fixed; **one existential landmine — localStorage-only saves, no `navigator.storage.persist()` (Safari eviction = total data loss)** |
+| Differentiator | Interesting-but-half-built | Living AI-hero world + palette-as-content are real & unusual; LLM off, art placeholder, prismatic palette unbuilt, PvP absent — every clause of the thesis is architected, none fully ships |
+
+**Reprioritized launch runway** — the audit reorders this; experience + data-loss now
+lead, ahead of more combat depth.
+
+**Launch-blockers, in order:**
+
+1. **Storage persistence — Track S.** Add `navigator.storage.persist()` at boot + an
+   IndexedDB/OPFS mirror. The save *corruption* path is fixed; *eviction* is not, and for
+   an idle game a week of not opening the app is the core play pattern. Existential.
+2. **Onboarding & objective tracker — needs a home (propose Track O).** The `activeQuest`
+   data already lives in the store but is never rendered until completion. Add a persistent
+   objective tracker, surface class descriptions on CharacterCreate, and label the
+   action-bar mode toggles. Pure UI; the single biggest first-session retention win.
+3. ~~**Title + talent-name finish — Track R.**~~ **DONE 2026-08-09.** "Idle Legends" was
+   **taken**; the game ships as **Stillmarch** — *still* + *march*: a column that never
+   stops and never moves, which is both the world's long war and, literally, the idle
+   mechanic. "March" echoes The Ashmarch without handing the title to either faction.
+   Applied to every title surface and to `appId` (`com.idlelegends.game` →
+   `com.stillmarch.game`, safe because no App Store Connect record exists yet). The §6.4
+   grep sweep ran against source *and* the built bundle: the only two player-visible
+   survivors were "The Hexlord's Fang" and the `Corruption` DoT label, both now fixed.
+   **App Store listing name is `Stillmarch: Idle MMORPG`** — see `store/LAUNCH.md` §4b for
+   why MMORPG rather than RPG, and for the one prerequisite that claim carries.
+4. ~~**Flip original art to default — Track R / Phase 4.**~~ **DONE 2026-08-01, re-verified
+   2026-08-09** against the built bundle rather than the diff: originals are the default,
+   the scaffold needs `import.meta.env.DEV && ?ffta` (two locks, so it dead-code-folds out
+   of release), and `grep -c local-assets dist/assets/*.js` → **0** on all three chunks.
+   `biome/map080` is likewise gone, replaced by an original `biome/meadow` ramp.
+   **What survives from this item is art *quality*, not art *source*:** the 7
+   brief-designed monster rigs are coarser than the spec rigs, and placeholder-grade art
+   remains the biggest risk to the palette-as-content thesis (players must want to recolor
+   art worth recoloring). That is now a polish item, not a blocker.
+5. **Turn the differentiator from architected to shipping — Tracks L + M + P:**
+   - Hosted LLM proxy (so the living world ships with personality, not ~52 canned barks +
+     8 whisper replies) **or** materially expand the canned pools — Track L.
+   - Implement the deterministic **prismatic per-player palette** (the most distinctive SKU;
+     currently unbuilt — no `generatePrismatic` exists) — Track M.
+   - The PvP "display case" — Track P is scoped post-launch, but without it purchased
+     palettes are seen only by you. At minimum, make ambient heroes *react* to your look.
+
+**Should-do (polish, not blockers):**
+
+6. **Circuit-specific rewards** — a second unique tier or meta-progression currency per
+   loop. Today circuit 2+ is "same fights, bigger numbers"; a player who clears the Maw has
+   seen every distinct reward the game offers.
+7. **World-space telegraphy — Track C.** VFX for level-ups and self-buffs (currently
+   HUD-only), boss body-size scaling (a 10×-HP boss is the same pixel size as trash), and an
+   honest answer to companion-assist damage reading as a bug.
+8. **First-session pacing** — ease the level 5→10 content-flat stretch; surface a first gold
+   sink earlier (T3 vendor stock is still open); revisit `OFFLINE_MIN_MEASURED_SECONDS=120`
+   so a new player's first absence pays out.
 
 ## My understanding of the brief
 
@@ -1465,6 +1533,15 @@ strips types), and nothing at all covers `combatAdapter.ts`'s 3,547 lines.
 
 ## Track S — accounts, character slots & creation (launch-critical; local now → hosted later)
 
+**Status (2026-08-08 audit): save slots + character select + boot-resume all SHIPPED and
+verified.** The save *corruption* / quota / rAF-death paths below are all closed. **One
+launch-blocker remains: saves are localStorage-only with no `navigator.storage.persist()`
+and no IndexedDB/OPFS mirror.** Safari/WKWebView can evict localStorage after ~7 days of
+inactivity — which for an idle game is the core play pattern — presenting as
+CharacterCreate-with-zero-heroes, indistinguishable from the corrupt-save path already
+guarded. This is the audit's #1 existential landmine; it is the first item on the runway at
+the top of this file.
+
 **Shape:** a proper entry flow in front of the game — a **character select / login screen**
 backed by persistent multi-character storage, plus a refreshed **character creation**
 experience. Built **local-first** now (browser storage), with the persistence layer designed
@@ -1554,17 +1631,183 @@ Remaining before store submission:
   (14/20), `emberwright.ts` (12), `the_unwritten.ts` (10), `gutterwork.ts` (15),
   `the_long_quiet.ts` (16), `cinderpact.ts` (16), `the_binding.ts` (16), `shadowed_edge.ts`
   (3). Display names only — internal ids untouched, so saves are unaffected. ~1 hour.
+  **Audit 2026-08-08:** player-visible ability and talent *display* names now read original
+  (Rimebolt, Cinderburst, Iron Hide, Creeping Certainty, …); only internal snake_case IDs
+  echo WoW and are player-invisible. Treat the ~1h pass above as largely done; run the
+  art-direction doc §6.4 grep sweep to confirm zero verbatim WoW display names remain
+  before submission.
+- ~~Replace `palettes.ts` `biome/map080`~~ — **done 2026-08-01**, now an original
+  `biome/meadow` ramp authored to the world bible (`palettes.ts:167`).
 - Art polish pass on the weakest rigs (the 7 brief-designed monsters are functional but
   coarser than the spec rigs) and the optional distinct back-facing (`/ne`) rows.
 - The [Speculative] fork pool (dwarf stoutguard, hornborn horns, tuskhog boar, carrionkite
   bird) — add on observed weak-read complaints.
-- Replace `palettes.ts` `biome/map080` (decoded from the FFTA map) with an original ramp.
-- Store-metadata sweep using the grep list in art-direction doc §6.4.
 - Post-launch, needs a save migration: retire coined words inside internal snake_case ids
   (`warsong_mesa`, `grimshade_worgen`, `worgen_hide`) — not user-visible, exempt for now.
 
+### Title — RESOLVED 2026-08-09: **Stillmarch**
+
+"Idle Legends" was taken. **Stillmarch** = *still* + *march* — a column that never stops
+and never moves. It is the world bible's "soldiers who have marched too far to turn back"
+and it is also, literally, the idle mechanic: the march advances while nothing on screen
+does. "March" echoes The Ashmarch without handing the title to either faction, which is
+the trap in naming a two-faction game.
+
+**The first pick, Emberhold, was killed by a verification pass — read this before
+proposing a name here again.** It cleared the iTunes Search API, which is exactly why it
+looked safe, and then failed everywhere else: an [Emberhold on
+Steam](https://store.steampowered.com/app/3324490/Emberhold/) (Pacific Ember Studios,
+Action/Adventure/RPG, planned 2027, already wishlistable with a Metacritic page), an
+`emberhold.org` RuneScape private server sitting on our exact audience, and Emberhold in
+Critical Role lore. **"No iOS app with this name" is not "this name is free."** A candidate
+must clear the App Store, Steam, the open web, and the domain before it is proposed.
+
+A second, structural lesson: the world bible's own vocabulary is a naming trap. `ash*` and
+`ember*` are the most saturated corner of fantasy game naming — Ashbound: Crown of Sin,
+Ashbound Expanse, Ashen, Ashborn, Prophecy of Ashen and Warborne Above Ashes are all live
+on Steam. Names must come from the world's *less* contested register.
+
+Runners-up, screened clean on App Store + Steam + web at the same time: **Dirgeholt**
+(`dirgeholt.com` also free; ties to the *Dirge of X* curse family), *Lastmarch* and
+*Warhollow* (both clean but their `.com` is registered and live). `stillmarch.com` was
+unregistered as of 2026-08-09.
+
+**Not verified: trademark.** No registry search was completed — USPTO and Justia block
+automated access, and the agent tasked with it died before reporting. A real knockout
+search is still owed before filing.
+
+Applied to: `index.html` / `harness.html` `<title>`, `capacitor.config.ts` `appName` **and
+`appId`**, `ios/App/App/Info.plist` `CFBundleDisplayName`, the Xcode
+`PRODUCT_BUNDLE_IDENTIFIER` (both configs), `package.json` + `package-lock.json`,
+`CharacterSelect.tsx` (the one player-visible title string), the two sim golden-log
+headers, `README.md`, `PLAN.md`, `docs/*.md`, `tools/spritegen/*`, `store/LAUNCH.md`.
+
+**`appId` changed** `com.idlelegends.game` → `com.stillmarch.game`. This was safe *only*
+because no App Store Connect record existed yet (`store/LAUNCH.md` step 3 was still open
+and the iOS project had never been compiled). It is permanent once that record is created —
+so create the record as `com.stillmarch.game`, and do it only after the trademark knockout
+search clears, because the bundle id cannot follow a forced rename later.
+
+**Deliberately NOT renamed** — both are correct as they stand:
+- `vite.config.ts` `base: '/projects/idle-legends/'` — a live web-deploy path. Changing it
+  breaks whatever is deployed there, and it has no bearing on the App Store build, which
+  uses `./`. The user's call, on the user's own site.
+- `https://github.com/kttalley/idle-legends.git` in `tools/spritegen/README.md` — a real
+  clone URL; editing it would break the documented setup unless the repo is renamed first.
+- Internal snake_case ids and the `ffa_*` roster keys — load-bearing save/cache keys.
+
+### §6.4 submission sweep — run 2026-08-09, source *and* bundle
+
+The bundle sweep is the authoritative one: source comments get stripped, so a source hit
+can be harmless while a bundle hit is a genuinely shipped string. Two player-visible
+survivors, both fixed:
+
+| Where | Was | Now |
+|---|---|---|
+| `src/data/uniques.ts:142` | `"The Hexlord's Fang"` | **`"The Hexcaller's Fang"`** — §6.3 renamed the boss to *Hexcaller Zal'grak*, but the unique it drops kept the old word |
+| `src/engine/combat.ts:779` | `label: 'Corruption'` | **`label: 'Rot'`** — verbatim WoW spell, rendered as a status chip in `StatusEffects.tsx:103`; harmonizes with the *Quickened Rot* talent |
+
+Everything else the greps caught is exempt: internal lowercase ids (`alliance`, `horde`,
+`tauren`, `warsong`, `worgen`, `malboro`, `tonberry`, `floateye`, `toughskin`) or source
+comments that never reach the bundle. Regenerating both combat goldens after the `Rot`
+change produced a **two-line diff across ~13,000 lines** — the headers only — which is the
+proof the label change carried no behavioural effect.
+
+**Store listing metadata** now has a home: `store/LAUNCH.md` §4b, added the same day
+because the sweep cannot be called complete against metadata that does not exist. The
+listing name is **`Stillmarch: Idle MMORPG`** while the app itself stays **`Stillmarch`** —
+the App Store listing name and `CFBundleDisplayName` are separate fields, iOS truncates the
+home-screen name near 12 chars, and Apple indexes name + subtitle + keywords as one bag,
+so the genre words earn their search weight from the listing without disfiguring the icon.
+Subtitle `Offline AFK RPG - Skill Trees` (29/30). Still todo there: the long description
+body.
+
+**Why MMORPG, and the string attached.** Measured on 2026-08-09, `idle rpg` is defended by
+RAID (526k ratings) and AFK Arena (498k) and is unwinnable for a new indie, while the
+`idle mmorpg` incumbents sit at **702 / 685 / 86 / 14** ratings — same audience, ~750× less
+competition, and a genuinely rankable #1. That is the single highest-leverage ASO decision
+available. **It is conditional on shipping one real shared server feature** (Track N below),
+because Apple 2.3.1 makes an unbacked multiplayer claim a removal-and-account-termination
+risk, not merely a bad look. If Track N slips, the title falls back to
+`Stillmarch - Idle RPG` and MMORPG language lives in the description body only.
+
 Track R is independent of Phases 0–4 and can run in any gap; it must be complete before
 store submission.
+
+## Track N — one real shared feature (gates the MMORPG title)
+
+**Status 2026-08-09: BUILT, switched off pending a Supabase project.** Setup walkthrough is
+`supabase/SETUP.md`; the whole feature activates when `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` exist and stays inert otherwise.
+
+| Piece | Where |
+|---|---|
+| Config + the cookie/bearer rationale | `src/net/cloudConfig.ts` |
+| Session (bearer tokens, anon + Apple, shared refresh) | `src/net/session.ts` |
+| Never-throws, never-hangs fetch wrapper | `src/net/cloudClient.ts` |
+| Roster snapshot + `powerScore` + `sanityCheck` | `src/net/snapshot.ts` |
+| Publish / leaderboard / opponent selection | `src/net/leaderboard.ts` |
+| Challenge + local replay + skew detection | `src/net/cloudDuel.ts` |
+| Tables, RLS, rate-limit RPC | `supabase/schema.sql` |
+| Server-side duel resolver (Deno) | `supabase/functions/duel/index.ts` |
+| UI — third tab beside COMBAT/CHAT | `src/components/game/LadderPanel.tsx` |
+| Coverage | `tools/uitest/suites/ladder.mjs` — 11 checks, total 86 → **97** |
+
+**The architectural payoff, and why this was cheap.** `runFight` is pure, seeded TypeScript
+whose determinism `src/sim/fightSim.ts` already proved byte-identical — and its runtime
+import tree is six modules with no DOM, browser globals, zustand or `import.meta`. So the
+Edge Function imports **the game's own combat code** rather than a reimplementation: the
+server resolves duels authoritatively, returns only the seed, and the client re-runs
+`runFight` locally to animate. No second combat implementation to drift, and no fight log
+on the wire. A local replay disagreeing with the server's winner means version skew, which
+the UI reports rather than hiding.
+
+**Trust boundary:** clients may upsert only their own roster row and may not write `duels`
+at all — there is deliberately no client RLS policy for it, so a modified build cannot
+report a win. It can still publish an inflated character; `sanityCheck` bounds that on both
+write and read, and full authority would mean simulating progression server-side, which is
+a different game. That trade is stated in `snapshot.ts`.
+
+**Why this exists:** it is the price of the `Idle MMORPG` listing name. A cross-player
+leaderboard is the cheapest honest form. **Never fabricate players** — the ambient
+LLM-driven heroes are world texture and must never appear in a leaderboard presented as
+real people; that specific artifact is what draws both legal attention and review-bombing.
+
+**Backend decision (researched 2026-08-09) — ~$49–74/month at 1,000 DAU:**
+
+| Piece | Pick | @1k DAU | @10k DAU |
+|---|---|---|---|
+| Saves, auth, leaderboard | **Supabase Pro** | $25 | $25–40 |
+| LLM proxy (holds the key, verifies the Supabase JWT) | **Cloudflare Worker** | $5 | $6 |
+| Inference — cheapest | **DeepInfra**, Llama 3.1 8B **Turbo endpoint** | $19 | $192 |
+| Inference — fastest, +$25 | Groq `llama-3.1-8b-instant`, 634 t/s | $44 | $444 |
+
+Supabase Free **pauses after one week of inactivity**, which for an idle game is fatal —
+Pro is the floor, not an upgrade. Postgres means the exit is `pg_dump`; lowest lock-in of
+the options considered. Rejected: PlayFab (free tier cut 99% in March 2026), Nakama managed
+($600/mo floor), PlanetScale (no free tier), AWS Amplify (most assembly, Cognito free MAU
+cut 80%). Runner-up is all-Cloudflare at ~$5–15/mo total — Durable Objects are a better
+async-PvP primitive than a Postgres row — but you write Sign in with Apple yourself.
+
+**Open question that dominates the LLM cost line:** if `llama3.1` is an Ollama Modelfile
+over stock weights, the table above holds and prompts port unchanged. If it is genuinely
+**fine-tuned weights**, Groq is out (fixed catalog) and custom deploys move to a dedicated
+GPU with an hourly floor — roughly **$700–2,900/month**, 40–150× the serverless price.
+Verify whether a system prompt on stock 8B suffices before designing around custom weights.
+
+**Traps, all load-bearing:**
+- **Never cookie sessions.** iOS defaults `NSHTTPCookieAcceptPolicy` to
+  `OnlyFromMainDocumentDomain`, so cross-domain cookies are refused *regardless of CORS
+  headers*. This is the root cause of the known Supabase-PKCE and Firebase
+  `capacitor://localhost` auth failures. Bearer tokens only.
+- **Never ship the inference key in the app.** The Worker exists to hold it. Rate-limit per
+  user id, not per IP — mobile carriers NAT heavily. Keep the 52 canned barks as the
+  circuit breaker on 429/5xx.
+- **LLM content needs a report affordance** under Guidelines 1.2 / 4.7 — a "Report this"
+  path on `WhisperWindow` and `ThoughtBubble`, plus disclosure that content is AI-generated.
+- Player-typed whisper text sent to a third-party model is **"User Content, collected"** on
+  the privacy nutrition label, and linked to identity if sent with a user id.
+- First thing that breaks is **Groq's TPM ceiling (~3–5k DAU), not the bill.**
 
 ## Open questions (non-blocking, defaults chosen)
 

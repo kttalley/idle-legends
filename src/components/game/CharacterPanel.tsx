@@ -29,10 +29,15 @@ export function CharacterPanel() {
         // of the rail. With the width back, the class and the hero's name fit on one
         // line each — a long generated name is the norm here, not the exception.
         <span style={{ display: 'block', minWidth: 0 }}>
+          {/* Level leads. It is the number the player checks most often and the one that
+              gates every zone on the track below, so it should not require reading past
+              the class name to find — and when the header is collapsed this line is the
+              only thing left, which makes the level's absence from it conspicuous. */}
+          <span className="char-level">{level}</span>
           <span className={classDef.colorClass}>{classDef.name}</span>
           {playerName && (
             <span style={{
-              display: 'block', fontSize: '0.58rem', color: '#d4b896', fontStyle: 'italic',
+              display: 'block', fontSize: '0.58rem', color: 'var(--parchment)', fontStyle: 'italic',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {playerName}
@@ -46,14 +51,14 @@ export function CharacterPanel() {
     >
 
       {/* Tab bar */}
-      <div className="flex border-b" style={{ borderColor: '#3a2c10' }}>
+      <div className="flex border-b" style={{ borderColor: 'var(--edge)' }}>
         {(['stats', 'talents'] as Tab[]).map(t => (
           <button
             key={t}
             className="rp-button flex-1"
             style={{
               background: tab === t ? 'rgba(200,161,0,0.15)' : undefined,
-              borderBottom: tab === t ? '2px solid #ffd700' : '2px solid transparent',
+              borderBottom: tab === t ? '2px solid var(--gold)' : '2px solid transparent',
               borderRadius: 0,
               textTransform: 'capitalize',
               position: 'relative',
@@ -87,9 +92,9 @@ export function CharacterPanel() {
       <div className="flex-1 panel-scroll p-2" style={{ fontSize: '0.7rem' }}>
         {tab === 'stats' && (
           <div>
-            <div style={{ color: '#ffd700', marginBottom: 4, fontWeight: 700 }}>
-              Level {level} {classDef.name}
-            </div>
+            {/* "Level 24 Warrior" used to head this tab. The panel header directly above
+                now leads with the level and the class, so the line was saying the same
+                thing twice in the space of 30 vertical pixels. */}
             <div style={{ marginBottom: 10 }}>
               <HealthBar
                 current={xp}
@@ -98,7 +103,7 @@ export function CharacterPanel() {
                 height={14}
                 label={`XP ${Math.floor(xp)} / ${xpNeeded}`}
               />
-              <div style={{ fontSize: '0.55rem', color: '#9d9d9d', marginTop: 2, textAlign: 'right' }}>
+              <div style={{ fontSize: '0.55rem', color: 'var(--muted)', marginTop: 2, textAlign: 'right' }}>
                 {xpNeeded - Math.floor(xp)} XP to level {level + 1}
               </div>
             </div>
@@ -114,9 +119,9 @@ export function CharacterPanel() {
               ['Crit Chance',   `${(stats.critChance * 100).toFixed(1)}%`],
               ['Gold Find',     `${((stats.goldFindBonus - 1) * 100).toFixed(0)}% bonus`],
             ].map(([label, val]) => (
-              <div key={String(label)} className="flex justify-between py-0.5" style={{ borderBottom: '1px solid #1a1508' }}>
-                <span style={{ color: '#9d9d9d' }}>{label}</span>
-                <span style={{ color: '#d4b896' }}>{val}</span>
+              <div key={String(label)} className="flex justify-between py-0.5" style={{ borderBottom: '1px solid var(--ink)' }}>
+                <span style={{ color: 'var(--muted)' }}>{label}</span>
+                <span style={{ color: 'var(--parchment)' }}>{val}</span>
               </div>
             ))}
           </div>

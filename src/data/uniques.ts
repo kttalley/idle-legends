@@ -139,7 +139,7 @@ export const UNIQUES: UniqueDef[] = [
   },
   {
     id: 'uniq_hexlords_fang', bossId: 'venom_hexlord',
-    name: "The Hexlord's Fang", slot: 'weapon',
+    name: "The Hexcaller's Fang", slot: 'weapon',
     equipText: 'Equip: The venom spreads further. Splashed blows reach half again as far.',
     effect: { kind: 'splashRadiusMult', value: 1.5 },
     accent: ['#1c3c1c', '#2c7434', '#54c45c'],

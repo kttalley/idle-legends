@@ -20,9 +20,17 @@ import type { ZoneId } from '../../data/types'
 // fills with that zone's boss progress, so "how close am I to moving on" is answered by
 // the same pixels that answer "where am I".
 
-/** Fraction of the segment leaving `idx` that is already earned. */
-function segmentFill(idx: number, currentIdx: number, killFraction: number): number {
-  if (idx < currentIdx) return 1
+/**
+ * Fraction of the segment leaving `idx` that is already earned — how much of the line to
+ * light up.
+ *
+ * Cleared wins over position, because the player can travel BACKWARDS: farming a zone you
+ * already beat should not un-light the track ahead of you that you have, in fact, beaten.
+ */
+function segmentFill(
+  idx: number, currentIdx: number, killFraction: number, cleared: boolean,
+): number {
+  if (cleared || idx < currentIdx) return 1
   if (idx > currentIdx) return 0
   return killFraction
 }
@@ -39,6 +47,7 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
   const {
     currentZone, unlockedZones, totalZoneKills, bossesDefeated, level,
     beginTravel, generatedZoneNames, gameMode, travelTarget,
+    settings, setAutoAdvanceZones,
   } = useGameStore()
 
   const railRef = useRef<HTMLDivElement>(null)
@@ -52,11 +61,57 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
   useEffect(() => {
     const rail = railRef.current
     if (!rail) return
-    const stop = rail.querySelector<HTMLElement>(`[data-zone="${focusZone}"]`)
-    if (!stop) return
-    // Not scrollIntoView: that walks up and scrolls every scrollable ancestor, which here
-    // means yanking the whole left rail sideways as well.
-    rail.scrollLeft = stop.offsetLeft - (rail.clientWidth - stop.offsetWidth) / 2
+
+    const centre = (): boolean => {
+      const stop = rail.querySelector<HTMLElement>(`[data-zone="${focusZone}"]`)
+      // A rail with no width has not been laid out yet, and every measurement taken from
+      // it is zero. Centring against that silently produces scrollLeft 0 — which looks
+      // exactly like "the track happened to already be at the start".
+      if (!stop || rail.clientWidth === 0) return false
+      // Not scrollIntoView: that walks up and scrolls every scrollable ancestor, which here
+      // means yanking the whole left rail sideways as well.
+      //
+      // Snapping and smooth scrolling both have to be suspended for the assignment, or the
+      // centring is silently undone. The rail is `scroll-behavior: smooth` (so the write
+      // starts an animation rather than taking effect) and `scroll-snap-type: x proximity`
+      // (so the browser then pulls the result to the nearest snap point). For an early
+      // zone the target is only ~26px from the start, which is nearer to stop 0's snap
+      // position than to its own — so the track animated a little and slid straight back
+      // to 0, looking exactly like "it was already at the start".
+      //
+      // The CSS comment beside `scroll-snap-type` chose `proximity` over `mandatory` for
+      // this reason; proximity is weaker, not absent. Suspending both for the write is
+      // what actually makes programmatic positioning authoritative, and both are restored
+      // immediately so the player's own flicks still snap and glide.
+      const prevBehavior = rail.style.scrollBehavior
+      const prevSnap = rail.style.scrollSnapType
+      rail.style.scrollBehavior = 'auto'
+      rail.style.scrollSnapType = 'none'
+      rail.scrollLeft = stop.offsetLeft - (rail.clientWidth - stop.offsetWidth) / 2
+      // Restore on the next frame: same-tick restoration re-enables snapping before the
+      // browser has committed the new offset, which reintroduces the pull.
+      requestAnimationFrame(() => {
+        rail.style.scrollBehavior = prevBehavior
+        rail.style.scrollSnapType = prevSnap
+      })
+      return true
+    }
+
+    if (centre()) return
+
+    // Not laid out yet. This is the normal case, not an edge one: the track mounts inside
+    // a collapsed accordion and inside a mobile drawer that starts retracted, so on a phone
+    // the FIRST measurement is essentially always zero. A plain `useEffect` fires once,
+    // gets nothing, and never runs again — leaving the current zone off-screen with no
+    // indication anything failed.
+    //
+    // Same treatment the layout already gives --log-h and --actionbar-h: observe the
+    // element and act when it is real. Disconnects on the first successful centring so it
+    // does not fight the player's own scrolling afterwards.
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => { if (centre()) ro.disconnect() })
+    ro.observe(rail)
+    return () => ro.disconnect()
   }, [focusZone])
 
   const zone       = ZONES[currentZone]
@@ -121,7 +176,7 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
                 type="button"
                 data-zone={zoneId}
                 className={cls}
-                style={{ '--seg': segmentFill(idx, currentIdx, killFrac) } as React.CSSProperties}
+                style={{ '--seg': segmentFill(idx, currentIdx, killFrac, zBossDown) } as React.CSSProperties}
                 title={tip}
                 aria-current={active ? 'true' : undefined}
                 disabled={!canEnter || isTraveling || active}
@@ -159,6 +214,28 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
             <span className="zone-track-status-meta">{toBoss} kills to boss</span>
           )}
         </div>
+
+        {/* Whether the hero walks the track by itself. This lived under the equipment
+            list in the bag, next to auto-equip, because that is where the other
+            unattended-play toggle happened to be — but it is a statement about ZONES, and
+            it belongs against the map of them.
+            Rail only: the modal is a "take me there now" picker, and a second checkbox
+            for the same setting, visible at the same time as the first, is just a way to
+            make the player wonder whether they are the same setting. */}
+        {collapsible && (
+          <label
+            className="zone-track-auto"
+            data-on={settings.autoAdvanceZones !== false}
+            title="Move on when the next zone opens, and fall back from one that proves too hard."
+          >
+            <input
+              type="checkbox"
+              checked={settings.autoAdvanceZones !== false}
+              onChange={e => setAutoAdvanceZones(e.target.checked)}
+            />
+            Roam onward when ready
+          </label>
+        )}
       </div>
   )
 
@@ -182,7 +259,7 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
     <CollapsiblePanel
       id="zones"
       title="Zones"
-      headerRight={<span style={{ fontSize: '0.55rem', color: '#8a8070' }}>{levelRange}</span>}
+      headerRight={<span style={{ fontSize: '0.55rem', color: 'var(--muted-warm)' }}>{levelRange}</span>}
     >
       {track}
     </CollapsiblePanel>

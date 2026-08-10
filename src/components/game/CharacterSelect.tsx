@@ -47,14 +47,14 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
         <h1 style={{
           fontFamily: '"Cinzel Decorative", var(--font-display)',
           fontSize: 'clamp(1.8rem, 5vw, 3rem)',
-          color: '#ffd700',
+          color: 'var(--gold)',
           textShadow: '0 0 20px rgba(200,161,0,0.5), 0 2px 4px rgba(0,0,0,0.9)',
           letterSpacing: '0.1em',
           marginBottom: 4,
         }}>
-          Idle Legends
+          Stillmarch
         </h1>
-        <p style={{ color: '#9d9d9d', fontSize: '0.8rem', letterSpacing: '0.15em' }}>
+        <p style={{ color: 'var(--muted)', fontSize: '0.8rem', letterSpacing: '0.15em' }}>
           CHOOSE YOUR HERO
         </p>
       </div>
@@ -88,20 +88,20 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
               <div className={`text-lg font-bold ${cls?.colorClass ?? ''}`} style={{ fontFamily: 'var(--font-display)', lineHeight: 1.1 }}>
                 {s.playerName || 'The Wanderer'}
               </div>
-              <div style={{ fontSize: '0.62rem', color: '#9d9d9d', marginTop: 2, marginBottom: 8 }}>
+              <div style={{ fontSize: '0.62rem', color: 'var(--muted)', marginTop: 2, marginBottom: 8 }}>
                 Lv {s.level} {race?.name ?? s.playerRace} {cls?.name ?? s.playerClass}
               </div>
 
-              <div style={{ fontSize: '0.58rem', borderTop: '1px solid #3a2c10', paddingTop: 6, marginBottom: 10 }}>
+              <div style={{ fontSize: '0.58rem', borderTop: '1px solid var(--edge)', paddingTop: 6, marginBottom: 10 }}>
                 <div className="flex justify-between">
                   <span style={{ color: '#666' }}>Faction</span>
-                  <span style={{ color: FACTION_DEFINITIONS[s.playerFaction]?.color ?? '#d4b896' }}>
+                  <span style={{ color: FACTION_DEFINITIONS[s.playerFaction]?.color ?? 'var(--parchment)' }}>
                     {s.factionName || FACTION_DEFINITIONS[s.playerFaction]?.name || '—'}
                   </span>
                 </div>
                 <div className="flex justify-between mt-1">
                   <span style={{ color: '#666' }}>Zone</span>
-                  <span style={{ color: '#d4b896' }}>{zone?.name ?? s.currentZone}</span>
+                  <span style={{ color: 'var(--parchment)' }}>{zone?.name ?? s.currentZone}</span>
                 </div>
                 {s.zoneCircuit > 0 && (
                   <div className="flex justify-between mt-1">
@@ -141,7 +141,7 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
                 <div className="flex gap-2">
                   <button
                     className="rp-button flex-1"
-                    style={{ fontSize: '0.68rem', background: 'linear-gradient(180deg, #6a5228, #4a3518)' }}
+                    style={{ fontSize: '0.68rem', background: 'linear-gradient(180deg, var(--wood-lit), #4a3518)' }}
                     onClick={() => onContinue(slot.id)}
                   >
                     Continue
@@ -178,8 +178,8 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
           }}
           onClick={() => { if (!full) onCreate() }}
         >
-          <div style={{ fontSize: '2.5rem', color: '#6a5228', lineHeight: 1 }}>＋</div>
-          <div style={{ fontFamily: 'var(--font-display)', color: '#d4b896', fontSize: '0.85rem', marginTop: 8 }}>
+          <div style={{ fontSize: '2.5rem', color: 'var(--wood-lit)', lineHeight: 1 }}>＋</div>
+          <div style={{ fontFamily: 'var(--font-display)', color: 'var(--parchment)', fontSize: '0.85rem', marginTop: 8 }}>
             New Character
           </div>
           <div style={{ fontSize: '0.58rem', color: '#666', marginTop: 6 }}>

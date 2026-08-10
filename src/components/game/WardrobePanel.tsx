@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useGameStore } from '../../store/gameStore'
-import { useDismissOnEscape } from '../ui/useDismissable'
+import { useDismissable } from '../ui/useDismissable'
 import { HeroAvatar } from '../sprites/HeroAvatar'
 import { COLORWAYS, isColorwayUnlocked, FOUNDER_ENTITLEMENT } from '../../render/colorways'
 import {
@@ -25,7 +25,8 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
 
   const [iap, setIap] = useState<PurchaseState | null>(null)
   useEffect(() => subscribePurchases(setIap), [])
-  useDismissOnEscape(true, onClose)
+  const surface = useRef<HTMLDivElement>(null)
+  useDismissable(true, onClose, { ref: surface, closeOnOutside: true, trapFocus: true })
   const active = iap?.active ?? new Set<string>()
   const owned = active.has(FOUNDER_ENTITLEMENT)
 
@@ -35,7 +36,9 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
   // covering the screen.
   return createPortal(
     <div
-      onClick={onClose}
+      // Stable hook for tools/uitest — matching on the visible "Wardrobe" string would
+      // couple the suite to copy, and it also matched the Looks button's tooltip.
+      data-surface="wardrobe"
       style={{
         position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.72)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -44,7 +47,10 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
       }}
     >
       <div
-        onClick={e => e.stopPropagation()}
+        ref={surface}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Wardrobe"
         className="rp-glass"
         style={{
           width: 'min(420px, 94vw)', maxHeight: '100%', overflowY: 'auto',
@@ -52,7 +58,7 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', color: '#ffd700' }}>Wardrobe</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', color: 'var(--gold)' }}>Wardrobe</span>
           <button className="rp-button" onClick={onClose} style={{ padding: '8px 12px', minHeight: 34 }}>Close</button>
         </div>
 
@@ -79,7 +85,7 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
                   padding: 8, borderRadius: 9, cursor: unlocked ? 'pointer' : 'default',
                   background: isOn ? 'rgba(255,215,0,0.10)' : 'rgba(0,0,0,0.30)',
-                  border: `1px solid ${isOn ? '#ffd700' : '#3a352c'}`,
+                  border: `1px solid ${isOn ? 'var(--gold)' : '#3a352c'}`,
                   // Locked tiles stay legible rather than being greyed into mush — the
                   // player is meant to want the thing they cannot equip yet.
                   opacity: unlocked ? 1 : 0.82,
@@ -90,14 +96,14 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
                   race={race} playerClass={playerClass} name={name} faction={faction}
                   colorway={cw.id} size={72} animate={isOn} circle={false}
                 />
-                <span style={{ fontSize: '0.6rem', color: isOn ? '#ffd700' : '#c8b890', textAlign: 'center', lineHeight: 1.25 }}>
+                <span style={{ fontSize: '0.6rem', color: isOn ? 'var(--gold)' : '#c8b890', textAlign: 'center', lineHeight: 1.25 }}>
                   {cw.name}
                 </span>
                 {!unlocked && (
                   <span style={{ fontSize: '0.5rem', color: '#8a7a58', letterSpacing: '0.05em' }}>🔒 FOUNDER</span>
                 )}
                 {isOn && (
-                  <span style={{ fontSize: '0.5rem', color: '#ffd700', letterSpacing: '0.05em' }}>EQUIPPED</span>
+                  <span style={{ fontSize: '0.5rem', color: 'var(--gold)', letterSpacing: '0.05em' }}>EQUIPPED</span>
                 )}
               </button>
             )
@@ -105,8 +111,8 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
         </div>
 
         {!owned && (
-          <div style={{ marginTop: 14, padding: 12, borderRadius: 9, border: '1px solid #6b5020', background: 'rgba(30,22,8,0.6)' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.78rem', color: '#ffd700', marginBottom: 4 }}>
+          <div style={{ marginTop: 14, padding: 12, borderRadius: 9, border: '1px solid var(--edge-strong)', background: 'rgba(30,22,8,0.6)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.78rem', color: 'var(--gold)', marginBottom: 4 }}>
               Founder Pack
             </div>
             <p style={{ fontSize: '0.62rem', color: '#c8b890', margin: '0 0 10px', lineHeight: 1.5 }}>

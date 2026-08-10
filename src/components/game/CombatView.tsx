@@ -125,7 +125,7 @@ export function CombatView() {
         // Mob attacked — player takes hit
         setMobAnimClass('avatar-hit')
         setTimeout(() => setMobAnimClass(''), 350)
-        particlesRef.current?.fireAttack('mob', '#ff4444', '#ff0000')
+        particlesRef.current?.fireAttack('mob', 'var(--danger)', '#ff0000')
       }
     }
   }, [floatingNumbers]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -133,9 +133,9 @@ export function CombatView() {
   // Auto-mode status label
   const autoStatus = (() => {
     if (isTraveling) return null
-    if (mobApproaching) return { label: `${currentMob!.name} approaching…`, color: currentMob!.isBoss ? '#ff8000' : '#ff6666' }
+    if (mobApproaching) return { label: `${currentMob!.name} approaching…`, color: currentMob!.isBoss ? 'var(--warn)' : '#ff6666' }
     if (gameMode === 'gathering') return { label: `${prof.gatherIcon} Gathering…`, color: '#88cc88' }
-    if (gameMode === 'crafting') return { label: `${prof.craftIcon} Crafting…`, color: '#ffd700' }
+    if (gameMode === 'crafting') return { label: `${prof.craftIcon} Crafting…`, color: 'var(--gold)' }
     if (gameMode === 'in_town' && currentTown) return { label: `In Town`, color: '#ddaa44' }
     if (gameMode === 'combat' && currentMob) return { label: `Fighting ${currentMob.name}`, color: '#88aaff' }
     return null
@@ -182,7 +182,7 @@ export function CombatView() {
         flexShrink: 0,
         gap: 6,
       }}>
-        <span style={{ fontSize: '0.6rem', color: '#d4b896', flexShrink: 0 }}>
+        <span style={{ fontSize: '0.6rem', color: 'var(--parchment)', flexShrink: 0 }}>
           {zoneName ?? 'Unknown Zone'}
           <span style={{ fontSize: '0.55rem', color: '#666', marginLeft: 6 }}>
             Lvl {zone?.levelRange[0]}–{zone?.levelRange[1]}
@@ -208,9 +208,9 @@ export function CombatView() {
                 fontSize: '0.50rem',
                 padding: '1px 4px',
                 borderRadius: 3,
-                border: `1px solid ${gameMode === m && !mobApproaching ? '#c8a864' : '#2a2a2a'}`,
+                border: `1px solid ${gameMode === m && !mobApproaching ? 'var(--gold-soft)' : '#2a2a2a'}`,
                 background: gameMode === m && !mobApproaching ? '#2a1e00' : '#0d0d0d',
-                color: gameMode === m && !mobApproaching ? '#ffd700' : '#444',
+                color: gameMode === m && !mobApproaching ? 'var(--gold)' : '#444',
                 cursor: isTraveling ? 'default' : 'pointer',
                 opacity: isTraveling ? 0.3 : 1,
                 transition: 'all 0.15s',
@@ -231,9 +231,9 @@ export function CombatView() {
                 fontSize: '0.50rem',
                 padding: '1px 4px',
                 borderRadius: 3,
-                border: `1px solid ${gameMode === 'in_town' ? '#c8a864' : '#2a2a2a'}`,
+                border: `1px solid ${gameMode === 'in_town' ? 'var(--gold-soft)' : '#2a2a2a'}`,
                 background: gameMode === 'in_town' ? '#2a1e00' : '#0d0d0d',
-                color: gameMode === 'in_town' ? '#ffd700' : '#444',
+                color: gameMode === 'in_town' ? 'var(--gold)' : '#444',
                 cursor: isTraveling ? 'default' : 'pointer',
                 opacity: isTraveling ? 0.3 : 1,
                 transition: 'all 0.15s',
@@ -267,7 +267,7 @@ export function CombatView() {
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '0.6rem', color: '#888', textTransform: 'uppercase' }}>You</div>
                 {playerName && (
-                  <div style={{ fontSize: '0.55rem', color: '#d4b896', fontStyle: 'italic', marginTop: 1 }}>
+                  <div style={{ fontSize: '0.55rem', color: 'var(--parchment)', fontStyle: 'italic', marginTop: 1 }}>
                     {playerName}
                   </div>
                 )}
@@ -306,7 +306,7 @@ export function CombatView() {
               </div>
 
               {!isAlive && (
-                <div className="text-center" style={{ fontSize: '0.6rem', color: '#ff4444' }}>
+                <div className="text-center" style={{ fontSize: '0.6rem', color: 'var(--danger)' }}>
                   <SpriteIcon emoji="💀" size={11} /> {Math.ceil(respawnTimer)}s
                   <br />
                   <button className="rp-button mt-1" onClick={respawnNow} style={{ fontSize: '0.55rem' }}>
@@ -331,7 +331,7 @@ export function CombatView() {
                 <>
                   <div style={{
                     fontSize: '0.6rem',
-                    color: currentMob.isBoss ? '#ff8000' : currentMob.isElite ? '#a335ee' : '#888',
+                    color: currentMob.isBoss ? 'var(--warn)' : currentMob.isElite ? '#a335ee' : '#888',
                     textTransform: 'uppercase',
                     textAlign: 'center',
                   }}>
@@ -424,7 +424,7 @@ export function CombatView() {
       {/* XP / Level bar at bottom (hidden in HUD-shell mode — the player frame shows it) */}
       {!HUD_SHELL_ENABLED && (
       <div className="px-2 pb-1" style={{ flexShrink: 0 }}>
-        <div className="flex justify-between text-xs mb-0.5" style={{ color: '#9d9d9d', fontSize: '0.6rem' }}>
+        <div className="flex justify-between text-xs mb-0.5" style={{ color: 'var(--muted)', fontSize: '0.6rem' }}>
           <span className={classDef.colorClass}>{classDef.name}</span>
           <span>Level {level}</span>
           <span>{xp} / {xpNeeded} XP</span>

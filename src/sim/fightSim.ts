@@ -331,7 +331,7 @@ export const GOLDEN_SEEDS = [1000, 8717, 16434, 24151, 31868, 39585]
 /** Serialise the whole standard suite into one comparable artefact. */
 export function formatGolden(cases: DeterminismCase[]): string {
   const out: string[] = [
-    '# Idle Legends — fight resolver golden log',
+    '# Stillmarch — fight resolver golden log',
     '# Regenerate with: node tools/sim/fight.mjs --update-golden',
     '# A diff here is a COMBAT BEHAVIOUR CHANGE. Read it before accepting it.',
     '',

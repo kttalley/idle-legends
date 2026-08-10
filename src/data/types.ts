@@ -1022,6 +1022,20 @@ export interface FloatingNumber {
    *  ally's damage appears to come out of the player, which is what made the first cut of
    *  ally combat read as the player hitting harder rather than the party helping. */
   allyKey?: string
+  /**
+   * Which MOB threw this blow. The symmetric partner of `allyKey`, and it exists for the
+   * same reason: the renderer can only play a swing on a body it can name.
+   *
+   * Without it, `triggerMobAttack` had exactly one place to put the choreography — the
+   * ENGAGED target — so it opened with `if (!this.mob) return`. Manual control
+   * deliberately holds `targetMobId` at null, which makes every mob a bystander, which
+   * made that early return fire on every incoming hit: no swing animation, no hero
+   * recoil, not even a damage floater, while the store dutifully applied the damage.
+   * Measured as three mobs stacked on the hero dealing 315 damage over 30s with their
+   * animators reading `idle` on all 680 samples. That is the whole of "enemies follow you
+   * and never attack" — they were attacking, invisibly.
+   */
+  mobId?: string
   x: number
   y: number
   createdAt: number

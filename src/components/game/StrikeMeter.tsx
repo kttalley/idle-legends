@@ -17,7 +17,7 @@ import { rarityColor } from '../../store/gameStore'
 // Ignore it entirely and the harvest lands on the same timer for the same amount.
 
 const RESULT_COLOR: Record<string, string> = {
-  perfect: '#ffd700', good: '#88cc66', miss: '#ff5544',
+  perfect: 'var(--gold)', good: '#88cc66', miss: '#ff5544',
 }
 const RESULT_TEXT: Record<string, string> = {
   perfect: 'PERFECT', good: 'Good', miss: 'Miss',
@@ -64,14 +64,14 @@ export function StrikeMeter() {
     <div style={{ pointerEvents: 'auto', width: 'min(340px, 88vw)' }}>
       <div style={{
         background: 'rgba(8,8,14,0.82)',
-        border: `1px solid ${session.richness === 2 ? '#c8a864' : '#3a3630'}`,
+        border: `1px solid ${session.richness === 2 ? 'var(--gold-soft)' : '#3a3630'}`,
         borderRadius: 8,
         padding: '6px 8px 7px',
         boxShadow: session.richness === 2 ? '0 0 12px rgba(200,168,100,0.25)' : 'none',
       }}>
         {/* Header: what vein, how rich, how good the current unit is turning out */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-          <span style={{ fontSize: '0.62rem', color: '#d4b896' }}>
+          <span style={{ fontSize: '0.62rem', color: 'var(--parchment)' }}>
             {prof.gatherIcon} {mat.icon} {mat.name}
           </span>
           <span style={{

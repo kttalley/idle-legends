@@ -21,8 +21,8 @@ function formatSpan(seconds: number): string {
 function Row({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: '0.6rem' }}>
-      <span style={{ color: '#9d9d9d' }}>{label}</span>
-      <span style={{ color: color ?? '#d4b896', fontWeight: 700 }}>{value}</span>
+      <span style={{ color: 'var(--muted)' }}>{label}</span>
+      <span style={{ color: color ?? 'var(--parchment)', fontWeight: 700 }}>{value}</span>
     </div>
   )
 }
@@ -42,16 +42,16 @@ export function OfflineReportToast() {
     >
       <div className="rp-panel" style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffd700' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold)' }}>
             While you were away
           </span>
-          <span style={{ fontSize: '0.55rem', color: '#9d9d9d' }}>
+          <span style={{ fontSize: '0.55rem', color: 'var(--muted)' }}>
             {formatSpan(report.secondsElapsed)}
           </span>
         </div>
 
         {report.cappedAtHours !== null && (
-          <div style={{ fontSize: '0.5rem', color: '#c8a100', fontStyle: 'italic' }}>
+          <div style={{ fontSize: '0.5rem', color: 'var(--gold-deep)', fontStyle: 'italic' }}>
             <SpriteIcon ui="warn" size={10} /> Counted the first {report.cappedAtHours} hours —
             that is as far ahead as your hero will range unsupervised.
           </div>
@@ -59,7 +59,7 @@ export function OfflineReportToast() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Row label="Enemies felled" value={report.kills.toLocaleString()} />
-          <Row label="Gold earned" value={`${report.gold.toLocaleString()}g`} color="#ffd700" />
+          <Row label="Gold earned" value={`${report.gold.toLocaleString()}g`} color="var(--gold)" />
           <Row label="Experience" value={report.xp.toLocaleString()} />
           {report.levelsGained > 0 && (
             <Row
@@ -70,9 +70,9 @@ export function OfflineReportToast() {
           )}
         </div>
 
-        <div style={{ borderTop: '1px solid #3a2c10', paddingTop: 5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ borderTop: '1px solid var(--edge)', paddingTop: 5, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {report.itemsEquipped > 0 && (
-            <Row label="Upgrades worn" value={`${report.itemsEquipped}`} color="#88ccaa" />
+            <Row label="Upgrades worn" value={`${report.itemsEquipped}`} color="var(--success)" />
           )}
           {report.itemsBagged > 0 && (
             <Row label="Carried home" value={`${report.itemsBagged}`} />
@@ -81,14 +81,14 @@ export function OfflineReportToast() {
             <Row
               label="Sold by your factor"
               value={`${report.itemsSold} · ${report.soldGold.toLocaleString()}g`}
-              color="#88ccaa"
+              color="var(--success)"
             />
           )}
           {report.itemsSalvaged > 0 && (
             <Row
               label="Scrapped — no room"
               value={`${report.itemsSalvaged} · ${report.salvagedGold.toLocaleString()}g`}
-              color="#c8a100"
+              color="var(--gold-deep)"
             />
           )}
           {report.itemsSalvaged > 0 && report.itemsSold === 0 && (

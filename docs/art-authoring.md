@@ -5,7 +5,7 @@ that drops into the dimetric renderer with **zero code changes**. Every sprite, 
 icon is palette-indexed and passes through one import path. Replacing the programmatic
 placeholders (or the local-only FFTA scaffold) is a pure file drop.
 
-This spec is the source of truth for anyone drawing art for Idle Legends. It restates, in
+This spec is the source of truth for anyone drawing art for Stillmarch. It restates, in
 authoring terms, the contracts enforced by `src/render/` — see `docs/graphics-spec.md` for
 the rendering-system rationale.
 

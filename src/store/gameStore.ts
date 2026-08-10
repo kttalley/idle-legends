@@ -54,7 +54,7 @@ import {
 import {
   INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
   PARTY_MOB_HP_SCALE, PARTY_MOB_DAMAGE_SCALE, PARTY_MOB_REWARD_SCALE,
-  ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE,
+  ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE, GREY_LEVEL_GAP,
   BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
   AUTOSAVE_INTERVAL_MS, ZONE_STUCK_SECONDS,
   BAG_SLOTS_MAX_PURCHASED, BAG_SLOT_BASE_COST, BAG_SLOT_COST_GROWTH,
@@ -534,8 +534,17 @@ function rehydrateState(saved: GameState): GameState {
   saved.activeTownNpc      = null
   saved.generatedTownNames = saved.generatedTownNames ?? {}
   saved.zoomLevel          = readZoomPref()  // global UI pref, not per-slot
-  // Zone quest fields (added after this save was written)
-  saved.activeQuest = saved.activeQuest ?? deriveActiveQuest(saved)
+  // Zone quest fields (added after this save was written).
+  //
+  // Also REPAIRS a quest pointing at the wrong zone. Until the zone-change paths were
+  // fixed, entering an already-cleared zone kept the quest from the zone you left — and
+  // because `??` only fills a null, an affected save carried that stale quest forever:
+  // kills increment `totalZoneKills[currentZone]` while the quest watches somewhere else,
+  // so the objective count sat frozen for the life of the character. Re-derive whenever
+  // the stored quest disagrees with where the hero actually is, which heals those saves on
+  // their next load and costs nothing on a healthy one.
+  const questZoneMatches = saved.activeQuest?.zoneId === saved.currentZone
+  saved.activeQuest = questZoneMatches ? saved.activeQuest : deriveActiveQuest(saved)
   saved.completedQuestIds = saved.completedQuestIds ?? []
   return saved
 }
@@ -591,6 +600,10 @@ function fn(
   /** Party-member key when the blow is an ALLY's — the renderer plays the hit on their
    *  body rather than the hero's. Absent for the player's own damage. */
   allyKey?: string,
+  /** The mob that threw it, when this is a mob's blow. The renderer needs the attacker's
+   *  IDENTITY, not just the fact that something hit you: a pack in manual mode has no
+   *  engaged target, so "the target swung" is not a body it can animate. */
+  mobId?: string,
 ): FloatingNumber {
   // Same rule as `log`: a floating number is presentation, so neither its id nor its
   // scatter may draw from the simulation's stream. The jitter is derived from the counter
@@ -598,7 +611,7 @@ function fn(
   const n = ++presentationSeq
   return {
     id: `fn_${n}`,
-    value, isCrit, isMobDamage, isDoT, color, allyKey,
+    value, isCrit, isMobDamage, isDoT, color, allyKey, mobId,
     x: 45 + ((n * 0.6180339887) % 1 - 0.5) * 22,
     y: 40 + ((n * 0.4142135624) % 1 - 0.5) * 12,
     createdAt: Date.now(),
@@ -901,6 +914,9 @@ const playerPath: PathHolder = { path: null, pathCool: 0 }
 /** Mob id → seconds we have spent failing to reach it. Derived, disposable, deliberately
  *  not in `GameState`. */
 const unreachableFor = new Map<string, number>()
+/** The zone we have already told the player is grey, so the notice lands once on arrival
+ *  rather than on every corpse. Derived and disposable, like the rest of this block. */
+let greyZoneNotified: ZoneId | null = null
 /** Skip a mob when choosing what to walk to after this long failing to reach it. */
 const UNREACHABLE_SKIP_SECONDS = 3
 /** Give up on it entirely after this long, so a replacement can spawn somewhere sane.
@@ -2017,9 +2033,19 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       if (newProgress >= 1) {
         const dest = state.travelTarget
         const destMap = state.zoneMaps[dest] ?? generateZoneMap(dest, mapSeed(state))
-        const activeQuest = !state.bossesDefeated.includes(dest)
-          ? makeZoneQuest(dest, state.playerFaction)
-          : state.activeQuest
+        // The quest always describes the zone you are STANDING IN.
+        //
+        // This used to fall back to `state.activeQuest` when the destination's boss was
+        // already down — which quietly kept the quest you had before the trip. Kills only
+        // ever increment `totalZoneKills[currentZone]`, so the moment you backtracked into
+        // a cleared zone the tracker was watching a zone you had left and its count sat
+        // frozen while you fought. `deriveActiveQuest` is the same predicate rehydrate
+        // uses: this zone's quest, or none if there is nothing left to do here.
+        const activeQuest = deriveActiveQuest({
+          currentZone: dest,
+          playerFaction: state.playerFaction,
+          bossesDefeated: state.bossesDefeated,
+        })
         resetCombatAccumulators()
         set({
           // Combat clocks ride out with every branch that RETURNS. Omitting them here would
@@ -2601,14 +2627,37 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         get().triggerThought('mob_kill')
       }
 
-      xp += deadMob.xpReward
+      // ── The grey-mob rule ───────────────────────────────────────────────────
+      // Trash far below you is worth no experience. Mobs carry no level of their own, so
+      // the zone's band stands in for one: past the TOP of the band plus GREY_LEVEL_GAP,
+      // this zone has nothing left to teach and pays nothing.
+      //
+      // Loot, gold and the kill COUNT are all deliberately untouched. The kill count is
+      // what opens the boss, and a player grinding a zone they have out-levelled is
+      // usually doing it precisely to reach that gate — taking the count away too would
+      // strand them instead of pointing them forward.
+      //
+      // Offline inherits this for free: `offlineRates` accrues from `xpThisTick`, so a
+      // grey zone banks a zero XP rate and the projection pays out accordingly. Without
+      // that, idling in a grey zone would out-earn playing in it.
+      const zoneTop = ZONES[currentZone]?.levelRange[1] ?? level
+      const isGrey = level - zoneTop > GREY_LEVEL_GAP
+      const awardedXp = isGrey ? 0 : deadMob.xpReward
+      if (isGrey && greyZoneNotified !== currentZone) {
+        greyZoneNotified = currentZone
+        newLogs.push(log('proc',
+          `${ZONES[currentZone].name} is far below you — its enemies grant no experience.`,
+          '#8a8070'))
+      }
+
+      xp += awardedXp
       killsThisTick++
       // Tiered kills are tracked separately because DROPS are not interchangeable: an
       // elite doubles the drop chance and rolls at a rarity bias. Without this the
       // offline projection has no way to know an hour was spent on elites and rolls the
       // whole hour as trash, which measured 4.9% worse gear per drop for idling.
       if (deadMob.isElite || deadMob.isBoss) eliteKillsThisTick++
-      xpThisTick += deadMob.xpReward
+      xpThisTick += awardedXp
       while (xp >= xpForLevel(level)) {
         xp -= xpForLevel(level)
         level++
@@ -3110,7 +3159,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             newLogs.push(log('proc', `🛡 ${victim.name} blocks!`, '#88aaff'))
           } else {
             victim.currentHp = Math.max(0, victim.currentHp - hit.damage)
-            newFns.push(fn(hit.damage, false, true, false, '#ff9c9c', victim.key))
+            newFns.push(fn(hit.damage, false, true, false, '#ff9c9c', victim.key, atk.id))
             if (hit.thorns > 0) {
               atk = { ...atk, currentHp: atk.currentHp - hit.thorns }
               newFns.push(fn(hit.thorns, false, false, false, '#ffaa44', victim.key))
@@ -3130,7 +3179,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         let mobDmg = swing.damage
 
         if (swing.blocked) {
-          newFns.push(fn(0, false, true, false, '#88aaff'))
+          newFns.push(fn(0, false, true, false, '#88aaff', undefined, atk.id))
           newLogs.push(log('proc', `🛡 Blocked ${atk.name}'s blow!`, '#88aaff'))
         }
 
@@ -3154,7 +3203,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
         if (mobDmg > 0) {
           stats.currentHp = Math.max(0, stats.currentHp - mobDmg)
-          newFns.push(fn(mobDmg, false, true, false))
+          newFns.push(fn(mobDmg, false, true, false, undefined, undefined, atk.id))
           newLogs.push(log('mob_attack', `${atk.name} hits you for ${mobDmg}`, '#ff8888'))
 
           // Cast pushback: a hit while channelling delays the cast (WoW-style),
@@ -3597,9 +3646,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const s = get()
     if (!canEnterZone(zoneId, s.level, s.bossesDefeated)) return
     resetCombatAccumulators()
-    const activeQuest = !s.bossesDefeated.includes(zoneId)
-      ? makeZoneQuest(zoneId, s.playerFaction)
-      : s.activeQuest
+    // Same rule as the travel-arrival branch above: the quest belongs to the zone you
+    // are in, and re-entering a cleared zone means there is no objective, not a stale one.
+    const activeQuest = deriveActiveQuest({
+      currentZone: zoneId,
+      playerFaction: s.playerFaction,
+      bossesDefeated: s.bossesDefeated,
+    })
     set({ currentZone: zoneId, mobs: [], targetMobId: null, currentMob: null, mobRespawnTimer: 0, activeDoTs: [], activeQuest })
   },
 

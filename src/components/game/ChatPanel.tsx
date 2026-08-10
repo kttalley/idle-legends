@@ -62,7 +62,7 @@ export function ChatPanel() {
     status === 'off' ? 'canned' : status === 'warming' ? 'warming' :
     status === 'failing' ? 'offline' : 'live'
   const statusColor =
-    status === 'live' ? '#7fbf7f' : status === 'failing' ? '#c07070' : '#8a8070'
+    status === 'live' ? '#7fbf7f' : status === 'failing' ? '#c07070' : 'var(--muted-warm)'
 
   return (
     <div className="chat-panel">
@@ -76,7 +76,7 @@ export function ChatPanel() {
       </div>
       <div className="chat-panel-body">
         {shown.length === 0 && (
-          <div style={{ color: '#8a8070', padding: '4px 2px', fontSize: '0.74rem' }}>
+          <div style={{ color: 'var(--muted-warm)', padding: '4px 2px', fontSize: '0.74rem' }}>
             Quiet out here. Heroes nearby will start talking.
           </div>
         )}
@@ -106,7 +106,7 @@ export function ChatPanel() {
 
 function ChatRow({ m }: { m: ChatMessage }) {
   const system = m.channel === 'system' && !m.from
-  const color = FACTION_COLOR[m.faction ?? 'neutral'] ?? '#d4b896'
+  const color = FACTION_COLOR[m.faction ?? 'neutral'] ?? 'var(--parchment)'
   return (
     <div className={`chat-bubble${system ? ' chat-bubble-system' : ''}`}>
       <div className="chat-meta">
@@ -114,7 +114,7 @@ function ChatRow({ m }: { m: ChatMessage }) {
         {m.from && <span className="chat-meta-name" style={{ color }}>[{m.from}]</span>}
       </div>
       <div>
-        {m.pending ? <span style={{ color: '#8a8070' }}>…</span> : m.text}
+        {m.pending ? <span style={{ color: 'var(--muted-warm)' }}>…</span> : m.text}
       </div>
     </div>
   )
