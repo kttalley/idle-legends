@@ -2298,12 +2298,30 @@ export class WorldSceneController {
     // Invert feetX/feetY (height 0): A = tx−ty, B = tx+ty.
     const A = (bufX - g.originX - HALF_W) / HALF_W
     const B = (bufY - g.planeOffsetY - HALF_H) / HALF_H
-    const lo = this.townMode ? -TOWN_WALK_RADIUS : PAD + 1
-    const hi = this.townMode ? TOWN_WALK_RADIUS : PAD + MAP_SIZE - 1
-    const tx = clamp((A + B) / 2, lo, hi)
-    const ty = clamp((B - A) / 2, lo, hi)
-    this.tapTx = tx
-    this.tapTy = ty
+    const rawTx = (A + B) / 2
+    const rawTy = (B - A) / 2
+    if (this.townMode) {
+      // Town is a hand-authored box, not a torus — clamping is correct there.
+      this.tapTx = clamp(rawTx, -TOWN_WALK_RADIUS, TOWN_WALK_RADIUS)
+      this.tapTy = clamp(rawTy, -TOWN_WALK_RADIUS, TOWN_WALK_RADIUS)
+    } else {
+      // The overworld WRAPS. `confinePlayer` already wraps the hero
+      // (`PAD + wrapMod(tx - PAD)`), and `followPath` aims at the wrapped copy of the goal
+      // nearest the walker — but this used to CLAMP the tapped point to [PAD+1, PAD+63]
+      // instead.
+      //
+      // That is why visible tiles were untappable while WASD reached them fine. The camera
+      // follows the hero across the seam, so tiles on screen routinely invert to
+      // coordinates outside that box — stand near the low edge and everything to your left
+      // inverts below PAD+1. Clamping silently rewrote those taps to the boundary, so the
+      // hero trudged to the edge of the box and stopped, and the tile you actually touched
+      // was unreachable by touch on a build whose primary input IS touch.
+      //
+      // Wrapping instead of clamping makes every on-screen tile a legal target, which is
+      // the whole point of a wrapping world.
+      this.tapTx = PAD + WorldSceneController.wrapMod(rawTx - PAD)
+      this.tapTy = PAD + WorldSceneController.wrapMod(rawTy - PAD)
+    }
     this.tapMoveActive = true
     this.tapFlashT = 0.42
     this.manualMode = false
@@ -2404,8 +2422,16 @@ export class WorldSceneController {
       // Tap/click-to-move: path straight to the tapped ground point at manual speed,
       // then hand back to auto-follow (syncOffset pins the auto target here so there's
       // no slingshot). Arrival snaps the target off; the marker VFX clears with it.
-      const dx = this.tapTx - this.player.tx
-      const dy = this.tapTy - this.player.ty
+      // Wrap-aware, for the same reason the target is now wrapped rather than clamped: a
+      // raw subtraction across the seam reads ~63 tiles when the hero is one tile away, so
+      // arrival would never register and the hero would orbit the world to reach a tile it
+      // was already standing next to.
+      const dx = this.townMode
+        ? this.tapTx - this.player.tx
+        : WorldSceneController.wrapDiff(this.tapTx, this.player.tx)
+      const dy = this.townMode
+        ? this.tapTy - this.player.ty
+        : WorldSceneController.wrapDiff(this.tapTy, this.player.ty)
       const d = Math.hypot(dx, dy)
       if (d < 0.25) {
         this.tapMoveActive = false
