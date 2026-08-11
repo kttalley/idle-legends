@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useSyncExternalStore } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { GoldDisplay } from '../ui/GoldDisplay'
 import { WardrobePanel } from './WardrobePanel'
 import { LadderModal } from './LadderPanel'
+import { getAudioState, setMuted as audioSetMuted, subscribeAudio } from '../../engine/audio/audioEngine'
 
 // Account-level navigation for the left rail: what you own, how you look, who else is out
 // there.
@@ -21,6 +22,9 @@ import { LadderModal } from './LadderPanel'
 export function HeroBar() {
   const gold = useGameStore(s => s.gold)
   const [open, setOpen] = useState<'wardrobe' | 'ladder' | null>(null)
+  // Mute is session-only ambience state — it lives in the audio engine, not the persisted
+  // save, so useSyncExternalStore reads it the same way the party/companion stores are read.
+  const audio = useSyncExternalStore(subscribeAudio, getAudioState)
 
   return (
     <div className="hero-bar">
@@ -39,6 +43,18 @@ export function HeroBar() {
         title="The ladder — standings and duels"
       >
         Ladder
+      </button>
+      {/* Ambience mute. The procedural bed starts on first tap (iOS gesture latch in App.tsx);
+          this silences/restores it without persisting, so a saved mute never surprises a player
+          who launched the app somewhere quiet. A real volume slider can replace this later. */}
+      <button
+        className="rp-button hero-bar-btn"
+        onClick={() => audioSetMuted(!audio.muted)}
+        title={audio.muted ? 'Unmute ambience' : 'Mute ambience'}
+        aria-label={audio.muted ? 'Unmute ambience' : 'Mute ambience'}
+        aria-pressed={audio.muted}
+      >
+        {audio.muted ? '🔇' : '🔊'}
       </button>
       <div className="hero-bar-gold">
         <GoldDisplay gold={gold} />

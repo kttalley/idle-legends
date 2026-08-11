@@ -88,8 +88,10 @@ export async function openTab(port) {
       consoleErrors.push(e.url ? `${e.text} <${e.url}>` : e.text)
     }
     if (msg.method === 'Runtime.exceptionThrown') {
-      consoleErrors.push(msg.params.exceptionDetails.exception?.description
-        ?? msg.params.exceptionDetails.text)
+      const d = msg.params.exceptionDetails
+      const frames = (d.stackTrace?.callFrames ?? []).slice(0, 8)
+        .map(f => `    at ${f.functionName || '<anon>'} (${f.url.split('/').slice(-1)[0]}:${f.lineNumber})`).join('\n')
+      consoleErrors.push((d.exception?.description ?? d.text) + (frames ? '\n' + frames : ''))
     }
   })
 

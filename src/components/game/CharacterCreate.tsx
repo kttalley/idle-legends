@@ -55,8 +55,16 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
 
   return (
     <div
-      className="flex flex-col items-center py-6 px-4"
+      className="flex flex-col items-center px-4"
       style={{
+        // Padding carries the SAFE-AREA insets rather than being a flat `py-6`.
+        // `viewport-fit=cover` (index.html) makes the WebView span the whole display, so a
+        // fixed 24px top put "Create Your Hero" underneath the Dynamic Island on an
+        // iPhone 17 Pro — the title cut in half by the pill and the clock sitting on the
+        // first letter. This is the first screen a new player and an App Store reviewer
+        // ever see, so it is the worst possible place for it.
+        paddingTop: 'calc(1.5rem + var(--safe-t))',
+        paddingBottom: 'calc(1.5rem + var(--safe-b))',
         // Definite viewport height + internal scroll: the app shell locks body to
         // 100dvh/overflow-hidden, so this screen must own its own scroll or tall
         // content (small phones) clips unreachably. min-h-screen (100vh) is a trap

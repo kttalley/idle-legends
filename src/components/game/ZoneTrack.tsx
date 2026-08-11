@@ -64,50 +64,50 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
 
     const centre = (): boolean => {
       const stop = rail.querySelector<HTMLElement>(`[data-zone="${focusZone}"]`)
-      // A rail with no width has not been laid out yet, and every measurement taken from
-      // it is zero. Centring against that silently produces scrollLeft 0 — which looks
-      // exactly like "the track happened to already be at the start".
-      if (!stop || rail.clientWidth === 0) return false
+      if (!stop) return false
+      // The rail must be CONSTRAINED before any of this means anything.
+      //
+      // The trap is that an un-laid-out flex child is not zero-width, it is *content*
+      // width: when this effect first runs the rail measures 816px — the full twelve-stop
+      // track — and only later settles to the ~309px the column actually gives it. Centring
+      // against 816 computes `146 - (816 - 68) / 2 = -228`, the browser clamps that to 0,
+      // and the result is indistinguishable from "the current zone is already at the
+      // start". Guarding on `clientWidth === 0` does not catch it, because it never is.
+      //
+      // `scrollWidth > clientWidth` is the honest test: it is false both while the rail is
+      // unconstrained and when the track genuinely fits, and in neither case is there any
+      // scrolling to do.
+      if (rail.scrollWidth <= rail.clientWidth + 1) return false
       // Not scrollIntoView: that walks up and scrolls every scrollable ancestor, which here
       // means yanking the whole left rail sideways as well.
       //
-      // Snapping and smooth scrolling both have to be suspended for the assignment, or the
-      // centring is silently undone. The rail is `scroll-behavior: smooth` (so the write
-      // starts an animation rather than taking effect) and `scroll-snap-type: x proximity`
-      // (so the browser then pulls the result to the nearest snap point). For an early
-      // zone the target is only ~26px from the start, which is nearer to stop 0's snap
-      // position than to its own — so the track animated a little and slid straight back
-      // to 0, looking exactly like "it was already at the start".
+      // Smooth scrolling is suspended for the write. The rail is `scroll-behavior: smooth`
+      // for the player's own flicks, which turns an assignment into an animation — so the
+      // position is not actually set when this returns, and anything reading it back (a
+      // test, or a second effect) sees the old value. Instant here, smooth for real input.
       //
-      // The CSS comment beside `scroll-snap-type` chose `proximity` over `mandatory` for
-      // this reason; proximity is weaker, not absent. Suspending both for the write is
-      // what actually makes programmatic positioning authoritative, and both are restored
-      // immediately so the player's own flicks still snap and glide.
+      // Scroll SNAPPING used to have to be suspended too, and could not be: re-enabling it
+      // afterwards re-snaps. It is gone from the CSS instead — see the note on
+      // `.zone-track-rail`.
       const prevBehavior = rail.style.scrollBehavior
-      const prevSnap = rail.style.scrollSnapType
       rail.style.scrollBehavior = 'auto'
-      rail.style.scrollSnapType = 'none'
       rail.scrollLeft = stop.offsetLeft - (rail.clientWidth - stop.offsetWidth) / 2
-      // Restore on the next frame: same-tick restoration re-enables snapping before the
-      // browser has committed the new offset, which reintroduces the pull.
-      requestAnimationFrame(() => {
-        rail.style.scrollBehavior = prevBehavior
-        rail.style.scrollSnapType = prevSnap
-      })
+      rail.style.scrollBehavior = prevBehavior
       return true
     }
 
     if (centre()) return
 
-    // Not laid out yet. This is the normal case, not an edge one: the track mounts inside
-    // a collapsed accordion and inside a mobile drawer that starts retracted, so on a phone
-    // the FIRST measurement is essentially always zero. A plain `useEffect` fires once,
-    // gets nothing, and never runs again — leaving the current zone off-screen with no
-    // indication anything failed.
+    // Not constrained yet. This is the normal path, not an edge case — on a phone the
+    // first measurement is essentially always the unconstrained one, because the track
+    // mounts inside an accordion inside a drawer that starts retracted. A plain
+    // `useEffect` fires once against that, computes a negative offset, and never runs
+    // again, leaving the current zone off-screen with nothing to indicate it failed.
     //
     // Same treatment the layout already gives --log-h and --actionbar-h: observe the
-    // element and act when it is real. Disconnects on the first successful centring so it
-    // does not fight the player's own scrolling afterwards.
+    // element and act once it is real. Disconnects on the first successful centring so it
+    // stops fighting the player's own scrolling afterwards — and if the track simply fits,
+    // it never "succeeds", which is correct: there is nothing to centre.
     if (typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(() => { if (centre()) ro.disconnect() })
     ro.observe(rail)

@@ -2153,10 +2153,15 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   padding-top: 2px;
-  /* `proximity`, not `mandatory`: the track is also positioned programmatically (centre
-     the current stop), and mandatory snapping fights that at the clamped ends — zone one
-     has nothing behind it, so its centred position does not exist. */
-  scroll-snap-type: x proximity;
+  /* No scroll snapping. It used to be `x proximity` — chosen over `mandatory` because
+     snapping "fights" the programmatic centring — but proximity is weaker, not absent, and
+     it lost the fight anyway: for an early zone the centred position is only ~26px from
+     the start, which is nearer to stop 0's snap position than to its own, so the browser
+     pulled the track straight back to 0 and the current zone silently never centred.
+     Re-enabling snap after a programmatic write re-snaps too, so this could not be fixed
+     by suspending it around the assignment.
+     The stops are ~68px wide on a 309px rail — snapping bought very little, and losing it
+     costs nothing next to the current zone actually being visible. */
   /* Fade both ends rather than showing a scrollbar. A hard edge mid-name reads as a
      rendering bug; a fade reads as "the line continues", which is the truth — and the
      ramp has to be wide enough to dissolve a partly-visible LABEL, not just soften the
@@ -2181,7 +2186,9 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   cursor: pointer;
   font-family: var(--font-ui);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
-  scroll-snap-align: center;
+  /* No `scroll-snap-align` — see the note on `.zone-track-rail`. A snap target with no
+     snap container is inert, but leaving it here would invite someone to restore
+     `scroll-snap-type` and silently reintroduce the bug. */
 }
 .zone-stop:disabled { cursor: default; }
 

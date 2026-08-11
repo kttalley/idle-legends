@@ -31,8 +31,12 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
 
   return (
     <div
-      className="flex flex-col items-center py-8"
+      className="flex flex-col items-center px-4"
       style={{
+        // Same safe-area fix as CharacterCreate: `viewport-fit=cover` means a flat `py-8`
+        // puts the Stillmarch wordmark under the Dynamic Island on a notched iPhone.
+        paddingTop: 'calc(2rem + var(--safe-t))',
+        paddingBottom: 'calc(2rem + var(--safe-b))',
         // Own scroll container: the app shell locks body to 100dvh/overflow-hidden, so
         // with several hero cards the list must scroll here. Dropped justify-center +
         // min-h-screen — centering pushed tall content off both ends unreachably, and

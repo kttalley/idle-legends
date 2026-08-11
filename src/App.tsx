@@ -18,6 +18,11 @@ import { QuestToast } from './components/game/QuestToast'
 import { OfflineReportToast } from './components/game/OfflineReportToast'
 import { slotStorage, getLastSlotId, setLastSlotId } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
+import { initAudio, setZone as audioSetZone, setVolume as audioSetVolume, setWeather as audioSetWeather } from './engine/audio/audioEngine'
+import {
+  initGenerative, setGenerativeZone, updateWorldSignals, playStinger,
+  startGenerative, stopGenerative,
+} from './engine/audio/generativeEngine'
 import { ZONES, ZONE_ORDER } from './data/zones'
 import { SpriteIcon } from './components/ui/SpriteIcon'
 import { formatGold } from './components/ui/GoldDisplay'
@@ -62,6 +67,61 @@ function defaultPanels(narrow: boolean): PanelState {
     : { hero: true, log: true, bag: true }
 }
 
+// ── Audio signal helpers ──────────────────────────────────────────────────────────────
+// Pure projections of store state into the slices the generative engine listens to. Kept here
+// (not in the engine) so the engine stays free of store knowledge and headless-safe.
+type StoreState = ReturnType<typeof useGameStore.getState>
+const clamp01v = (v: number) => Math.max(0, Math.min(1, v))
+const clampv = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+
+/** Non-tile world signals: how busy the world is, what mode, whether a boss is up, the weather,
+ *  and how out-of-depth the player is. Pushed to the generative engine on change. */
+function worldSignals(s: StoreState) {
+  const range = ZONES[s.currentZone]?.levelRange
+  const danger = range && s.level < range[0] ? clamp01v((range[0] - s.level) / 8) : 0
+  return {
+    entityCount: s.mobs.length + s.allies.length,
+    gameMode: s.gameMode,
+    boss: !!s.currentMob?.isBoss,
+    weather: s.weatherState.type,
+    danger,
+  }
+}
+
+/** Tile-reactivity: histogram the ground under a radius around the player and translate it
+ *  into register/tension/density nudges. Returns null when there is no map to read yet. */
+function tileSignals(s: StoreState): { registerShift: number; tensionAdd: number; densityMul: number } | null {
+  const map = s.zoneMaps[s.currentZone]
+  const tiles = map?.tiles
+  if (!tiles) return null
+  const R = 6
+  const cx = Math.round(s.playerMapPos.x), cy = Math.round(s.playerMapPos.y)
+  const counts: Record<string, number> = {}
+  let total = 0
+  for (let dy = -R; dy <= R; dy++) {
+    const r = cy + dy
+    if (r < 0 || r >= tiles.length) continue
+    const row = tiles[r]
+    for (let dx = -R; dx <= R; dx++) {
+      const c = cx + dx
+      if (c < 0 || c >= row.length) continue
+      const t = row[c]?.type
+      if (!t) continue
+      counts[t] = (counts[t] ?? 0) + 1
+      total++
+    }
+  }
+  if (!total) return null
+  const frac = (k: string) => (counts[k] ?? 0) / total
+  const water = frac('water'), ember = frac('ember'), rock = frac('rock')
+  const flower = frac('flower'), moss = frac('moss'), grass = frac('grass'), cliff = frac('cliff')
+  return {
+    registerShift: clampv(12 * water - 12 * (ember + rock), -12, 12),
+    tensionAdd: clamp01v(0.4 * (ember + rock) + 0.2 * cliff),
+    densityMul: clampv(1 + 0.3 * (flower + moss + grass) - 0.3 * water, 0.4, 1.6),
+  }
+}
+
 export default function App() {
   const initialized  = useGameStore(s => s.initialized)
   const initGame     = useGameStore(s => s.initGame)
@@ -86,6 +146,117 @@ export default function App() {
 
   // Publish the iOS keyboard height as --kb-inset so fixed panels can ride above it.
   useEffect(installViewportInsets, [])
+
+  // ── Procedural audio ─────────────────────────────────────────────────────────────
+  //
+  // iOS WKWebView only resumes an AudioContext off a user gesture, so the context is latched
+  // on the first pointerdown/keydown (the Continue/Create tap is the natural one). After that
+  // a single store subscription drives BOTH audio layers: the ambient bed (zone crossfade,
+  // volume, weather) and the generative music (zone grammar + live world signals). The
+  // generative layer's tile-reactivity runs on its own 0.5 s sampler below. No per-frame work —
+  // both engines modulate parameters on transitions only (see audioEngine/generativeEngine).
+  useEffect(() => {
+    let latched = false
+    const latch = () => {
+      if (latched) return
+      latched = true
+      initAudio()
+      const s = useGameStore.getState()
+      audioSetVolume(s.settings.volume)
+      audioSetWeather(s.weatherState.type)
+      if (s.initialized) {
+        audioSetZone(s.currentZone, s.worldSeed)
+        // Tone.js is dynamically imported inside initGenerative; chain the zone grammar on so
+        // the cells come up reading the right scale/tempo the moment they exist.
+        void initGenerative().then(() => {
+          setGenerativeZone(s.currentZone, s.worldSeed)
+          updateWorldSignals(worldSignals(s))
+          startGenerative()
+        })
+      }
+      window.removeEventListener('pointerdown', latch)
+      window.removeEventListener('keydown', latch)
+    }
+    window.addEventListener('pointerdown', latch)
+    window.addEventListener('keydown', latch)
+    return () => {
+      window.removeEventListener('pointerdown', latch)
+      window.removeEventListener('keydown', latch)
+    }
+  }, [])
+
+  useEffect(() => {
+    // Tracks how much of combatLog we have already sonified, so only NEW entries fire stingers.
+    let lastLogLen = 0
+    // Diff only the slices the engines care about; everything else is ignored so combat ticks
+    // (which fire this callback constantly) never reach Web Audio.
+    const onStore = (state: ReturnType<typeof useGameStore.getState>, prev: typeof state) => {
+      if (state.initialized && !prev.initialized) {
+        audioSetZone(state.currentZone, state.worldSeed)
+        audioSetVolume(state.settings.volume)
+        audioSetWeather(state.weatherState.type)
+        lastLogLen = state.combatLog.length
+        void initGenerative().then(() => {
+          setGenerativeZone(state.currentZone, state.worldSeed)
+          updateWorldSignals(worldSignals(state))
+          startGenerative()
+        })
+        return
+      }
+      if (!state.initialized) {
+        stopGenerative()
+        lastLogLen = 0
+        return
+      }
+      if (state.currentZone !== prev.currentZone) {
+        audioSetZone(state.currentZone, state.worldSeed)
+        setGenerativeZone(state.currentZone, state.worldSeed)
+        updateWorldSignals(worldSignals(state))
+      }
+      if (state.settings.volume !== prev.settings.volume) audioSetVolume(state.settings.volume)
+      if (state.weatherState.type !== prev.weatherState.type) {
+        audioSetWeather(state.weatherState.type)
+        updateWorldSignals({ weather: state.weatherState.type })
+      }
+
+      // Generative reactivity: only when a watched slice actually changes (these change on
+      // spawns/deaths/transitions, not every tick) do we push new signals to the music.
+      const a = worldSignals(state), b = worldSignals(prev)
+      if (a.entityCount !== b.entityCount || a.gameMode !== b.gameMode ||
+          a.boss !== b.boss || a.danger !== b.danger) {
+        updateWorldSignals(a)
+      }
+
+      // Combat-log stinger tail: sonify level-ups, boss spawns, and mob deaths as the log grows.
+      const log = state.combatLog
+      if (log.length !== lastLogLen) {
+        if (log.length > lastLogLen) {
+          for (let i = lastLogLen; i < log.length; i++) {
+            const t = log[i].type
+            if (t === 'level_up') playStinger('level_up')
+            else if (t === 'boss_spawn') playStinger('boss_spawn')
+            else if (t === 'mob_death') playStinger('mob_death')
+          }
+        }
+        lastLogLen = log.length
+      }
+    }
+    return useGameStore.subscribe(onStore)
+  }, [])
+
+  // Tile-reactivity sampler: every 0.5 s, histogram the tile types under a radius around the
+  // player and retune the generative grammar — water lifts and thins it, ember/rock drop and
+  // darken it, flowers/moss thicken it. This is the "walking changes the music" channel; it is
+  // deliberately off the per-tick store subscription so it never competes with the render loop.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const s = useGameStore.getState()
+      if (!s.initialized) return
+      const ts = tileSignals(s)
+      if (ts) updateWorldSignals(ts)
+    }, 500)
+    return () => window.clearInterval(id)
+  }, [])
 
   // Publish the log panel's real height as --log-h.
   //

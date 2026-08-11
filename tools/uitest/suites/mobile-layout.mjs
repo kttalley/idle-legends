@@ -161,12 +161,10 @@ export async function run({ send, appUrl, check, note }) {
       scrollLeft: Math.round(rail.scrollLeft),
       railW: Math.round(rail.clientWidth),
       contentW: Math.round(rail.scrollWidth),
-      drawerW: Math.round(document.querySelector('.app-sidebar-left')?.getBoundingClientRect().width ?? 0),
-      // What ZoneTrack's own centring formula evaluates to right now. If this is > 0 while
-      // scrollLeft is 0, the effect ran against a rail that was not laid out yet.
+      // What ZoneTrack's centring formula evaluates to right now. Kept in the note because
+      // this is exactly the number that silently went negative when the rail was measured
+      // before it was constrained — see the comment in ZoneTrack.
       ideal: current ? Math.round(current.offsetLeft - (rail.clientWidth - current.offsetWidth) / 2) : null,
-      stopOffset: current ? Math.round(current.offsetLeft) : null,
-      stopW: current ? Math.round(current.offsetWidth) : null,
       offCentre: c ? Math.round(Math.abs((c.x + c.width / 2) - (r.x + r.width / 2))) : null,
     };
   })()`)
@@ -192,8 +190,14 @@ export async function run({ send, appUrl, check, note }) {
   await evaluate(send, openDock('Hero'))
   await sleep(900)
   const mid = await measure()
-  note(`mid-track: ideal ${mid?.ideal}, stopOffset ${mid?.stopOffset}, stopW ${mid?.stopW}, offCentre ${mid?.offCentre}px, scrollLeft ${mid?.scrollLeft}, rail ${mid?.railW}px, content ${mid?.contentW}px, drawer ${mid?.drawerW}px, scrollable ${mid?.scrollable}`)
+  note(`mid-track: scrollLeft ${mid?.scrollLeft} (ideal ${mid?.ideal}), offCentre ${mid?.offCentre}px, rail ${mid?.railW}px of ${mid?.contentW}px content`)
+  // `scrollLeft > 0` alone is weak — it was the assertion that failed for weeks-worth of
+  // wrong reasons. Assert the track landed where its own formula wanted, so a future
+  // regression that clamps to 0 (or overshoots) is named rather than merely detected.
   check('a mid-track zone scrolls itself into view', mid && mid.scrollLeft > 0)
+  check('...and lands where the centring formula asked for',
+    mid && mid.ideal > 0 && Math.abs(mid.scrollLeft - mid.ideal) <= 2,
+    mid ? `scrollLeft ${mid.scrollLeft} vs ideal ${mid.ideal}` : 'no measurement')
   check('...and lands centred, with the zone behind and ahead flanking it',
     mid && mid.offCentre !== null && mid.offCentre < 40)
 }

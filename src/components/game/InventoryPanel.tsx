@@ -60,6 +60,25 @@ function ItemBox({ item, onClick, equippedItem, isEquipped = false }: {
   )
 }
 
+/**
+ * Display labels for the two tabs, deliberately decoupled from the keys.
+ *
+ * The panel was titled "Inventory" and one of its two tabs was ALSO "Inventory" — a label
+ * cannot be both the container and one of the things inside it, and nothing told a player
+ * which of the two held the sword they were wearing. The keys stay as they are (`inventory`
+ * is referenced throughout this file and by the CollapsiblePanel's persisted `id`), so this
+ * is a display-only change with no state migration.
+ *
+ * "Equipment" and "Backpack" are both concrete and both SPATIAL — they answer "where is
+ * this item", on your body or in your pack, which is the distinction the tabs actually
+ * encode. "Inventory / Backpack" would have been near-synonyms, and "Character" collides
+ * with the character sheet in the opposite rail.
+ */
+const TAB_LABEL: Record<'equipment' | 'inventory', string> = {
+  equipment: 'Equipment',
+  inventory: 'Backpack',
+}
+
 export function InventoryPanel() {
   const {
     inventory, equipment, equipItem, unequipItem, sellItem, sellAllCommon,
@@ -111,7 +130,7 @@ export function InventoryPanel() {
   })()
 
   return (
-    <CollapsiblePanel id="inventory" title="Inventory" grow>
+    <CollapsiblePanel id="inventory" title="Gear" grow>
       {/* Tabs */}
       <div className="flex border-b" style={{ borderColor: 'var(--edge)' }}>
         {(['equipment', 'inventory'] as const).map(t => (
@@ -122,11 +141,10 @@ export function InventoryPanel() {
               background: activeTab === t ? 'rgba(200,161,0,0.15)' : undefined,
               borderBottom: activeTab === t ? '2px solid var(--gold)' : '2px solid transparent',
               borderRadius: 0,
-              textTransform: 'capitalize',
             }}
             onClick={() => setActiveTab(t)}
           >
-            {t}
+            {TAB_LABEL[t]}
           </button>
         ))}
       </div>
