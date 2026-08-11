@@ -1,4 +1,5 @@
 import type { ClassType, ZoneId, FactionType, TownId } from '../data/types'
+import { FACTION_DEFINITIONS } from '../data/factions'
 
 // Security: never default to localhost. A public build without VITE_LLM_URL must not
 // probe the visitor's machine. Only call out to an endpoint that was explicitly set
@@ -40,11 +41,30 @@ function seededPick<T>(arr: T[], seed: number, offset: number): T {
   return arr[idx % arr.length]
 }
 
-export function generateFactionNamesFallback(seed: number): Record<FactionType, string> {
+/**
+ * The factions are FIXED. Zones, towns, player names and traits are not.
+ *
+ * This used to mint a fresh pair every playthrough — "The Starfall Covenant", "The
+ * Dawnward Bulwark" — and the UI showed the generated name, so a player never once saw
+ * **The Lastlight Concord** or **The Ashmarch**. That quietly discarded the thing the whole
+ * rebrand is built on: the mottos, the 9–12 faction trim ramps, the beacon-star and
+ * broken-ring emblems in `docs/art-direction.md` §1 all describe two specific factions, and
+ * the game title *Stillmarch* deliberately echoes "Ashmarch". None of that survives a name
+ * that is different on every save.
+ *
+ * Procedural flavour still applies everywhere it costs nothing: zones, towns, hero names
+ * and traits are all still seeded per playthrough. Factions are the fixed poles the world
+ * hangs on, so they come from `FACTION_DEFINITIONS` — one source of truth, shared with the
+ * palette registry and the store listing.
+ *
+ * `seed` is retained so every caller keeps compiling and the signature stays honest about
+ * being a "generator"; it is deliberately unused.
+ */
+export function generateFactionNamesFallback(_seed: number): Record<FactionType, string> {
   return {
-    alliance: `The ${seededPick(LIGHT_PREFIXES, seed, 1)} ${seededPick(LIGHT_SUFFIXES, seed, 2)}`,
-    horde:    `The ${seededPick(SHADOW_PREFIXES, seed, 3)} ${seededPick(SHADOW_SUFFIXES, seed, 4)}`,
-    neutral:  `The ${seededPick(NEUTRAL_PREFIXES, seed, 5)} ${seededPick(NEUTRAL_SUFFIXES, seed, 6)}`,
+    alliance: FACTION_DEFINITIONS.alliance.name,
+    horde:    FACTION_DEFINITIONS.horde.name,
+    neutral:  FACTION_DEFINITIONS.neutral.name,
   }
 }
 
@@ -212,11 +232,6 @@ Generate this exact JSON:
 {
   "playerName": "<2-word fantasy name, format FirstName Epithet, e.g. 'Gorvain the Relentless'>",
   "traits": ["<trait 1>", "<trait 2>", "<trait 3>"],
-  "factionNames": {
-    "alliance": "<original name for the light/noble faction>",
-    "horde": "<original name for the shadow/primal faction>",
-    "neutral": "<original name for the neutral/wanderer faction>"
-  },
   "zoneNames": {
 ${zoneDescriptions}
   },
@@ -232,21 +247,17 @@ ${townDescriptions}
   const parsed = JSON.parse(match[0]) as {
     playerName: string
     traits: string[]
-    factionNames: Record<FactionType, string>
     zoneNames: Record<string, string>
     townNames: Record<string, string>
   }
 
-  const fallbackFactions = generateFactionNamesFallback(seed)
-
   return {
     playerName:   parsed.playerName ?? 'The Wanderer',
     traits:       Array.isArray(parsed.traits) ? parsed.traits.slice(0, 3) : [],
-    factionNames: {
-      alliance: parsed.factionNames?.alliance ?? fallbackFactions.alliance,
-      horde:    parsed.factionNames?.horde    ?? fallbackFactions.horde,
-      neutral:  parsed.factionNames?.neutral  ?? fallbackFactions.neutral,
-    },
+    // NOT model-supplied, and no longer asked for in the prompt above. The factions are
+    // canon; letting an LLM rename them is how the world bible's two factions stopped
+    // appearing in the game at all.
+    factionNames: generateFactionNamesFallback(seed),
     zoneNames:  (parsed.zoneNames  ?? {}) as Partial<Record<ZoneId, string>>,
     townNames:  (parsed.townNames  ?? {}) as Record<TownId, string>,
   }

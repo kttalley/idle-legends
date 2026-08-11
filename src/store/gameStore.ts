@@ -409,7 +409,12 @@ function rehydrateState(saved: GameState): GameState {
   // Ensure new fields exist on old saves
   saved.playerRace    = saved.playerRace    ?? 'human'
   saved.playerFaction = saved.playerFaction ?? 'alliance'
-  saved.factionNames  = saved.factionNames  ?? generateFactionNamesFallback(Date.now())
+  // Factions are canon, so this is an OVERWRITE rather than the usual `??` backfill.
+  // Saves written while faction names were generated per-playthrough are carrying things
+  // like "The Starfall Covenant", and a `??` would preserve them forever — leaving those
+  // players in a world whose two factions never match the art, the mottos, or the store
+  // listing. Display-only field, no ids touched, so re-stamping it is safe.
+  saved.factionNames  = generateFactionNamesFallback(0)
   saved.controlMode   = saved.controlMode   ?? 'idle'
   // Saves written before colorways existed, and any save naming a colorway this build
   // no longer ships, fall back to the default rather than rendering an unknown palette.
@@ -456,6 +461,7 @@ function rehydrateState(saved: GameState): GameState {
     ...saved.settings,
     autoEquip: saved.settings?.autoEquip ?? true,
     autoAdvanceZones: saved.settings?.autoAdvanceZones ?? true,
+    volume: saved.settings?.volume ?? 0.5,
   }
   saved.zoneWatch = { zone: saved.currentZone, seconds: 0, kills: 0 }
   saved.zoneBlockedAtLevel = saved.zoneBlockedAtLevel ?? {}
@@ -1772,6 +1778,8 @@ interface GameActions {
   buyBagSlot: () => void
   setAutoEquip: (on: boolean) => void
   setAutoAdvanceZones: (on: boolean) => void
+  /** Master audio volume, 0–1. Persisted with the save; the audio engine mirrors it. */
+  setVolume: (v: number) => void
   setActiveTownNpc: (id: TownServiceKind | null) => void
   buyUpgrade: (id: UpgradeId) => void
   dismissOfflineReport: () => void
@@ -3593,6 +3601,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const s = get()
     if ((s.settings.autoEquip !== false) === on) return
     set({ settings: { ...s.settings, autoEquip: on } })
+  },
+
+  /** Master volume (0–1). Persisted; the audio engine is told via the App subscription so the
+   *  store stays decoupled from Web Audio (and stays headless-safe). */
+  setVolume: (v) => {
+    const clamped = Math.max(0, Math.min(1, v))
+    const s = get()
+    if (s.settings.volume === clamped) return
+    set({ settings: { ...s.settings, volume: clamped } })
   },
 
   /**
