@@ -1689,9 +1689,13 @@ so create the record as `com.stillmarch.game`, and do it only after the trademar
 search clears, because the bundle id cannot follow a forced rename later.
 
 **Deliberately NOT renamed** — both are correct as they stand:
-- `vite.config.ts` `base: '/projects/idle-legends/'` — a live web-deploy path. Changing it
-  breaks whatever is deployed there, and it has no bearing on the App Store build, which
-  uses `./`. The user's call, on the user's own site.
+- ~~`vite.config.ts` `base: '/projects/idle-legends/'`~~ — **renamed to `/projects/stillmarch/`
+  on 2026-08-12**, on the owner's call. It was left alone during the rebrand because it is a
+  live web-deploy path and changing it breaks any existing link; the site had not actually
+  been deployed yet, so there was nothing to break. Serves from nginx at
+  `/var/www/html/projects/stillmarch/`. Note this base is absolute and baked in at build
+  time — the web build ONLY works at that exact URL path, and `npm run build:native` still
+  uses `./` because iOS serves from the root of `capacitor://localhost`.
 - `https://github.com/kttalley/idle-legends.git` in `tools/spritegen/README.md` — a real
   clone URL; editing it would break the documented setup unless the repo is renamed first.
 - Internal snake_case ids and the `ffa_*` roster keys — load-bearing save/cache keys.

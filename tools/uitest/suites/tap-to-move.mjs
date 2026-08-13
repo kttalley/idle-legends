@@ -42,21 +42,22 @@ export async function run({ send, appUrl, check, note }) {
   note(`canvas ${rect.w}x${rect.h} at ${rect.x},${rect.y}`)
 
   // Put the hero hard against the low edge of the map, where the seam is on screen and
-  // where clamping used to do the most damage.
+  // where clamping used to do the most damage, and force every tap to the GROUND branch.
   //
-  // Also clear the entities first. `moveTo` runs a hit-test chain — town NPC, ambient hero,
-  // current mob, other mobs — and any hit returns EARLY without touching tapTx/tapTy. That
-  // is correct behaviour (tapping a monster should fight it, not walk to the dirt under
-  // it), but it makes a ground-projection test non-deterministic: a wandering mob drifting
-  // under a sample point leaves the previous target in place, which reads as two screen
-  // points resolving to the same tile. Probing ground means probing ground.
+  // moveTo runs a hit-test chain — town NPC, ambient hero, current mob, other mobs — and any
+  // hit returns early without touching tapTx/tapTy. That is correct behaviour (tapping a
+  // monster should fight it, not walk to the dirt under it) but it makes a ground-projection
+  // test non-deterministic.
+  //
+  // Clearing the entity lists was the obvious fix and does NOT hold: the scene re-syncs them
+  // from the store every frame, so a mob drifts back under a sample point within a frame or
+  // two and the suite flakes. Stubbing the hit-test survives the re-sync, which is the
+  // difference between a test that passes and one that passes reliably.
   await evaluate(send, `(() => {
     const s = window.__ilScene;
     s.player.tx = 17.5; s.player.ty = 17.5;
-    s.mob = null; s.showMob = false;
-    s.otherMobEnts?.clear?.();
-    if (Array.isArray(s.ambient)) s.ambient.length = 0;
-    if (Array.isArray(s.townNpcs)) s.townNpcs.length = 0;
+    s.__origHitTest = s.hitTestEntity;
+    s.hitTestEntity = () => false;
   })()`)
   await sleep(300)
 
@@ -79,13 +80,18 @@ export async function run({ send, appUrl, check, note }) {
 
   check('every tapped point resolves to a target', results.every(r => r && r.active === true))
 
-  // The regression signature: clamped taps pile up on the boundary value, so several
-  // distinct screen points collapse onto the same coordinate.
+  // The regression signature is COLLAPSE onto the boundary — under the old clamp every tap
+  // past the edge became exactly PAD+1, so several distinct points shared it.
+  //
+  // Asserting "no tap equals 17" was wrong and flaked: with wrapping, 17 is an ordinary
+  // legal coordinate, and across 4 points × 2 axes at 0.01 tolerance one lands there by
+  // chance every few runs. Requiring TWO or more is the actual signature and has no false
+  // positive.
   const PAD_FLOOR = 17 // PAD + 1
-  const pinned = results.filter(r =>
+  const onFloor = results.filter(r =>
     Math.abs(r.tx - PAD_FLOOR) < 0.01 || Math.abs(r.ty - PAD_FLOOR) < 0.01)
-  check('no tap is pinned to the old clamp boundary', pinned.length === 0,
-    pinned.length ? `${pinned.map(p => p.label).join(', ')} landed exactly on ${PAD_FLOOR}` : '')
+  check('taps are not collapsing onto the old clamp boundary', onFloor.length < 2,
+    onFloor.length >= 2 ? `${onFloor.map(p => p.label).join(', ')} all landed on ${PAD_FLOOR}` : '')
 
   const unique = new Set(results.map(r => `${r.tx.toFixed(2)},${r.ty.toFixed(2)}`))
   check('distinct screen points give distinct tiles', unique.size === results.length,
@@ -114,24 +120,58 @@ export async function run({ send, appUrl, check, note }) {
   check('tapping left and right resolve to opposite directions',
     (dir.left.dx - dir.right.dx) < 0 && (dir.left.dy - dir.right.dy) > 0)
 
-  // And the whole point: a real touch on the canvas moves the hero.
-  const before = await evaluate(send, `(() => { const s = window.__ilScene; return { x: s.player.tx, y: s.player.ty }; })()`)
-  await send('Input.dispatchTouchEvent', {
-    type: 'touchStart',
-    touchPoints: [{ x: rect.x + Math.round(rect.w * 0.3), y: rect.y + Math.round(rect.h * 0.35) }],
-  })
+  // And the whole point: a REAL touch — not a synthetic moveTo call — resolves to the right
+  // tile. This asserts the target, not the walk.
+  //
+  // Locomotion is deliberately not asserted here: combat outranks tap-move by design
+  // (mobEngaged clears tapMoveActive, combatAdapter ~L2353), and at level 24 in Grimshade
+  // the hero is in combat most of the time, so "did the hero move" flaked 2 runs in 5 for
+  // reasons that were correct behaviour. The bug this suite exists for was target
+  // RESOLUTION — which tile a tap maps to — so that is what gets asserted.
+  // Pick a point that genuinely lands on the WORLD CANVAS. A fixed fraction does not: at
+  // (0.3w, 0.35h) the touch landed under the unit-frame panel, whose height changes with
+  // however many buffs are active, so the canvas never saw the event and tapTx stayed
+  // untouched on ~2 runs in 5. elementFromPoint settles it instead of guessing.
+  const pt = await evaluate(send, `(() => {
+    const c = document.querySelector('canvas');
+    const r = c.getBoundingClientRect();
+    for (const [fx, fy] of [[0.5,0.5],[0.4,0.55],[0.6,0.45],[0.35,0.62],[0.65,0.6]]) {
+      const x = Math.round(r.x + r.width * fx), y = Math.round(r.y + r.height * fy);
+      const el = document.elementFromPoint(x, y);
+      if (el && el.tagName === 'CANVAS') return { x, y };
+    }
+    return null;
+  })()`)
+  check('found a point on the world canvas, clear of the HUD', pt !== null)
+  if (!pt) return
+
+  await evaluate(send, `(() => { const s = window.__ilScene; s.tapTx = -999; s.tapTy = -999; })()`)
+  await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: pt.x, y: pt.y }] })
   await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-  await sleep(1200)
-  const after = await evaluate(send, `(() => { const s = window.__ilScene; return { x: s.player.tx, y: s.player.ty }; })()`)
-  // Wrapped delta, or this measures nothing: the hero sits on the seam, so a one-tile step
-  // shows up as a ~63-tile raw jump and `moved > 0` passes no matter what happens. Bound it
-  // above too — a real walk over ~1.2s covers a few tiles, so an implausibly large distance
-  // means the target was wrong rather than that movement worked.
-  const M = 64
-  const wrapDiff = (a, b) => { let d = (a - b) % M; d = ((d % M) + M) % M; return d > M / 2 ? d - M : d }
-  const moved = Math.hypot(wrapDiff(after.x, before.x), wrapDiff(after.y, before.y))
-  note(`hero moved ${moved.toFixed(2)} tiles (wrapped) after a real touch`)
-  check('a real touch on a visible tile actually moves the hero', moved > 0.05)
-  check('...by a plausible walking distance, not a teleport', moved < 20,
-    `moved ${moved.toFixed(2)} tiles`)
+  await sleep(350)
+
+  // Compare against a moveTo at the SAME point taken right afterwards. The camera scrolls
+  // continuously, so an expectation computed before the touch drifts by a fraction of a
+  // tile; back-to-back keeps the comparison meaningful. Tolerance is deliberately loose —
+  // the regression being guarded against mis-resolved taps by TENS of tiles, not tenths.
+  const touched = await evaluate(send, `(() => {
+    const s = window.__ilScene;
+    const got = { tx: s.tapTx, ty: s.tapTy, engaged: !!s.mobEngaged };
+    s.moveTo(${pt.x}, ${pt.y});
+    return { got, expect: { tx: s.tapTx, ty: s.tapTy } };
+  })()`)
+
+  note(`real touch → (${touched.got.tx?.toFixed(1)}, ${touched.got.ty?.toFixed(1)}) vs moveTo (${touched.expect.tx?.toFixed(1)}, ${touched.expect.ty?.toFixed(1)})${touched.got.engaged ? ' · in combat' : ''}`)
+
+  check('a real touch reaches the scene and sets a ground target',
+    touched.got.tx !== -999 && touched.got.ty !== -999)
+  check('...resolving to the same tile the projection predicts',
+    Math.abs(touched.got.tx - touched.expect.tx) < 2 && Math.abs(touched.got.ty - touched.expect.ty) < 2,
+    `got (${touched.got.tx?.toFixed(2)}, ${touched.got.ty?.toFixed(2)}), moveTo (${touched.expect.tx?.toFixed(2)}, ${touched.expect.ty?.toFixed(2)})`)
+
+  // Restore the real hit-test, so nothing after this point runs against a stubbed scene.
+  await evaluate(send, `(() => {
+    const s = window.__ilScene;
+    if (s && s.__origHitTest) { s.hitTestEntity = s.__origHitTest; delete s.__origHitTest; }
+  })()`)
 }

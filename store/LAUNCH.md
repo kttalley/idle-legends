@@ -50,7 +50,7 @@ Then in Xcode: select a team under Signing & Capabilities, add the **In-App Purc
 capability, and run on a device.
 
 **Use `npm run build:native`, never `npm run build`, for anything native.** The web target
-hardcodes the `/projects/idle-legends/` base; iOS serves from `capacitor://localhost` at
+hardcodes the `/projects/stillmarch/` base; iOS serves from `capacitor://localhost` at
 the root, so a web build 404s every asset inside the WebView.
 
 ## 4. The IAP

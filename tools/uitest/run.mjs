@@ -4,7 +4,7 @@
 //   npm run test:ui                 # boot a dev server, run every suite headless
 //   npm run test:ui -- --only menus # one suite
 //   npm run test:ui -- --headed     # watch it happen
-//   APP_URL=http://localhost:5174/projects/idle-legends/ npm run test:ui
+//   APP_URL=http://localhost:5174/projects/stillmarch/ npm run test:ui
 //
 // Complements the headless economy harness in tools/sim, which needs no browser and can
 // therefore see none of this. Everything asserted here is layout, hit-testing or event

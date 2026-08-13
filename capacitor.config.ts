@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   appId: 'com.stillmarch.game',
   appName: 'Stillmarch',
   // Vite's build output. Populate it with `npm run build:native`, NOT `npm run build`:
-  // the web target hardcodes the /projects/idle-legends/ base, and iOS serves this
+  // the web target hardcodes the /projects/stillmarch/ base, and iOS serves this
   // bundle from capacitor://localhost at the ROOT, so every asset would 404.
   webDir: 'dist',
   ios: {
