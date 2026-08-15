@@ -81,6 +81,14 @@ export async function run({ send, appUrl, check, note }) {
     check('it does not present being switched off as an error', !/error|failed|crash/i.test(disabledCopy))
   } else {
     // LIVE: only reachable once the env vars are set.
+    //
+    // Publish-then-fetch is two round trips to the project's region, and while they are in
+    // flight the panel renders neither a list nor an empty state — only the refresh button
+    // showing `…`. Reading row counts before that settles measures the loading frame and
+    // reports an empty board. This branch had never actually executed until the backend
+    // went live on 2026-08-15, which is why the race shipped unnoticed.
+    await waitFor(send, `!!document.querySelector('.ladder-list') || !!document.querySelector('.ladder-empty')`,
+      { timeout: 15000 })
     const rows = await evaluate(send, `document.querySelectorAll('.ladder-row').length`)
     note(`live ladder: ${rows} row(s)`)
     check('the board renders rows or an honest empty state', rows >= 0)

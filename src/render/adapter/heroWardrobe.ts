@@ -9,7 +9,7 @@
 
 import type { ClassType, RaceType, FactionType, Rarity } from '../../data/types'
 import { composePalette } from '../palette'
-import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
+import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS, applyBiomeAmbient } from '../palettes'
 import { getColorway, DEFAULT_COLORWAY } from '../colorways'
 import { UNIQUE_BY_ID } from '../../data/uniques'
 
@@ -70,12 +70,16 @@ export function heroPaletteId(
   faction: FactionType,
   rarity: AccentKey = 'common',
   colorway: string = DEFAULT_COLORWAY,
+  biome?: string,
 ): string {
   // The colorway is part of the cache key, so an equipped skin is a distinct registered
   // palette rather than a mutation of the base one — two heroes in the same party can
   // wear different colorways in the same frame.
   const cw = getColorway(colorway)
-  const id = `hero/${playerClass}/${race}/${faction}/${rarity}/${cw.id}`
+  // Biome is a full axis of the cache key, not a mutation: the same hero in two zones is two
+  // registered palettes, so walking between zones is a lookup rather than a recompose, and
+  // two heroes standing in different zones can render in the same frame.
+  const id = `hero/${playerClass}/${race}/${faction}/${rarity}/${cw.id}${biome ? `/${biome}` : ''}`
   if (hasPalette(id)) return id
   const base = getPalette(RACE_PALETTE[race] ?? 'race/human')  // skin ramp (1–4)
   const overrides: Partial<Record<number, string>> = {
@@ -86,6 +90,10 @@ export function heroPaletteId(
     // of buying it. It deliberately carries no slots 1–4, so race skin always survives.
     ...cw.overrides,
   }
-  registerPaletteRaw(id, composePalette(base, overrides))
+  // Ambient LAST, over the finished look. It has to see the actual colours the hero ended up
+  // wearing to solve its strength against them — a colorway or a legendary accent changes how
+  // much tint the figure can absorb before it stops separating from the ground.
+  const composed = composePalette(base, overrides)
+  registerPaletteRaw(id, biome ? applyBiomeAmbient(composed, biome) : composed)
   return id
 }

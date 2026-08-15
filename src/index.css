@@ -127,23 +127,36 @@ body {
   --safe-t:          env(safe-area-inset-top, 0px);
   --safe-l:          env(safe-area-inset-left, 0px);
   --safe-r:          env(safe-area-inset-right, 0px);
-  /* Width the floating rails occupy. The HUD (unit frames, minimap, strike meter)
-     insets by these so it never slides under a glass column — and they collapse to
-     0 when a column is folded away, giving the HUD the reclaimed space. */
-  --rail-l: 252px;
-  /* The radar column: 74px disc + its corner satellites overhanging 6px each side, plus
-     margin. The inventory rail and the bottom stack both reserve against it, so the
-     minimap can stay pinned to the corner without anything sliding under it. */
-  --radar-w: 96px;
-  /* Everything the right edge is spending: the radar column, then the inventory rail
-     flown out to its left (250px + a 10px gap). Derived rather than a second hand-kept
-     number, because that pair drifting apart is what puts the action bar under a panel. */
-  --rail-r: calc(var(--radar-w) + 260px);
+  /* ── The left column ──
+     On desktop the unit frames, the character rail and the chat feed are ONE column down
+     the left edge: frames on top, panels stacked under them, all sharing `--col-l-w` and
+     the same 8px inset. Flying the rail out beside the frames instead was tried and looked
+     like a staircase; the frames are the head of this column, not an obstacle beside it.
+     `--unit-h` is the height the frames actually occupy, measured at runtime (HudOverlay)
+     so the rail below them cannot drift out of sync with a hand-kept number — the same
+     treatment `--log-h` and `--actionbar-h` already get. The value here is only the
+     pre-measurement default. */
+  --col-l-w: 232px;
+  --unit-h: 150px;
+  /* ── The right column ──
+     The same idea mirrored: radar and objective tracker on top, the inventory stacked
+     underneath, everything right-aligned on one 8px inset. `--hud-r-h` is the measured
+     height of that top-right stack (HudOverlay), the counterpart of `--unit-h`. */
+  --col-r-w: 250px;
+  --hud-r-h: 190px;
+  /* Width each side is spending, which is what the bottom stack reserves against so the
+     action bar never slides under a glass column.
+     The left one does NOT shrink when the character rail is folded, because the CHAT FEED
+     is still at the foot of that column and does not fold with it — the old collapsed value
+     of 52px slid the action bar straight under the chat panel. The right one still
+     collapses, because the inventory really is the only thing that reaches the bottom on
+     that side — the radar and the tracker stop well above it. */
+  --rail-l: calc(var(--col-l-w) + 20px);
+  --rail-r: calc(var(--col-r-w) + 20px);
 }
-.app-root[data-left-collapsed="true"]  { --rail-l: 52px; }
-/* Retracted, the right rail is a 34px stub — but it still sits inboard of the radar, so
-   the space the HUD must keep clear is the stub PLUS the radar column. */
-.app-root[data-right-collapsed="true"] { --rail-r: calc(var(--radar-w) + 44px); }
+/* Folded to a 34px stub, and nothing else on this side comes near the bottom stack — the
+   radar and the tracker sit above it in the same column. */
+.app-root[data-right-collapsed="true"] { --rail-r: 62px; }
 
 /* ── Display type ────────────────────────────────────────────────────────────
    The complete list of things that keep the serif. If a rule is not here (or does not
@@ -253,18 +266,30 @@ h1, h2, h3, h4,
   scrollbar-color: var(--wood) transparent;
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
 }
+/* Stacked UNDER the unit frames, sharing their left edge and their width — the three
+   surfaces on this side are one column, not three things scattered down the same edge.
+   `top` therefore tracks the frames' measured height rather than the top of the screen. */
 .app-sidebar-left  {
-  left: 10px;
-  /* The zone-chat panel occupies the foot of this column, so the rail may only grow to
-     the space above it. */
-  max-height: calc(100dvh - var(--log-h) - 28px - var(--safe-t));
+  left: calc(8px + var(--safe-l));
+  top: calc(var(--unit-h) + 16px + var(--safe-t));
+  width: var(--col-l-w);
+  /* Bounded by BOTH neighbours: the frames above set where it starts, and the chat feed at
+     the foot of the column sets where it has to stop. Both are measured, so neither
+     coupling can drift. */
+  max-height: calc(100dvh - var(--unit-h) - var(--log-h) - 36px - var(--safe-t));
   /* The left rail scrolls in its MIDDLE, not as a whole — see `.rail-body`. */
   overflow: hidden;
 }
-/* Flies out to the LEFT of the radar rather than under it. `--radar-w` is the disc plus
-   its corner satellites plus the zone caption — reserved as a token so the two cannot
-   drift apart when the disc is resized. */
-.app-sidebar-right { right: calc(var(--radar-w) + var(--safe-r)); width: 250px; }
+/* Stacked UNDER the radar and the objective tracker, right-aligned on the same 8px inset —
+   the mirror of the left column. It used to fly out to the LEFT of the radar, which put a
+   250px panel beside a 172px one and left the two top corners built on different principles.
+   `--hud-r-h` is that top-right stack's measured height (HudOverlay). */
+.app-sidebar-right {
+  right: calc(8px + var(--safe-r));
+  top: calc(var(--hud-r-h) + 16px + var(--safe-t));
+  width: var(--col-r-w);
+  max-height: calc(100dvh - var(--hud-r-h) - var(--safe-t) - 36px);
+}
 
 /* ── Left rail: pinned head, scrolling body, pinned foot ─────────────────────
    The hero identity strip (gold / Looks / Heroes) and the zone track are navigation:
@@ -274,8 +299,15 @@ h1, h2, h3, h4,
 .rail-head, .rail-foot { flex: 0 0 auto; }
 .rail-head { display: flex; align-items: flex-start; gap: 4px; }
 .rail-head > .hero-bar { flex: 1 1 auto; min-width: 0; }
-/* The right rail has no hero strip, so its head is just the button. */
-.app-sidebar-right .rail-head { justify-content: flex-end; }
+/* The right rail's head is its title bar: name on the left, close on the right. */
+.app-sidebar-right .rail-head { justify-content: space-between; align-items: center; padding-bottom: 6px; border-bottom: 1px solid rgba(200, 161, 0, 0.16); }
+.rail-title {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+  padding-left: 2px;
+}
 
 /* Minimize. Sits in the rail's own header row rather than floating beside it. */
 .rail-minimize {
@@ -329,15 +361,32 @@ h1, h2, h3, h4,
   padding: 6px 5px;
   overflow: hidden;
 }
-/* The head — and therefore the restore arrow — deliberately survives. It is the ONLY way
-   back on desktop, where there is no dock. */
+/* The head — and therefore the way back — deliberately survives. It is the ONLY way back on
+   desktop, where there is no dock. */
 .app-sidebar-left.collapsed  .rail-body,
 .app-sidebar-left.collapsed  .rail-foot,
 .app-sidebar-right.collapsed .rail-body,
 .app-sidebar-right.collapsed .rail-foot,
-.app-sidebar-left.collapsed  .hero-bar { display: none; }
+.app-sidebar-right.collapsed .rail-title { display: none; }
 .app-sidebar-left.collapsed  .rail-head,
 .app-sidebar-right.collapsed .rail-head { border-bottom: none; padding: 0; }
+
+/* ── Collapsed left rail: one Menu chip ──
+   The stub was a bare ‹ arrow, then briefly a pair of icons — and a pair is one control too
+   many for a thing whose entire job is "bring the panel back". One labelled button says what
+   it does without a legend: everything the rail carries, including the ☰ that leads to
+   settings and character select, is one tap behind it. */
+.app-sidebar-left.collapsed { width: auto; padding: 6px; }
+.app-sidebar-left.collapsed .hero-bar { display: none; }
+.app-sidebar-left.collapsed .rail-minimize {
+  width: auto;
+  gap: 5px;
+  padding: 0 10px;
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+}
+.rail-restore-label { line-height: 1; }
 
 
 .app-log.rp-glass,
@@ -358,10 +407,10 @@ h1, h2, h3, h4,
 
 .app-log {
   position: absolute;
-  left: 10px;
+  left: calc(8px + var(--safe-l));
   bottom: 12px;
   z-index: 24;
-  width: 232px;   /* same column as the left rail, stacked beneath it */
+  width: var(--col-l-w);   /* foot of the left column: frames, rail, then this */
   height: var(--log-h);
   display: flex;
   flex-direction: column;
@@ -567,6 +616,9 @@ h1, h2, h3, h4,
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: inherit;
+  /* The caption is a profession name now, and "Leatherworking" must widen its button
+     rather than break across two lines inside it. */
+  white-space: nowrap;
 }
 
 /* The bar itself is a single sheet of glass the panes sit on. */
@@ -786,7 +838,10 @@ h1, h2, h3, h4,
 
 /* Hidden on desktop */
 .app-dock         { display: none; }
-.app-backdrop     { display: none; }
+/* `.app-backdrop` is gone on purpose too. It dimmed the world behind an open hero or bag
+   drawer, which framed them as modals that own the screen — but they are panels you glance
+   at while an idle game keeps running, and greying out the world is greying out the thing
+   worth watching. Dismissal never lived here; it lives in ui/useDismissable. */
 /* `.app-drawer-close` is gone on purpose. It was the mobile ✕, a second dismissal verb
    competing with the rail's minimize; one control, drawn once, is the whole point of the
    current model. Nothing renders this class any more. */
@@ -796,23 +851,32 @@ h1, h2, h3, h4,
    it from the edges, and a tab bar replaces the collapse tabs. */
 @media (max-width: 899px) {
 
+  /* ── Rooted at the DOCK, not at the top of the screen ──
+     These used to be `top: 0` sheets: you tapped a button in the bottom bar and a panel
+     appeared welded to the opposite edge of the phone, growing down from a corner nothing
+     had happened in. Anchoring the bottom edge to the tab bar instead means the drawer
+     rises out of the button that opened it and rests on it — the same relationship the
+     chat sheet and the mode panel already have with the bottom of the screen.
+
+     `top: auto` matters as much as the `bottom`: with both edges pinned the drawer stretches
+     to full height regardless of content, which is what used to paint a screen-tall slab of
+     empty glass when every section inside was collapsed. Height still follows content, now
+     capped by the space between the dock and the safe area at the top. */
   .app-sidebar-left,
   .app-sidebar-right {
-    top: 0;
-    /* Content-height, capped above the dock. The later `bottom` this replaced was
-       re-stretching the drawer to full height and undoing the shrink. */
-    bottom: auto;
-    max-height: calc(100dvh - var(--dock-h) - var(--safe-b));
+    top: auto;
+    bottom: calc(var(--dock-h) + var(--safe-b));
+    max-height: calc(100dvh - var(--dock-h) - var(--safe-b) - var(--safe-t) - 8px);
     width: min(330px, 90vw);
+    /* Only the corner that faces INTO the screen is rounded. The other three sit against
+       the screen edge and the dock, which is what makes the panel read as growing out of
+       that corner rather than floating in front of it. */
     border-radius: 0;
-    padding: 44px 10px 12px;
+    padding: 12px 10px;
     z-index: 50;
   }
-  /* No `bottom` here: it would win over the `bottom: auto` above and re-stretch the
-     drawer to full height, which is what kept a rail of collapsed sections painting a
-     full-screen slab of empty glass. `max-height` already caps it above the dock. */
-  .app-sidebar-left  { left: 0; border-left: none;  border-top: none; border-bottom: none; transform: translateX(calc(-100% - 4px)); opacity: 1; }
-  .app-sidebar-right { right: 0; border-right: none; border-top: none; border-bottom: none; transform: translateX(calc(100% + 4px));  opacity: 1; }
+  .app-sidebar-left  { left: 0; border-left: none;  border-top: none; border-bottom: none; border-top-right-radius: 14px; transform: translateX(calc(-100% - 4px)); opacity: 1; }
+  .app-sidebar-right { right: 0; border-right: none; border-top: none; border-bottom: none; border-top-left-radius: 14px;  transform: translateX(calc(100% + 4px));  opacity: 1; }
   .app-sidebar-left.panel-open,
   .app-sidebar-right.panel-open { transform: translateX(0); }
 
@@ -828,7 +892,7 @@ h1, h2, h3, h4,
     opacity: 1;
     pointer-events: auto;
     width: min(330px, 90vw);
-    padding: 44px 10px 12px;
+    padding: 12px 10px;
     overflow: hidden;
   }
   .app-sidebar-left.collapsed  .rail-body,
@@ -836,8 +900,15 @@ h1, h2, h3, h4,
   .app-sidebar-left.collapsed  .hero-bar,
   .app-sidebar-right.collapsed .rail-body,
   .app-sidebar-right.collapsed .rail-foot { display: flex; }
-  .app-sidebar-left.collapsed  .rail-head,
-  .app-sidebar-right.collapsed .rail-head { border-bottom: 1px solid var(--edge-soft); padding: 0; }
+  /* The desktop stub's Menu chip has no meaning here — a retracted drawer is simply
+     off-screen and comes back whole, so every control it normally carries must come back
+     with it. Undoing these one by one is deliberate: the alternative is a `.collapsed`
+     block that means two different things at two breakpoints. */
+  .app-sidebar-left.collapsed  .hero-bar { display: flex; gap: 6px; padding: 0 2px 6px; border-bottom: 1px solid rgba(200, 161, 0, 0.16); }
+  .app-sidebar-left.collapsed  .rail-minimize { width: 30px; padding: 0; font-family: inherit; }
+  .app-sidebar-right.collapsed .rail-title { display: inline; }
+  .app-sidebar-left.collapsed  .rail-head { border-bottom: 1px solid var(--edge-soft); padding: 0; }
+  .app-sidebar-right.collapsed .rail-head { border-bottom: 1px solid var(--edge-soft); padding: 0 0 6px; }
 
   .app-log {
     /* NOT full width. A 100%-wide feed is a curtain across the middle of the screen: this
@@ -866,15 +937,6 @@ h1, h2, h3, h4,
   .app-modepanel {
     width: calc(100vw - 12px);
     max-height: 40vh;
-  }
-
-  .app-backdrop {
-    display: block;
-    position: absolute;
-    inset: 0;
-    bottom: calc(var(--dock-h) + var(--safe-b));
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 45;
   }
 
   /* ── Bottom dock ── */
@@ -910,7 +972,22 @@ h1, h2, h3, h4,
    unit frame and minimap sit under the Dynamic Island on a notched iPhone, and in
    landscape the sensor housing eats one side (hence separate l/r, not one value).
    All four resolve to 0 in a browser and on non-notched devices. */
-.hud-tl { position: absolute; top: calc(8px + var(--safe-t)); left: calc(var(--rail-l) + var(--safe-l)); transition: left 0.28s cubic-bezier(0.4,0,0.2,1);
+/* The unit frames are the left-hand counterpart of the radar, and now get exactly the same
+   treatment: welded into their corner, with the rail flying out inboard of them.
+
+   They used to inset by `--rail-l`, the COLLAPSE-AWARE rail width, so they lived wherever
+   the character rail happened to end — folding it slid your own health bar 200px sideways,
+   and with it folded the frames floated in open world with the restore stub marooned in the
+   corner behind them. On a phone it was worse: the `@media (max-width: 899px)` block that
+   meant to pull them to the edge could never apply, because
+   `.app-root[data-left-collapsed="true"]` is (0,2,0) and outranks the (0,1,0) `.app-root`
+   rule inside it — media queries add no specificity — so the frames sat at 52px, or 252px
+   with the hero drawer out, while the minimap opposite them sat at 8px.
+
+   One constant now, at every breakpoint and in every panel state: the same 8px the radar
+   has. On desktop this box is also the head of the left column — `.app-sidebar-left` starts
+   directly beneath it (see `--unit-h`). */
+.hud-tl { position: absolute; top: calc(8px + var(--safe-t)); left: calc(8px + var(--safe-l));
   /* Cap the column so a full party can never stack past the bottom of the screen.
      Clipped rather than scrollable on purpose: .hud-layer is pointer-events:none so the
      world beneath stays tappable, and a scroll container here would have to claim those
@@ -923,6 +1000,36 @@ h1, h2, h3, h4,
    LEFT of the radar instead of displacing it (see `.app-sidebar-right`), which is why the
    dependency and its transition are gone rather than merely retimed. */
 .hud-tr { position: absolute; top: calc(8px + var(--safe-t)); right: calc(8px + var(--safe-r)); }
+/* Same anti-jitter floor the unit frames get: the objective tracker collapses, gains a
+   second line, and stands down entirely when a zone is cleared, and without a reserved
+   height every one of those would shove the inventory rail up or down beneath it. */
+@media (min-width: 900px) { .hud-tr { min-height: 190px; } }
+
+/* The frames themselves. Width, scrim and reserved height live here rather than inline in
+   UnitFrames.tsx because on desktop this box heads a column that two other elements belong
+   to — it shares their width, and its height is what positions the rail beneath it.
+
+   `min-height` is the anti-jitter measure. The frames grow and shrink constantly in play
+   (a target appears, a buff drops, a cast bar opens), and without a floor every one of
+   those would shove the character rail up or down a few pixels. Reserving the height of the
+   common case — you, your buffs and a target — means the column only ever moves for a
+   change that is itself durable, like gaining a party. */
+.unit-frames {
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Matches the bottom action bar's panel so the HUD reads as one system. */
+  background: rgba(8, 8, 14, 0.6);
+  border: 1px solid #3a3630;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+@media (min-width: 900px) {
+  /* Full column width — border-box, so this is the same outer edge the rail and the feed
+     below it land on. */
+  .unit-frames { width: var(--col-l-w); min-height: 122px; }
+}
 /* The bottom stack stays CENTRED ON THE WORLD and narrows symmetrically, rather than
    being squeezed between the two rails.
    Insetting by each rail independently meant the action bar and XP strip slid sideways
@@ -942,11 +1049,14 @@ h1, h2, h3, h4,
   transition: padding 0.28s cubic-bezier(0.4,0,0.2,1);
 }
 @media (max-width: 899px) {
-  /* No persistent rails on mobile — the drawers are transient, so the HUD gets
-     the full width and tucks above the dock. */
-  .app-root { --rail-l: 6px; --rail-r: 6px; }
+  /* There is deliberately no `.app-root { --rail-l: 6px }` here any more. It read as "the
+     HUD gets the full width on mobile" and was a trap: `.app-root[data-left-collapsed]` is
+     (0,2,0) and outranked it whenever a rail was folded — media queries add no specificity
+     — so it applied in one panel state and not the other. Nothing on mobile reads those
+     tokens now: `.hud-tl`/`.hud-tr` are pinned to their corners at every breakpoint, and
+     `.hud-bottom` overrides its own padding below. */
   /* Nothing above them any more — the HUD starts at the top of the safe area. */
-  .hud-tl { top: calc(8px + var(--safe-t)); }
+  .hud-tl,
   .hud-tr { top: calc(8px + var(--safe-t)); }
   .hud-bottom {
     bottom: calc(var(--dock-h) + var(--safe-b));
@@ -2122,9 +2232,66 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   min-height: 30px;
   border-radius: 6px;
 }
-/* Pushed to the trailing edge: it is a readout, not a control, and right-aligning it
-   keeps the digits in one column as the number grows. */
-.hero-bar-gold { margin-left: auto; }
+/* The bag's body, standing in for the CollapsiblePanel that used to wrap it: a flex column
+   that fills the rail, with the item grid scrolling in the middle and the purse pinned at
+   the foot. */
+.bag-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* ── Menu rows ───────────────────────────────────────────────────────────────
+   A title, an optional current value on the right, and a note underneath. Grid rather than
+   flex because the note has to span both columns and stay left-aligned under the title. */
+.menu-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 8px;
+  text-align: left;
+  padding: 8px 12px;
+  min-height: 42px;
+  font-size: 0.7rem;
+}
+.menu-row-value { color: var(--gold-soft); font-family: var(--font-ui); font-size: 0.62rem; }
+.menu-row-note {
+  grid-column: 1 / -1;
+  font-family: var(--font-ui);
+  font-size: 0.55rem;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #9a9086;
+  margin-top: 2px;
+}
+
+/* ── The purse, at the foot of the bag ───────────────────────────────────────
+   Pinned rather than scrolling with the item grid: a balance you have to scroll to see is
+   one you end up checking somewhere else. Same hairline-over-a-footer treatment as
+   `.rail-foot`, so the two columns read as one system. */
+.bag-purse {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-top: 1px solid rgba(200, 161, 0, 0.18);
+}
+.bag-purse-label {
+  font-family: var(--font-ui);
+  font-size: 0.55rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The ☰ is a glyph, not a word, so it takes a square target instead of the label padding
+   the lettered buttons need — the strip is 232px wide and already spends most of it. */
+.hero-bar-menu {
+  padding: 5px 7px;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  line-height: 1;
+}
+/* `.hero-bar-gold` is gone — the purse moved to the foot of the bag (`.bag-purse`) when
+   the menu button arrived and the strip ran out of width. */
 
 /* ── Zone track ──────────────────────────────────────────────────────────────
    Was a vertical list of twelve fat rows — roughly 380px of the left rail, which meant

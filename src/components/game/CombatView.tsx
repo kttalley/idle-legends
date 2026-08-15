@@ -134,8 +134,10 @@ export function CombatView() {
   const autoStatus = (() => {
     if (isTraveling) return null
     if (mobApproaching) return { label: `${currentMob!.name} approaching…`, color: currentMob!.isBoss ? 'var(--warn)' : '#ff6666' }
-    if (gameMode === 'gathering') return { label: `${prof.gatherIcon} Gathering…`, color: '#88cc88' }
-    if (gameMode === 'crafting') return { label: `${prof.craftIcon} Crafting…`, color: 'var(--gold)' }
+    // The hero's actual trade, not the generic mode. "Mining…" / "Brewing…" says what the
+    // icon beside it has always shown.
+    if (gameMode === 'gathering') return { label: `${prof.gatherIcon} ${prof.gatherVerb}…`, color: '#88cc88' }
+    if (gameMode === 'crafting') return { label: `${prof.craftIcon} ${prof.craftVerb}…`, color: 'var(--gold)' }
     if (gameMode === 'in_town' && currentTown) return { label: `In Town`, color: '#ddaa44' }
     if (gameMode === 'combat' && currentMob) return { label: `Fighting ${currentMob.name}`, color: '#88aaff' }
     return null

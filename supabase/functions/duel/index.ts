@@ -17,14 +17,22 @@
 // `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically by the
 // platform — do NOT add them to `.env`, and never expose the service-role key to the app.
 //
-// ── The one thing to verify on first deploy ─────────────────────────────────
-// The game's modules use extensionless relative imports (`./rng`), which Vite resolves and
-// stock Deno does not. `../deno.json` enables `sloppy-imports` to bridge that. If a deploy
-// ever fails on module resolution, the fallback is a thin build step that emits an
-// extension-qualified copy of the resolver subtree — it is only six runtime modules
-// (fight, combat, rng, data/classes, data/specs, data/constants).
+// ── Why the import below points at `_game/` ─────────────────────────────────
+// It is still the game's own combat code — `_game/` is a generated, extension-qualified
+// copy of the subtree under `src/`, emitted by `tools/bundleDuelResolver.mjs` and rebuilt
+// on every deploy (`npm run deploy:duel`). It is gitignored, so it cannot go stale.
+//
+// The direct `../../../src/engine/fight` import does not deploy: the Supabase API bundler
+// walks the graph itself, and it neither resolves extensionless specifiers nor uploads
+// files from outside the function's own directory. `../deno.json`'s `sloppy-imports` fixes
+// the first half for local `deno run`, but nothing fixes the second half except copying
+// the subtree inside. Verified against the real deploy on 2026-08-15 — it fails with
+// `Module not found ".../source/src/engine/fight"`.
+//
+// The subtree is 18 modules, not the six this file used to claim: `data/classes` pulls in
+// all twelve talent trees.
 
-import { runFight } from '../../../src/engine/fight'
+import { runFight } from './_game/engine/fight.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!

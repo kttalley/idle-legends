@@ -12,6 +12,8 @@
     "cap:sync": "npm run build:native && npx cap sync ios",
     "ios": "npm run cap:sync && npx cap open ios",
     "icon": "node tools/spritegen/makeAppIcon.mjs",
+    "bundle:duel": "node tools/bundleDuelResolver.mjs",
+    "deploy:duel": "npm run bundle:duel && supabase functions deploy duel",
     "lint:tokens": "node scripts/validate-design-tokens.mjs"
   },
   "dependencies": {

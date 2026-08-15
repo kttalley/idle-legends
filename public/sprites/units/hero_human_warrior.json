@@ -1,0 +1,134 @@
+{
+  "id": "hero_human_warrior",
+  "image": "hero_human_warrior.png",
+  "frameW": 24,
+  "frameH": 32,
+  "anchor": {
+    "x": 12,
+    "y": 30
+  },
+  "sourcePalette": [
+    "",
+    "#5c3a24",
+    "#8a5c38",
+    "#c08a58",
+    "#e8b888",
+    "#3a2818",
+    "#5c4028",
+    "#7c5838",
+    "#9c7048",
+    "#2c2c34",
+    "#44444e",
+    "#5c5c68",
+    "#787884",
+    "#4a4a52",
+    "#8a8a96",
+    "#c8c8d4"
+  ],
+  "animations": {
+    "idle": {
+      "se": {
+        "frames": [
+          0,
+          1
+        ],
+        "fps": 4,
+        "loop": true
+      },
+      "ne": {
+        "frames": [
+          17,
+          18
+        ],
+        "fps": 4,
+        "loop": true
+      }
+    },
+    "walk": {
+      "se": {
+        "frames": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "fps": 10,
+        "loop": true
+      },
+      "ne": {
+        "frames": [
+          19,
+          20,
+          21,
+          22,
+          23,
+          24
+        ],
+        "fps": 10,
+        "loop": true
+      }
+    },
+    "attack": {
+      "se": {
+        "frames": [
+          8,
+          9,
+          10,
+          11
+        ],
+        "fps": 12,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          25,
+          26,
+          27,
+          28
+        ],
+        "fps": 12,
+        "loop": false
+      }
+    },
+    "hit": {
+      "se": {
+        "frames": [
+          12,
+          13
+        ],
+        "fps": 12,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          29,
+          30
+        ],
+        "fps": 12,
+        "loop": false
+      }
+    },
+    "death": {
+      "se": {
+        "frames": [
+          14,
+          15,
+          16
+        ],
+        "fps": 6,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          31,
+          32,
+          33
+        ],
+        "fps": 6,
+        "loop": false
+      }
+    }
+  }
+}

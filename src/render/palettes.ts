@@ -5,7 +5,7 @@
 // Every gameplay/monetization concept (race, gear tier, elite, rarity, team, biome)
 // resolves to a palette id here; the renderer itself only ever sees (spriteId, paletteId).
 
-import { composePalette, paletteFromHex } from './palette'
+import { composePalette, paletteFromHex, ambientMix, slotLuminance } from './palette'
 import type { Palette } from './types'
 
 // Base humanoid: fair skin, brown leathers, grey cloth, iron accents.
@@ -342,4 +342,80 @@ export function registerPalette(id: string, hex: string[]): void {
 /** Register an already-packed palette (tints/derived variants). */
 export function registerPaletteRaw(id: string, p: Palette): void {
   reg(id, p)
+}
+
+// ── Biome ambient: making a unit belong to the ground it stands on ───────────
+//
+// Units wore ONE palette across every biome. Measured, the base unit sits at mid-luminance
+// 0.41 while biome ground runs from 0.22 (ashfire, gloom) to 0.65 (the bleached wastes), so
+// the same figure was simultaneously too light for a charcoal zone and far too dark for a
+// pale one and belonged to neither. That is what reads as flat, pasted-on art against terrain
+// whose own values sit in a tight band — a grass patch spans just 0.11 between its 10th and
+// 90th percentile, and puts 0.3% of its pixels below luminance 0.20.
+//
+// Composes as one more layer over race/class/faction/rarity/colorway, so it needs no new art
+// and no new code path: it is the same runtime recolour the registry already exists to do.
+
+/**
+ * Minimum luminance separation kept between a unit and its ground. Below roughly this a
+ * figure stops reading as a character and starts reading as camouflage — integration is
+ * worthless if the player loses track of their own hero.
+ */
+export const AMBIENT_CONTRAST_FLOOR = 0.15
+
+/** The light a biome casts: its ground, weighted toward vegetation since that fills a zone. */
+export function biomeAmbient(biomeId: string): { r: number; g: number; b: number; mid: number } {
+  const p = REGISTRY.get(biomeId) ?? REGISTRY.get('biome/meadow')!
+  let r = 0, g = 0, b = 0, w = 0
+  for (let slot = 1; slot <= 8; slot++) {
+    const c = p[slot]
+    if (!c) continue
+    const weight = slot >= 5 ? 2 : 1 // 5-8 vegetation, 1-4 earth/path
+    r += (c & 0xff) * weight
+    g += ((c >> 8) & 0xff) * weight
+    b += ((c >> 16) & 0xff) * weight
+    w += weight
+  }
+  if (!w) return { r: 128, g: 128, b: 128, mid: 0.5 }
+  r /= w; g /= w; b /= w
+  return { r, g, b, mid: (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 }
+}
+
+/** How far a palette's typical value sits from the ground — the readability guard. */
+function contrastAgainst(p: Palette, mid: number): number {
+  const ls: number[] = []
+  for (let i = 1; i < 16; i++) if (p[i]) ls.push(slotLuminance(p[i]))
+  if (!ls.length) return 1
+  ls.sort((a, b) => a - b)
+  const lo = ls[Math.floor(ls.length * 0.25)]
+  const hi = ls[Math.floor(ls.length * 0.75)]
+  return Math.max(Math.abs(mid - lo), Math.abs(hi - mid))
+}
+
+/**
+ * Strongest ambient mix a biome can take before the unit stops reading as a character.
+ *
+ * Solved per biome rather than fixed, because a fixed strength is wrong in both directions.
+ * In the wastes a unit sits 0.39 away from the ground and can absorb a heavy tint — which is
+ * exactly where it is most needed. In the meadow the unit and ground are already within 0.16
+ * of each other (that biome is effectively what the base unit palette was tuned against), and
+ * the same tint walks it straight into camouflage.
+ */
+export function autoAmbientStrength(
+  base: Palette, amb: { r: number; g: number; b: number; mid: number },
+  floor = AMBIENT_CONTRAST_FLOOR, max = 0.35,
+): number {
+  let best = 0
+  for (let t = 0; t <= max + 1e-9; t += 0.01) {
+    if (contrastAgainst(ambientMix(base, amb.r, amb.g, amb.b, t), amb.mid) >= floor) best = t
+    else break
+  }
+  return best
+}
+
+/** Apply a biome's ambient to a composed unit palette, at the strongest safe strength. */
+export function applyBiomeAmbient(base: Palette, biomeId: string): Palette {
+  const amb = biomeAmbient(biomeId)
+  const k = autoAmbientStrength(base, amb)
+  return k <= 0 ? base : ambientMix(base, amb.r, amb.g, amb.b, k)
 }

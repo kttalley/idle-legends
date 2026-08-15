@@ -3,13 +3,17 @@
     "Deno config for the Edge Functions only. It is scoped to supabase/functions/ and has",
     "no effect on the Vite app build.",
     "",
-    "sloppy-imports lets Deno resolve the game's extensionless relative imports (`./rng`,",
-    "`../data/classes`), which Vite resolves natively and stock Deno rejects. Without it,",
-    "`import { runFight } from '../../../src/engine/fight'` fails at deploy time.",
+    "sloppy-imports lets Deno resolve extensionless relative imports (`./rng`), which Vite",
+    "resolves natively and stock Deno rejects. It is kept for local `deno run`/`deno check`",
+    "against the game's own source.",
     "",
-    "This is what allows the duel resolver to import the game's REAL combat code instead of",
-    "a reimplementation that could drift from it. Six runtime modules resolve through here:",
-    "engine/fight, engine/combat, engine/rng, data/classes, data/specs, data/constants."
+    "It is NOT what makes the deploy work, though this file used to say so. Deploying does",
+    "not run Deno first — the Supabase API bundler walks the import graph itself, and it",
+    "neither resolves extensionless specifiers nor uploads files from outside the function",
+    "directory. That is why the resolver imports `./_game/engine/fight.ts`, a generated",
+    "extension-qualified copy emitted by tools/bundleDuelResolver.mjs on every deploy.",
+    "See ../SETUP.md §5. The copy is 28 modules, 18 of which execute — not the six this",
+    "file once claimed, since data/classes pulls in all twelve talent trees."
   ],
   "unstable": ["sloppy-imports"],
   "imports": {}

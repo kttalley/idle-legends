@@ -409,6 +409,8 @@ export interface ProfessionDef {
   gatherIcon: string
   craftIcon: string
   gatherVerb: string  // e.g. "Mining", "Gathering", "Skinning"
+  /** Gerund, for the "…ing" status line over the world. Pairs with `gatherVerb`. */
+  craftVerb: string   // e.g. "Forging", "Brewing", "Enchanting"
 }
 
 export const CLASS_PROFESSIONS: Record<ClassType, ProfessionDef> = {
@@ -419,6 +421,7 @@ export const CLASS_PROFESSIONS: Record<ClassType, ProfessionDef> = {
     gatherIcon:    '⛏️',
     craftIcon:     '🔨',
     gatherVerb:    'Mining',
+    craftVerb:     'Forging',
   },
   mage: {
     gatheringName: 'Tailoring',
@@ -427,6 +430,7 @@ export const CLASS_PROFESSIONS: Record<ClassType, ProfessionDef> = {
     gatherIcon:    '🧵',
     craftIcon:     '📜',
     gatherVerb:    'Tailoring',
+    craftVerb:     'Enchanting',
   },
   warlock: {
     gatheringName: 'Herbalism',
@@ -435,6 +439,7 @@ export const CLASS_PROFESSIONS: Record<ClassType, ProfessionDef> = {
     gatherIcon:    '🌿',
     craftIcon:     '🧪',
     gatherVerb:    'Gathering',
+    craftVerb:     'Brewing',
   },
   rogue: {
     gatheringName: 'Skinning',
@@ -443,6 +448,7 @@ export const CLASS_PROFESSIONS: Record<ClassType, ProfessionDef> = {
     gatherIcon:    '🦴',
     craftIcon:     '🥷',
     gatherVerb:    'Skinning',
+    craftVerb:     'Stitching',
   },
 }
 

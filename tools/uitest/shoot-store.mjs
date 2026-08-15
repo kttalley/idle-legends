@@ -164,12 +164,12 @@ try {
   })
   await sleep(3500)
   await shoot(tab.send, '02-world.png', 'the world — dimetric renderer, HUD, objective tracker',
-    `document.querySelectorAll('.app-dock-btn').length >= 3 && !document.querySelector('.app-backdrop')`)
+    `document.querySelectorAll('.app-dock-btn').length >= 3 && !document.querySelector('.app-sidebar-left.panel-open, .app-sidebar-right.panel-open')`)
 
   // ── Combat, mid-swing ─────────────────────────────────────────────────────
   await sleep(4000)
   await shoot(tab.send, '03-combat.png', 'combat — action bar, floaters, unit frames',
-    `document.querySelectorAll('.skill-slot').length > 0 && !document.querySelector('.app-backdrop')`)
+    `document.querySelectorAll('.skill-slot').length > 0 && !document.querySelector('.app-sidebar-left.panel-open, .app-sidebar-right.panel-open')`)
 
   // ── The ladder ────────────────────────────────────────────────────────────
   const openedHero = await evaluate(tab.send, `(() => {

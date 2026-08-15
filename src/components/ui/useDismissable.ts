@@ -44,6 +44,7 @@ interface Entry {
   close: Dismiss
   ref: RefObject<HTMLElement | null> | null
   outside: boolean
+  exempt: string | null
   trap: boolean
 }
 
@@ -90,6 +91,14 @@ function onPointerDownCapture(e: PointerEvent): void {
   const top = stack[stack.length - 1]
   if (!top?.outside || !top.ref?.current) return
   if (top.ref.current.contains(e.target as Node)) return
+  // A surface's own EXTERNAL control is not "outside" it. The mobile dock is the restore
+  // control for the drawers (see App.tsx), and without this the two mechanisms cancelled
+  // out: pointerdown on the dock button retracted the drawer here, then the button's own
+  // click read the now-closed state and extended it again. Net effect, tapping Hero a
+  // second time did nothing — the panel could be opened but never closed, and only from a
+  // real finger. `element.click()` fires no pointerdown, so every synthetic-click test
+  // passed the whole time.
+  if (top.exempt && (e.target as Element | null)?.closest?.(top.exempt)) return
   // Deliberately NOT stopped. A tap on open ground still issues a move order, which is how
   // targeting works in an MMO: you click away and your character goes there, and the thing
   // you clicked away from closes behind you.
@@ -109,6 +118,11 @@ export interface DismissableOptions {
   /** Dismiss on a pointer press outside `ref`. Modals and popovers; not the chat window. */
   closeOnOutside?: boolean
   /**
+   * Selector for chrome that governs this surface from OUTSIDE it — the mobile dock — and
+   * must therefore not count as an outside press. Only meaningful with `closeOnOutside`.
+   */
+  exempt?: string
+  /**
    * Keep Tab inside `ref` and move focus into it on open. For MODAL surfaces only —
    * trapping a non-modal window (the whisper thread) would strand the keyboard in it.
    */
@@ -122,13 +136,13 @@ export interface DismissableOptions {
  * `onClose` is read through a ref, so an inline arrow is fine and re-registers nothing.
  */
 export function useDismissable(open: boolean, onClose: Dismiss, opts: DismissableOptions = {}): void {
-  const { ref = null, closeOnOutside = false, trapFocus = false } = opts
+  const { ref = null, closeOnOutside = false, exempt, trapFocus = false } = opts
   const latest = useRef(onClose)
   latest.current = onClose
 
   useEffect(() => {
     if (!open) return
-    const entry: Entry = { close: () => latest.current(), ref, outside: closeOnOutside, trap: trapFocus }
+    const entry: Entry = { close: () => latest.current(), ref, outside: closeOnOutside, exempt: exempt ?? null, trap: trapFocus }
     stack.push(entry)
     install()
 
@@ -154,7 +168,7 @@ export function useDismissable(open: boolean, onClose: Dismiss, opts: Dismissabl
       // on <body> and the next Tab restarts from the top of the document.
       if (trapFocus && restoreTo?.isConnected) restoreTo.focus({ preventScroll: true })
     }
-  }, [open, ref, closeOnOutside, trapFocus])
+  }, [open, ref, closeOnOutside, exempt, trapFocus])
 }
 
 /** Escape only — for surfaces that own their own outside-press handling. */

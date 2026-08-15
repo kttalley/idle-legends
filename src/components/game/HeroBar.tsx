@@ -1,33 +1,42 @@
-import React, { useState, useSyncExternalStore } from 'react'
-import { useGameStore } from '../../store/gameStore'
-import { GoldDisplay } from '../ui/GoldDisplay'
+import React, { useState } from 'react'
 import { WardrobePanel } from './WardrobePanel'
 import { LadderModal } from './LadderPanel'
-import { getAudioState, setMuted as audioSetMuted, subscribeAudio } from '../../engine/audio/audioEngine'
+import { GameMenu } from './GameMenu'
 
-// Account-level navigation for the left rail: what you own, how you look, who else is out
-// there.
+// Account-level navigation for the left rail: how you look, who else is out there, and the
+// way back to character select.
 //
 // These lived in the CHARACTER SHEET's header, competing for width with a generated hero
 // name that is routinely two words longer than the rail is wide. None of them is a
-// character-sheet control — gold is a global resource, and the others leave the sheet
-// entirely — so they get their own strip at the top of the column instead.
+// character-sheet control — they all leave the sheet entirely — so they get their own strip
+// at the top of the column instead.
 //
-// **"Heroes" was removed 2026-08-09.** It read as navigation sitting between two other
-// navigation buttons, and it was actually an EXIT: it ended the run and returned to
-// character select. A confirm() dialog is not enough to make a mis-tap safe when the
-// control is styled identically to its neighbours and one of them opens a cosmetics
-// modal. Switching characters needs a home that reads as leaving — deliberately unbuilt
-// for now rather than replaced in place.
+// **Gold left this strip on 2026-08-15**, when the menu button arrived and four controls
+// plus a readout stopped fitting across 232px — the coin ended up half-hidden behind the
+// minimize arrow. It now lives at the foot of the bag (InventoryPanel), beside the items it
+// is spent on, which is also where it was always going to be looked for.
+//
+// **"Heroes" was removed 2026-08-09 and is back as ☰.** It read as navigation sitting
+// between two other navigation buttons, and it was actually an EXIT: it ended the run and
+// returned to character select. A confirm() dialog is not enough to make a mis-tap safe
+// when the control is styled identically to its neighbours and one of them opens a
+// cosmetics modal. The exit now lives inside a MENU rather than on this strip, and arms
+// itself before it fires — see GameMenu. The ☰ leads the row because a menu is where you
+// look for the way out, and because opening one is not itself an action.
 export function HeroBar() {
-  const gold = useGameStore(s => s.gold)
-  const [open, setOpen] = useState<'wardrobe' | 'ladder' | null>(null)
-  // Mute is session-only ambience state — it lives in the audio engine, not the persisted
-  // save, so useSyncExternalStore reads it the same way the party/companion stores are read.
-  const audio = useSyncExternalStore(subscribeAudio, getAudioState)
+  const [open, setOpen] = useState<'wardrobe' | 'ladder' | 'menu' | null>(null)
 
   return (
     <div className="hero-bar">
+      <button
+        className="rp-button hero-bar-btn hero-bar-menu"
+        onClick={() => setOpen('menu')}
+        title="Menu — character select"
+        aria-label="Menu — character select"
+        aria-haspopup="dialog"
+      >
+        ☰
+      </button>
       <button
         className="rp-button hero-bar-btn"
         onClick={() => setOpen('wardrobe')}
@@ -44,24 +53,9 @@ export function HeroBar() {
       >
         Ladder
       </button>
-      {/* Ambience mute. The procedural bed starts on first tap (iOS gesture latch in App.tsx);
-          this silences/restores it without persisting, so a saved mute never surprises a player
-          who launched the app somewhere quiet. A real volume slider can replace this later. */}
-      <button
-        className="rp-button hero-bar-btn"
-        onClick={() => audioSetMuted(!audio.muted)}
-        title={audio.muted ? 'Unmute ambience' : 'Mute ambience'}
-        aria-label={audio.muted ? 'Unmute ambience' : 'Mute ambience'}
-        aria-pressed={audio.muted}
-      >
-        {audio.muted ? '🔇' : '🔊'}
-      </button>
-      <div className="hero-bar-gold">
-        <GoldDisplay gold={gold} />
-      </div>
-
       {open === 'wardrobe' && <WardrobePanel onClose={() => setOpen(null)} />}
       {open === 'ladder' && <LadderModal onClose={() => setOpen(null)} />}
+      {open === 'menu' && <GameMenu onClose={() => setOpen(null)} />}
     </div>
   )
 }

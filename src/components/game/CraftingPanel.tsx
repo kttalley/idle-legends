@@ -174,7 +174,9 @@ export function CraftingPanel() {
           disabled={isCrafting}
           style={{ fontSize: '0.6rem', flex: 1, opacity: isCrafting ? 0.4 : 1 }}
         >
-          <SpriteIcon emoji="⛏" size={13} /> Gather
+          {/* This class's gathering profession, under this class's gathering icon — a
+              hardcoded ⛏ sent a rogue off to Skinning with a miner's pick. */}
+          <SpriteIcon emoji={prof.gatherIcon} size={13} /> {prof.gatheringName}
         </button>
         <button
           className="rp-button"
@@ -195,7 +197,7 @@ export function CraftingPanel() {
               opacity: canCraft(selected) ? 1 : 0.4,
             }}
           >
-            <SpriteIcon emoji="🔨" size={13} /> Craft{selectedRecipe && canCraft(selectedRecipe.id)
+            <SpriteIcon emoji={prof.craftIcon} size={13} /> Craft{selectedRecipe && canCraft(selectedRecipe.id)
               ? ` ${QUALITY_LABEL[qualityOf(selectedRecipe)]}`
               : '!'}
           </button>

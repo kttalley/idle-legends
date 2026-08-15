@@ -21,6 +21,62 @@ const openDock = label => `(() => {
 export async function run({ send, appUrl, check, note }) {
   await enterGame(send, appUrl, { device })
 
+  // ── The dock toggles, with a real finger ───────────────────────────────────
+  //
+  // Every other dock interaction in these suites goes through `element.click()`, which
+  // dispatches NO pointerdown — and pointerdown is the entire mechanism here. The drawers
+  // register with the dismissable stack as close-on-outside surfaces, so a press on the
+  // dock used to retract the drawer before the button's own click ran, and that click then
+  // read a closed panel and extended it again. Net effect on a phone: Hero and the bag
+  // opened but could never be closed from the tab bar, while every synthetic-click
+  // assertion in this file passed. Touch is the only thing that sees it.
+  const openPanels = () => evaluate(send, `(() => ({
+    hero: !!document.querySelector('.app-sidebar-left.panel-open'),
+    bag:  !!document.querySelector('.app-sidebar-right.panel-open'),
+    log:  !!document.querySelector('.app-log.panel-open'),
+  }))()`)
+  const dockCentre = label => evaluate(send, `(() => {
+    const b = [...document.querySelectorAll('.app-dock-btn')].find(x => /${label}/i.test(x.textContent));
+    if (!b) return null;
+    const r = b.getBoundingClientRect();
+    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+  })()`)
+  for (const [label, key] of [['Hero', 'hero'], ['Log', 'log']]) {
+    const c = await dockCentre(label)
+    if (!c) { check(`the ${label} dock button exists`, false); continue }
+    await tap(send, c.x, c.y)
+    const opened = await openPanels()
+    await tap(send, c.x, c.y)
+    const closed = await openPanels()
+    note(`${label}: tap → ${JSON.stringify(opened)}, tap again → ${JSON.stringify(closed)}`)
+    check(`tapping ${label} extends its panel`, opened[key])
+    check(`tapping ${label} again RETRACTS it`, !closed[key])
+  }
+
+  // ── The two top corners are anchored the same, and neither drifts ──────────
+  //
+  // `.hud-tl` used to inset by `--rail-l`, so the unit frames sat 52px in (and 252px in
+  // with the hero drawer out) while the minimap opposite them sat at 8px — your own health
+  // bar sliding sideways in response to a panel, in a game whose whole loop is watching it.
+  // The `@media (max-width: 899px)` rule that meant to pull them to the edge could never
+  // win: `.app-root[data-left-collapsed="true"]` is (0,2,0) against its (0,1,0), and a
+  // media query adds no specificity.
+  const corners = () => evaluate(send, `(() => {
+    const l = document.querySelector('.hud-tl').getBoundingClientRect();
+    const r = document.querySelector('.hud-tr').getBoundingClientRect();
+    return { left: Math.round(l.x), rightGap: Math.round(innerWidth - r.right), top: Math.round(l.y) };
+  })()`)
+  const shut = await corners()
+  note(`top corners: left inset ${shut.left}px, right inset ${shut.rightGap}px`)
+  check('the unit frames are inset like the minimap opposite them', shut.left === shut.rightGap)
+  const heroBtn = await dockCentre('Hero')
+  await tap(send, heroBtn.x, heroBtn.y)
+  const withDrawer = await corners()
+  check('...and do not move when the hero drawer comes out',
+    withDrawer.left === shut.left && withDrawer.top === shut.top,
+    `${shut.left} → ${withDrawer.left}`)
+  await tap(send, heroBtn.x, heroBtn.y)
+
   const chatOpen = () => evaluate(send, `!!document.querySelector('.app-log.panel-open')`)
   const alive = () => evaluate(send, `!!document.querySelector('.app-log') && !!window.__ilScene`)
   const openChat = async () => { await evaluate(send, openDock('Log')); await sleep(800) }

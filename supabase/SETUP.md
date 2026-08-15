@@ -66,26 +66,43 @@ character on the board instead of the "offline in this build" message.
 ## 5. Deploy the duel resolver
 
 ```sh
-npm i -g supabase          # or: brew install supabase/tap/supabase
-supabase login
+brew install supabase/tap/supabase   # macOS; `npm i -g supabase` is refused by the package
+supabase login                       # needs a real TTY — a non-interactive shell cannot
 supabase link --project-ref YOUR-PROJECT-REF
-supabase functions deploy duel
+npm run deploy:duel
 ```
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by the platform — do not set
 them yourself.
 
-**The one thing that may need attention on first deploy.** The function imports the game's
-real combat code (`import { runFight } from '../../../src/engine/fight'`), which is the
-whole point: one combat implementation, used by client and server, so a duel result can
-always be reproduced by a replay. The game's modules use extensionless imports (`./rng`),
-which Vite resolves and stock Deno does not — [`functions/deno.json`](./functions/deno.json)
-enables `sloppy-imports` to bridge that.
+**Why `npm run deploy:duel` and not `supabase functions deploy duel`.** The function imports
+the game's real combat code, which is the whole point: one combat implementation, used by
+client and server, so a duel result can always be reproduced by a replay. But importing it
+*directly* (`../../../src/engine/fight`) does not deploy. Tried on 2026-08-15; it fails with
 
-If the deploy fails on module resolution, the fallback is a small build step emitting an
-extension-qualified copy of the resolver subtree. It is only six runtime modules:
-`engine/fight`, `engine/combat`, `engine/rng`, `data/classes`, `data/specs`,
-`data/constants`. Tell me and I will write it.
+```
+Failed to bundle the function (reason: Module not found ".../source/src/engine/fight")
+```
+
+because the Supabase API bundler walks the import graph itself and it neither resolves
+extensionless specifiers nor uploads files from outside the function's own directory.
+`deno.json`'s `sloppy-imports` only ever addressed the first half.
+
+So `tools/bundleDuelResolver.mjs` emits an extension-qualified copy of the subtree into
+`supabase/functions/duel/_game/`, and `npm run deploy:duel` regenerates it on every deploy.
+`_game/` is **gitignored on purpose** — a committed copy could go stale and quietly become
+the second combat implementation this design exists to avoid.
+
+It copies **28 modules, of which 18 execute**; the other 10 arrive through `import type`
+chains (`data/types.ts` alone reaches `engine/offline`, `engine/loot`, `data/items` …) and
+are erased before anything runs. Any claim of "six runtime modules" elsewhere in this repo
+predates measuring it — `data/classes` pulls in all twelve talent trees by itself.
+
+The bundler refuses to emit a module that touches `window`, `document`, `localStorage`,
+`navigator` or `import.meta` **on the executing path**, naming file and line. Type-only
+modules are exempt, which is not a loophole: they are erased before Deno sees them, and
+`engine/offline` is exactly such a module — it touches `window` and is genuinely unreachable
+from the resolver.
 
 Verify after deploying: open the LADDER tab in two different browser profiles (so you get
 two anonymous users), and duel one from the other.

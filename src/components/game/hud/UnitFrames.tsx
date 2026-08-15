@@ -13,17 +13,14 @@ import { PartyFrame } from './PartyFrame'
 // contrast; text carries a shadow for legibility.
 
 // 1px corner outline + soft drop — legible over the busy tiles, paired with a light
-// feathered scrim on the container (below) instead of a hard card panel.
+// feathered scrim on the container instead of a hard card panel.
 const TEXT_SHADOW = '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000, 0 1px 3px rgba(0,0,0,0.9)'
-const WIDTH = 150
 
-// Match the bottom action bar's panel so the HUD reads as one system.
-const SCRIM: React.CSSProperties = {
-  background: 'rgba(8,8,14,0.6)',
-  border: '1px solid #3a3630',
-  borderRadius: 8,
-  padding: '6px 8px',
-}
+// The container's width, scrim and reserved height live in `.unit-frames` (index.css)
+// rather than here, because on desktop this box is the HEAD OF THE LEFT COLUMN — the
+// character rail and the chat feed stack beneath it and share its width. That is a layout
+// relationship between three elements, so it belongs in the stylesheet where all three are
+// described, not in an inline style only one of them can see.
 
 function CastBar({ cast }: { cast: CastState }) {
   const pct = cast.total > 0 ? Math.max(0, Math.min(1, 1 - cast.remaining / cast.total)) : 0
@@ -54,7 +51,7 @@ export function UnitFrames() {
   const combo = procState.comboPoints
 
   return (
-    <div style={{ width: WIDTH, display: 'flex', flexDirection: 'column', gap: 6, ...SCRIM }}>
+    <div className="unit-frames">
       {/* ── Player ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 10, textShadow: TEXT_SHADOW }}>

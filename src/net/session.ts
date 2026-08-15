@@ -165,11 +165,32 @@ export async function signInWithApple(identityToken: string, nonce?: string): Pr
  *
  * Requires "Allow anonymous sign-ins" to be enabled in the Supabase dashboard.
  */
+let signupInFlight: Promise<boolean> | null = null
+
 export async function signInAnonymously(): Promise<boolean> {
-  const s = await postAuth('signup', {})
-  if (!s) return false
-  write(s)
-  return true
+  // Concurrent callers share one sign-up, for the same reason they share one refresh
+  // below — but the failure here is worse, and it is not hypothetical. `ensureSession`
+  // is check-then-act: two callers both see no session, both POST `signup`, and the
+  // second `write` wins. The first user still EXISTS, still holds a JWT, and has usually
+  // already published a roster row — which is now an orphan that no client will ever
+  // update again, because nothing holds its refresh token.
+  //
+  // Observed 2026-08-15 driving the real app: one LadderPanel mount produced two
+  // anonymous users and two identical rows on the board. React StrictMode's double-effect
+  // makes it every time in dev; in production `refresh()` and the duel-history fetch mount
+  // together, and `challenge()` calls this too.
+  //
+  // It also breaks the rule the ladder exists to satisfy: every row must be a real
+  // player's character (supabase/SETUP.md). Rows cloned by a race are not fabricated
+  // players, but a board showing the same hero N times reads exactly like a padded one.
+  if (signupInFlight) return signupInFlight
+  signupInFlight = (async () => {
+    const s = await postAuth('signup', {})
+    if (!s) return false
+    write(s)
+    return true
+  })().finally(() => { signupInFlight = null })
+  return signupInFlight
 }
 
 let refreshInFlight: Promise<string | null> | null = null

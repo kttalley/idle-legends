@@ -128,13 +128,16 @@ export function GatheringPanel() {
         >
           <SpriteIcon emoji="⚔" size={13} /> Fight
         </button>
+        {/* The destination is this class's craft, not a generic "Craft" — and the icon that
+            goes with it is the one the mode toggle and the crafting header already use. A
+            hardcoded 🔨 sent a warlock to Alchemy under a blacksmith's hammer. */}
         <button
           className="rp-button"
           onClick={() => setMode('crafting')}
           disabled={!hasMaterials}
           style={{ fontSize: '0.6rem', flex: 1, opacity: hasMaterials ? 1 : 0.4 }}
         >
-          <SpriteIcon emoji="🔨" size={13} /> Craft
+          <SpriteIcon emoji={prof.craftIcon} size={13} /> {prof.craftingName}
         </button>
       </div>
     </div>

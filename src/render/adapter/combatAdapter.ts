@@ -22,7 +22,7 @@ import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } fro
 import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } from '../../data/townNpcs'
 import { PARTY_MAX } from '../../engine/party'
 import { Animator } from '../animation'
-import { HERO_SPRITES, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId, useScaffoldArt } from './fftaRoster'
+import { HERO_SPRITES, HERO_ORIGINAL_IDS, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId, useScaffoldArt } from './fftaRoster'
 import { mulberry32, subStream, type Rng } from '../../engine/rng'
 import { deepestSpec } from '../../data/specs'
 import { AGGRESSIVE_RE, combatantOnlyWorldFields, isRangedMob, restGapFor,
@@ -870,10 +870,15 @@ export class WorldSceneController {
     const scaffoldArt = useScaffoldArt
     const realUnits = `${base}sprites/units/`
     const unitIds = new Set<string>()
-    for (const race of ['human', 'dwarf', 'elf', 'orc', 'troll', 'goblin', 'gnome', 'tauren'] as RaceType[]) {
-      for (const cls of ['warrior', 'mage', 'rogue', 'warlock'] as ClassType[]) {
-        for (const id of HERO_SPRITES[race][cls]) unitIds.add(id)
+    if (scaffoldArt) {
+      for (const race of ['human', 'dwarf', 'elf', 'orc', 'troll', 'goblin', 'gnome', 'tauren'] as RaceType[]) {
+        for (const cls of ['warrior', 'mage', 'rogue', 'warlock'] as ClassType[]) {
+          for (const id of HERO_SPRITES[race][cls]) unitIds.add(id)
+        }
       }
+    } else {
+      // One drawn rig per race x class combination — what heroSpriteId now returns.
+      for (const id of HERO_ORIGINAL_IDS) unitIds.add(id)
     }
     for (const id of MONSTER_SPRITES) unitIds.add(id)
     const loadUnit = async (id: string): Promise<IndexedSprite> => {
@@ -1524,6 +1529,8 @@ export class WorldSceneController {
     this.playerBasePalette = heroPaletteId(
       state.playerClass, state.playerRace, state.playerFaction, bestEquipmentRarity(state),
       state.colorway,
+      // The zone's ground palette, so the hero picks up the light of wherever they are.
+      biomePaletteId(state.currentZone),
     )
     if (this.playerFlashT <= 0) this.player.paletteId = this.playerBasePalette
 
@@ -2525,11 +2532,17 @@ export class WorldSceneController {
     } else if (moving) {
       this.lastFaceDx = mvx; this.lastFaceDy = mvy
       this.faceToward(this.player, this.player.tx + mvx, this.player.ty + mvy)
-      // Movement uses the 'idle' tag on purpose: in the sprites we have (FFTA scaffold
-      // and the placeholder rig alike) the idle tag holds the good-looking gait, while
-      // the 'walk' tag is a flinchy jitter. Idle-as-walk is the intended movement anim;
-      // the flinch/'hit' tag is reserved for taking damage.
-      if (!inCombatAnim) this.player.animator.set('idle')
+      // Movement uses the real 'walk' tag.
+      //
+      // This used to be 'idle' on purpose, because every sprite we had — FFTA scaffold and
+      // the old placeholder rig alike — carried its good-looking gait on the idle tag while
+      // 'walk' was a flinchy jitter (docs/art-authoring.md §3 notes the swap and says to
+      // switch back once a genuine stride exists). The hero_<race>_<class> rigs now author a
+      // six-frame contact/down/pass cycle with articulated legs, so it does.
+      //
+      // Deliberately the PLAYER only: mob_* rigs have not been regenerated and still have the
+      // jittery walk, so the mob branch below stays on 'idle'.
+      if (!inCombatAnim) this.player.animator.set('walk')
     } else if (!inCombatAnim) {
       this.player.animator.set('idle')
     }

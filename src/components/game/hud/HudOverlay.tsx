@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { useGameStore } from '../../../store/gameStore'
 import { MinimapRadar } from './MinimapRadar'
 import { ObjectiveTracker } from './ObjectiveTracker'
@@ -25,15 +25,46 @@ export function HudOverlay() {
   const showPanel = gameMode === 'traveling' || gameMode === 'gathering'
     || gameMode === 'crafting' || showTown
 
+  // Publish both top corners' real heights as --unit-h / --hud-r-h.
+  //
+  // On desktop each corner heads a column: the character rail is positioned directly under
+  // the unit frames, the inventory directly under the radar and objective tracker. Both
+  // rails' `top` AND `max-height` therefore depend on how tall the box above them actually
+  // is, and hardcoding those numbers means a rail overlapping its own header the first time
+  // a party, a cast bar or a second quest line makes one taller. Same coupling `--log-h` and
+  // `--actionbar-h` are measured for. `.unit-frames` and `.hud-tr` carry `min-height` floors
+  // so the ordinary in-and-out of a target does not jog a column (see index.css).
+  const tlRef = useRef<HTMLDivElement>(null)
+  const trRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return
+    const pairs: [HTMLDivElement | null, string][] = [[tlRef.current, '--unit-h'], [trRef.current, '--hud-r-h']]
+    const ro = new ResizeObserver(() => {
+      for (const [el, prop] of pairs) {
+        if (!el) continue
+        const h = el.getBoundingClientRect().height
+        if (h > 0) document.documentElement.style.setProperty(prop, `${Math.round(h)}px`)
+      }
+    })
+    for (const [el] of pairs) if (el) ro.observe(el)
+    // Seed before the first resize callback, or the rails spend a frame at the defaults.
+    for (const [el, prop] of pairs) {
+      if (!el) continue
+      const h = el.getBoundingClientRect().height
+      if (h > 0) document.documentElement.style.setProperty(prop, `${Math.round(h)}px`)
+    }
+    return () => ro.disconnect()
+  }, [])
+
   return (
     <div className="hud-layer">
-      <div className="hud-tl"><UnitFrames /></div>
+      <div ref={tlRef} className="hud-tl"><UnitFrames /></div>
       {/* One top-right column, in reading order: where you are, what you are doing, what
           you just made. This used to be two `.hud-tr` layers with the second pushed down by
           a hardcoded `marginTop: 150` guessed from the minimap's height — a number that
           silently overlapped or floated the moment the minimap changed size. Stacking them
           lets the layout do that arithmetic. */}
-      <div className="hud-tr hud-tr-stack">
+      <div ref={trRef} className="hud-tr hud-tr-stack">
         <MinimapRadar />
         <ObjectiveTracker />
         <CraftResultToast />

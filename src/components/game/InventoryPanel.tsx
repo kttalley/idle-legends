@@ -1,9 +1,9 @@
-import { CollapsiblePanel } from '../ui/CollapsiblePanel'
 import React, { useState } from 'react'
 import { useGameStore, itemColor } from '../../store/gameStore'
 import { TooltipWrapper, ItemTooltipContent } from '../ui/Tooltip'
 import { DetailSheet, type SheetAction } from '../ui/DetailSheet'
 import { SpriteIcon } from '../ui/SpriteIcon'
+import { GoldDisplay } from '../ui/GoldDisplay'
 import type { Item, Slot } from '../../data/types'
 
 /** What the sheet is currently describing: a bag index, or an equipped slot. */
@@ -82,7 +82,7 @@ const TAB_LABEL: Record<'equipment' | 'inventory', string> = {
 export function InventoryPanel() {
   const {
     inventory, equipment, equipItem, unequipItem, sellItem, sellAllCommon,
-    settings, setAutoEquip,
+    settings, setAutoEquip, gold,
   } = useGameStore()
   const [activeTab, setActiveTab] = useState<'inventory' | 'equipment'>('equipment')
   const [inspecting, setInspecting] = useState<Inspecting>(null)
@@ -129,8 +129,11 @@ export function InventoryPanel() {
     }
   })()
 
+  // No CollapsiblePanel. Its header printed "Gear" and folded a section that IS the whole
+  // rail — a second collapse control for the same thing, one row under the rail's own. The
+  // title moved up to the rail head (App.tsx) where the close button already lives.
   return (
-    <CollapsiblePanel id="inventory" title="Gear" grow>
+    <div className="bag-panel">
       {/* Tabs */}
       <div className="flex border-b" style={{ borderColor: 'var(--edge)' }}>
         {(['equipment', 'inventory'] as const).map(t => (
@@ -270,6 +273,18 @@ export function InventoryPanel() {
         )}
       </div>
 
+      {/* ── Purse ──
+          Gold used to ride the hero strip at the top of the LEFT rail, where it was
+          competing with four buttons for 232px and finished up half-behind the minimize
+          arrow. It belongs here: this is the panel you sell from and buy slots from, so the
+          number and the things it is spent on are finally in the same place. Pinned to the
+          foot rather than scrolling with the grid — a balance you have to scroll to find is
+          a balance you check by opening a different screen. */}
+      <div className="bag-purse">
+        <span className="bag-purse-label">Purse</span>
+        <GoldDisplay gold={gold} />
+      </div>
+
       <DetailSheet
         open={!!inspected}
         onClose={() => setInspecting(null)}
@@ -282,6 +297,6 @@ export function InventoryPanel() {
           <ItemTooltipContent item={inspected.item} equippedItem={inspected.compare} hideName />
         )}
       </DetailSheet>
-    </CollapsiblePanel>
+    </div>
   )
 }

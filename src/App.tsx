@@ -340,7 +340,11 @@ export default function App() {
   const openDrawer = narrow && panels.hero ? heroDrawer
     : narrow && panels.bag ? bagDrawer
     : undefined
-  useDismissable(openDrawer != null, close, { ref: openDrawer, closeOnOutside: true })
+  // The dock is EXEMPT from outside-dismissal. It is this drawer's restore control, so a
+  // press on it is using the panel's own chrome, not tapping away from it — and treating it
+  // as "outside" made the tab bar one-way: pointerdown retracted the drawer, then the
+  // button's click saw a closed panel and extended it again.
+  useDismissable(openDrawer != null, close, { ref: openDrawer, closeOnOutside: true, exempt: '.app-dock' })
   // Chat is the exception, and deliberately so: it has no scrim, because this is an idle
   // game you watch and a scrim would grey out the world you are chatting about. Its
   // "outside" is the world itself, handled on `.app-world` below — tapping the HUD while
@@ -426,16 +430,21 @@ export default function App() {
           the FOOT because it reads as the ground the hero is standing on, and because it
           is now short enough that the sheet above it no longer has to be folded away. */}
       <div ref={heroDrawer} className={panelClass('app-sidebar-left', 'hero')}>
+        {/* Retracted, this head is the whole panel: a hero button to bring the sheet back
+            and the menu beside it. The old ‹/› arrows were a poor fit once the rail became
+            a stacked column rather than a sliding edge — an arrow points somewhere, and
+            these do not travel sideways any more. Open, the control is a plain ✕ (it
+            closes); closed, it is the thing it reopens. */}
         <div className="rail-head">
           <HeroBar />
           <button
             className="rail-minimize"
             onClick={() => toggle('hero')}
-            title={panels.hero ? 'Minimize character panel' : 'Show character panel'}
-            aria-label={panels.hero ? 'Minimize character panel' : 'Show character panel'}
+            title={panels.hero ? 'Close character panel' : 'Show character panel'}
+            aria-label={panels.hero ? 'Close character panel' : 'Show character panel'}
             aria-expanded={panels.hero}
           >
-            {panels.hero ? '‹' : '›'}
+            {panels.hero ? '✕' : <><SpriteIcon emoji="☰" size={14} /><span className="rail-restore-label">Menu</span></>}
           </button>
         </div>
         <div className="rail-body">
@@ -463,15 +472,20 @@ export default function App() {
       </div>
       {/* ── Right: inventory ── */}
       <div ref={bagDrawer} className={panelClass('app-sidebar-right', 'bag')}>
+        {/* The rail's head IS the panel's title bar now. InventoryPanel used to wrap itself
+            in a CollapsiblePanel whose only job was to print "Gear" and fold a section that
+            was the entire contents of the rail — a second collapse control for the same
+            thing, one row below the first. */}
         <div className="rail-head">
+          <span className="rail-title">Gear</span>
           <button
             className="rail-minimize"
             onClick={() => toggle('bag')}
-            title={panels.bag ? 'Minimize inventory' : 'Show inventory'}
-            aria-label={panels.bag ? 'Minimize inventory' : 'Show inventory'}
+            title={panels.bag ? 'Close inventory' : 'Show inventory'}
+            aria-label={panels.bag ? 'Close inventory' : 'Show inventory'}
             aria-expanded={panels.bag}
           >
-            {panels.bag ? '›' : '‹'}
+            {panels.bag ? '✕' : <SpriteIcon ui="bag" size={15} />}
           </button>
         </div>
         <div className="rail-body">
@@ -532,16 +546,17 @@ export default function App() {
         </button>
       </div>
 
-      {/* The hero and inventory drawers are full-height sheets that own the screen, so
-          they get a dismissing scrim. CHAT deliberately does not: this is an idle game
-          you watch, and the whole point of a living-world chat feed is reading it WHILE
-          the world runs. A scrim there greys out the world you're chatting about and
-          blocks the action bar, which on a phone is most of the interface. */}
-      {/* Scrim only — it dims the world and blocks stray taps, but dismissal comes from
-          the shared stack, which is the only thing that knows whether the drawer is still
-          the frontmost surface. */}
-      {/* Phone only — on desktop these are columns beside the world, not sheets over it. */}
-      {narrow && (panels.hero || panels.bag) && <div className="app-backdrop" />}
+      {/* No scrim. The hero and inventory drawers used to dim the world behind them, which
+          made them read as modals that own the screen — but they are not: they are panels
+          you glance at while an idle game keeps running, exactly like the chat sheet, which
+          never had one for that reason. Greying out the world is greying out the thing you
+          opened the app to watch.
+
+          Nothing is lost with it gone. Tap-outside dismissal never came from the scrim —
+          it comes from the shared dismissable stack, which is the only thing that knows
+          whether the drawer is still the frontmost surface — and a tap on open ground
+          issuing a move order behind the closing panel is the MMO convention the target
+          card and the chat sheet already follow. */}
     </div>
   )
 }

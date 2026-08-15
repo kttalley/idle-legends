@@ -23,15 +23,15 @@ import type { GameMode } from '../../../data/types'
 // caption is what makes the mode switcher self-describing on the platform that matters.
 // Geometry only — the material (glass, hairlines, press response) lives in `.mode-btn`
 // in index.css, next to the `.skill-slot` panes it has to stay consistent with.
+// Sized to its caption rather than to a fixed 42px, because the caption is now the
+// PROFESSION and those are not all four letters long — a rogue's is "Leatherworking". The
+// floor keeps the three buttons the same comfortable thumb target they were when they all
+// happened to fit; only the widest labels actually spend more than it.
 const MODE_BTN = (touch: boolean): React.CSSProperties => ({
-  width: touch ? 42 : 38,
+  minWidth: touch ? 42 : 38,
   minHeight: touch ? 40 : 34,
-  padding: touch ? '3px 1px' : '2px 1px',
+  padding: touch ? '3px 6px' : '2px 5px',
 })
-
-const MODE_TEXT: Record<string, string> = {
-  combat: 'Fight', gathering: 'Gather', crafting: 'Craft',
-}
 
 export function ActionBar() {
   const { playerClass, gameMode, setMode, mobMapOffset, currentMob, level, xp } = useGameStore()
@@ -43,6 +43,15 @@ export function ActionBar() {
 
   const touch = useCoarsePointer()
   const isActive = (m: GameMode) => gameMode === m && !mobApproaching
+
+  // "Gather" and "Craft" were generic verbs on a bar whose ICONS were already
+  // class-specific — a warrior saw a pick and a hammer captioned as though every class did
+  // the same two jobs. The professions are the whole point of the pair, so the buttons say
+  // which two they are: Mining/Smithing, Herbalism/Alchemy, Skinning/Leatherworking.
+  const modeText: Record<GameMode, string> = {
+    combat: 'Fight', gathering: prof.gatheringName, crafting: prof.craftingName,
+    traveling: 'Travel', in_town: 'Town',
+  }
 
   // Publish the bar's real height as --actionbar-h.
   //
@@ -114,13 +123,13 @@ export function ActionBar() {
               className={`mode-btn${isActive(m) ? ' is-active' : ''}`}
               onClick={() => !isTraveling && setMode(m)}
               disabled={isTraveling}
-              title={`${m[0].toUpperCase()}${m.slice(1)}`}
-              aria-label={`${m[0].toUpperCase()}${m.slice(1)} mode`}
+              title={modeText[m]}
+              aria-label={`${modeText[m]} mode`}
               aria-pressed={isActive(m)}
               style={MODE_BTN(touch)}
             >
               <SpriteIcon emoji={m === 'combat' ? '⚔' : m === 'gathering' ? prof.gatherIcon : prof.craftIcon} size={16} />
-              <span className="mode-btn-label">{MODE_TEXT[m]}</span>
+              <span className="mode-btn-label">{modeText[m]}</span>
             </button>
           ))}
         </div>
