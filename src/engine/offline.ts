@@ -6,6 +6,7 @@ import {
 } from '../data/constants'
 import { UPGRADE_COST_GROWTH } from '../data/upgrades'
 import { ZONES } from '../data/zones'
+import { ZONE_MATERIALS, MATERIALS } from '../data/professions'
 import { GATHER_SECONDS, GATHER_YIELD, purityToQuality } from './crafting'
 import type { GameState, Item, QualityTier, Slot } from '../data/types'
 import { generateItem } from '../data/items'
@@ -173,6 +174,8 @@ export interface OfflineReport {
   watchSpent: number
   /** Banked watch still in hand afterwards. */
   watchRemaining: number
+  /** What the hero dug up, if they were left working a node rather than fighting. */
+  gathered: { materialId: string; name: string; qty: number } | null
 }
 
 export interface OfflineOutcome {
@@ -237,9 +240,6 @@ export function projectOfflineProgress(
     purchasedWatchHours?: number
   } = {},
 ): OfflineOutcome | null {
-  const rates = state.offlineRates
-  if (!rates || rates.seconds < OFFLINE_MIN_MEASURED_SECONDS) return null
-
   const fx = compileUpgrades(state.upgradeRanks)
   // Meadowwarden extends the cap alongside the Long Watch upgrade — both are "the world
   // keeps paying while you are away", so they add rather than compete.
@@ -253,6 +253,54 @@ export function projectOfflineProgress(
   if (elapsed.secondsElapsed < OFFLINE_MIN_SECONDS) return null
   const permanentSeconds = (OFFLINE_CAP_HOURS + permanentHours) * 3600
   const bankSpent = Math.max(0, Math.min(banked, elapsed.secondsElapsed - permanentSeconds))
+
+  // ── A hero left at a node was GATHERING, not fighting ─────────────────────
+  //
+  // This branch did not exist, and its absence made a liar of the gathering panel: that
+  // panel prints an idle rate ("12/min at Coarse") drawn from `projectGathering`, and
+  // `projectGathering` had exactly one caller — the panel itself. Nothing ever granted the
+  // materials. Close the app at a vein and you came back to nothing at all, while the UI
+  // had just told you what you would earn.
+  //
+  // Branching on the saved mode rather than paying both is the honest shape: you cannot
+  // swing and dig at once. It is also the more accurate of the two, because the combat
+  // projection replays a DECAYING measured rate — a hero who spent their last ten minutes
+  // gathering has a combat rate near zero, so the old path would have paid them for
+  // fighting they did not do, using numbers from before they walked to the node.
+  //
+  // Deliberately NOT gated on `OFFLINE_MIN_MEASURED_SECONDS`. That gate exists because a
+  // combat rate needs a sample to extrapolate from; gathering has no rate to measure. The
+  // cadence is fixed (`GATHER_SECONDS`), so a player who has never landed a blow still
+  // earns the floor, which is the whole promise.
+  if ((state.departedMode ?? state.gameMode) === 'gathering') {
+    const matId = ZONE_MATERIALS[state.currentZone]?.[state.playerClass]
+    const gathered = matId ? projectGathering(elapsed.secondsElapsed).units : 0
+    if (!matId || gathered <= 0) return null
+    return {
+      patch: {
+        // Purity is untouched: unattended work banks NONE, so the stock lands at Coarse —
+        // the exact quality the game produced before the strike meter existed. Quality is
+        // the reward for being present; quantity is the reward for the hero being out
+        // there at all.
+        materials: { ...state.materials, [matId]: (state.materials[matId] ?? 0) + gathered },
+        watchBonusSeconds: banked - bankSpent,
+        lastTickTimestamp: now,
+      },
+      report: {
+        secondsElapsed: elapsed.secondsElapsed,
+        cappedAtHours: elapsed.cappedAt === null ? null : OFFLINE_CAP_HOURS + permanentHours,
+        kills: 0, gold: 0, xp: 0, levelsGained: 0,
+        itemsEquipped: 0, itemsSold: 0, itemsBagged: 0, itemsSalvaged: 0,
+        soldGold: 0, salvagedGold: 0,
+        cappedByContent: false, contentCeiling: 0,
+        watchSpent: bankSpent, watchRemaining: banked - bankSpent,
+        gathered: { materialId: matId, name: MATERIALS[matId]?.name ?? matId, qty: gathered },
+      },
+    }
+  }
+
+  const rates = state.offlineRates
+  if (!rates || rates.seconds < OFFLINE_MIN_MEASURED_SECONDS) return null
 
   // A thin sample is trusted but not extrapolated far — see OFFLINE_THIN_SAMPLE_SECONDS.
   // This is what lets a 45-second first session still pay for an overnight absence
@@ -355,6 +403,7 @@ export function projectOfflineProgress(
       soldGold, salvagedGold,
       cappedByContent, contentCeiling: ceiling,
       watchSpent: bankSpent, watchRemaining: banked - bankSpent,
+      gathered: null,
     },
   }
 }

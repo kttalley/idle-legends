@@ -3155,3 +3155,75 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Mode-panel close ─────────────────────────────────────────────────────────
+   The gathering, crafting and town panels used to end in a row of navigation buttons —
+   "Fight", "Mining", "Smithing" — which were the SAME three controls the action bar
+   carries permanently two inches below, drawn a second time in a different style. A panel
+   that repeats the app's persistent navigation inside itself teaches the player that the
+   persistent navigation cannot be trusted.
+   So the panels lost their footer entirely and gained this: one dismissal, in the corner
+   every dismissal in this app lives in (`.rail-minimize` uses the same glyph in the same
+   place), leaving the bar below to do the job it was already doing. */
+.modepanel-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  border: 1px solid var(--edge-soft);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--muted-warm);
+  font-size: 0.72rem;
+  line-height: 1;
+  transition: color 0.12s, border-color 0.15s, background 0.12s;
+}
+.modepanel-close:hover { color: var(--gold); border-color: var(--gold-deep); background: var(--ink); }
+.modepanel-close:active { transform: translateY(1px); }
+/* The panel is the positioning context for it. */
+.app-modepanel { position: relative; }
+@media (pointer: coarse) {
+  /* Thumb-sized, and inset a touch further so it clears the panel's rounded corner. */
+  .modepanel-close { width: 34px; height: 34px; top: 5px; right: 6px; }
+}
+/* The craft commit, inside its recipe row. Full width of the expanded detail so it reads
+   as "do this one" rather than as another item in the list. */
+.craft-commit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  margin-top: 5px;
+  font-size: 0.58rem;
+  background: linear-gradient(180deg, var(--wood-lit), var(--wood));
+}
+@media (pointer: coarse) { .craft-commit { min-height: 38px; } }
+
+/* ── Top-centre announcements ─────────────────────────────────────────────────
+   The craft receipt. Anchored under the unit frames rather than at a fixed offset,
+   because "the top" is a different y on each breakpoint: `--unit-h` is the measured
+   height of the top-left HUD corner (published by HudOverlay), so the card clears the
+   player's own health bar on a phone and on a desktop without either number being
+   guessed. Same trick the rails use to sit under their corner boxes. */
+.toast-top {
+  position: fixed;
+  top: calc(var(--unit-h) + 14px + var(--safe-t));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}
+.toast-top > * { pointer-events: auto; }

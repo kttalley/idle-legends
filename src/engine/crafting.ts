@@ -156,6 +156,56 @@ export function resolveStrike(
   return { result: perfect ? 'perfect' : 'good', purity, streak: nextStreak }
 }
 
+// ── Tempering: the craft's own skill moment ───────────────────────────────────
+//
+// Gathering has the strike meter, so working a vein is something a present player does
+// BETTER than an absent one. Crafting had no such beat at all — output quality was
+// inherited wholesale from material quality, which made the forge a vending machine: put
+// Masterwork in, get Masterwork out, and the player's only contribution was having walked
+// to a node earlier.
+//
+// The temper is the missing half. While a craft runs, a marker sweeps a heat band; land
+// strikes in it and the piece comes out one tier ABOVE its materials. It cannot go the
+// other way — a botched temper simply forfeits the bonus — because punishing an idle
+// player for not watching a progress bar is the opposite of what this game is.
+//
+// Geometry is deliberately the same as the gathering meter's (`rollSweep`, a reflecting
+// cursor, a band with a perfect core). One learned gesture, used in both professions.
+
+/** Strikes offered per craft. */
+export const TEMPER_STRIKES = 3
+/** Heat needed to raise the piece a tier. Two perfects, or three good hits. */
+export const TEMPER_THRESHOLD = 4
+const TEMPER_HEAT_PERFECT = 2
+const TEMPER_HEAT_GOOD = 1
+
+export interface TemperOutcome {
+  result: StrikeResult
+  heat: number
+}
+
+/** Resolve one temper strike. Same band geometry as `resolveStrike`, simpler payout: this
+ *  is a yes/no bonus, not an accumulating purity score. */
+export function resolveTemper(
+  cursor: number, bandCenter: number, bandHalfWidth: number,
+): TemperOutcome {
+  const d = Math.abs(cursor - bandCenter)
+  if (d > bandHalfWidth) return { result: 'miss', heat: 0 }
+  const perfect = d <= bandHalfWidth * PERFECT_FRACTION
+  return {
+    result: perfect ? 'perfect' : 'good',
+    heat: perfect ? TEMPER_HEAT_PERFECT : TEMPER_HEAT_GOOD,
+  }
+}
+
+/** The tier a finished craft lands on, given its material tier and the heat banked.
+ *  Never below the material tier — the temper is upside only. */
+export function temperedQuality(base: QualityTier, heat: number): QualityTier {
+  if (heat < TEMPER_THRESHOLD) return base
+  const next = QUALITY_ORDER[Math.min(QUALITY_ORDER.length - 1, qualityRank(base) + 1)]
+  return next ?? base
+}
+
 // ── Stock quality ─────────────────────────────────────────────────────────────
 /** Average purity per unit currently held of a material (0 when none held / none banked). */
 export function stockPurity(

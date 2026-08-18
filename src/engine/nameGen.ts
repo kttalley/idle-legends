@@ -78,7 +78,7 @@ const NAME_ENDS   = ['van', 'dor', 'ric', 'gar', 'wyn', 'thas', 'mir', 'ok', 'as
 const CLASS_EPITHETS: Record<ClassType, string[]> = {
   warrior: ['the Relentless', 'the Unbroken', 'Ironheart', 'the Wrathful', 'Bloodsworn', 'the Stalwart', 'Oathkeeper'],
   mage:    ['the Frostborn', 'the Arcane', 'Coldmind', 'Wintertongue', 'the Calculating', 'the Unseen', 'Riftwatcher'],
-  rogue:   ['the Silent', 'Poisonhand', 'the Patient', 'Nightblade', 'the Vengeful', 'Shadowstep', 'the Quick'],
+  rogue:   ['the Silent', 'Poisonhand', 'the Patient', 'Nightblade', 'the Vengeful', 'Duskstep', 'the Quick'],
   warlock: ['the Hollow', 'Voidsworn', 'the Cursed', 'Duskcaller', 'the Haunted', 'Felbound', 'the Nameless'],
 }
 

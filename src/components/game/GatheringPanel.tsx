@@ -119,27 +119,12 @@ export function GatheringPanel() {
         </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="flex gap-2 mt-auto" style={{ paddingTop: 4 }}>
-        <button
-          className="rp-button"
-          onClick={() => setMode('combat')}
-          style={{ fontSize: '0.6rem', flex: 1 }}
-        >
-          <SpriteIcon emoji="⚔" size={13} /> Fight
-        </button>
-        {/* The destination is this class's craft, not a generic "Craft" — and the icon that
-            goes with it is the one the mode toggle and the crafting header already use. A
-            hardcoded 🔨 sent a warlock to Alchemy under a blacksmith's hammer. */}
-        <button
-          className="rp-button"
-          onClick={() => setMode('crafting')}
-          disabled={!hasMaterials}
-          style={{ fontSize: '0.6rem', flex: 1, opacity: hasMaterials ? 1 : 0.4 }}
-        >
-          <SpriteIcon emoji={prof.craftIcon} size={13} /> {prof.craftingName}
-        </button>
-      </div>
+      {/* No footer. This panel used to end with "Fight" and a jump to the craft — both of
+          which are the action bar's own mode toggles, permanently on screen a couple of
+          inches below and already showing which mode is lit. Drawing them again here made
+          the bar look like it might not work, and cost the panel a row of height on the
+          screen size that can least afford one. Dismissal is the frame's ✕; switching
+          activity is the bar's job. */}
     </div>
   )
 }

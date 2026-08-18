@@ -20,6 +20,8 @@ import { TownView } from '../TownView'
 export function HudOverlay() {
   const gameMode = useGameStore(s => s.gameMode)
   const currentTown = useGameStore(s => s.currentTown)
+  const setMode = useGameStore(s => s.setMode)
+  const leaveTown = useGameStore(s => s.leaveTown)
   const showTown = gameMode === 'in_town' && !!currentTown
   const showPanel = gameMode === 'traveling' || gameMode === 'gathering'
     || gameMode === 'crafting' || showTown
@@ -87,6 +89,23 @@ export function HudOverlay() {
       <div className="hud-bottom">
         {showPanel && (
           <div className="app-modepanel rp-glass">
+            {/* ── One close control, owned by the FRAME rather than by each panel ──
+                Every mode panel needs the same "put this away" verb, and four copies of it
+                is four chances to place it differently. Here it is one button, always in
+                the same corner, and each panel below stays purely about its own content.
+
+                What it closes back TO is mode-dependent, which is why it lives in the one
+                place that knows the mode. Travel is deliberately exempt: a journey in
+                progress is not a menu you dismiss, and offering an ✕ that silently did
+                nothing would be worse than offering none. */}
+            {gameMode !== 'traveling' && (
+              <button
+                className="modepanel-close"
+                onClick={() => (showTown ? leaveTown() : setMode('combat'))}
+                title={showTown ? 'Leave town' : 'Back to the fight'}
+                aria-label={showTown ? 'Leave town' : 'Back to the fight'}
+              >✕</button>
+            )}
             {gameMode === 'traveling' && <TravelOverlay />}
             {gameMode === 'gathering' && <GatheringPanel />}
             {gameMode === 'crafting'  && <CraftingPanel />}

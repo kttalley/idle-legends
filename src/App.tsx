@@ -644,6 +644,15 @@ export default function App() {
           screen, over everything, and expire on their own. */}
       <div className="toast-centre">
         <LevelUpToast />
+      </div>
+      {/* The craft card sits at the TOP, not with the level-up in the middle.
+          They are different kinds of moment and were never really the same problem. A
+          level-up is a beat: it wants the centre of the screen, it wants to interrupt, and
+          it is over in five seconds. A finished craft is a RECEIPT — it hangs around for
+          six and a half, it arrives while the player is watching a fight, and dead centre
+          means the one thing they were looking at is behind it for the duration. Top-centre
+          keeps it unmissable without standing on the hero. */}
+      <div className="toast-top">
         <CraftResultToast />
       </div>
 

@@ -79,6 +79,23 @@ export function OfflineReportToast() {
           </div>
         )}
 
+        {/* A gathering absence pays in stock, not in kills — and it is a different report,
+            so it says so rather than printing four zeroes and a material. */}
+        {report.gathered && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Row
+              label={report.gathered.name}
+              value={`+${report.gathered.qty.toLocaleString()}`}
+              color="var(--success)"
+            />
+            <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic', marginTop: 2 }}>
+              Worked the vein while you were gone. Unattended stock comes back Coarse —
+              quality is what being there is for.
+            </div>
+          </div>
+        )}
+
+        {!report.gathered && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Row label="Enemies felled" value={report.kills.toLocaleString()} />
           <Row label="Gold earned" value={`${report.gold.toLocaleString()}g`} color="var(--gold)" />
@@ -91,6 +108,7 @@ export function OfflineReportToast() {
             />
           )}
         </div>
+        )}
 
         <div style={{ borderTop: '1px solid var(--edge)', paddingTop: 5, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {report.itemsEquipped > 0 && (

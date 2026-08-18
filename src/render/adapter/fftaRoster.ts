@@ -197,7 +197,18 @@ export const ORIGINAL_SPRITE: Record<string, string> = {
   // comes from palette, and `resolveMobSprite` guarantees no two mobs in one zone land on
   // the same sheet.
   ffa_direwolf: 'mob_duskcat', ffa_grim_wolfkin: 'mob_duskcat',
-  ffa_dire_boar: 'mob_gnarljaw', ffa_bog_troll: 'mob_gnarljaw',
+  // The boar is FOUR-LEGGED and was drawing on `mob_gnarljaw`, which is a bipedal brute in
+  // a loincloth. A quadruped on a two-legged rig is the most obviously wrong a sprite can
+  // be, so it moves to the dog-shaped sheet even though the wolf in its starting zone is
+  // already there — two similar quadrupeds beat one boar standing upright.
+  //
+  // KNOWN ART GAP, recorded rather than papered over: `mob_duskcat` is the ONLY drawn
+  // quadruped, and mob palettes vary by boss/elite/normal rather than per mob, so the Grey
+  // Wolf and the Rampaging Boar are now the same figure in Sunhollow. The fix is a second
+  // four-legged sheet (something tusked and heavy); until that exists this is the least
+  // wrong arrangement available.
+  ffa_dire_boar: 'mob_duskcat',
+  ffa_bog_troll: 'mob_gnarljaw',
   ffa_chimera: 'mob_ashdrake', ffa_frost_wyrm: 'mob_ashdrake', ffa_carrion_bird: 'mob_ashdrake',
   ffa_rot_crawler: 'mob_scuttler',
   ffa_magma_brute: 'mob_cinderwisp',
@@ -252,8 +263,10 @@ const MOB_KEYWORDS: KeywordPool[] = [
   [/goblin|kobold|imp|gremlin|sapper|sprite/, ['ffa_goblin', 'ffa_tonberry']],
   [/ant|bug|insect|spider|scorpion|beetle|mantis|antlion/, ['ffa_antlion']],
   [/lizard|newt|gecko/, ['ffa_tonberry']],
-  [/ogre|troll|brute|golem|giant|ettin|beast/, ['ffa_toughskin']],
-  [/boar|pig|hog|swine/, ['ffa_toughskin']],
+  // `beast` left this pool: it is the generic word for a four-legged animal, and sending it
+  // to `ffa_toughskin` (a bipedal brute) put every unmapped creature on two legs.
+  [/ogre|troll|brute|golem|giant|ettin/, ['ffa_toughskin']],
+  [/boar|pig|hog|swine|beast|bear|stag|ram|goat|ox|drake-hound/, ['ffa_direwolf']],
   [/vulture|bird|crow|raven/, ['ffa_floateye', 'ffa_icedrake']],
 
   // Humanoid mobs rendered as FFTA job sprites (enemy palette tints them)
@@ -304,8 +317,21 @@ export function resolveMobSprite(name: string, templateId?: string): string {
   return DEFAULT_MOB_SPRITE
 }
 
-/** The skeleton — see `resolveMobSprite`. Resolves to `mob_gravewalker` in shipped builds. */
+/**
+ * The fallbacks, and there are TWO because a body has a shape.
+ *
+ * Making the skeleton the single universal default was an over-correction: it fixed
+ * unmapped HUMANOIDS (which used to come out as a faceless programmatic figure) and broke
+ * unmapped BEASTS, which then came out as bipedal undead. A boar drawn standing upright is
+ * not an improvement on a boar drawn as a blank.
+ *
+ * So: anything that reads as a creature falls back to the four-legged sheet, anything that
+ * reads as a person falls back to the skeleton. Both are drawn, both ship, and neither is
+ * ever a placeholder blob.
+ */
 export const DEFAULT_MOB_SPRITE = 'ffa_bone_archer'
+/** Four-legged fallback — resolves to `mob_duskcat`, the one drawn quadruped. */
+export const DEFAULT_BEAST_SPRITE = 'ffa_direwolf'
 
 /**
  * Per-combination original rigs — one drawn sheet for every race x class the character

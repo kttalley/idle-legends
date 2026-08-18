@@ -1,6 +1,24 @@
 import type { ClassType, ZoneId, MaterialId, RecipeId, Slot } from './types'
 
 // ── Materials ─────────────────────────────────────────────────────────────────
+//
+// **Names are original; IDS ARE NOT RENAMED.** Every id here is a save key — a player's
+// stock is `Record<MaterialId, number>` and their recipes are stored by id — so renaming
+// one would silently delete whatever they had gathered. The ids therefore still read
+// `mithril_ore`, `kingsblood`, `runecloth`; only the words the player sees have changed.
+//
+// They changed because the previous set was not "inspired by" another game, it WAS another
+// game's: all five herbs (Silverleaf, Mageroyal, Briarthorn, Kingsblood, Dreamfoil), both
+// upper cloth tiers (Mageweave, Runecloth), the top two ores (Mithril, Thorium) and the
+// entire five-step leather ladder were verbatim World of Warcraft item names, as were
+// "Linen Bandage" and "Minor Healing Potion". That is a trademark exposure a term-grep by
+// a reviewer finds in one pass, and it is the same class of problem the FFTA palette had
+// (see palettes.ts) — content copied at the level of the actual value, not the idea.
+//
+// The replacements are drawn from this world's own vocabulary rather than being
+// find-and-replace synonyms: ash, dusk, gallows, sorrow, vows and the long war. Real
+// materials keep their real names — copper, tin, iron, linen, wool and silk are not
+// anyone's invention.
 export interface Material {
   id: MaterialId
   name: string
@@ -12,26 +30,26 @@ export const MATERIALS: Record<MaterialId, Material> = {
   copper_ore:   { id: 'copper_ore',   name: 'Copper Ore',     icon: '🪨' },
   tin_ore:      { id: 'tin_ore',      name: 'Tin Ore',        icon: '🪨' },
   iron_ore:     { id: 'iron_ore',     name: 'Iron Ore',       icon: '🪨' },
-  mithril_ore:  { id: 'mithril_ore',  name: 'Mithril Ore',    icon: '💎' },
-  thorium_ore:  { id: 'thorium_ore',  name: 'Thorium Ore',    icon: '💎' },
+  mithril_ore:  { id: 'mithril_ore',  name: 'Palesilver Ore',    icon: '💎' },
+  thorium_ore:  { id: 'thorium_ore',  name: 'Grimsteel Ore',    icon: '💎' },
   // Mage — Tailoring
   linen_cloth:      { id: 'linen_cloth',      name: 'Linen Cloth',      icon: '🧵' },
   wool_cloth:       { id: 'wool_cloth',       name: 'Wool Cloth',       icon: '🧵' },
   silk_cloth:       { id: 'silk_cloth',       name: 'Silk Cloth',       icon: '🧵' },
-  mageweave_cloth:  { id: 'mageweave_cloth',  name: 'Mageweave Cloth',  icon: '✨' },
-  runecloth:        { id: 'runecloth',        name: 'Runecloth',        icon: '✨' },
+  mageweave_cloth:  { id: 'mageweave_cloth',  name: 'Glimmerweave Cloth',  icon: '✨' },
+  runecloth:        { id: 'runecloth',        name: 'Sigilcloth',        icon: '✨' },
   // Warlock — Herbalism
-  silverleaf:  { id: 'silverleaf',  name: 'Silverleaf',   icon: '🌿' },
-  mageroyal:   { id: 'mageroyal',   name: 'Mageroyal',    icon: '🌿' },
-  briarthorn:  { id: 'briarthorn',  name: 'Briarthorn',   icon: '🌿' },
-  kingsblood:  { id: 'kingsblood',  name: 'Kingsblood',   icon: '🌸' },
-  dreamfoil:   { id: 'dreamfoil',   name: 'Dreamfoil',    icon: '🌸' },
+  silverleaf:  { id: 'silverleaf',  name: 'Palewort',   icon: '🌿' },
+  mageroyal:   { id: 'mageroyal',   name: 'Ashbloom',    icon: '🌿' },
+  briarthorn:  { id: 'briarthorn',  name: 'Gallowvine',   icon: '🌿' },
+  kingsblood:  { id: 'kingsblood',  name: 'Sorrowcap',   icon: '🌸' },
+  dreamfoil:   { id: 'dreamfoil',   name: 'Stillbloom',    icon: '🌸' },
   // Rogue — Skinning
-  ruined_leather:  { id: 'ruined_leather',  name: 'Ruined Leather',  icon: '🦴' },
-  light_leather:   { id: 'light_leather',   name: 'Light Leather',   icon: '🦴' },
-  medium_leather:  { id: 'medium_leather',  name: 'Medium Leather',  icon: '🦴' },
-  heavy_leather:   { id: 'heavy_leather',   name: 'Heavy Leather',   icon: '🐾' },
-  thick_leather:   { id: 'thick_leather',   name: 'Thick Leather',   icon: '🐾' },
+  ruined_leather:  { id: 'ruined_leather',  name: 'Ragged Hide',  icon: '🦴' },
+  light_leather:   { id: 'light_leather',   name: 'Supple Hide',   icon: '🦴' },
+  medium_leather:  { id: 'medium_leather',  name: 'Tanned Hide',  icon: '🦴' },
+  heavy_leather:   { id: 'heavy_leather',   name: 'Scarred Hide',   icon: '🐾' },
+  thick_leather:   { id: 'thick_leather',   name: 'Warhide',   icon: '🐾' },
 }
 
 // ── Zone → Material mapping ───────────────────────────────────────────────────
@@ -110,6 +128,31 @@ export const ZONE_MATERIALS: Record<ZoneId, Record<ClassType, MaterialId>> = {
   },
 }
 
+/**
+ * Where a material grows, dug the other way round.
+ *
+ * `ZONE_MATERIALS` answers "what does this zone yield" — which is what the gathering tick
+ * needs, and useless to the crafting panel, which is holding a recipe and wants to know
+ * where its inputs come from. The panel could not answer "where do I find Sorrowcap"
+ * despite the game knowing exactly, so an unmakeable recipe was a dead end rather than a
+ * destination.
+ *
+ * Derived rather than hand-written: a second table would be one more thing to forget to
+ * update when a zone's yield changes.
+ */
+export const MATERIAL_ZONE: Record<MaterialId, ZoneId> = (() => {
+  const out: Record<string, ZoneId> = {}
+  for (const [zoneId, byClass] of Object.entries(ZONE_MATERIALS)) {
+    for (const matId of Object.values(byClass)) {
+      // First zone wins: materials appear in exactly one zone per class, and if that ever
+      // stops being true the EARLIEST one is the one worth pointing a player at.
+      if (!(matId in out)) out[matId] = zoneId as ZoneId
+    }
+  }
+  return out
+})()
+
+
 // ── Stat effect for crafted items ─────────────────────────────────────────────
 export interface CraftStatEffect {
   type: 'instant_heal' | 'buff_dmg_pct' | 'buff_armor' | 'buff_crit'
@@ -170,28 +213,28 @@ export const RECIPES: Recipe[] = [
   },
   {
     id: 'mithril_insignia',
-    name: 'Mithril Insignia',
+    name: 'Palesilver Insignia',
     classFor: 'warrior',
     inputs: [{ materialId: 'mithril_ore', qty: 4 }],
-    output: { name: 'Mithril Insignia', icon: '💠', effect: { type: 'buff_crit', value: 0.08, durationSeconds: 45 } },
+    output: { name: 'Palesilver Insignia', icon: '💠', effect: { type: 'buff_crit', value: 0.08, durationSeconds: 45 } },
     craftTime: 15,
   },
   {
     id: 'thorium_bladestone',
-    name: 'Thorium Bladestone',
+    name: 'Grimsteel Bladestone',
     classFor: 'warrior',
     inputs: [{ materialId: 'thorium_ore', qty: 3 }, { materialId: 'mithril_ore', qty: 2 }],
-    output: { name: 'Thorium Bladestone', icon: '🔥', effect: { type: 'buff_dmg_pct', value: 0.18, durationSeconds: 60 } },
+    output: { name: 'Grimsteel Bladestone', icon: '🔥', effect: { type: 'buff_dmg_pct', value: 0.18, durationSeconds: 60 } },
     craftTime: 20,
   },
 
   // ── Mage — Enchanting ───────────────────────────────────────────────────
   {
     id: 'linen_bandage',
-    name: 'Linen Bandage',
+    name: 'Field Dressing',
     classFor: 'mage',
     inputs: [{ materialId: 'linen_cloth', qty: 4 }],
-    output: { name: 'Linen Bandage', icon: '🩹', effect: { type: 'instant_heal', value: 40 } },
+    output: { name: 'Field Dressing', icon: '🩹', effect: { type: 'instant_heal', value: 40 } },
     craftTime: 5,
   },
   {
@@ -212,28 +255,28 @@ export const RECIPES: Recipe[] = [
   },
   {
     id: 'mageweave_robe',
-    name: 'Mageweave Robe',
+    name: 'Glimmerweave Robe',
     classFor: 'mage',
     inputs: [{ materialId: 'mageweave_cloth', qty: 5 }],
-    output: { name: 'Mageweave Robe', icon: '🌀', effect: { type: 'buff_dmg_pct', value: 0.12, durationSeconds: 60 } },
+    output: { name: 'Glimmerweave Robe', icon: '🌀', effect: { type: 'buff_dmg_pct', value: 0.12, durationSeconds: 60 } },
     craftTime: 15,
   },
   {
     id: 'runecloth_phylactery',
-    name: 'Runecloth Phylactery',
+    name: 'Sigilcloth Phylactery',
     classFor: 'mage',
     inputs: [{ materialId: 'runecloth', qty: 4 }, { materialId: 'mageweave_cloth', qty: 2 }],
-    output: { name: 'Runecloth Phylactery', icon: '💜', effect: { type: 'buff_dmg_pct', value: 0.20, durationSeconds: 60 } },
+    output: { name: 'Sigilcloth Phylactery', icon: '💜', effect: { type: 'buff_dmg_pct', value: 0.20, durationSeconds: 60 } },
     craftTime: 20,
   },
 
   // ── Warlock — Alchemy ───────────────────────────────────────────────────
   {
     id: 'minor_healing_potion',
-    name: 'Minor Healing Potion',
+    name: 'Lesser Healing Draught',
     classFor: 'warlock',
     inputs: [{ materialId: 'silverleaf', qty: 3 }],
-    output: { name: 'Minor Healing Potion', icon: '🧪', effect: { type: 'instant_heal', value: 60 } },
+    output: { name: 'Lesser Healing Draught', icon: '🧪', effect: { type: 'instant_heal', value: 60 } },
     craftTime: 5,
   },
   {
@@ -246,44 +289,44 @@ export const RECIPES: Recipe[] = [
   },
   {
     id: 'briarthorn_elixir',
-    name: 'Briarthorn Elixir',
+    name: 'Gallowvine Elixir',
     classFor: 'warlock',
     inputs: [{ materialId: 'briarthorn', qty: 4 }, { materialId: 'silverleaf', qty: 2 }],
-    output: { name: 'Briarthorn Elixir', icon: '💀', effect: { type: 'buff_crit', value: 0.08, durationSeconds: 45 } },
+    output: { name: 'Gallowvine Elixir', icon: '💀', effect: { type: 'buff_crit', value: 0.08, durationSeconds: 45 } },
     craftTime: 12,
   },
   {
     id: 'kingsblood_brew',
-    name: 'Kingsblood Brew',
+    name: 'Sorrowcap Brew',
     classFor: 'warlock',
     inputs: [{ materialId: 'kingsblood', qty: 4 }],
-    output: { name: 'Kingsblood Brew', icon: '🩸', effect: { type: 'buff_dmg_pct', value: 0.13, durationSeconds: 60 } },
+    output: { name: 'Sorrowcap Brew', icon: '🩸', effect: { type: 'buff_dmg_pct', value: 0.13, durationSeconds: 60 } },
     craftTime: 15,
   },
   {
     id: 'dreamfoil_flask',
-    name: 'Dreamfoil Flask',
+    name: 'Stillbloom Flask',
     classFor: 'warlock',
     inputs: [{ materialId: 'dreamfoil', qty: 3 }, { materialId: 'kingsblood', qty: 2 }],
-    output: { name: 'Dreamfoil Flask', icon: '🌑', effect: { type: 'buff_dmg_pct', value: 0.20, durationSeconds: 60 } },
+    output: { name: 'Stillbloom Flask', icon: '🌑', effect: { type: 'buff_dmg_pct', value: 0.20, durationSeconds: 60 } },
     craftTime: 20,
   },
 
   // ── Rogue — Leatherworking ───────────────────────────────────────────────
   {
     id: 'ruined_armor_kit',
-    name: 'Ruined Armor Kit',
+    name: 'Ragged Hide Kit',
     classFor: 'rogue',
     inputs: [{ materialId: 'ruined_leather', qty: 4 }],
-    output: { name: 'Ruined Armor Kit', icon: '🦺', effect: { type: 'buff_armor', value: 10, durationSeconds: 30 } },
+    output: { name: 'Ragged Hide Kit', icon: '🦺', effect: { type: 'buff_armor', value: 10, durationSeconds: 30 } },
     craftTime: 5,
   },
   {
     id: 'light_armor_kit',
-    name: 'Light Armor Kit',
+    name: 'Supple Hide Kit',
     classFor: 'rogue',
     inputs: [{ materialId: 'light_leather', qty: 3 }],
-    output: { name: 'Light Armor Kit', icon: '🥷', effect: { type: 'buff_crit', value: 0.05, durationSeconds: 30 } },
+    output: { name: 'Supple Hide Kit', icon: '🥷', effect: { type: 'buff_crit', value: 0.05, durationSeconds: 30 } },
     craftTime: 8,
   },
   {
@@ -296,10 +339,10 @@ export const RECIPES: Recipe[] = [
   },
   {
     id: 'heavy_shadowstep_wrap',
-    name: 'Shadowstep Wraps',
+    name: 'Duskstep Wraps',
     classFor: 'rogue',
     inputs: [{ materialId: 'heavy_leather', qty: 4 }],
-    output: { name: 'Shadowstep Wraps', icon: '🌑', effect: { type: 'buff_crit', value: 0.10, durationSeconds: 60 } },
+    output: { name: 'Duskstep Wraps', icon: '🌑', effect: { type: 'buff_crit', value: 0.10, durationSeconds: 60 } },
     craftTime: 15,
   },
   {
@@ -319,81 +362,81 @@ export const RECIPES: Recipe[] = [
   // They cost high-tier materials, so they are a goal rather than a default.
   {
     id: 'mithril_battleplate',
-    name: 'Mithril Battleplate',
+    name: 'Palesilver Battleplate',
     classFor: 'warrior',
     kind: 'gear',
     inputs: [{ materialId: 'mithril_ore', qty: 6 }],
-    output: { name: 'Mithril Battleplate', icon: '🛡️' },
+    output: { name: 'Palesilver Battleplate', icon: '🛡️' },
     gear: { slot: 'chest' },
     craftTime: 24,
   },
   {
     id: 'thorium_greathelm',
-    name: 'Thorium Greathelm',
+    name: 'Grimsteel Greathelm',
     classFor: 'warrior',
     kind: 'gear',
     inputs: [{ materialId: 'thorium_ore', qty: 5 }, { materialId: 'mithril_ore', qty: 3 }],
-    output: { name: 'Thorium Greathelm', icon: '⛑️' },
+    output: { name: 'Grimsteel Greathelm', icon: '⛑️' },
     gear: { slot: 'helm' },
     craftTime: 28,
   },
   {
     id: 'mageweave_mantle',
-    name: 'Mageweave Mantle',
+    name: 'Glimmerweave Mantle',
     classFor: 'mage',
     kind: 'gear',
     inputs: [{ materialId: 'mageweave_cloth', qty: 6 }],
-    output: { name: 'Mageweave Mantle', icon: '🧥' },
+    output: { name: 'Glimmerweave Mantle', icon: '🧥' },
     gear: { slot: 'chest' },
     craftTime: 24,
   },
   {
     id: 'runecloth_circlet',
-    name: 'Runecloth Circlet',
+    name: 'Sigilcloth Circlet',
     classFor: 'mage',
     kind: 'gear',
     inputs: [{ materialId: 'runecloth', qty: 5 }, { materialId: 'silk_cloth', qty: 3 }],
-    output: { name: 'Runecloth Circlet', icon: '👑' },
+    output: { name: 'Sigilcloth Circlet', icon: '👑' },
     gear: { slot: 'helm' },
     craftTime: 28,
   },
   {
     id: 'kingsblood_signet',
-    name: 'Kingsblood Signet',
+    name: 'Sorrowcap Signet',
     classFor: 'warlock',
     kind: 'gear',
     inputs: [{ materialId: 'kingsblood', qty: 6 }],
-    output: { name: 'Kingsblood Signet', icon: '💍' },
+    output: { name: 'Sorrowcap Signet', icon: '💍' },
     gear: { slot: 'trinket' },
     craftTime: 24,
   },
   {
     id: 'dreamfoil_shroud',
-    name: 'Dreamfoil Shroud',
+    name: 'Stillbloom Shroud',
     classFor: 'warlock',
     kind: 'gear',
     inputs: [{ materialId: 'dreamfoil', qty: 5 }, { materialId: 'kingsblood', qty: 3 }],
-    output: { name: 'Dreamfoil Shroud', icon: '🌘' },
+    output: { name: 'Stillbloom Shroud', icon: '🌘' },
     gear: { slot: 'chest' },
     craftTime: 28,
   },
   {
     id: 'shadowhide_vest',
-    name: 'Shadowhide Vest',
+    name: 'Duskhide Vest',
     classFor: 'rogue',
     kind: 'gear',
     inputs: [{ materialId: 'heavy_leather', qty: 6 }],
-    output: { name: 'Shadowhide Vest', icon: '🦺' },
+    output: { name: 'Duskhide Vest', icon: '🦺' },
     gear: { slot: 'chest' },
     craftTime: 24,
   },
   {
     id: 'stalker_treads',
-    name: 'Stalker Treads',
+    name: 'Warhide Treads',
     classFor: 'rogue',
     kind: 'gear',
     inputs: [{ materialId: 'thick_leather', qty: 5 }, { materialId: 'heavy_leather', qty: 3 }],
-    output: { name: 'Stalker Treads', icon: '👢' },
+    output: { name: 'Warhide Treads', icon: '👢' },
     gear: { slot: 'boots' },
     craftTime: 28,
   },
