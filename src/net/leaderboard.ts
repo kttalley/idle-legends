@@ -29,6 +29,9 @@ export interface RosterRow {
   faction_name: string
   zone_circuit: number
   bosses_defeated: number
+  /** Nullable in the table: rows written before PvP shipped have none, and the column is
+   *  added with no backfill. Every read coalesces to 0. */
+  honor_kills: number | null
   updated_at: string
   snapshot: RosterSnapshot
 }
@@ -44,6 +47,8 @@ export interface LeaderboardEntry {
   factionName: string
   zoneCircuit: number
   bossesDefeated: number
+  /** Enemy-faction kills — what the HONOR board ranks by. */
+  honorKills: number
   /** True for the signed-in player's own row, so the UI can highlight it. */
   isYou: boolean
 }
@@ -75,10 +80,26 @@ export async function publishSnapshot(state: GameState): Promise<boolean> {
     faction_name: snap.factionName,
     zone_circuit: snap.zoneCircuit,
     bosses_defeated: snap.bossesDefeated,
+    honor_kills: snap.honorKills ?? 0,
     snapshot: snap,
   }
   const res = await upsertRow<RosterRow>(TABLE, row)
-  return res.ok
+  if (res.ok) return true
+
+  // ── The column may not exist yet ───────────────────────────────────────────
+  // `honor_kills` was added to `supabase/schema.sql` when PvP shipped, and a project whose
+  // SQL has not been re-run rejects the whole row with a 400 — which would take the
+  // leaderboard, the thing the store listing's "MMORPG" claim rests on, offline for every
+  // player on the old schema until someone noticed. Observed exactly that against the live
+  // project while testing.
+  //
+  // So the new column is best-effort: on failure, publish the row the old schema accepts.
+  // The value is still inside `snapshot`, and `fetchLeaderboard` already prefers the
+  // column and falls back to the payload — so honor survives, it just cannot be ORDERED by
+  // server-side until the migration runs.
+  const { honor_kills: _dropped, ...legacyRow } = row
+  const retry = await upsertRow<RosterRow>(TABLE, legacyRow)
+  return retry.ok
 }
 
 /**
@@ -89,10 +110,20 @@ export async function publishSnapshot(state: GameState): Promise<boolean> {
  * filtering so the displayed list is always 1..n with no gaps, which matters because a gap
  * reads as a bug to a player who cannot see the row that was removed.
  */
-export async function fetchLeaderboard(limit = 50): Promise<CloudResult<LeaderboardEntry[]>> {
+/** The column list, named once so the two queries below cannot drift apart. */
+const ROW_COLUMNS =
+  'user_id,hero_name,player_class,level,power,faction,faction_name,zone_circuit,bosses_defeated,honor_kills,snapshot'
+
+/** How a board is ordered. Power is the main ladder; honor is the PvP one, and it is a
+ *  genuinely different ranking — the strongest character on the server may never have
+ *  taken a single kill. */
+export type BoardKind = 'power' | 'honor'
+
+export async function fetchLeaderboard(limit = 50, kind: BoardKind = 'power'): Promise<CloudResult<LeaderboardEntry[]>> {
+  const order = kind === 'honor' ? 'order=honor_kills.desc,power.desc' : 'order=power.desc,level.desc'
   const query = [
-    'select=user_id,hero_name,player_class,level,power,faction,faction_name,zone_circuit,bosses_defeated,snapshot',
-    'order=power.desc,level.desc',
+    `select=${ROW_COLUMNS}`,
+    order,
     `limit=${Math.max(1, Math.min(limit, 200))}`,
   ].join('&')
 
@@ -114,6 +145,10 @@ export async function fetchLeaderboard(limit = 50): Promise<CloudResult<Leaderbo
       factionName: r.faction_name,
       zoneCircuit: r.zone_circuit,
       bossesDefeated: r.bosses_defeated,
+      // Prefer the column, fall back to the payload. The column is what the honor board
+      // orders by server-side; the payload is what an older row still carries when the
+      // column has not been written yet.
+      honorKills: r.honor_kills ?? r.snapshot?.honorKills ?? 0,
       isYou: me !== null && r.user_id === me,
     })
   }
@@ -130,7 +165,7 @@ export async function fetchLeaderboard(limit = 50): Promise<CloudResult<Leaderbo
 export async function fetchDuelCandidates(power: number, count = 3): Promise<CloudResult<RosterRow[]>> {
   const me = currentSession()?.userId ?? null
   const query = [
-    'select=user_id,hero_name,player_class,level,power,faction,faction_name,zone_circuit,bosses_defeated,snapshot',
+    `select=${ROW_COLUMNS}`,
     // A window rather than a hard band, so a sparse board still returns opponents.
     `order=power.desc`,
     `limit=${Math.max(1, Math.min(count * 8, 100))}`,

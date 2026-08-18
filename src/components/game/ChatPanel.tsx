@@ -2,6 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExtern
 import { getChatMessages, pushChat, subscribeChat, type ChatMessage } from '../../engine/chatLog'
 import { chatGenStatus } from '../../engine/chatGen'
 import { useGameStore } from '../../store/gameStore'
+// One table for name colour, shared with the nameplates, the target card, the party frame
+// and the ladder. This file used to keep its own copy, which is exactly how the chat feed
+// and the world ended up disagreeing about who was on which side.
+import { factionNameColor, HOSTILE_MARK, isHostile } from '../../data/factions'
 
 // Zone chat — a feed of what the world is saying around you, plus a /say input so the
 // player can join the conversation.
@@ -15,11 +19,6 @@ import { useGameStore } from '../../store/gameStore'
 // Reads from `engine/chatLog` via `useSyncExternalStore` rather than from `gameStore`, so
 // ambient chatter never travels through the player's state.
 
-const FACTION_COLOR: Record<string, string> = {
-  alliance: '#8ac0ff',
-  horde: '#ff8a7a',
-  neutral: '#9a8f7a',
-}
 
 function timeOf(ts: number): string {
   const d = new Date(ts)
@@ -80,7 +79,7 @@ export function ChatPanel() {
             Quiet out here. Heroes nearby will start talking.
           </div>
         )}
-        {shown.map(m => <ChatRow key={m.id} m={m} />)}
+        {shown.map(m => <ChatRow key={m.id} m={m} playerFaction={playerFaction} />)}
         <div ref={bottomRef} />
       </div>
       <div className="chat-panel-footer">
@@ -104,14 +103,22 @@ export function ChatPanel() {
   )
 }
 
-function ChatRow({ m }: { m: ChatMessage }) {
+function ChatRow({ m, playerFaction }: { m: ChatMessage; playerFaction: string }) {
   const system = m.channel === 'system' && !m.from
-  const color = FACTION_COLOR[m.faction ?? 'neutral'] ?? 'var(--parchment)'
+  const color = factionNameColor(m.faction ?? 'neutral')
+  // Crossed swords in the feed for the same reason they are on the nameplate and the
+  // card: chat is where you meet most of the other faction, and "can I kill this person"
+  // should not require reading the colour of small text against a busy background.
+  const hostile = !m.mine && isHostile(m.faction, playerFaction)
   return (
     <div className={`chat-bubble${system ? ' chat-bubble-system' : ''}`}>
       <div className="chat-meta">
         <span className="chat-meta-time">{timeOf(m.ts)}</span>
-        {m.from && <span className="chat-meta-name" style={{ color }}>[{m.from}]</span>}
+        {m.from && (
+          <span className="chat-meta-name" style={{ color }}>
+            {hostile ? `${HOSTILE_MARK} ` : ''}[{m.from}]
+          </span>
+        )}
       </div>
       <div>
         {m.pending ? <span style={{ color: 'var(--muted-warm)' }}>…</span> : m.text}

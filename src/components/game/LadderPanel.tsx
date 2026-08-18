@@ -17,8 +17,12 @@ import { currentSession, ensureSession } from '../../net/session'
 import {
   fetchLeaderboard,
   publishSnapshot,
+  type BoardKind,
   type LeaderboardEntry,
 } from '../../net/leaderboard'
+import { factionNameColor, HOSTILE_MARK, isHostile } from '../../data/factions'
+import { honorRank, nextHonorRank, readPvpRecord } from '../../engine/pvp'
+import { FACTION_DEFINITIONS } from '../../data/factions'
 import {
   challenge,
   fetchDuelHistory,
@@ -30,7 +34,7 @@ import { buildSnapshot } from '../../net/snapshot'
 type Status = 'idle' | 'loading' | 'offline' | 'disabled' | 'ready'
 
 export function LadderPanel() {
-  const [tab, setTab] = useState<'ladder' | 'record'>('ladder')
+  const [tab, setTab] = useState<'ladder' | 'record' | 'honor'>('ladder')
   const [status, setStatus] = useState<Status>('idle')
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [duel, setDuel] = useState<ResolvedDuel | null>(null)
@@ -38,20 +42,28 @@ export function LadderPanel() {
   const [note, setNote] = useState<string | null>(null)
   const [history, setHistory] = useState<DuelResponse[] | null>(null)
 
-  const refresh = useCallback(async () => {
+  // Which ordering the board is showing. The HONOR tab is not a filtered view of the power
+  // ladder — it is a different query with a different index behind it, because the two
+  // rankings genuinely disagree: the strongest character on the server may have taken no
+  // kills at all, and a dedicated ganker may be nowhere near the top by power.
+  const board: BoardKind = tab === 'honor' ? 'honor' : 'power'
+
+  const refresh = useCallback(async (kind: BoardKind = 'power') => {
     if (!cloudEnabled()) { setStatus('disabled'); return }
     setStatus('loading')
     // Publish before reading, so a first-time player sees themselves on the board they just
     // opened rather than an empty list that looks broken.
     const state = useGameStore.getState()
     await publishSnapshot(state)
-    const res = await fetchLeaderboard(50)
+    const res = await fetchLeaderboard(50, kind)
     if (!res.ok) { setStatus(res.reason === 'disabled' ? 'disabled' : 'offline'); return }
     setEntries(res.data)
     setStatus('ready')
   }, [])
 
-  useEffect(() => { void refresh() }, [refresh])
+  // Re-fetch when the ORDERING changes, not on every tab press: switching to RECORD reads
+  // duel history instead and has no board to reorder.
+  useEffect(() => { void refresh(board) }, [refresh, board])
 
   // Fetched lazily, when the record tab is first opened — most sessions never look at it,
   // and it is a second round trip on a panel that already made one.
@@ -111,13 +123,17 @@ export function LadderPanel() {
             onClick={() => setTab('ladder')}
           >LADDER</button>
           <button
+            className={`ladder-tab${tab === 'honor' ? ' is-active' : ''}`}
+            onClick={() => setTab('honor')}
+          >{HOSTILE_MARK} HONOR</button>
+          <button
             className={`ladder-tab${tab === 'record' ? ' is-active' : ''}`}
             onClick={() => setTab('record')}
           >RECORD</button>
         </div>
         <button
           className="ladder-refresh"
-          onClick={() => void refresh()}
+          onClick={() => void refresh(board)}
           disabled={status === 'loading'}
           aria-label="Refresh the ladder"
         >
@@ -151,19 +167,21 @@ export function LadderPanel() {
         </div>
       )}
 
-      {status === 'ready' && entries.length === 0 && (
+      {status === 'ready' && entries.length === 0 && tab !== 'honor' && (
         <div className="ladder-empty">
           <p>No challengers yet.</p>
           <p className="ladder-hint">You are the first to march.</p>
         </div>
       )}
 
-      {tab === 'ladder' ? (
+      {tab === 'honor' ? (
+        <HonorTab entries={entries} />
+      ) : tab === 'ladder' ? (
         <ol className="ladder-list">
           {entries.map(e => (
             <li key={e.userId} className={`ladder-row${e.isYou ? ' is-you' : ''}`}>
               <span className="ladder-rank">{e.rank}</span>
-              <span className="ladder-name">
+              <span className="ladder-name" style={{ color: factionNameColor(e.faction) }}>
                 {e.name}
                 {e.isYou && <span className="ladder-you"> you</span>}
               </span>
@@ -185,6 +203,82 @@ export function LadderPanel() {
         </ol>
       ) : (
         <RecordTab history={history} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * PVP HONOR — your own kill record, then the board ranked by kills.
+ *
+ * Your own line comes FIRST and is read from local state rather than from the board,
+ * which is deliberate: honor is earned in the open world against ambient enemy players,
+ * so it is a number the client owns and publishes. The board below it is other people,
+ * and it can be empty (or offline) without the tab having nothing to say — which is the
+ * failure the ladder tab has always had to work around.
+ */
+function HonorTab({ entries }: { entries: LeaderboardEntry[] }) {
+  const record = readPvpRecord(useGameStore(s => s.pvpRecord))
+  const myFaction = useGameStore(s => s.playerFaction)
+  const rank = honorRank(record.kills)
+  const next = nextHonorRank(record.kills)
+  const enemy = FACTION_DEFINITIONS[myFaction]?.opposingFaction ?? null
+
+  return (
+    <div className="ladder-record">
+      <div className="ladder-tally">
+        <strong style={{ color: factionNameColor(myFaction) }}>{record.kills}</strong>
+        <span className="ladder-hint"> kill{record.kills === 1 ? '' : 's'}</span>
+        <span className="ladder-hint"> · {record.deaths} death{record.deaths === 1 ? '' : 's'}</span>
+      </div>
+      <div className="ladder-hint" style={{ padding: '0 2px 6px' }}>
+        <div><strong style={{ color: 'var(--gold-warm)' }}>{rank}</strong>
+          {next && <span> · {next.remaining} more for {next.title}</span>}
+        </div>
+        {record.bestStreak > 0 && (
+          <div>
+            Streak {record.streak} · best {record.bestStreak}
+            {record.lastVictim && <span> · last: {record.lastVictim}</span>}
+          </div>
+        )}
+        {/* Where the kills come from. Worth stating on the board itself: the crowd mixes
+            generated heroes with real characters pulled off this very ladder, and a player
+            who does not know that reads every kill as fictional. */}
+        <div style={{ marginTop: 2 }}>
+          Enemy players in the world include real characters from this board.
+        </div>
+        {record.kills === 0 && (
+          <div>
+            {enemy
+              ? `Find a ${FACTION_DEFINITIONS[enemy].name} player in the world and attack them.`
+              : 'Unaligned heroes take no honor — pick a side to fight for.'}
+          </div>
+        )}
+      </div>
+      {entries.length === 0 ? (
+        <div className="ladder-empty">
+          <p>No honor recorded yet.</p>
+          <p className="ladder-hint">Nobody on this board has taken a kill.</p>
+        </div>
+      ) : (
+        <ol className="ladder-list">
+          {entries.map(e => (
+            <li key={e.userId} className={`ladder-row${e.isYou ? ' is-you' : ''}`}>
+              <span className="ladder-rank">{e.rank}</span>
+              <span className="ladder-name" style={{ color: factionNameColor(e.faction) }}>
+                {/* The board is the one place you see both factions listed together, so it
+                    is the place the colour rule earns the most — and the crossed swords
+                    mark the rows you would be able to attack in the world. */}
+                {isHostile(e.faction, myFaction) ? `${HOSTILE_MARK} ` : ''}{e.name}
+                {e.isYou && <span className="ladder-you"> you</span>}
+              </span>
+              <span className="ladder-meta">
+                {e.honorKills} kill{e.honorKills === 1 ? '' : 's'}
+                <span className="ladder-circuit"> · Lv {e.level}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
       )}
     </div>
   )

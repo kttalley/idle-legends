@@ -28,6 +28,7 @@
 // ambient crowd is regenerated per zone and a member would otherwise be silently recycled
 // out from under you. That is also how it reads in an MMO: people go their own way.
 
+import { canGroupWith, HOSTILE_MARK, isHostile, resolveFaction } from '../data/factions'
 import type { ChatSpeaker } from './chatGen'
 import { pushChat, resolveChat } from './chatLog'
 import { isLlmReachable, llmGenerate, PRIORITY } from './llmClient'
@@ -91,9 +92,24 @@ export function isInvitePending(key: string): boolean {
  *
  * Returns null when the party is full or they are already in it.
  */
-export function joinParty(speaker: ChatSpeaker): PartyMember | null {
+export function joinParty(speaker: ChatSpeaker, playerFaction?: string): PartyMember | null {
   const key = entityKey(speaker)
   if (isInParty(key) || members.length >= PARTY_MAX) return null
+  // ── The faction wall ────────────────────────────────────────────────────────
+  // Enforced HERE rather than only at the invite, because this is the one door into the
+  // party and the invite is not the only thing that walks through it: the economy harness
+  // calls `joinParty` directly to build a party without an LLM round trip, and the accept
+  // path calls it again asynchronously seconds after the invite's own check passed.
+  //
+  // A cross-faction group is not merely unusual, it is incoherent now that PvP exists —
+  // the member would be simultaneously in your party frame and a legal target in your
+  // rotation, and `mobs` would hold a body for someone standing in `allies`. Refusing at
+  // the door is what keeps those two collections from ever describing the same person.
+  //
+  // `playerFaction` is optional so callers that genuinely have no faction context (the
+  // harness) keep working; when it is absent no wall is applied, which is the old
+  // behaviour rather than a silent failure.
+  if (playerFaction !== undefined && !canGroupWith(speaker.faction, playerFaction)) return null
   const m: PartyMember = { key, speaker, joinedAt: Date.now() }
   members = [...members, m]
   emit()
@@ -111,6 +127,17 @@ function wouldAccept(speaker: ChatSpeaker, playerFaction: string): boolean {
   const roll = Math.abs(h % 100) / 100
   return same ? roll < 0.85 : roll < 0.15
 }
+
+/** What the other side says when you try to group with them. Trash talk, not a decline —
+ *  there was never a decision to make. */
+const HOSTILE_REFUSALS = [
+  'lol no. wrong colour',
+  'i dont group with your kind',
+  'nice try. /spit',
+  'come closer and say that',
+  'ur faction is trash',
+  'invite? ill send you a corpse run instead',
+]
 
 const CANNED_ACCEPT = ['sure, im down', 'yeah ok lets go', 'k inv', 'sounds good, following u']
 const CANNED_DECLINE = ['nah im good', 'sorry, soloing rn', 'cant, waiting on a friend', 'not right now']
@@ -131,6 +158,27 @@ export function invitePartyMember(
 ): void {
   const key = entityKey(speaker)
   if (isInParty(key) || pendingInvites.has(key)) return
+  // Hostiles do not get an invite dialogue. The old flow sent the invite, waited ~4s for
+  // a generated reply and then usually printed a decline — which spent a round trip and
+  // four seconds of the player's attention to say something the rules already knew. Worse,
+  // `wouldAccept` gave the enemy a 15% chance of saying YES, and that hole is precisely
+  // the cross-faction party the wall in `joinParty` now refuses; the invite would have
+  // resolved to nothing and read as a bug.
+  //
+  // What comes back instead is a hostile line, immediately. You can still TALK to the
+  // other side (see `engine/whisper`) — you just cannot group with them.
+  if (isHostile(speaker.faction, playerFaction)) {
+    pushChat({
+      channel: 'system', from: null, entityKey: key,
+      text: `${HOSTILE_MARK} ${speaker.name} is of an enemy faction. You cannot group with them.`,
+    })
+    pushChat({
+      channel: 'system', from: speaker.name, entityKey: key,
+      faction: resolveFaction(speaker.faction),
+      text: HOSTILE_REFUSALS[Math.abs(key.length * 13) % HOSTILE_REFUSALS.length],
+    })
+    return
+  }
   if (members.length >= PARTY_MAX) {
     pushChat({
       channel: 'system', from: null,
@@ -151,9 +199,14 @@ export function invitePartyMember(
   // this behaved, and it read as the invite silently doing nothing.
   const placeholder = pushChat({
     channel: 'system', from: speaker.name, entityKey: key,
-    // Colour by whether they match the player's faction; the literal name is generated
-    // per run, so matching on a hardcoded substring never worked.
-    faction: speaker.faction.trim().toLowerCase() === playerFaction.trim().toLowerCase() ? 'alliance' : 'horde',
+    // Colour by the speaker's OWN faction, resolved to a key.
+    //
+    // It used to be "player's faction ? alliance : horde", i.e. blue when they matched you
+    // and red when they did not — which meant an Ashmarch player saw their own allies
+    // rendered in Concord blue. Name colour is a single global fact now (see
+    // `data/factions`): Ashmarch red, Concord blue, in every surface, regardless of who
+    // is looking.
+    faction: resolveFaction(speaker.faction),
     text: '…', pending: true,
   })
 
@@ -174,7 +227,7 @@ export function invitePartyMember(
       return
     }
     if (accepted) {
-      const m = joinParty(speaker)
+      const m = joinParty(speaker, playerFaction)
       if (m) {
         pushChat({ channel: 'system', from: null, entityKey: key, text: `${speaker.name} joins your party.` })
         onAccepted?.(m)

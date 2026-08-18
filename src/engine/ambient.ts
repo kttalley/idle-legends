@@ -58,6 +58,17 @@ export interface AmbientIdentity {
   talentAllocs: Record<string, number>
   /** The tree they fed most — `deepestSpec`, same as the player's title. */
   specTitle: string | null
+  /**
+   * Set when this "ambient hero" is actually a REAL player's published character standing
+   * in the world — see `engine/ghosts`. It is the owner's `user_id`, which is the only
+   * stable identity a character has (names collide freely in the ambient pool, which is
+   * why `entityKey` folds in class, race and level).
+   *
+   * Everything else about them behaves identically: they wander, they bark, they fight
+   * monsters. What it changes is the fight — a ghost brings their real gear — and what the
+   * UI says about them.
+   */
+  ghostUserId?: string
 }
 
 const NAMES = [

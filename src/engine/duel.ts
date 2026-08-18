@@ -42,6 +42,18 @@ export interface DuelOutcome {
 /**
  * Resolve a duel and post it to chat.
  *
+ * ── No longer how a LOCAL duel works ─────────────────────────────────────────
+ * Tapping a hero and choosing Duel now spawns a real body in the world and fights it
+ * through the ordinary combat loop (`gameStore.duelPlayer`), because an instantly-resolved
+ * duel was the only fight in the game the player never got to watch — three lines of chat
+ * where every other encounter is a thing happening in front of you.
+ *
+ * This function stays because the CLOUD duel is a genuinely different problem: the
+ * opponent is a snapshot in a database, not a body standing next to you, and there is
+ * nothing to render them into. `playerCombatant` above is also what `net/snapshot` builds
+ * a published row from. Neither should be deleted on the strength of the local path
+ * changing shape.
+ *
  * Deterministic in its seed like every other fight, so the same duel replays identically —
  * which is the property Track P actually needs and the reason this is worth building on
  * `runFight` rather than faking a result.

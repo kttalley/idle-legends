@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { WorldSceneController, CSS_SCALE } from '../../render/adapter/combatAdapter'
 import { setSelectedHero } from '../../engine/selection'
+import { refreshGhostRoster } from '../../net/ghostRoster'
+import { buildSnapshot } from '../../net/snapshot'
 import { CombatDebugReadout } from './CombatDebugReadout'
 import { BossBeacon } from './BossBeacon'
 
@@ -20,6 +22,37 @@ export function DimetricWorldScene() {
   const floatersRef = useRef<HTMLDivElement>(null)
   const reflowRef = useRef<() => void>(() => {})
   const zoomLevel = useGameStore(s => s.zoomLevel)
+  const currentZone = useGameStore(s => s.currentZone)
+  const playerFaction = useGameStore(s => s.playerFaction)
+
+  // ── Ghost roster ──────────────────────────────────────────────────────────
+  // Pull the opposing faction's real published characters whenever the hero arrives
+  // somewhere new, and hand them to `engine/ghosts` for the crowd to stand up.
+  //
+  // Keyed on the zone rather than fetched once at mount: the crowd is regenerated per
+  // zone, so each arrival is a fresh chance to place people, and re-reading the board also
+  // picks up anyone who has published since. Level is deliberately NOT a dependency — it
+  // changes constantly and would turn this into a request per level-up.
+  //
+  // Every failure is silent by design (see `net/ghostRoster`): no cloud, no session, no
+  // board, or an empty one all mean the zone is populated entirely by generated heroes,
+  // which is exactly what shipped before ghosts existed.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const state = useGameStore.getState()
+      const power = buildSnapshot(state).power
+      try {
+        const n = await refreshGhostRoster(playerFaction, power)
+        if (!cancelled && n > 0 && import.meta.env.DEV) {
+          console.info(`[ghosts] ${n} real ${playerFaction === 'alliance' ? 'Ashmarch' : 'Concord'} character(s) walking this zone`)
+        }
+      } catch {
+        // Never let the world depend on the network. See the module header.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [currentZone, playerFaction])
 
   useEffect(() => {
     const canvas = canvasRef.current!
@@ -46,6 +79,11 @@ export function DimetricWorldScene() {
     // the canvas and is consumed by overlay UI elsewhere in the tree.
     controller.onHeroTapped = (speaker, clientX, clientY) =>
       setSelectedHero({ speaker, clientX, clientY })
+    // The other half of PvP: the enemy faction opening on YOU. The adapter decides who and
+    // when (it is the only thing that knows where the crowd is standing); the store owns
+    // the state change, exactly as with every other signal on this list.
+    controller.onHeroDeclares = speaker =>
+      useGameStore.getState().attackPlayer(speaker, 'enemy')
 
     controller.init().then(() => {
       if (disposed) return

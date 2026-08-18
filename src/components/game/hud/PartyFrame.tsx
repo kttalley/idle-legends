@@ -1,4 +1,5 @@
 import React, { useSyncExternalStore } from 'react'
+import { factionNameColor } from '../../../data/factions'
 import {
   getCompanionStatuses, getParty, leaveParty, subscribeCompanionStatus, subscribeParty,
 } from '../../../engine/party'
@@ -64,8 +65,9 @@ export function PartyFrame() {
         // No ally record yet means the tick has not reconciled them — full rather than
         // empty, so a just-joined member does not flash up as a corpse.
         const hp = ally ? Math.max(0, Math.min(1, ally.currentHp / Math.max(1, ally.stats.maxHp))) : 1
-        // Generated faction names differ per run, so compare against the player's actual one.
-        const hostile = speaker.faction.trim().toLowerCase() !== playerFaction.trim().toLowerCase()
+        // A party member is ALWAYS your own faction now — `joinParty` refuses anyone else
+        // — so this is no longer a hostility read. It is the same global rule as
+        // everywhere else: colour the name by whose banner they carry.
         const activity = downed ? 'down' : (status?.activity ?? 'following')
 
         return (
@@ -82,7 +84,7 @@ export function PartyFrame() {
               fontSize: 10, textShadow: TEXT_SHADOW, gap: 4,
             }}>
               <span style={{
-                fontWeight: 700, color: hostile ? '#ff8a7a' : '#8ac0ff',
+                fontWeight: 700, color: factionNameColor(speaker.faction),
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {speaker.name}

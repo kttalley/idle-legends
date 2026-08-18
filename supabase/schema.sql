@@ -41,9 +41,29 @@ create table if not exists public.roster_snapshots (
   updated_at      timestamptz not null default now()
 );
 
+-- ── PvP honor ────────────────────────────────────────────────────────────────
+-- Added after the table shipped, so it is an ALTER with a default rather than part of the
+-- CREATE above: existing rows keep working and simply read as zero kills, which is exactly
+-- what they are. Kept as its own column rather than left inside `snapshot` because the
+-- honor board ORDERS by it, and ordering by a JSONB field means no usable index.
+alter table public.roster_snapshots
+  add column if not exists honor_kills int not null default 0 check (honor_kills >= 0);
+
 -- The leaderboard's only query: order by power, take the top N.
 create index if not exists roster_snapshots_power_idx
   on public.roster_snapshots (power desc, level desc);
+
+-- The honor board's query. A separate index because it is a genuinely different ordering:
+-- the strongest character on the board may have taken no kills at all.
+create index if not exists roster_snapshots_honor_idx
+  on public.roster_snapshots (honor_kills desc, power desc);
+
+-- The GHOST ROSTER's query (src/net/ghostRoster.ts): "the opposing faction's characters,
+-- nearest my power". It filters on faction and orders by power, and it runs on every zone
+-- arrival — far more often than either board above, which is why it gets its own index
+-- rather than riding on the power one and filtering after the fact.
+create index if not exists roster_snapshots_faction_power_idx
+  on public.roster_snapshots (faction, power desc);
 
 alter table public.roster_snapshots enable row level security;
 

@@ -635,6 +635,50 @@ export interface MobInstance {
    *  migration; `persistedBoss` is the one mob that survives a reload, and it is
    *  defaulted on the way back in. */
   attackAccum: number
+  /**
+   * Set when this "mob" is actually an enemy-faction PLAYER the hero chose to attack.
+   *
+   * PvP reuses the monster pipeline on purpose. An enemy hero that fights you needs
+   * exactly what a mob needs — a position on the torus, an HP pool, a swing timer, aggro,
+   * pathing, a place in `mobs` so retaliation and ally assist can see it — and every one
+   * of those already works. Inventing a parallel "hostile player" collection would have
+   * meant a second copy of combat resolution, and the two would drift.
+   *
+   * What this flag changes is the PAYOUT and the PRESENTATION: `registerKill` pays honor
+   * instead of loot/XP (see the note there), and the renderer draws them as the hero they
+   * are rather than as whatever `resolveMobSprite` makes of their name.
+   */
+  pvp?: PvpIdentity
+}
+
+/** Who an enemy-faction combatant actually is, carried on their `MobInstance`. */
+export interface PvpIdentity {
+  faction: FactionType
+  race: RaceType
+  playerClass: ClassType
+  rarity: Rarity
+  level: number
+  spec: string | null
+  /** `entityKey` of the ambient hero this was built from, so the crowd can hide the body
+   *  that is now standing in `mobs` instead of drawing them twice. */
+  sourceKey: string
+  /**
+   * A FRIENDLY duel rather than a faction fight.
+   *
+   * Same body, same combat, same renderer — the difference is entirely in what happens at
+   * the end. A duel pays no honor, and nobody actually dies: the loser yields. That is why
+   * this is a flag on the identity rather than a separate kind of entity; "is this fight
+   * lethal" is a property of the fight, and everything else about the two is identical.
+   */
+  duel: boolean
+  /**
+   * Owner's `user_id` when this body is a real player's published character.
+   *
+   * Carried onto the instance so the kill line can say so — "you killed a person" and "you
+   * killed one of the zone's generated heroes" are different events, and the honor ladder's
+   * credibility rests on the difference.
+   */
+  ghostUserId?: string
 }
 
 // ── Zones ─────────────────────────────────────────────────────────────────────
@@ -859,6 +903,8 @@ export interface GameState {
   craftQuality: QualityTier | null
   /** The most recent craft's reveal card. Transient; auto-expires in the UI. */
   lastCraft: CraftResult | null
+  /** Live temper meter for the craft in progress. Transient — see TemperSession. */
+  temperSession: TemperSession | null
   /** The most recent level-up's banner. Transient; auto-expires in the UI, and only ever
    *  set by the live tick — an offline session's levels are reported by the offline
    *  toast, which already says how many were gained. */
@@ -888,10 +934,42 @@ export interface GameState {
   colorway: string
   /** Seconds remaining before manual mode falls back to idle. Only counts down in combat. */
   manualIdleTimer: number
+  /** What the hero was doing when the app last closed, captured on load before `gameMode`
+   *  is reset to 'combat'. Read ONLY by the offline projection, which pays a gathering
+   *  absence in materials rather than in kills. Null on a save written before this existed
+   *  (and on a fresh hero), which reads as "was fighting" — the old behaviour exactly. */
+  departedMode: GameMode | null
   /** Banked offline extension, in seconds — bought with gold, consumed by the absence that
    *  needs it. Sits ON TOP of the free cap and the permanent `long_watch` ranks; see
    *  WATCH_BANK_CAP_HOURS. Absent on old saves → 0, i.e. exactly the old behaviour. */
   watchBonusSeconds: number
+  // ── PvP ─────────────────────────────────────────────────────────────────────
+  /**
+   * The honor record: what the PVP HONOR ladder tab reads.
+   *
+   * Persisted, because a kill count that resets on reload is not a record. Absent on
+   * every save written before PvP existed, so every reader must tolerate `undefined` —
+   * `rehydrateState` backfills a zeroed one rather than making the field optional at
+   * every call site.
+   */
+  pvpRecord: PvpRecord
+}
+
+/** Lifetime PvP tally. Kills are by the faction of the VICTIM, so a player who switches
+ *  sides on a new character still reads correctly on their own board. */
+export interface PvpRecord {
+  /** Enemy-faction players killed, all time. This is the honor ladder's rank column. */
+  kills: number
+  /** Times an enemy-faction player killed the hero. Shown beside kills; a bare kill count
+   *  with no deaths beside it is the kind of number nobody believes. */
+  deaths: number
+  /** Kills broken out by the victim's faction, for the record line. */
+  killsByFaction: Partial<Record<FactionType, number>>
+  /** The current unbroken kill streak, and the best one ever reached. Reset by a death. */
+  streak: number
+  bestStreak: number
+  /** Name of the last player killed, for the honor tab's "last kill" line. */
+  lastVictim: string | null
 }
 
 // ── Gathering: the optional strike-meter overlay ──────────────────────────────
@@ -920,6 +998,24 @@ export interface GatherSession {
   /** Harvests completed in this session — used to vary the sweep so it never becomes a
    *  metronome the player can tap blind. */
   harvests: number
+}
+
+/**
+ * The live temper meter for the craft in progress. Transient — nulled on rehydrate, like
+ * `gatherSession`, because a half-tempered craft cannot be resumed across a reload.
+ */
+export interface TemperSession {
+  recipeId: RecipeId
+  cursor: number
+  dir: 1 | -1
+  speed: number
+  bandCenter: number
+  bandHalfWidth: number
+  strikesLeft: number
+  /** Banked heat; `TEMPER_THRESHOLD` raises the piece a tier. */
+  heat: number
+  lastResult: StrikeResult | null
+  lastResultAt: number
 }
 
 export interface CraftResult {

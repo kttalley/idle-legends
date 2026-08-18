@@ -32,6 +32,7 @@
 // Pointing a shipped build at a personal Ollama box would expose an unauthenticated,
 // unmetered endpoint to every player, so that is deliberately not the default.
 
+import type { Rarity } from '../data/types'
 import type { Rng } from './rng'
 import type { BarkEvent } from './ambient'
 import { isLlmReachable, llmBackedOff, llmBusy, llmGenerate, llmHealth, PRIORITY } from './llmClient'
@@ -224,6 +225,13 @@ export interface ChatSpeaker {
   /** The hero's actual talent build. Carried so a duel can be resolved straight from a
    *  tap without re-deriving the identity from its seed. */
   talentAllocs?: Record<string, number>
+  /** Owner's `user_id` when this speaker is a real player's published character (a
+   *  "ghost" — see `engine/ghosts`), absent for a generated ambient hero. */
+  ghostUserId?: string
+  /** How notable this hero is — the ambient crowd's rarity roll. Optional because a
+   *  speaker can also be built from a cloud snapshot, which has no such notion; PvP treats
+   *  a missing one as `common`, so an enemy is never accidentally scaled up. */
+  rarity?: Rarity
 }
 
 /** What just happened to them, in words the prompt can use. */

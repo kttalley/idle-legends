@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { CLASS_DEFINITIONS } from '../../data/classes'
 import { RACE_DEFINITIONS } from '../../data/races'
-import { FACTION_DEFINITIONS } from '../../data/factions'
+import { FACTION_DEFINITIONS, FACTION_NAME_COLOR } from '../../data/factions'
 import { ZONES } from '../../data/zones'
 import { HeroAvatar } from '../sprites/HeroAvatar'
 import { MAX_SLOTS } from '../../store/saveSlots'
@@ -99,7 +99,10 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
               <div style={{ fontSize: '0.58rem', borderTop: '1px solid var(--edge)', paddingTop: 6, marginBottom: 10 }}>
                 <div className="flex justify-between">
                   <span style={{ color: '#666' }}>Faction</span>
-                  <span style={{ color: FACTION_DEFINITIONS[s.playerFaction]?.color ?? 'var(--parchment)' }}>
+                  {/* The TEXT tone, not the crest tone. `FACTION_DEFINITIONS[].color` is
+                      the deep banner colour meant for fills; at 0.58rem on a dark card the
+                      Ashmarch's `#c0392b` reads as brown. Same table as every nameplate. */}
+                  <span style={{ color: FACTION_NAME_COLOR[s.playerFaction] ?? 'var(--parchment)' }}>
                     {s.factionName || FACTION_DEFINITIONS[s.playerFaction]?.name || '—'}
                   </span>
                 </div>

@@ -17,12 +17,17 @@ import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEnti
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { composePalette } from '../palette'
 import { heroPaletteId, type AccentKey } from './heroWardrobe'
+import {
+  gankReady, isSuppressed as isPvpSuppressed, markGank, wouldAttackUnprovoked,
+} from '../../engine/pvp'
+import { ghostVersion, releaseGhosts, takeGhost } from '../../engine/ghosts'
+import { factionNameColor, HOSTILE_MARK, isHostile } from '../../data/factions'
 import { zoneMapToTileMap, biomePaletteId, propPaletteId, MAP_SIZE, PAD, loadFftaTerrain } from './mapAdapter'
 import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } from '../../engine/walkability'
 import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } from '../../data/townNpcs'
 import { PARTY_MAX } from '../../engine/party'
 import { Animator } from '../animation'
-import { MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, DEFAULT_MOB_SPRITE, isMonsterSprite, isHumanoidMonster, heroSpriteId, heroPreloadIds, useScaffoldArt } from './fftaRoster'
+import { MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, DEFAULT_MOB_SPRITE, DEFAULT_BEAST_SPRITE, isMonsterSprite, isHumanoidMonster, heroSpriteId, heroPreloadIds, useScaffoldArt } from './fftaRoster'
 import { mulberry32, subStream, type Rng } from '../../engine/rng'
 import { deepestSpec } from '../../data/specs'
 import { AGGRESSIVE_RE, combatantOnlyWorldFields, isRangedMob, restGapFor,
@@ -175,7 +180,29 @@ function bestEquipmentRarity(state: GameState): AccentKey {
   return best
 }
 
+/**
+ * Which sprite a mob is drawn with.
+ *
+ * The `pvp` branch is why this exists rather than `resolveMobSprite` being called inline
+ * at both sites. An enemy player's `MobInstance` carries a `templateId` that points at
+ * nothing meaningful (see `buildPvpMob`), and its `baseName` is a person's name — so
+ * `resolveMobSprite` would fall through its keyword table and draw the other faction's
+ * champion as a skeleton. They are heroes; they get the hero rig for their race and class,
+ * chosen by the same `heroSpriteId` the ambient crowd and the player use, so the body that
+ * turns and fights you is the body you tapped.
+ */
+function mobSpriteId(mob: MobInstance): string {
+  return mob.pvp
+    ? heroSpriteId(mob.pvp.race, mob.pvp.playerClass, mob.baseName)
+    : resolveMobSprite(mob.baseName ?? mob.name, mob.templateId)
+}
+
 function mobPaletteId(mob: MobInstance): string {
+  // An enemy player wears their own faction's cloth, not the shared enemy ramp. This is
+  // the same rule the nameplate follows: allegiance is read off colour, everywhere.
+  if (mob.pvp) {
+    return heroPaletteId(mob.pvp.playerClass, mob.pvp.race, mob.pvp.faction, mob.pvp.rarity)
+  }
   if (mob.isBoss) {
     const id = 'mob/boss'
     if (!hasPalette(id)) {
@@ -555,6 +582,9 @@ interface Ambient {
   /** Monsters only: seconds until this corpse respawns. Without this the zone runs out
    *  of things to fight within a minute and the "busy server" decays into a stroll. */
   respawnT: number
+  /** True while `applyPvpSuppression` is the reason this hero is inactive — so that pass
+   *  only ever revives bodies it put away itself. */
+  pvpHidden?: boolean
   /** Monsters only: seconds of fade-IN remaining after a respawn. Deaths already ease out
    *  (see `dyingMobs`), but respawns used to hard-cut back to full alpha, so the crowd
    *  dissolved politely and then popped. Measured at 8 flips in 45s on a two-monster
@@ -659,6 +689,10 @@ export class WorldSceneController {
   private ambientSkirmishCd = 0
   /** Player level, mirrored from sync() purely to band ambient hero levels. */
   private playerLevel = 1
+  private playerRace: RaceType = 'human'
+  /** Which `engine/ghosts` roster generation is already standing in this zone. */
+  private ghostVersionApplied = -1
+  private playerAlive = true
   /** Zone/faction display names, mirrored from sync() so generated chat uses the
    *  game's own generated proper nouns rather than generic fantasy filler. */
   private zoneDisplayName = ''
@@ -757,6 +791,16 @@ export class WorldSceneController {
   /** Tapping an ambient hero opens their player card. The adapter stays read-only over
    *  game state: it reports who was tapped and where, the host owns the UI. */
   onHeroTapped: ((speaker: ChatSpeaker, clientX: number, clientY: number) => void) | null = null
+  /**
+   * An enemy-faction hero has decided to open on the player, unprovoked.
+   *
+   * Same discipline as `onHeroTapped`: the adapter decides WHO and WHEN, because it is the
+   * only thing that knows where the crowd is standing and who is looking at whom; the host
+   * turns that into a combat body. A renderer that reached into the store to start a fight
+   * would be the first crack in the rule that has kept the ambient world out of the
+   * economy since it was built.
+   */
+  onHeroDeclares: ((speaker: ChatSpeaker) => void) | null = null
   /** Where the hero's feet ended up, in game tile coords, while under MANUAL control.
    *
    *  Under manual steering this controller is the only thing that knows the hero's
@@ -778,6 +822,10 @@ export class WorldSceneController {
   private otherMobEnts = new Map<string, {
     e: Entity; wx: number; wy: number; ranged: boolean; lunge: Lunge
   }>()
+  /** Enemy players currently in the field, and the id of the engaged one — the two facts
+   *  `drawPvpNameplates` needs to find the right entity for each plate. */
+  private pvpPlates: { id: string; name: string; faction: string; duel: boolean }[] = []
+  private targetMobId: string | null = null
   /** Debounce so one splashed BURST plays one whirlwind, not one per enemy caught.
    *  Three rings and three screen shakes on a single frame read as a fault, not as force. */
   private splashRingCool = 0
@@ -922,6 +970,7 @@ export class WorldSceneController {
     // not a fallback — it would itself fall through to the programmatic rig, which is the
     // exact blank humanoid it exists to replace.
     unitIds.add(DEFAULT_MOB_SPRITE)
+    unitIds.add(DEFAULT_BEAST_SPRITE)
     const loadUnit = async (id: string): Promise<IndexedSprite> => {
       if (scaffoldArt) {
         return loadSpriteOrPlaceholder(`${ffaUnits}${id}.json`, () =>
@@ -1530,6 +1579,10 @@ export class WorldSceneController {
     // is the ONLY thing the ambient system reads off the player, and it is read-only —
     // nothing here writes back into combat, loot, XP or the economy.
     this.playerLevel = state.level ?? 1
+    // Race, because who wants to fight the player depends on WHAT the player is — see the
+    // enmity table in `engine/pvp`.
+    this.playerRace = state.playerRace ?? 'human'
+    this.playerAlive = state.isAlive !== false
     this.zoneDisplayName = state.generatedZoneNames?.[state.currentZone] ?? ZONES[state.currentZone]?.name ?? ''
     this.factionNames = state.factionNames ?? {}
     this.playerName = state.playerName || 'You'
@@ -1638,6 +1691,14 @@ export class WorldSceneController {
     }
 
     if (!this.ground) return
+
+    // A ghost roster that arrived after this zone's crowd spawned gets folded in here.
+    // Version-gated so it costs one integer comparison per sync rather than a walk of the
+    // population — sync runs every frame.
+    if (this.ghostVersionApplied !== ghostVersion()) {
+      this.ghostVersionApplied = ghostVersion()
+      this.applyGhostRoster()
+    }
 
     // Auto-follow target = store's map position (wrapped) + the persistent visual
     // offset. Updated every sync so combat drift / travel / gathering all drive the
@@ -1776,7 +1837,7 @@ export class WorldSceneController {
       this.mobPlacedDx = this.mobApproachDx * mag
       this.mobPlacedDy = this.mobApproachDy * mag
 
-      const wantedMobSprite = resolveMobSprite(mob.baseName ?? mob.name, mob.templateId)
+      const wantedMobSprite = mobSpriteId(mob)
       if (!this.mob) {
         const sprite = this.spriteCache[wantedMobSprite] ?? this.mobFallback(wantedMobSprite)
         this.mob = this.scene.spawn(
@@ -1865,6 +1926,15 @@ export class WorldSceneController {
    */
   private syncOtherMobs(state: GameState): void {
     const targetId = state.currentMob?.id
+    // Who currently needs a PvP plate. Rebuilt from state each sync rather than tracked
+    // incrementally: bodies enter `mobs` on an attack and leave it on a death, and a
+    // stale entry would draw a name over whatever pooled entity reclaimed the slot.
+    this.targetMobId = targetId ?? null
+    this.pvpPlates = state.mobs
+      .filter(m => m.pvp && m.currentHp > 0)
+      .map(m => ({
+        id: m.id, name: m.baseName, faction: m.pvp!.faction as string, duel: m.pvp!.duel,
+      }))
     const alive = new Set<string>()
     // ── Which modes keep the crowd on screen ──────────────────────────────────
     // This used to be `gameMode === 'combat'` alone, which quietly meant the entire
@@ -1885,8 +1955,9 @@ export class WorldSceneController {
         alive.add(m.id)
         let rec = this.otherMobEnts.get(m.id)
         if (!rec || !rec.e.active) {
-          const spriteId = resolveMobSprite(m.baseName ?? m.name, m.templateId)
-          const sprite = this.spriteCache[spriteId] ?? this.mobFallback(spriteId)
+          const spriteId = mobSpriteId(m)
+          const sprite = this.spriteCache[spriteId]
+            ?? (m.pvp ? this.rigs?.player ?? this.mobFallback(spriteId) : this.mobFallback(spriteId))
           // Place on walkable ground near its spawn offset, then keep that world spot.
           let wx = this.player.tx + m.offset.dx
           let wy = this.player.ty + m.offset.dy
@@ -2404,6 +2475,13 @@ export class WorldSceneController {
           name: best.a.name, playerClass: id.playerClass, race: id.race,
           faction: this.factionLabel(best.a.faction), level: best.a.level, spec: id.specTitle,
           talentAllocs: id.talentAllocs,
+          // Carried so an attack on this hero builds a body of the right calibre — the
+          // crowd's rarity roll is what makes a legendary enemy player the PvP equivalent
+          // of an elite rather than one more identical body.
+          rarity: id.rarity,
+          // ...and, when they are a real player's character, who that is — so the fight is
+          // built from their published gear rather than from a generated stand-in.
+          ghostUserId: id.ghostUserId,
         }, clientX, clientY)
         return
       }
@@ -2877,7 +2955,7 @@ export class WorldSceneController {
     // Nameplates: building destinations + idle crowd in town, else roaming heroes.
     try {
       if (this.townMode) this.drawTownLabels(g)
-      else this.drawAmbientNameplates()
+      else { this.drawAmbientNameplates(); this.drawPvpNameplates() }
     } catch (err) { console.error('[nameplate] draw failed:', err) }
 
     // Player chevron — gold marker above the followed unit (rides above the jump).
@@ -3051,8 +3129,13 @@ export class WorldSceneController {
    * finishes loading.
    */
   private mobFallback(id: string): IndexedSprite {
-    return this.spriteCache[DEFAULT_MOB_SPRITE]
-      ?? (isMonsterSprite(id) ? this.rigs!.mobBeast : this.rigs!.mobHumanoid)
+    // Shape first. `isMonsterSprite` is true for the creature sheets, so a beast whose own
+    // art is missing falls back to the quadruped and a person falls back to the skeleton —
+    // rather than every unmapped enemy in the game standing up on two legs.
+    const beast = isMonsterSprite(id)
+    return (beast ? this.spriteCache[DEFAULT_BEAST_SPRITE] : this.spriteCache[DEFAULT_MOB_SPRITE])
+      ?? this.spriteCache[DEFAULT_MOB_SPRITE]
+      ?? (beast ? this.rigs!.mobBeast : this.rigs!.mobHumanoid)
   }
 
   private nodeTallProp(type: MapNode['type']): IndexedSprite | null {
@@ -3134,6 +3217,10 @@ export class WorldSceneController {
 
   private retireAmbient(): void {
     for (const a of this.ambient) this.scene.despawn(a.e)
+    // Nobody is standing anywhere any more, so every ghost claim is void. Without this a
+    // second zone would find every ghost already "placed" and populate itself entirely
+    // with generated heroes.
+    releaseGhosts()
     this.ambient = []
     this.ambientGroups = []
     // Indices into `ambient` are now meaningless; holding stale ones would point the
@@ -3159,6 +3246,78 @@ export class WorldSceneController {
     return { gx, gy }
   }
 
+  /**
+   * Hand this crowd slot to a real player's character, if one is waiting.
+   *
+   * A ghost keeps the SLOT's faction rather than the other way round: the crowd's
+   * alliance/horde split is what makes a zone feel like contested ground, and letting the
+   * roster decide it would produce a zone of eight enemies (or eight allies) whenever the
+   * board happened to lean one way. So the generated hero decides which banner stands here
+   * and the ghost fills the body — which is also why `takeGhost` is asked for a specific
+   * faction rather than for anyone at all.
+   *
+   * Everything the ghost overrides is identity: who they are, what they wear, what they
+   * have specced. Their behaviour is the crowd's — they wander, bark and fight monsters
+   * exactly like a generated hero, because their owner is not online to do anything else.
+   */
+  private withGhost(id: AmbientIdentity): AmbientIdentity {
+    const g = takeGhost(id.faction)
+    if (!g) return id
+    return {
+      ...id,
+      name: g.name,
+      playerClass: g.playerClass,
+      race: g.race,
+      level: g.level,
+      talentAllocs: g.talentAllocs,
+      specTitle: g.specTitle,
+      ghostUserId: g.userId,
+    }
+  }
+
+  /**
+   * Fold a late-arriving ghost roster into a crowd that is already standing.
+   *
+   * The fetch is a network round trip and the crowd spawns the moment the ground is baked,
+   * so on the first zone of a session the roster almost always lands AFTER the population
+   * exists. Without this, ghosts would only ever appear from the second zone onward — the
+   * feature would look broken for the entire first zone, which is the one most sessions
+   * spend the most time in.
+   *
+   * Bodies are re-skinned in place rather than the whole crowd being rebuilt: a full
+   * respawn would pop every hero on screen for the sake of one or two of them.
+   */
+  private applyGhostRoster(): void {
+    if (!this.rigs) return
+    for (const a of this.ambient) {
+      if (a.kind !== 'hero' || !a.identity || a.identity.ghostUserId) continue
+      // Not a companion: a party member is someone the player recruited by name, and
+      // swapping who they are underneath them would be the worst kind of surprise.
+      if (a.partySlot >= 0) continue
+      const id = this.withGhost(a.identity)
+      if (!id.ghostUserId) continue
+      a.identity = id
+      a.name = id.name
+      a.level = id.level
+      // The body has to change with the identity — a ghost's race and class are their own,
+      // and leaving the old rig would put a dwarf's name on an elf. Released and re-spawned
+      // at the same spot, the same trade the mob sprite swap makes.
+      const spriteId = heroSpriteId(id.race, id.playerClass, id.name)
+      const sprite = this.spriteCache[spriteId] ?? this.rigs.player
+      const tx = a.e.tx, ty = a.e.ty
+      this.scene.despawn(a.e)
+      const e = this.scene.spawn(
+        sprite, heroPaletteId(id.playerClass, id.race, id.faction, id.rarity), tx, ty,
+      )
+      e.shadow = true
+      e.animator.set('idle')
+      // Fade in rather than hard-cut, matching every other body that arrives mid-scene.
+      e.alpha = 0
+      a.spawnFadeT = SPAWN_FADE
+      a.e = e
+    }
+  }
+
   private spawnAmbient(groupCount = AMBIENT_GROUPS_WORLD): void {
     if (!this.rigs) return
     const seed = this.zoneSeed()
@@ -3179,7 +3338,7 @@ export class WorldSceneController {
         // Identity now comes from `engine/ambient`, so an ambient hero has the same
         // shape as the player — class, race, level band, AND a real spec allocation
         // that both titles them and changes how their simulated fights go.
-        const id = makeAmbientHero(seed, heroIndex, this.playerLevel)
+        const id = this.withGhost(makeAmbientHero(seed, heroIndex, this.playerLevel))
         heroIndex++
         const spriteId = heroSpriteId(id.race, id.playerClass, id.name)
         const sprite = this.spriteCache[spriteId] ?? this.rigs.player
@@ -3555,7 +3714,7 @@ export class WorldSceneController {
       if (sx < -40 || sx > this.cam.w + 40 || sy < 0 || sy > this.cam.h) continue
       ctx.strokeStyle = 'rgba(0,0,0,0.95)'
       ctx.strokeText(a.name, sx, sy)
-      ctx.fillStyle = a.faction === 'horde' ? '#ff8a7a' : '#8ac0ff'
+      ctx.fillStyle = factionNameColor(a.faction)
       ctx.fillText(a.name, sx, sy)
     }
     ctx.restore()
@@ -3736,8 +3895,45 @@ export class WorldSceneController {
     return moved
   }
 
+  /**
+   * Stand down any ambient hero who is currently a combat body in `state.mobs`.
+   *
+   * Attacking someone makes them exist twice: the crowd still holds the hero you tapped
+   * (this renderer owns that population and seeds it from the zone, not from the store),
+   * and `mobs` now holds the body that fights back. Without this pass they are drawn as
+   * two people a few tiles apart, one of them wandering off to farm while the other one
+   * kills you.
+   *
+   * The suppression registry lives in `engine/pvp` rather than here because the store is
+   * what knows when the fight starts and ends, and it may not reach into the renderer.
+   * It also holds the body down for `PVP_RESPAWN_SECONDS` after a kill, so a slain enemy
+   * does not pop back the moment their corpse fades.
+   */
+  private applyPvpSuppression(): void {
+    for (const a of this.ambient) {
+      if (a.kind !== 'hero' || !a.identity) continue
+      const key = `${a.name}:${a.identity.playerClass}:${a.identity.race}:${a.level}`
+      const hidden = isPvpSuppressed(key)
+      if (hidden && a.e.active) {
+        a.e.active = false
+        a.bark = null
+        a.barkT = 0
+      } else if (!hidden && !a.e.active && a.pvpHidden) {
+        // Only revive what THIS pass put away. Ambient heroes can be inactive for other
+        // reasons (a lost fight, a pooled slot released), and reviving those here would
+        // resurrect a body some other rule deliberately downed.
+        a.e.active = true
+        a.e.alpha = 0
+        a.spawnFadeT = SPAWN_FADE
+        a.state = 'wander'
+      }
+      a.pvpHidden = hidden
+    }
+  }
+
   private updateAmbient(dt: number): void {
     if (!this.ambient.length || !this.player) return
+    this.applyPvpSuppression()
     const pgx = WorldSceneController.wrapMod(this.player.tx - PAD)
     const pgy = WorldSceneController.wrapMod(this.player.ty - PAD)
     const SPEED = 1.3
@@ -4160,10 +4356,46 @@ export class WorldSceneController {
     for (let i = 0; i < this.ambient.length; i++) {
       const a = this.ambient[i]
       if (a.kind !== 'hero' || !a.identity) continue
-      const near = Math.hypot(
+      const distToPlayer = Math.hypot(
         WorldSceneController.wrapDiff(a.gx, pgx), WorldSceneController.wrapDiff(a.gy, pgy),
-      ) <= thinkRadius
+      )
+      const near = distToPlayer <= thinkRadius
       if (!near) continue
+
+      // ── Do they open on you? ────────────────────────────────────────────────
+      // The other faction is not a set of optional targets standing around waiting to be
+      // farmed; walking through their part of the zone is supposed to cost something.
+      // Whether this particular hero tries you is decided in `engine/pvp` from race
+      // enmity, their nerve at your level, and how close they are — all off their OWN
+      // seeded stream, so a hero who jumps you does it for a legible reason rather than a
+      // global coin flip.
+      //
+      // The guards are as important as the roll. A hero already in a fight, in your party,
+      // or suppressed (they are ALREADY a body in `mobs`) is not a candidate; neither is
+      // anyone at all while the player is dead or the global cooldown is running, which is
+      // what stops a bad walk through a crowded clearing turning into a pile-on.
+      if (this.onHeroDeclares
+          && this.playerAlive
+          && !this.townMode
+          && a.partySlot < 0
+          && a.e.active
+          && (a.state === 'wander' || a.state === 'idle')
+          && isHostile(a.faction, this.playerFaction)
+          && gankReady(Date.now())
+          && wouldAttackUnprovoked(
+            { race: a.identity.race, level: a.level },
+            { race: this.playerRace, level: this.playerLevel },
+            distToPlayer, step, a.rng)) {
+        markGank(Date.now())
+        speaking += this.tryBark(a, 'rivalFaction', speaking)
+        this.onHeroDeclares({
+          name: a.name, playerClass: a.identity.playerClass, race: a.identity.race,
+          faction: this.factionLabel(a.faction), level: a.level, spec: a.identity.specTitle,
+          talentAllocs: a.identity.talentAllocs, rarity: a.identity.rarity,
+          ghostUserId: a.identity.ghostUserId,
+        })
+        continue
+      }
 
       switch (a.state) {
         case 'follow': {
@@ -4392,8 +4624,8 @@ export class WorldSceneController {
    * On-screen positions of ambient heroes, for headless drivers that need to TAP one
    * (whisper flow). Buffer-space coords; a driver scales by canvas-rect / canvas-width.
    */
-  ambientScreenPositions(): { name: string; sx: number; sy: number }[] {
-    const out: { name: string; sx: number; sy: number }[] = []
+  ambientScreenPositions(): { name: string; sx: number; sy: number; faction: string }[] {
+    const out: { name: string; sx: number; sy: number; faction: string }[] = []
     // Visibility is recomputed here from the camera rather than read off `e.onScreen`.
     // That flag is only assigned during a render pass, so a probe that asks between
     // passes — or before the first one — sees `false` for a hero that is plainly visible,
@@ -4411,6 +4643,10 @@ export class WorldSceneController {
         name: a.name,
         sx: a.e.screenX - this.cam.x,
         sy: a.e.screenY - this.cam.y,
+        // Carried so a driver can find an ENEMY-faction hero to tap without guessing.
+        // PvP is the first behaviour where which hero you pick changes what happens, and
+        // a suite that taps a random one would pass or fail on a coin flip.
+        faction: a.faction,
       })
     }
     return out
@@ -4685,7 +4921,11 @@ export class WorldSceneController {
     g.lineWidth = 3
     g.strokeStyle = 'rgba(0,0,0,0.95)'
     g.strokeText(name, w / 2, h / 2)
-    g.fillStyle = faction === 'horde' ? '#ff8a7a' : '#8ac0ff'
+    // One answer to "what colour is a name", shared with the target card, the chat feed,
+    // the party frame and the ladder. It used to be this ternary — which also meant every
+    // NEUTRAL hero was painted Concord blue, since anything that was not `horde` fell
+    // through to the else.
+    g.fillStyle = factionNameColor(faction)
     g.fillText(name, w / 2, h / 2)
     // Bounded, like the sprite bake cache. The crowd recycles as the player travels, so
     // without a cap this grows for the length of the session.
@@ -4697,11 +4937,41 @@ export class WorldSceneController {
     return c
   }
 
+  /**
+   * Nameplates over enemy PLAYERS.
+   *
+   * Ordinary mobs deliberately have none — the engaged target's name is on the HUD, and
+   * plates over a whole pack of wolves is noise. An enemy player is the exception, and it
+   * is the same exception the ambient crowd already gets: the thing a plate communicates
+   * here is not "what is that" but "whose side is that on", which is the only question
+   * that matters when the answer decides whether you can attack it.
+   *
+   * Reuses the ambient plate cache, so a name that appears in both places is rasterised
+   * once. The crossed swords are baked into the plate text rather than drawn separately —
+   * the cache is keyed on the string, so the marker costs nothing per frame.
+   */
+  private drawPvpNameplates(): void {
+    if (!this.pvpPlates.length) return
+    const ctx = this.ctx
+    for (const p of this.pvpPlates) {
+      const ent = p.id === this.targetMobId ? this.mob : this.otherMobEnts.get(p.id)?.e
+      if (!ent || !ent.active) continue
+      const sx = Math.round(ent.screenX - this.cam.x)
+      const sy = Math.round(ent.screenY - this.cam.y - ent.sprite.frameH - 2)
+      if (sx < -40 || sx > this.cam.w + 40 || sy < 6 || sy > this.cam.h) continue
+      // Crossed swords mark an ENEMY. A duel opponent is on your own side and keeps a
+      // plain plate — putting the "you may kill this" marker over a sparring partner would
+      // say the opposite of what the rest of the UI says about them.
+      const plate = this.nameplateFor(p.duel ? p.name : `${HOSTILE_MARK} ${p.name}`, p.faction)
+      ctx.drawImage(plate, sx - (plate.width >> 1), sy - (plate.height >> 1))
+    }
+  }
+
   private drawAmbientNameplates(): void {
     if (!this.ambient.length) return
     const ctx = this.ctx
     for (const a of this.ambient) {
-      if (a.kind !== 'hero' || !a.name) continue
+      if (a.kind !== 'hero' || !a.name || !a.e.active) continue
       const sx = Math.round(a.e.screenX - this.cam.x)
       const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 2)
       if (sx < -40 || sx > this.cam.w + 40 || sy < 6 || sy > this.cam.h) continue

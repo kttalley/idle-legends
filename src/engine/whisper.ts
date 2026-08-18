@@ -16,6 +16,7 @@
 import type { ChatSpeaker } from './chatGen'
 import { pushChat, resolveChat } from './chatLog'
 import { isLlmReachable, llmGenerate, PRIORITY } from './llmClient'
+import { factionLabel, isHostile, resolveFaction } from '../data/factions'
 
 function configured(): boolean {
   return isLlmReachable()
@@ -50,7 +51,23 @@ const OFFLINE_REPLIES = [
   'who dis?', 'lol wrong person?', 'k', 'sup',
 ]
 
-function buildPrompt(speaker: ChatSpeaker, playerName: string, zoneName: string, history: Turn[], msg: string): string {
+/** The hostile equivalent. Talking across the faction line is allowed and always has
+ *  been; what changes is the register, and it should change with no endpoint configured
+ *  too — an enemy who politely says "brb" undoes the whole wall. */
+const OFFLINE_HOSTILE_REPLIES = [
+  'lol get out of my zone',
+  'come say that in the open',
+  '/spit',
+  'ur gonna get ganked',
+  'nice level. shame about the faction',
+  'dont whisper me again',
+]
+
+function buildPrompt(
+  speaker: ChatSpeaker, playerName: string, zoneName: string, history: Turn[], msg: string,
+  playerFaction?: string,
+): string {
+  const hostile = isHostile(speaker.faction, playerFaction)
   const specStr = speaker.spec ? `${speaker.spec} ${speaker.playerClass}` : speaker.playerClass
   const transcript = history
     .map(t => `${t.who === 'player' ? playerName : speaker.name}: ${t.text}`)
@@ -62,7 +79,13 @@ You are currently out in ${zoneName}, grinding mobs.
 You are NOT an assistant. You are a random player who happens to be online. You have your
 own agenda: farming, gearing up, looking for groups. You can be friendly, curt, sarcastic,
 or suspicious — whatever fits your class and faction.
-
+${hostile ? `
+${playerName} is of ${factionLabel(resolveFaction(playerFaction))} — THE ENEMY FACTION. You
+are at war with them. You do not help them, you do not group with them, you do not make
+friends. Your reply is hostile: taunting, dismissive, threatening, or contemptuous. Keep it
+to in-game trash talk — the register of a rival player, not real-world cruelty. No slurs.
+You may threaten to kill their character; that is a normal thing to say to an enemy here.
+` : ''}
 ${transcript ? `Conversation so far:\n${transcript}\n` : ''}
 ${playerName} whispers: ${msg}
 
@@ -98,6 +121,10 @@ export function sendWhisper(
   zoneName: string,
   zoneTheme: string,
   text: string,
+  /** The player's own faction, so the reply knows whether it is talking to an enemy.
+   *  Optional because the offline harness calls this without one; absent means the
+   *  speaker is treated as friendly, which is the pre-PvP behaviour. */
+  playerFaction?: string,
 ): void {
   const msg = text.trim()
   if (!msg) return
@@ -111,13 +138,17 @@ export function sendWhisper(
 
   const placeholder = pushChat({
     channel: 'whisper', from: speaker.name,
-    faction: speaker.faction === 'horde' ? 'horde' : 'alliance',
+    // `speaker.faction` is a generated DISPLAY NAME, not a key — so this comparison was
+    // false for every hero in the game and every whisper reply was painted Concord blue,
+    // the Ashmarch's own included.
+    faction: resolveFaction(speaker.faction),
     entityKey: key, text: '…', pending: true,
   })
 
   if (!configured()) {
     // No endpoint: still answer, so whispering is never a dead end in an offline build.
-    const reply = OFFLINE_REPLIES[(msg.length + key.length) % OFFLINE_REPLIES.length]
+    const pool = isHostile(speaker.faction, playerFaction) ? OFFLINE_HOSTILE_REPLIES : OFFLINE_REPLIES
+    const reply = pool[(msg.length + key.length) % pool.length]
     history.push({ who: 'hero', text: reply })
     threads.set(key, history.slice(-MAX_TURNS))
     setTimeout(() => resolveChat(placeholder.id, reply), 600)
@@ -127,7 +158,7 @@ export function sendWhisper(
   busy.add(key)
 
   void llmGenerate({
-    prompt: buildPrompt(speaker, playerName, zoneName, history.slice(0, -1), msg),
+    prompt: buildPrompt(speaker, playerName, zoneName, history.slice(0, -1), msg, playerFaction),
     // The player is sitting there watching a typing indicator, so this outranks
     // everything else queued for the endpoint — including barks and pool refills.
     priority: PRIORITY.INTERACTIVE,

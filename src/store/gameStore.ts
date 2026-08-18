@@ -6,7 +6,7 @@ import type {
   AllyCombatant, CombatAccumulators,
   GameMode, RecipeId, MaterialId, WeatherType, TownId, Rarity, MerchantContract,
 } from '../data/types'
-import type { GatherSession, CraftResult, QualityTier } from '../data/types'
+import type { GatherSession, CraftResult, QualityTier, TemperSession } from '../data/types'
 import { TOWNS } from '../data/towns'
 import { RACE_DEFINITIONS } from '../data/races'
 import { ZONE_MATERIALS, RECIPES, isGearRecipe } from '../data/professions'
@@ -15,7 +15,7 @@ import {
   GATHER_SECONDS, STRIKES_PER_HARVEST, STRIKE_LOCKOUT_SECONDS, MAX_PURITY_PER_UNIT,
   QUALITY_LABEL, QUALITY_MULT, QUALITY_PALETTE, QUALITY_RARITY,
   bandHalfWidthFor, consumeInputs, nodeRichness, qualityAtLeast, recipeQuality, rollSweep,
-  resolveStrike,
+  resolveStrike, resolveTemper, temperedQuality, TEMPER_STRIKES, TEMPER_THRESHOLD,
 } from '../engine/crafting'
 import { generateItem, itemPower } from '../data/items'
 import { ZONE_ORDER } from '../data/zones'
@@ -35,6 +35,15 @@ import {
 } from '../engine/combat'
 import { xpForLevel } from '../engine/progression'
 import { getParty } from '../engine/party'
+import { registerFactionNames, resolveFaction } from '../data/factions'
+import { clearSelectedHero } from '../engine/selection'
+import { getGhost } from '../engine/ghosts'
+import {
+  buildPvpMob, clearPvpSuppression, emptyPvpRecord, fromSpeaker, markDisengaged, markDowned,
+  markEngaged, readPvpRecord, recordDeath, recordKill, resetGankClock,
+} from '../engine/pvp'
+import type { ChatSpeaker } from '../engine/chatGen'
+import { pushChat } from '../engine/chatLog'
 import type { Rng } from '../engine/rng'
 import {
   canEnterZone,
@@ -393,6 +402,7 @@ function defaultState(): GameState {
     },
     // Map / Travel / Professions
     gameMode: 'combat',
+    departedMode: null,
     travelTarget: null,
     travelProgress: 0,
     travelDuration: 0,
@@ -404,8 +414,10 @@ function defaultState(): GameState {
     craftingTimer: 0,
     craftQuality: null,
     lastCraft: null,
+    temperSession: null,
     lastLevelUp: null,
     watchBonusSeconds: 0,
+    pvpRecord: emptyPvpRecord(),
     // World Map
     zoneMaps: {},
     // Per-run world entropy. 0 = the original fixed world (what every save before this
@@ -531,6 +543,13 @@ function rehydrateState(saved: GameState): GameState {
   saved.castState     = null
   saved.skillCooldowns = {}
   // New fields — default if missing
+  //
+  // The mode is reset because a hero must not resume mid-journey or mid-craft. But the mode
+  // they were LEFT in is the one fact the offline projection needs — a hero parked at a vein
+  // spent the absence gathering, not fighting — and resetting it here, before the projection
+  // runs, is what made `state.gameMode === 'gathering'` unreachable. Stashed first, so the
+  // live state is still safely 'combat' and the projection can still see where they stood.
+  saved.departedMode  = saved.gameMode
   saved.gameMode      = 'combat'
   saved.travelTarget  = null
   saved.travelProgress = 0
@@ -545,12 +564,18 @@ function rehydrateState(saved: GameState): GameState {
   saved.craftingTimer = 0
   saved.craftQuality  = null
   saved.lastCraft     = null
+  // Transient like the gather session: a half-tempered craft cannot be resumed.
+  saved.temperSession = null
   // Transient like the craft card: a banner restored from disk would announce a level the
   // player earned in a session they have already left.
   saved.lastLevelUp   = null
   // Banked watch is PERSISTENT — it is bought with gold and must survive a reload, unlike
   // everything else in this block. `?? 0` is the pre-Watch save, which had no bank.
   saved.watchBonusSeconds = saved.watchBonusSeconds ?? 0
+  // Honor is persistent — a kill count that resets on reload is not a record — so it is
+  // backfilled rather than defaulted at every read. `readPvpRecord` also repairs a
+  // partially-written one, which matters because this field grew fields after shipping.
+  saved.pvpRecord = readPvpRecord(saved.pvpRecord)
   // Generate maps for all unlocked zones
   saved.worldSeed = saved.worldSeed ?? 0   // pre-worldSeed saves keep their original world
   const zoneMaps: GameState['zoneMaps'] = {}
@@ -772,6 +797,38 @@ function openGatherSession(state: GameState, node: { x: number; y: number } | nu
 }
 
 /** Advance the sweep. Pure motion — never touches the harvest timer. */
+/** Open the temper meter for a craft. Same sweep generator the gathering meter uses. */
+function openTemperSession(state: GameState, recipe: Recipe): TemperSession {
+  const seed = hashStr(`temper:${recipe.id}`) ^ mapSeed(state)
+  const sweep = rollSweep(seed, 0)
+  return {
+    recipeId: recipe.id,
+    cursor: sweep.dir === 1 ? 0 : 1,
+    dir: sweep.dir,
+    speed: sweep.speed,
+    bandCenter: sweep.bandCenter,
+    // A fixed band: node richness has no meaning at a forge, and the difficulty should be
+    // the same wherever the player happens to be standing.
+    bandHalfWidth: bandHalfWidthFor(1),
+    strikesLeft: TEMPER_STRIKES,
+    heat: 0,
+    lastResult: null,
+    lastResultAt: 0,
+  }
+}
+
+/** Sweep the temper cursor. Identical reflection to the gathering meter's, on purpose —
+ *  the two meters are one learned gesture. */
+function advanceTemperSession(s: TemperSession, dt: number): TemperSession {
+  let cursor = s.cursor + s.dir * s.speed * dt
+  let dir = s.dir
+  while (cursor < 0 || cursor > 1) {
+    if (cursor < 0) { cursor = -cursor; dir = 1 }
+    else { cursor = 2 - cursor; dir = -1 }
+  }
+  return { ...s, cursor, dir }
+}
+
 function advanceGatherSession(s: GatherSession, dt: number): GatherSession {
   let cursor = s.cursor + s.dir * s.speed * dt
   let dir = s.dir
@@ -1516,6 +1573,48 @@ export function torusDistance(
  * arriving somewhere feels like travel, near enough that a zone is not empty — and the
  * mob spawns on it. `offset` is no longer authored here at all; the tick derives it.
  */
+/**
+ * Where another PLAYER's combat body appears — a few tiles away, not across the zone.
+ *
+ * Deliberately not `placeInWorld`, whose 12–26 tile band is right for wildlife and wrong
+ * here: you tapped (or were jumped by) someone standing in front of you, and putting their
+ * body half a zone away reads as them fleeing while the hero walks half a minute to reach
+ * a fight that already started.
+ *
+ * Walkability is respected but reachability is not A*-checked — at four tiles a straight
+ * walk is the honest answer, and the fallback is ground the player is provably standing on.
+ */
+function placeCombatantNearPlayer(s: GameState): Pick<MobInstance,
+  'pos' | 'home' | 'patrolTarget' | 'patrolPause' | 'aggro' | 'aggroRadius' | 'offset'
+  | 'path' | 'pathCool'> {
+  const zm = s.zoneMaps[s.currentZone]
+  const mask = zm ? getWalkMask(zm) : null
+  let px = s.playerMapPos.x, py = s.playerMapPos.y
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const ang = Math.random() * Math.PI * 2
+    const dist = 3 + Math.random() * 2
+    const x = wrapTileCoord(s.playerMapPos.x + Math.cos(ang) * dist)
+    const y = wrapTileCoord(s.playerMapPos.y + Math.sin(ang) * dist)
+    if (!mask || isWalkable(mask, x, y)) { px = x; py = y; break }
+  }
+  return {
+    pos: { x: px, y: py },
+    home: { x: px, y: py },
+    patrolTarget: null,
+    patrolPause: 0,
+    // Aggroed on arrival, with a wide notice radius. Somebody started this; neither party
+    // is going to stand there patrolling while the other opens on them.
+    aggro: true,
+    aggroRadius: 14,
+    offset: {
+      dx: torusDelta(s.playerMapPos.x, px),
+      dy: torusDelta(s.playerMapPos.y, py),
+    },
+    path: null,
+    pathCool: 0,
+  }
+}
+
 function placeInWorld(
   state: GameState, mob: { name: string; isBoss: boolean },
 ): Pick<MobInstance,
@@ -1902,6 +2001,8 @@ interface GameActions {
   dismissLevelUp: () => void
   /** Spend gold to bank more unattended time. False if capped or unaffordable. */
   extendWatch: () => boolean
+  /** Strike the piece being forged — the crafting half of the strike meter. */
+  temperCraft: () => void
   enterTown: (townId: TownId) => void
   leaveTown: () => void
   restInTown: () => void
@@ -1911,6 +2012,24 @@ interface GameActions {
   setTarget: (mobId: string) => void
   /** Tab: cycle the targetable enemies within reach, nearest first. */
   cycleTarget: () => void
+  /**
+   * Declare on an enemy-faction player: pull them out of the crowd and into `mobs`.
+   *
+   * Returns false when the target is not a legal one (same faction, neutral, already
+   * engaged, hero dead, not in the world), so the card can stay open and say why rather
+   * than appearing to do nothing.
+   */
+  attackPlayer: (speaker: ChatSpeaker, initiator?: 'player' | 'enemy') => boolean
+  /**
+   * Challenge a hero of your OWN faction to a real duel.
+   *
+   * The same body, the same fight, the same renderer as an enemy-faction kill — the only
+   * difference is that nobody dies and nothing is paid. Replaces the old `engine/duel`
+   * flow, which resolved the whole thing instantly into three lines of chat: a duel you
+   * cannot watch is a dice roll with flavour text, and it sat oddly beside a world where
+   * every other fight happens in front of you.
+   */
+  duelPlayer: (speaker: ChatSpeaker) => boolean
 }
 
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
@@ -2155,6 +2274,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           bossesDefeated: state.bossesDefeated,
         })
         resetCombatAccumulators()
+        // Arriving regenerates the crowd from a new zone seed, so every suppressed key
+        // refers to a hero who no longer exists. Same reasoning as the party disbanding
+        // on travel: membership of a zone does not survive leaving it.
+        clearPvpSuppression()
+        resetGankClock()
         set({
           // Combat clocks ride out with every branch that RETURNS. Omitting them here would
           // discard this tick's working copy and silently reset the hero's swing timer every
@@ -2273,14 +2397,24 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         if (recipe) {
           // The tier was locked when the craft started; re-derive only as a fallback for a
           // craft that predates the field (an in-flight save from an older build).
-          const quality = state.craftQuality
+          const base = state.craftQuality
             ?? recipeQuality(state.materials, state.materialPurity, recipe.inputs)
-          set(resolveCraft(state, recipe, quality))
+          // Heat banked at the forge raises the piece a tier. Upside only — a missed
+          // temper forfeits the bonus and never spoils the materials, because an idle
+          // player who never looked at the meter must land exactly where they used to.
+          const quality = temperedQuality(base, state.temperSession?.heat ?? 0)
+          set({ ...resolveCraft(state, recipe, quality), temperSession: null })
         } else {
-          set({ activeRecipe: null, craftingTimer: 0, craftQuality: null })
+          set({ activeRecipe: null, craftingTimer: 0, craftQuality: null, temperSession: null })
         }
       } else {
-        set({ craftingTimer: newTimer, offlineRates: idleAccrual })
+        set({
+          craftingTimer: newTimer,
+          offlineRates: idleAccrual,
+          temperSession: state.temperSession
+            ? advanceTemperSession(state.temperSession, deltaSeconds)
+            : null,
+        })
       }
       return
     }
@@ -2322,6 +2456,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     let salvaged = 0
     // Combat output this tick, folded into the decaying rate window at the end. This is
     // what offline progress replays, so it has to be measured rather than assumed.
+    // The honor ledger's working copy for this tick. Threaded like every other mutable
+    // total rather than written through a nested `set()`, because a kill and a death can
+    // both land in one tick (a PvP fight is two rotations pointed at each other) and two
+    // out-of-band writes would race — the loser silently discarding the other's count.
+    let pvpRecord = readPvpRecord(state.pvpRecord)
     let killsThisTick = 0
     let eliteKillsThisTick = 0
     let xpThisTick = 0
@@ -2735,6 +2874,58 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const registerKill = (victim: MobInstance | null = currentMob): boolean => {
       if (!victim || victim.currentHp > 0) return false
       const deadMob = victim
+
+      // ── An enemy player pays honor, and only honor ───────────────────────────
+      // This branch returns BEFORE the payout block, and that early return is the whole
+      // of the "PvP is outside the economy" guarantee. Not a zeroed reward that still
+      // walks the ladder — an exit. Nothing below runs: no `rollLoot`, no gold, no XP, no
+      // `zoneKillCounts` (which would let PvP open a zone boss), no `totalZoneKills`
+      // (which feeds the offline projection), no elite tally, no drop placement.
+      //
+      // The kill count that DOES move is `pvpRecord`, read by the ladder's HONOR tab.
+      if (deadMob.pvp?.duel) {
+        // A duel ends when someone runs out of fight, not when someone dies. Nothing is
+        // paid and nothing is taken — the standing rule from the old instant-resolve
+        // version, kept intact now that the fight is real.
+        newLogs.push(log('mob_death', `You defeat ${deadMob.baseName} in the duel.`, '#d8b878'))
+        pushChat({
+          channel: 'system', from: null,
+          text: `${deadMob.baseName} yields. ${state.playerName || 'You'} win the duel.`,
+        })
+        mobs = mobs.filter(m => m.id !== deadMob.id)
+        if (targetMobId === deadMob.id) { targetMobId = null; currentMob = null; activeDoTs = [] }
+        // Released rather than downed: they yielded, so they get straight back up and
+        // rejoin the crowd instead of serving a corpse timer they never earned.
+        markDisengaged(deadMob.pvp.sourceKey)
+        return true
+      }
+
+      if (deadMob.pvp) {
+        const victimFaction = deadMob.pvp.faction
+        pvpRecord = recordKill(pvpRecord, { name: deadMob.baseName, faction: victimFaction })
+        newLogs.push(log('mob_death',
+          deadMob.pvp.ghostUserId
+            // Worth saying out loud. Most of the crowd is generated, and a kill on somebody
+            // who actually plays this game is the one the honor ladder is really about.
+            ? `⚔ You have slain ${deadMob.baseName} — a real player!`
+            : `⚔ You have slain ${deadMob.baseName}!`,
+          '#ff6a5a'))
+        newLogs.push(log('proc',
+          pvpRecord.streak > 1
+            ? `Honor +1 (${pvpRecord.kills} total · ${pvpRecord.streak} kill streak)`
+            : `Honor +1 (${pvpRecord.kills} total)`,
+          '#ffd700'))
+        pushChat({
+          channel: 'system', from: null,
+          text: `⚔ ${state.playerName || 'You'} has slain ${deadMob.baseName}.`,
+        })
+        // Same cleanup the ordinary path ends with: drop the body, release the
+        // commitment, and let the next tick pick a new target.
+        mobs = mobs.filter(m => m.id !== deadMob.id)
+        if (targetMobId === deadMob.id) { targetMobId = null; currentMob = null; activeDoTs = [] }
+        markDowned(deadMob.pvp.sourceKey)
+        return true
+      }
       const loot = rollLoot(
         deadMob, level,
         stats.goldFindBonus,
@@ -3432,6 +3623,25 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           newFns.push(fn(stats.currentHp, true, false, true, '#ffd700'))
         }
 
+        // ── Losing a duel is not dying ──────────────────────────────────────
+        // Checked BEFORE the death branch and before Glacial Tomb, because a duel that
+        // could kill you is not a duel — it is a fight you agreed to with someone on your
+        // own side. The hero yields at 1 HP, the opponent walks away, and nothing else in
+        // the death path runs: no respawn timer, no scattered encounter, no PvP death on
+        // the record.
+        if (stats.currentHp <= 0 && atk.pvp?.duel) {
+          stats.currentHp = 1
+          newLogs.push(log('player_death', `You yield. ${atk.baseName} wins the duel.`, '#d8b878'))
+          pushChat({
+            channel: 'system', from: null,
+            text: `${state.playerName || 'You'} yields. ${atk.baseName} wins the duel.`,
+          })
+          for (const m of mobs) if (m.pvp?.duel) markDisengaged(m.pvp.sourceKey)
+          mobs = mobs.filter(m => !m.pvp?.duel)
+          if (currentMob?.pvp?.duel) { currentMob = null; targetMobId = null; activeDoTs = [] }
+          resetCombatAccumulators()
+        }
+
         if (stats.currentHp <= 0) {
           // Check ice block
           const iceBuff = activeBuffs.find(b => b.label === 'Glacial Tomb')
@@ -3446,8 +3656,21 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             if (currentMob?.isBoss) {
               persistedBoss = currentMob
             }
+            // Dying to an enemy PLAYER is a different event from dying to wildlife, and
+            // the record has to say so. `mob` is the thing that actually landed the blow,
+            // which is not necessarily the engaged target — retaliation can kill you.
+            if (atk.pvp) {
+              pvpRecord = recordDeath(pvpRecord)
+              newLogs.push(log('player_death',
+                `⚔ ${atk.baseName} has slain you.`, '#ff6a5a'))
+            }
             // Dying scatters the encounter: the crowd disperses and the player starts the
             // next one fresh, rather than respawning already surrounded.
+            //
+            // Enemy players in that scattered set are RELEASED rather than left downed —
+            // they beat you, so they walk away and rejoin the crowd rather than vanishing
+            // for a respawn timer they never earned.
+            for (const m of mobs) if (m.pvp) markDisengaged(m.pvp.sourceKey)
             mobs = []
             targetMobId = null
             currentMob = null
@@ -3589,6 +3812,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       mobs, targetMobId,
       allies,
       stats, gold, xp, level, currentMob, persistedBoss, isAlive, respawnTimer, mobRespawnTimer,
+      pvpRecord,
       inventory, equipment, activeDoTs, activeBuffs, procState, castState, skillCooldowns,
       floatingNumbers: allFns,
       totalZoneKills, zoneKillCounts, bossesDefeated, unlockedZones, currentZone,
@@ -4275,6 +4499,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     set({
       activeRecipe: recipeId,
       craftingTimer: recipe.craftTime,
+      // The temper meter opens with the craft. Seeded off the recipe and the world so the
+      // sweep is stable for a given craft rather than re-rolling every frame.
+      temperSession: openTemperSession(get(), recipe),
       craftQuality: recipeQuality(s.materials, s.materialPurity, recipe.inputs),
     })
   },
@@ -4304,6 +4531,30 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         strikesLeft: session.strikesLeft - 1,
         lockout: out.result === 'miss' ? STRIKE_LOCKOUT_SECONDS : 0,
         purity: Math.min(MAX_PURITY_PER_UNIT, session.purity + out.purity),
+        lastResult: out.result,
+        lastResultAt: Date.now(),
+      },
+    })
+  },
+
+  /**
+   * Strike the piece on the forge. The crafting counterpart of `strikeNode`.
+   *
+   * Bounded to `TEMPER_STRIKES` per craft and upside-only: a miss costs a strike and
+   * nothing else. It cannot touch materials, the timer, or the base tier — the only thing
+   * it writes is `heat`, which the crafting tick reads once at completion.
+   */
+  temperCraft: () => {
+    const s = get()
+    const session = s.temperSession
+    if (!session || session.strikesLeft <= 0) return
+    if (s.gameMode !== 'crafting' || !s.activeRecipe) return
+    const out = resolveTemper(session.cursor, session.bandCenter, session.bandHalfWidth)
+    set({
+      temperSession: {
+        ...session,
+        strikesLeft: session.strikesLeft - 1,
+        heat: session.heat + out.heat,
         lastResult: out.result,
         lastResultAt: Date.now(),
       },
@@ -4407,6 +4658,127 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
    * them off a chosen fight. Switching mid-fight is allowed and simply re-projects:
    * DoTs live on each mob, so the old target keeps its bleeds rather than donating them.
    */
+  /**
+   * Attack an enemy-faction player.
+   *
+   * The whole of "PvP combat" from the store's side is this function: build the body,
+   * place it, put it in `mobs`, target it. Everything after that — approach, swings,
+   * DoTs, ally assist, retaliation, death — is the combat loop that already existed,
+   * which is exactly the payoff for expressing an enemy player as a `MobInstance`.
+   *
+   * Placement is deliberately CLOSE (3–5 tiles) rather than via `placeInWorld`'s 12–26
+   * band. You tapped someone standing in front of you; spawning their combat body across
+   * the zone would read as them fleeing, and the hero would then walk half a minute to
+   * reach a fight the player thought they had just started.
+   */
+  attackPlayer: (speaker, initiator = 'player') => {
+    const s = get()
+    if (!s.isAlive || s.gameMode !== 'combat') return false
+    const playerFaction = s.playerFaction
+    const foeFaction = resolveFaction(speaker.faction)
+    // The rules floor. Neutrals are not attackable and neither is your own side — see
+    // `isHostile` in data/factions for why neutral is nobody's enemy.
+    if (foeFaction === 'neutral' || foeFaction === resolveFaction(playerFaction)) return false
+
+    const key = `${speaker.name}:${speaker.playerClass}:${speaker.race}:${speaker.level}`
+    if (s.mobs.some(m => m.pvp?.sourceKey === key)) return false
+
+    // A ghost — a real player's published character — fights in their OWN gear. That is
+    // the entire point of the ghost roster: honor taken off a generated stand-in and honor
+    // taken off somebody's actual geared character are not the same achievement, and the
+    // ladder cannot tell the difference unless the fight can.
+    const ghost = speaker.ghostUserId ? getGhost(speaker.ghostUserId) : null
+    const mob = buildPvpMob(
+      {
+        ...fromSpeaker(speaker, foeFaction, speaker.rarity ?? 'common'),
+        equipment: ghost?.equipment,
+        ghostUserId: ghost?.userId,
+      },
+      placeCombatantNearPlayer(s),
+    )
+    markEngaged(key)
+    // The card is a menu of things you MIGHT do about someone. Once a fight has started it
+    // is a menu over a person who is now a combat body three tiles away, floating in front
+    // of the fight it began — so it goes.
+    //
+    // Dismissed here rather than in the card's own click handlers (where it used to live,
+    // and where it only covered the two buttons) because that missed the entry point that
+    // matters most: an enemy opening on you UNPROVOKED while you happen to have somebody
+    // else's card open. Every path into a fight runs through this action, so this is the
+    // one place that catches all of them.
+    clearSelectedHero()
+
+    // Who started it changes only the words. Both directions produce the same body, the
+    // same fight and the same honor — an enemy who jumps you is worth exactly as much as
+    // one you picked, or else the safest way to play would be to never be attacked.
+    const declared = initiator === 'enemy'
+      ? `⚔ ${speaker.name} attacks you!`
+      : `⚔ You attack ${speaker.name}!`
+    pushChat({ channel: 'system', from: null, text: declared })
+    set({
+      mobs: [...s.mobs, mob],
+      targetMobId: mob.id,
+      currentMob: mob,
+      activeDoTs: mob.dots,
+      mobMapOffset: mob.offset,
+      combatLog: [{
+        id: `pvp_${Date.now()}`, timestamp: Date.now(), type: 'boss_spawn' as const,
+        message: initiator === 'enemy'
+          ? `⚔ ${speaker.name} of the enemy faction attacks you unprovoked!`
+          : `⚔ ${speaker.name} of the enemy faction turns on you!`,
+        color: '#ff6a5a',
+      }, ...s.combatLog].slice(0, LOG_MAX),
+    })
+    resetCombatAccumulators()
+    // Only a DELIBERATE attack counts as manual input. An ambush that bumped this would
+    // hand the wheel to a player who is not holding it — pulling them out of idle
+    // auto-play because somebody else pressed the button.
+    if (initiator === 'player') get().bumpManualInput()
+    return true
+  },
+
+  /**
+   * Duel a hero of your own faction — a real fight, in the world, with nothing at stake.
+   *
+   * Everything about the body is identical to a faction fight (see `attackPlayer`), which
+   * is the point: a duel should look and feel like combat because it IS combat. What the
+   * `duel` flag buys is the ending — `registerKill` pays no honor for it, and the death
+   * branch turns a fatal blow into a yield instead of a corpse run.
+   */
+  duelPlayer: (speaker) => {
+    const s = get()
+    if (!s.isAlive || s.gameMode !== 'combat') return false
+    const theirFaction = resolveFaction(speaker.faction)
+    // Only your own side. The other faction does not accept duels — there is nothing
+    // friendly on offer there, and the card does not show the button.
+    if (theirFaction !== resolveFaction(s.playerFaction)) return false
+
+    const key = `${speaker.name}:${speaker.playerClass}:${speaker.race}:${speaker.level}`
+    if (s.mobs.some(m => m.pvp?.sourceKey === key)) return false
+
+    const mob = buildPvpMob(
+      fromSpeaker(speaker, theirFaction, speaker.rarity ?? 'common', true),
+      placeCombatantNearPlayer(s),
+    )
+    markEngaged(key)
+    clearSelectedHero()   // see the note in `attackPlayer` — a fight is not a menu
+    pushChat({ channel: 'system', from: null, text: `⚔ You duel ${speaker.name}. First to yield.` })
+    set({
+      mobs: [...s.mobs, mob],
+      targetMobId: mob.id,
+      currentMob: mob,
+      activeDoTs: mob.dots,
+      mobMapOffset: mob.offset,
+      combatLog: [{
+        id: `duel_${Date.now()}`, timestamp: Date.now(), type: 'boss_spawn' as const,
+        message: `${speaker.name} squares up to duel you.`, color: '#d8b878',
+      }, ...s.combatLog].slice(0, LOG_MAX),
+    })
+    resetCombatAccumulators()
+    get().bumpManualInput()
+    return true
+  },
+
   setTarget: (mobId) => {
     const s = get()
     const mob = s.mobs.find(m => m.id === mobId)
@@ -4503,3 +4875,17 @@ export const UNIQUE_COLOR = '#e6cc80'
 export function itemColor(item: Pick<Item, 'rarity'> & { uniqueId?: string }): string {
   return item.uniqueId ? UNIQUE_COLOR : rarityColor(item.rarity)
 }
+
+// ── Keeping the faction-name registry in step ─────────────────────────────────
+//
+// Faction display names are rolled per playthrough, and every non-React consumer that has
+// to answer "is this speaker hostile?" needs the mapping from generated name back to
+// faction key: the canvas adapter, the whisper engine, the party module. Rather than
+// thread `factionNames` through all of them, `data/factions` keeps a small registry and
+// this subscription is what fills it.
+//
+// Mirrored rather than owned there because the store is the source of truth — names change
+// on `initGame`, on loading a slot, and again when the generated names arrive from the
+// model a moment after the fallback ones are shown.
+registerFactionNames(useGameStore.getState().factionNames)
+useGameStore.subscribe(s => registerFactionNames(s.factionNames))

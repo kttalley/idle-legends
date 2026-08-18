@@ -53,6 +53,15 @@ export interface RosterSnapshot {
   bossesDefeated: number
   /** Derived rank metric — see `powerScore`. */
   power: number
+  /**
+   * Enemy-faction players killed, all time. Optional at the type level, unlike the fields
+   * above it, because rows published before PvP shipped have no such number and must keep
+   * passing `sanityCheck` — a schema addition is not grounds for emptying the board.
+   * Readers treat `undefined` as 0.
+   */
+  honorKills?: number
+  /** Deaths to enemy players, shown beside kills on the honor board. */
+  honorDeaths?: number
 }
 
 /**
@@ -84,6 +93,8 @@ export function buildSnapshot(s: GameState): RosterSnapshot {
     zoneCircuit: circuit,
     bossesDefeated: bosses,
     power: powerScore(s.level, circuit, bosses),
+    honorKills: s.pvpRecord?.kills ?? 0,
+    honorDeaths: s.pvpRecord?.deaths ?? 0,
   }
 }
 

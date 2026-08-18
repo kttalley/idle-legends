@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { factionNameColor, HOSTILE_MARK, isHostile } from '../../data/factions'
 import { getChatMessages, subscribeChat, type ChatMessage } from '../../engine/chatLog'
 import {
   entityKey, getWhisperTarget, isWhisperBusy, sendWhisper, setWhisperTarget, subscribeWhisperTarget,
@@ -69,24 +70,27 @@ export function WhisperWindow() {
   const send = useCallback(() => {
     const text = draft.trim()
     if (!text || !target) return
-    sendWhisper(target, playerName || 'You', zoneName, zoneTheme, text)
+    sendWhisper(target, playerName || 'You', zoneName, zoneTheme, text, playerFaction)
     setDraft('')
     inputRef.current?.focus()
-  }, [draft, target, playerName, zoneName, zoneTheme])
+  }, [draft, target, playerName, zoneName, zoneTheme, playerFaction])
 
   if (!target) return null
 
   const busy = isWhisperBusy(entityKey(target))
-  const hostile = target.faction.trim().toLowerCase() !== playerFaction.trim().toLowerCase()
+  // You can whisper the other side — that is deliberate, and it is the one channel that
+  // stays open across the faction wall. What you get back is trash talk (see the prompt in
+  // `engine/whisper`), and the header says who you are talking to in their own colour.
+  const hostile = isHostile(target.faction, playerFaction)
 
   return (
     <div className="whisper-window">
       <div className="whisper-window-header">
         <div style={{ minWidth: 0 }}>
           <div style={{
-            color: hostile ? '#ff8a7a' : '#8ac0ff', fontWeight: 700, fontSize: '0.88rem',
+            color: factionNameColor(target.faction), fontWeight: 700, fontSize: '0.88rem',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>{target.name}</div>
+          }}>{hostile ? `${HOSTILE_MARK} ` : ''}{target.name}</div>
           <div style={{ color: '#9a9080', fontSize: '0.7rem' }}>
             Lv {target.level} {target.race} {target.spec ?? target.playerClass}
           </div>
