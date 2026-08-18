@@ -18,6 +18,7 @@
 // bearing cache keys, and churning them risks the renderer for zero user-visible gain.
 
 import type { ClassType, RaceType } from '../../data/types'
+import { MOB_SPRITE } from '../../data/mobSprites'
 
 /**
  * True when the caller should load the FFTA dev scaffold instead of the original rigs.
@@ -40,6 +41,47 @@ export const useScaffoldArt: boolean =
   import.meta.env.DEV &&
   typeof location !== 'undefined' &&
   new URLSearchParams(location.search).has('ffta')
+
+/**
+ * Which hero art the build is showing.
+ *
+ *   revampv1  DEFAULT — one drawn rig per race x class (23 sheets, `hero_<race>_<class>`)
+ *   original  `?original` — the pre-revamp archetypes, several roster keys per sheet,
+ *             race carried only by the skin ramp. This is what shipped before 22eb736.
+ *   ffta      `?ffta` — the DEV-only extracted scaffold. See `useScaffoldArt`.
+ *
+ * ART SELECTION IS TWO INDEPENDENT DECISIONS and this is why they are separate consts:
+ *
+ *   WHICH ROSTER KEY a unit gets — `hero_<race>_<class>` or a pooled `ffa_*` key. That is
+ *   `usePooledRosterKeys`, below, and it is what `heroSpriteId()` branches on.
+ *
+ *   WHERE THE ART COMES FROM — `public/sprites/units/` or the gitignored scaffold. That is
+ *   `useScaffoldArt`, and NOTHING ELSE MAY GATE IT. It is the IP lock, it folds to the
+ *   literal `false` in a production build, and that fold is what strips the `local-assets/…`
+ *   URL strings out of the release bundle entirely.
+ *
+ * They were welded to one boolean because there were only ever two modes, and both of the
+ * old modes happened to agree on both questions. `original` is the case that separates them:
+ * it wants the POOLED keys (like the scaffold) resolved from SHIPPED art (like the default).
+ *
+ * `original` is deliberately available in production builds, unlike `?ffta`. It resolves
+ * through `ORIGINAL_SPRITE` to files already in `public/sprites/units/`, so there is nothing
+ * unshippable behind it — it is a comparison toggle, not a licence risk. `?ffta` wins if both
+ * are passed, since it is the more specific tool.
+ */
+export type HeroArtMode = 'revampv1' | 'original' | 'ffta'
+
+const artParams = typeof location === 'undefined' ? null : new URLSearchParams(location.search)
+
+export const heroArtMode: HeroArtMode =
+  useScaffoldArt ? 'ffta' : artParams?.has('original') ? 'original' : 'revampv1'
+
+/**
+ * True when `heroSpriteId()` should return a pooled `ffa_*` roster key rather than a
+ * per-combination rig id. Both non-default modes want the pools; only the scaffold mode also
+ * wants scaffold pixels.
+ */
+export const usePooledRosterKeys: boolean = heroArtMode !== 'revampv1'
 
 // ── Hero race/class → FFTA unit manifest ids ─────────────────────────────────
 // Race mapping (Idle race → FFTA race):
@@ -118,10 +160,14 @@ export function isMonsterSprite(id: string): boolean {
 // roster keys collapse to one original archetype by design; variety comes from
 // race/gear/rarity palette swaps rather than from distinct sheets.
 // INVARIANT: every value here must exist as public/sprites/units/<value>.json, or that
-// unit silently degrades to a programmatic placeholder. All 18 verified present.
+// unit silently degrades to a programmatic placeholder. All 21 verified present.
+//
+// De-pooling in progress: 47 keys → 21 distinct sprites. The vanguard pool is done — its
+// four jobs each have their own rig. Four pools still share one archetype apiece and are
+// the remaining work: colossus (6), magus (13), shade (6), cogling (5).
 export const ORIGINAL_SPRITE: Record<string, string> = {
-  // Hero jobs → 5 humanoid archetypes
-  ffa_soldier: 'hero_vanguard', ffa_paladin: 'hero_vanguard', ffa_fighter: 'hero_vanguard', ffa_hunter: 'hero_vanguard',
+  // Vanguard pool — one rig per job (Hume line: 16x40 / 10-tile proportion)
+  ffa_soldier: 'hero_vanguard', ffa_paladin: 'hero_oathbound', ffa_fighter: 'hero_breaker', ffa_hunter: 'hero_stalker',
   ffa_warrior: 'hero_colossus', ffa_dragoon: 'hero_colossus', ffa_defender: 'hero_colossus',
   ffa_gladiator: 'hero_colossus', ffa_white_monk: 'hero_colossus', ffa_templar: 'hero_colossus',
   ffa_white_mage: 'hero_magus', ffa_black_mage: 'hero_magus', ffa_illusionist: 'hero_magus', ffa_blue_mage: 'hero_magus',
@@ -137,6 +183,37 @@ export const ORIGINAL_SPRITE: Record<string, string> = {
   ffa_lamia: 'mob_marshcoil', ffa_malboro: 'mob_snapvine', ffa_floateye: 'mob_orbwatcher', ffa_zombie: 'mob_gravewalker',
   ffa_vampire: 'mob_nightflit', ffa_goblin: 'mob_grubkin', ffa_antlion: 'mob_scuttler', ffa_tonberry: 'mob_shivtail',
   ffa_toughskin: 'mob_gnarljaw',
+
+  // ── The rigs `MOB_SPRITE` names, collapsed onto shipped originals ─────────────
+  // `data/mobSprites.ts` binds every mob to a scaffold rig, and eighteen of those rigs
+  // have no drawn counterpart yet. Without an entry here each one degrades to a
+  // programmatic placeholder blob in the shipped build — which is the exact failure this
+  // file's header records from 2026-08-01, when the whole game shipped as blobs because
+  // the art path was gated on a flag no packaged build could set.
+  //
+  // Mapped by WHAT THE CREATURE IS rather than by name, so the collapse is legible: canines
+  // and cats to the duskcat, anything armoured and enormous to the colossus, casters to the
+  // magus, undead to the gravewalker. Several rigs share a target on purpose — variety
+  // comes from palette, and `resolveMobSprite` guarantees no two mobs in one zone land on
+  // the same sheet.
+  ffa_direwolf: 'mob_duskcat', ffa_grim_wolfkin: 'mob_duskcat',
+  ffa_dire_boar: 'mob_gnarljaw', ffa_bog_troll: 'mob_gnarljaw',
+  ffa_chimera: 'mob_ashdrake', ffa_frost_wyrm: 'mob_ashdrake', ffa_carrion_bird: 'mob_ashdrake',
+  ffa_rot_crawler: 'mob_scuttler',
+  ffa_magma_brute: 'mob_cinderwisp',
+  ffa_ashen_maw: 'mob_snapvine',
+  // The skeleton. `ffa_bone_archer` is the scaffold's bone rig and `mob_gravewalker` is the
+  // drawn one; binding them means the skeleton is the same creature in both art modes,
+  // which is what lets it be the default fallback below.
+  ffa_bone_archer: 'mob_gravewalker',
+  // Humanoid mobs take hero rigs — they are people, and the enemy palette is what makes
+  // them read as hostile.
+  ffa_dune_raider: 'hero_shade',
+  ffa_bandit_brute: 'hero_colossus', ffa_stone_warden: 'hero_colossus',
+  ffa_iron_sentinel: 'hero_colossus',
+  ffa_war_deserter: 'hero_vanguard',
+  ffa_storm_caller: 'hero_magus',
+  ffa_hexknight: 'hero_oathbound',
 }
 
 // Original monster rigs authored on the HUMANOID frame (24×32) rather than the beast frame
@@ -162,7 +239,15 @@ const MOB_KEYWORDS: KeywordPool[] = [
   [/snake|serpent|lamia|naga|viper|cobra/, ['ffa_lamia']],
   [/plant|flower|vine|shambler|treant|fungus|mushroom/, ['ffa_malboro']],
   [/eye|gazer|watcher|orb|sentinel|devourer/, ['ffa_floateye']],
-  [/zombie|undead|ghoul|corpse|rot|skeleton|wraith|lich/, ['ffa_zombie']],
+  // The undead pool, widened. It matched `skeleton` — and every skeletal enemy in the game
+  // is called SKELETAL, which the pattern does not match, so the Skeletal Archer fell all
+  // the way through twenty pools to the random-monster fallback and rendered as a floating
+  // eye. Same for the Grave-Risen Soldier, which matched `soldier` first and came out as a
+  // living swordsman. Net effect: `mob_gravewalker` — the one undead rig in the shipped
+  // set — was reachable by NO mob in the bestiary, only by the roaming ambient crowd.
+  // Stems rather than whole words (`skelet` covers skeleton/skeletal), and `\b` on the
+  // short ones so "Brotherhood" and "Bonecrusher"-style names cannot be dragged in.
+  [/zombie|undead|ghoul|corpse|\brot|skelet|\bbone|grave|risen|crypt|tomb|barrow|revenant|wight|wraith|lich/, ['ffa_zombie']],
   [/vampire|bat|blood|nosferatu/, ['ffa_vampire']],
   [/goblin|kobold|imp|gremlin|sapper|sprite/, ['ffa_goblin', 'ffa_tonberry']],
   [/ant|bug|insect|spider|scorpion|beetle|mantis|antlion/, ['ffa_antlion']],
@@ -185,14 +270,42 @@ function strHash(s: string): number {
   return Math.abs(h)
 }
 
-/** Pick a sprite for a mob by name. Falls back to a random named monster if no keyword matches. */
-export function resolveMobSprite(name: string): string {
+/**
+ * Pick a sprite for a mob.
+ *
+ * Three tiers, most-specific first, and the order is the whole point:
+ *
+ *   1. `MOB_SPRITE[templateId]` — the CURATED table (data/mobSprites.ts). Every mob in
+ *      every zone was assigned a rig by hand, checked for per-zone distinctness. It was
+ *      generated months ago and then wired to nothing, which is why a "Skeletal Archer"
+ *      rendered as a floating eye: the table said `ffa_bone_archer` and no code read it.
+ *   2. The keyword pools — for anything with no table entry: duel opponents, ambient
+ *      monsters, and any mob added to a zone without updating the table.
+ *   3. The SKELETON. Not a random monster.
+ *
+ * That last change matters more than it looks. The old fallback picked from
+ * `MONSTER_SPRITES` by name hash, so an unmatched mob got an arbitrary creature — which is
+ * how "Grave-Risen Soldier" became a lamia and "Skeletal Archer" a floating eye. An
+ * arbitrary-but-stable answer is still arbitrary, and it produces exactly the mismatches
+ * that make a bestiary feel randomly assembled. Defaulting to one strong, legible,
+ * unmistakably-hostile rig means an unmapped mob reads as "some undead thing" rather than
+ * as a category error — and undead is the safest possible default in a world whose every
+ * zone is a battlefield somebody already lost.
+ */
+export function resolveMobSprite(name: string, templateId?: string): string {
+  if (templateId) {
+    const mapped = MOB_SPRITE[templateId]
+    if (mapped) return mapped
+  }
   const n = name.toLowerCase()
   for (const [re, pool] of MOB_KEYWORDS) {
     if (re.test(n)) return pool[strHash(n) % pool.length]
   }
-  return MONSTER_SPRITES[strHash(n) % MONSTER_SPRITES.length]
+  return DEFAULT_MOB_SPRITE
 }
+
+/** The skeleton — see `resolveMobSprite`. Resolves to `mob_gravewalker` in shipped builds. */
+export const DEFAULT_MOB_SPRITE = 'ffa_bone_archer'
 
 /**
  * Per-combination original rigs — one drawn sheet for every race x class the character
@@ -218,25 +331,39 @@ export const HERO_ORIGINAL: Record<RaceType, Partial<Record<ClassType, string>>>
   tauren: { warrior: 'hero_tauren_warrior' },
 }
 
-/** Every original hero rig id — used to preload the sprite cache. */
+/** Every per-combination hero rig id — used to preload the sprite cache in `revampv1`. */
 export const HERO_ORIGINAL_IDS: string[] =
   Object.values(HERO_ORIGINAL).flatMap((byClass) => Object.values(byClass) as string[])
 
 /**
+ * Every pooled roster key any hero can be assigned — the preload set for `original` and
+ * `ffta`. Derived from the pools rather than from a second hand-written race/class list, so
+ * adding a job to a pool cannot leave its sprite unpreloaded.
+ */
+export const HERO_POOLED_IDS: string[] = [
+  ...new Set(Object.values(HERO_SPRITES).flatMap((byClass) => Object.values(byClass).flat())),
+]
+
+/** The roster keys to warm the sprite cache with, for whichever mode is active. */
+export const heroPreloadIds = (): string[] =>
+  usePooledRosterKeys ? HERO_POOLED_IDS : HERO_ORIGINAL_IDS
+
+/**
  * Pick a hero sprite for a unit.
  *
- * Default path returns the per-combination original rig directly; `ORIGINAL_SPRITE[id] ?? id`
- * downstream passes these through unchanged, so they need no entry in that table. Under
- * `?ffta` (DEV only) it keeps returning an `ffa_*` roster key so the scaffold still resolves.
+ * `revampv1` returns the per-combination rig directly; `ORIGINAL_SPRITE[id] ?? id` downstream
+ * passes those through unchanged, so they need no entry in that table. `original` and `ffta`
+ * both return a pooled `ffa_*` roster key — `original` then resolves it through
+ * `ORIGINAL_SPRITE` to a shipped archetype, `ffta` to the scaffold.
  *
- * The `name` hash only matters on the scaffold path, where several jobs share a class pool.
+ * The `name` hash only matters on the pooled paths, where several jobs share a class pool.
  */
 export function heroSpriteId(
   race: RaceType,
   cls: ClassType,
   name: string,
 ): string {
-  if (!useScaffoldArt) {
+  if (!usePooledRosterKeys) {
     // Combinations the creator disallows can still be reached by old saves; fall back to the
     // human rig for that class rather than dropping to a programmatic placeholder blob.
     return HERO_ORIGINAL[race]?.[cls] ?? HERO_ORIGINAL.human[cls] ?? 'hero_human_warrior'

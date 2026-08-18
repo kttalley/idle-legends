@@ -25,7 +25,10 @@ const TEXT_SHADOW = '1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px
 function CastBar({ cast }: { cast: CastState }) {
   const pct = cast.total > 0 ? Math.max(0, Math.min(1, 1 - cast.remaining / cast.total)) : 0
   return (
-    <div style={{ position: 'relative', height: 10, borderRadius: 2, overflow: 'hidden', background: 'rgba(8,6,14,0.7)' }}>
+    // `cast-bar` carries no styling — it is a hook. The bar is drawn with inline styles and
+    // was therefore invisible to any assertion, which is why "the cast bar fires while out
+    // of range" could only be reported by eye and never caught by a suite.
+    <div className="cast-bar" style={{ position: 'relative', height: 10, borderRadius: 2, overflow: 'hidden', background: 'rgba(8,6,14,0.7)' }}>
       <div style={{ height: '100%', width: `${pct * 100}%`, background: 'linear-gradient(180deg, #ffe27a, #c8901c)' }} />
       <span style={{ position: 'absolute', left: 3, top: 0, fontSize: 8, lineHeight: '10px', color: '#fff8e0', fontWeight: 600, textShadow: TEXT_SHADOW, whiteSpace: 'nowrap' }}>
         {cast.icon} {cast.name}

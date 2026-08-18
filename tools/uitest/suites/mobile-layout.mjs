@@ -41,7 +41,8 @@ export async function run({ send, appUrl, check, note }) {
     const r = b.getBoundingClientRect();
     return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
   })()`)
-  for (const [label, key] of [['Hero', 'hero'], ['Log', 'log']]) {
+  // Dock captions are Menu / Chat / Gear now — see the note in App.tsx.
+  for (const [label, key] of [['Menu', 'hero'], ['Chat', 'log']]) {
     const c = await dockCentre(label)
     if (!c) { check(`the ${label} dock button exists`, false); continue }
     await tap(send, c.x, c.y)
@@ -69,7 +70,7 @@ export async function run({ send, appUrl, check, note }) {
   const shut = await corners()
   note(`top corners: left inset ${shut.left}px, right inset ${shut.rightGap}px`)
   check('the unit frames are inset like the minimap opposite them', shut.left === shut.rightGap)
-  const heroBtn = await dockCentre('Hero')
+  const heroBtn = await dockCentre('Menu')
   await tap(send, heroBtn.x, heroBtn.y)
   const withDrawer = await corners()
   check('...and do not move when the hero drawer comes out',
@@ -79,7 +80,7 @@ export async function run({ send, appUrl, check, note }) {
 
   const chatOpen = () => evaluate(send, `!!document.querySelector('.app-log.panel-open')`)
   const alive = () => evaluate(send, `!!document.querySelector('.app-log') && !!window.__ilScene`)
-  const openChat = async () => { await evaluate(send, openDock('Log')); await sleep(800) }
+  const openChat = async () => { await evaluate(send, openDock('Chat')); await sleep(800) }
 
   // ── The feed must not be a curtain across the screen ───────────────────────
   await openChat()
@@ -188,7 +189,7 @@ export async function run({ send, appUrl, check, note }) {
   check('the reserved height matches the bar that is actually rendered',
     reserve && Math.abs(reserve.declared - reserve.actual) <= 1)
 
-  await evaluate(send, openDock('Log'))
+  await evaluate(send, openDock('Chat'))
   await sleep(700)
   check('the chat sheet clears the action bar rather than covering it',
     await evaluate(send, `(() => {
@@ -196,7 +197,7 @@ export async function run({ send, appUrl, check, note }) {
       const stack = document.querySelector('.hud-bottom').getBoundingClientRect();
       return log.bottom <= stack.top + 1;
     })()`))
-  await evaluate(send, openDock('Log'))
+  await evaluate(send, openDock('Chat'))
   await sleep(500)
 
   // ── The zone track is a track, not a list ──────────────────────────────────
@@ -225,7 +226,7 @@ export async function run({ send, appUrl, check, note }) {
     };
   })()`)
 
-  await evaluate(send, openDock('Hero'))
+  await evaluate(send, openDock('Menu'))
   await sleep(800)
   const first = await measure()
   note(`zone track: ${first?.stops} stops in ${first?.height}px`)
@@ -243,7 +244,7 @@ export async function run({ send, appUrl, check, note }) {
     bossesDefeated: ['sunhollow_meadows', 'dustwind_plains'],
     totalZoneKills: { sunhollow_meadows: 51, dustwind_plains: 60, grimshade_forest: 18 },
   })
-  await evaluate(send, openDock('Hero'))
+  await evaluate(send, openDock('Menu'))
   await sleep(900)
   const mid = await measure()
   note(`mid-track: scrollLeft ${mid?.scrollLeft} (ideal ${mid?.ideal}), offCentre ${mid?.offCentre}px, rail ${mid?.railW}px of ${mid?.contentW}px content`)

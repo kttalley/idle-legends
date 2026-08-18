@@ -57,6 +57,28 @@ export function OfflineReportToast() {
           </div>
         )}
 
+        {/* The banked extension actually being SPENT is the only proof the player gets that
+            the gold went somewhere, so it is stated even though nothing went wrong. */}
+        {report.watchSpent > 0 && (
+          <div style={{ fontSize: '0.5rem', color: 'var(--gold-soft)', fontStyle: 'italic' }}>
+            Drew {formatSpan(report.watchSpent)} from your banked watch
+            {report.watchRemaining > 0
+              ? ` — ${formatSpan(report.watchRemaining)} still in hand.`
+              : ' — the bank is empty.'}
+          </div>
+        )}
+
+        {/* Not an error, and it must not read as one: the hero out-grew the world you have
+            opened for them. The fix is a door, not a purchase, so the line points at the
+            door. */}
+        {report.cappedByContent && (
+          <div style={{ fontSize: '0.5rem', color: 'var(--warn)', fontStyle: 'italic' }}>
+            <SpriteIcon ui="warn" size={10} /> Your hero has learned all these lands can
+            teach — they stopped at level {report.contentCeiling}. Open the next region to
+            keep growing.
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Row label="Enemies felled" value={report.kills.toLocaleString()} />
           <Row label="Gold earned" value={`${report.gold.toLocaleString()}g`} color="var(--gold)" />

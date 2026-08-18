@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import { CollapsiblePanel } from '../ui/CollapsiblePanel'
+import { WatchMeter } from './WatchMeter'
 import { useGameStore } from '../../store/gameStore'
 import { ZONES, ZONE_ORDER } from '../../data/zones'
 import { getZoneProgression, getPrerequisiteZone } from '../../engine/zoneProgression'
@@ -236,6 +237,7 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
             Roam onward when ready
           </label>
         )}
+
       </div>
   )
 
@@ -256,12 +258,30 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
   }
 
   return (
+    // The default-open member of the left rail's accordion: where you are and where you can
+    // go next is the thing you glance at constantly, and it is also the short one — the
+    // character sheet grows without bound, so opening THAT by default is what buried this.
     <CollapsiblePanel
       id="zones"
+      group="rail-left"
+      defaultCollapsed={false}
       title="Zones"
       headerRight={<span style={{ fontSize: '0.55rem', color: 'var(--muted-warm)' }}>{levelRange}</span>}
     >
       {track}
+      {/* ── The Watch, inside the zone accordion but OUTSIDE `.zone-track` ──
+          It belongs to this section rather than to the character sheet: the track and the
+          watch both answer "where is my hero going, and for how long", while the sheet
+          answers "what are they made of". Living here also keeps it out of the sheet's
+          scroll region, where it ate the top of the column and pushed the stats down every
+          time the sheet was expanded.
+          A SIBLING of `track`, not a child of it, and that is load-bearing rather than
+          tidiness: `.zone-track`'s height is an asserted invariant (mobile-layout checks it
+          stays under 160px, because a track that grows is what made the rail unusable with
+          the character sheet open). Nested inside, the meter measured as part of the track
+          and pushed it to 223px — a real regression in the thing the rail was rebuilt for,
+          caught by that check. */}
+      <WatchMeter />
     </CollapsiblePanel>
   )
 }

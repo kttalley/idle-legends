@@ -14,7 +14,18 @@ import { SpriteIcon } from '../../ui/SpriteIcon'
 
 const MAP = 64
 const SRC = 128          // offscreen bake resolution (2px/tile)
-const VIEW = 74          // on-screen disc diameter (css px)
+// Drawing space AND canvas backing store — no longer the on-screen size, which is now CSS
+// (`--radar-size`, index.css) so the disc can grow on desktop to square off the right
+// column against the unit frames on the left. Raised 74 → 128 to match the bake: the disc
+// displays around 120px on desktop, and upscaling a 74px buffer to that was visibly soft.
+const VIEW = 128
+// Blips were authored as literals against the old 74px space; scaling them keeps a mob dot
+// the same size relative to the disc instead of shrinking to a speck at the new resolution.
+const BLIP = VIEW / 74
+// On-screen diameter is CSS now (`--radar-size`): 74px on a phone, and on desktop it grows
+// to square the right column off against the unit frames on the left. It has to be CSS
+// rather than a constant because it derives from `--unit-h`, which is MEASURED at runtime
+// from the frames themselves — a JS constant could only ever guess at that.
 const SPAN = 30          // tiles visible across the disc (player-centered window)
 
 function tileColor(type: TileType): string {
@@ -116,31 +127,31 @@ export function MinimapRadar() {
       let dy = node.y - cyTile; dy = ((dy + MAP / 2 + MAP) % MAP) - MAP / 2
       if (Math.abs(dx) > SPAN / 2 || Math.abs(dy) > SPAN / 2) continue
       ctx.fillStyle = node.color
-      ctx.fillRect(VIEW / 2 + dx * scale - 1, VIEW / 2 + dy * scale - 1, 2, 2)
+      ctx.fillRect(VIEW / 2 + dx * scale - BLIP, VIEW / 2 + dy * scale - BLIP, 2 * BLIP, 2 * BLIP)
     }
 
     // Mob blip.
     if (hasMob) {
       const p = toDisc(cxTile + mobOffset.dx, cyTile + mobOffset.dy)
       ctx.fillStyle = '#ff3b30'
-      ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.5 * BLIP, 0, Math.PI * 2); ctx.fill()
     }
 
     // Player at center.
     ctx.fillStyle = '#ffd54a'
-    ctx.beginPath(); ctx.arc(VIEW / 2, VIEW / 2, 2.8, 0, Math.PI * 2); ctx.fill()
-    ctx.strokeStyle = '#7a5a10'; ctx.lineWidth = 1; ctx.stroke()
+    ctx.beginPath(); ctx.arc(VIEW / 2, VIEW / 2, 2.8 * BLIP, 0, Math.PI * 2); ctx.fill()
+    ctx.strokeStyle = '#7a5a10'; ctx.lineWidth = BLIP; ctx.stroke()
   }, [currentZone, zm, playerPos, mobOffset, hasMob])
 
   return (
-    <div style={{ pointerEvents: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-      <div style={{ position: 'relative', width: VIEW, height: VIEW }}>
+    <div className="minimap-radar">
+      <div className="minimap-disc">
         <canvas
           ref={canvasRef}
           width={VIEW}
           height={VIEW}
           style={{
-            width: VIEW, height: VIEW, display: 'block',
+            width: '100%', height: '100%', display: 'block',
             borderRadius: '50%',
             border: '2px solid #3a3630',
             boxShadow: '0 0 0 1px #000, inset 0 0 8px rgba(0,0,0,0.6)',
@@ -230,11 +241,7 @@ export function MinimapRadar() {
           </span>
         </button>
       </div>
-      <div style={{
-        fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#c8b890',
-        textShadow: '0 1px 2px #000', maxWidth: VIEW + 12, textAlign: 'center',
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-      }}>
+      <div className="minimap-caption">
         {zoneName}
       </div>
 

@@ -859,6 +859,10 @@ export interface GameState {
   craftQuality: QualityTier | null
   /** The most recent craft's reveal card. Transient; auto-expires in the UI. */
   lastCraft: CraftResult | null
+  /** The most recent level-up's banner. Transient; auto-expires in the UI, and only ever
+   *  set by the live tick — an offline session's levels are reported by the offline
+   *  toast, which already says how many were gained. */
+  lastLevelUp: LevelUpEvent | null
   // ── World Map ───────────────────────────────────────────────────────────────
   zoneMaps: Partial<Record<ZoneId, ZoneMap>>
   /** Per-character world entropy; seeds terrain generation. 0 = the legacy fixed world. */
@@ -884,6 +888,10 @@ export interface GameState {
   colorway: string
   /** Seconds remaining before manual mode falls back to idle. Only counts down in combat. */
   manualIdleTimer: number
+  /** Banked offline extension, in seconds — bought with gold, consumed by the absence that
+   *  needs it. Sits ON TOP of the free cap and the permanent `long_watch` ranks; see
+   *  WATCH_BANK_CAP_HOURS. Absent on old saves → 0, i.e. exactly the old behaviour. */
+  watchBonusSeconds: number
 }
 
 // ── Gathering: the optional strike-meter overlay ──────────────────────────────
@@ -928,6 +936,26 @@ export interface CraftResult {
   paletteId: string
   /** Set for gear crafts so the reveal can show the real item. */
   item: Item | null
+  createdAt: number
+}
+
+/**
+ * A level-up worth announcing.
+ *
+ * Levelling used to be visible only as one line in a feed that is also carrying every
+ * swing of the fight — on a phone, where the feed is a sheet you have to open, it was
+ * invisible. This is the same contract `CraftResult` has: the store records the moment,
+ * the UI reveals it once and lets it expire.
+ */
+export interface LevelUpEvent {
+  id: string
+  level: number
+  /** Whether this level actually paid a talent point — levels past the lifetime cap do not. */
+  talentPoint: boolean
+  /** Names of abilities whose unlock level is this one; the action bar itself changed. */
+  unlockedAbilities: string[]
+  /** Max-HP gained, so the banner can say what got stronger. */
+  maxHpGain: number
   createdAt: number
 }
 
@@ -984,6 +1012,11 @@ export const SCENERY_KIND = {
   TREE: 0, ROCK_BIG: 1, PINE: 7, BOULDER: 8, SPIRE: 9, MOUND: 10,
   BUSH: 11, FLOWERBED: 12, PILLAR: 13, DEADTREE: 14, STUMP: 15, REEDS: 16,
   HUT: 17, TOWER: 18, ARCH: 19,
+  // Canopy giants (renderer: the 64×96 landmark sheet, same as HUT/TOWER/ARCH). 20–25 are
+  // taken by town furniture on the render side, hence 26. Sparse by design — see
+  // BIOME_CANOPY in mapGen: the point of a giant is that the ordinary trees around it
+  // read as ordinary.
+  GREAT_TREE: 26, GREAT_PINE: 27, GREAT_DEADTREE: 28,
 } as const
 
 export interface MapScenery {

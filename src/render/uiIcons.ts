@@ -32,6 +32,12 @@ const STILL = { frames: [0], fps: 1, loop: true }
 export const UI_ICON = {
   lock: 0, map: 1, zoom: 2, coin: 3, trophy: 4,
   warn: 5, travel: 6, dice: 7, quill: 8, bag: 9,
+  // Navigation chrome. These two were the last places a FONT GLYPH was still standing in
+  // for an icon: the rails' collapsed chip drew a literal '☰', and the dock's chat button
+  // fell through to the emoji fallback. A glyph next to a pixel icon is instantly wrong at
+  // 20px — different weight, different grid, and it re-renders with the system font rather
+  // than the palette. Now the whole dock is one sheet.
+  menu: 10, chat: 11,
 } as const
 export type UiIconKey = keyof typeof UI_ICON
 
@@ -96,8 +102,26 @@ const U_BAG: IconSketch = [
   '..2566666666652.', '..25555555555 2.', '...2222222222...', '................',
 ]
 
+// Hamburger — three gold bars with a darker core, so it holds an edge against a bright
+// meadow as well as a cave. Rows 2/6/10 keep the classic 3-bar rhythm at 16px.
+const U_MENU: IconSketch = [
+  '................', '................', '..EEEEEEEEEEEE..', '..E8888888888E..',
+  '..EEEEEEEEEEEE..', '................', '..EEEEEEEEEEEE..', '..E8888888888E..',
+  '..EEEEEEEEEEEE..', '................', '..EEEEEEEEEEEE..', '..E8888888888E..',
+  '..EEEEEEEEEEEE..', '................', '................', '................',
+]
+// Speech bubble — gold frame, parchment field, three dark beads, tail bottom-left. Reads
+// as "talking", which is what the panel behind it mostly is (zone chat, not a combat log).
+const U_CHAT: IconSketch = [
+  '................', '..EEEEEEEEEEEE..', '.EE4444444444EE.', '.E444444444444E.',
+  '.E422442244224E.', '.E422442244224E.', '.E444444444444E.', '.EE4444444444EE.',
+  '..EEEEE44EEEEE..', '.....E44E.......', '.....E4E........', '.....EE.........',
+  '................', '................', '................', '................',
+]
+
 const SKETCHES: IconSketch[] = [
   U_LOCK, U_MAP, U_ZOOM, U_COIN, U_TROPHY, U_WARN, U_TRAVEL, U_DICE, U_QUILL, U_BAG,
+  U_MENU, U_CHAT,
 ]
 
 export function makeUiIconSheet(id = 'icons/ui'): IndexedSprite {
@@ -125,4 +149,8 @@ export const EMOJI_UI_ICON: Record<string, UiIconKey> = {
   '🎲': 'dice',
   '✎': 'quill', '✏': 'quill', '📝': 'quill',
   '🎒': 'bag', '👜': 'bag',
+  '☰': 'menu', '≡': 'menu',
+  // NOT '📜' — the item sheet already claims it as `scroll` (a craftable), and resolve()
+  // checks that sheet first. Mapping it here too would read as though this one won.
+  '💬': 'chat', '🗨': 'chat',
 }

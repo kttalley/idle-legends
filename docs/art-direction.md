@@ -1349,6 +1349,31 @@ shipping app rendered programmatic placeholder blobs and a town with no ground. 
 Originals ship **se-only** (importer auto-reuses for the back facing — the sanctioned MVP
 path).
 
+**There are now three hero art modes, selected by URL param** (`fftaRoster.ts`,
+`heroArtMode`):
+
+| param | roster key | art loaded from | ships? |
+|---|---|---|---|
+| *(none)* / `?revampv1` | `hero_<race>_<class>` | `public/sprites/units/` | **yes — the default** |
+| `?original` | pooled `ffa_*` | `public/sprites/units/` via `ORIGINAL_SPRITE` | yes (comparison toggle) |
+| `?ffta` | pooled `ffa_*` | `local-assets/ffta-scaffold/` | **no — DEV only** |
+
+`?original` is the pre-`22eb736` world: several roster keys collapse onto one archetype
+sheet and race is carried only by the skin ramp. Nothing had to be restored from a branch
+for it — those archetype sheets were never deleted, and it also picks up any in-progress
+de-pooling of `ORIGINAL_SPRITE` automatically.
+
+The reason this needed a change rather than an extra `if`: art selection is **two
+independent decisions** — *which roster key* a unit gets, and *where art is loaded from* —
+and they had been welded to the single `useScaffoldArt` boolean because the only two modes
+that existed happened to agree on both. `?original` is the case that pulls them apart: it
+wants the pooled keys (like the scaffold) resolved from shipped art (like the default). So
+`usePooledRosterKeys` now answers the first question and `useScaffoldArt` still exclusively
+answers the second. **`useScaffoldArt` remains the sole gate on the scaffold path** — that
+is the IP lock and the thing that folds to `false` and strips the `local-assets/…` strings
+from a release bundle. `?original` is safe in production precisely because it never touches
+it. If both flags are passed, `?ffta` wins.
+
 Remaining:
 1. **Polish pass** — the 7 brief-designed monsters read correctly but are coarser than the
    spec rigs; hand-refine in Aseprite when time allows. Author distinct back-facing (`/ne`)

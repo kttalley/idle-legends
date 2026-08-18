@@ -238,21 +238,55 @@ const BIOME_SCENERY: Record<ZoneId, { density: number; kinds: number[] }> = {
   venom_hollows:      { density: 0.026, kinds: [SK.DEADTREE, SK.BUSH, SK.REEDS, SK.MOUND, SK.DEADTREE] },
 }
 
-// A handful of structure landmarks per zone. Ruined/war biomes get arches & towers;
-// settled biomes get the occasional hut. Kept rare so they read as points of interest.
+// A handful of structure landmarks per zone. Ruined/war biomes get arches; settled biomes
+// get the occasional homestead. Kept rare so they read as points of interest.
+//
+// The TOWER used to appear in eleven of the twelve pools and was usually the first or
+// second entry, which made it the default silhouette of the whole world — you could not
+// cross a zone without one on screen, and a landmark you see everywhere is scenery. It is
+// now the RAREST of the three: one weighted slot in five biomes, none in the rest. A
+// watchtower means someone is holding this ground, so the biomes that get one are the
+// contested ones (the crossing, the mesa, the badlands, the bloodfields, the wastes).
+// Everywhere else the ruin and the homestead carry the job, with the small PILLAR still
+// available as a quieter marker.
 const BIOME_LANDMARK: Record<ZoneId, { count: number; kinds: number[] }> = {
-  sunhollow_meadows:  { count: 3, kinds: [SK.HUT, SK.HUT, SK.TOWER] },
-  shattered_crossing: { count: 4, kinds: [SK.HUT, SK.TOWER, SK.ARCH] },
+  sunhollow_meadows:  { count: 3, kinds: [SK.HUT, SK.HUT, SK.ARCH] },
+  shattered_crossing: { count: 4, kinds: [SK.HUT, SK.ARCH, SK.ARCH, SK.TOWER] },
   thornvale_jungle:   { count: 2, kinds: [SK.ARCH, SK.PILLAR] },
-  the_maw_eternal:    { count: 3, kinds: [SK.ARCH, SK.PILLAR, SK.TOWER] },
-  dustwind_plains:    { count: 2, kinds: [SK.HUT, SK.TOWER] },
-  ironcrag_badlands:  { count: 3, kinds: [SK.TOWER, SK.ARCH, SK.HUT] },
-  warsong_mesa:       { count: 3, kinds: [SK.TOWER, SK.HUT, SK.ARCH] },
-  ashfire_peaks:      { count: 2, kinds: [SK.ARCH, SK.TOWER] },
-  the_bloodfields:    { count: 4, kinds: [SK.ARCH, SK.TOWER, SK.PILLAR] },
-  cinderfall_wastes:  { count: 3, kinds: [SK.ARCH, SK.TOWER, SK.PILLAR] },
-  grimshade_forest:   { count: 3, kinds: [SK.HUT, SK.ARCH, SK.TOWER] },
+  the_maw_eternal:    { count: 3, kinds: [SK.ARCH, SK.PILLAR, SK.ARCH] },
+  dustwind_plains:    { count: 2, kinds: [SK.HUT, SK.HUT, SK.TOWER] },
+  ironcrag_badlands:  { count: 3, kinds: [SK.ARCH, SK.HUT, SK.ARCH, SK.TOWER] },
+  warsong_mesa:       { count: 3, kinds: [SK.HUT, SK.ARCH, SK.ARCH, SK.TOWER] },
+  ashfire_peaks:      { count: 2, kinds: [SK.ARCH, SK.PILLAR] },
+  the_bloodfields:    { count: 4, kinds: [SK.ARCH, SK.PILLAR, SK.ARCH, SK.TOWER] },
+  cinderfall_wastes:  { count: 3, kinds: [SK.ARCH, SK.PILLAR, SK.ARCH] },
+  grimshade_forest:   { count: 3, kinds: [SK.HUT, SK.ARCH, SK.PILLAR] },
   venom_hollows:      { count: 2, kinds: [SK.ARCH, SK.PILLAR] },
+}
+
+// Canopy giants — the 64×96 trees, scattered like landmarks rather than like scenery.
+//
+// Scale variety is the point. Every living thing in a biome used to be 32×48, so a forest
+// was a field of identical lollipops and nothing gave the hero a size. A handful of trees
+// three times taller fixes that from one pass — and because they depth-sort like any other
+// prop, they also give the player something to walk BEHIND, which is most of what sells a
+// diorama as a place.
+//
+// Counts are per 64×64 map and deliberately in the same range as the structure landmarks:
+// a giant that turns up every few tiles is just the new normal size.
+const BIOME_CANOPY: Record<ZoneId, { count: number; kinds: number[] }> = {
+  sunhollow_meadows:  { count: 5, kinds: [SK.GREAT_TREE] },
+  shattered_crossing: { count: 6, kinds: [SK.GREAT_TREE, SK.GREAT_PINE] },
+  thornvale_jungle:   { count: 9, kinds: [SK.GREAT_TREE, SK.GREAT_TREE, SK.GREAT_PINE] },
+  the_maw_eternal:    { count: 6, kinds: [SK.GREAT_DEADTREE] },
+  dustwind_plains:    { count: 3, kinds: [SK.GREAT_DEADTREE] },
+  ironcrag_badlands:  { count: 3, kinds: [SK.GREAT_DEADTREE] },
+  warsong_mesa:       { count: 3, kinds: [SK.GREAT_DEADTREE] },
+  ashfire_peaks:      { count: 4, kinds: [SK.GREAT_DEADTREE] },
+  the_bloodfields:    { count: 4, kinds: [SK.GREAT_DEADTREE] },
+  cinderfall_wastes:  { count: 4, kinds: [SK.GREAT_DEADTREE] },
+  grimshade_forest:   { count: 8, kinds: [SK.GREAT_PINE, SK.GREAT_DEADTREE, SK.GREAT_PINE] },
+  venom_hollows:      { count: 6, kinds: [SK.GREAT_DEADTREE, SK.GREAT_PINE] },
 }
 
 // ── CA terrain generation ─────────────────────────────────────────────────────
@@ -447,6 +481,29 @@ export function generateZoneMap(zoneId: ZoneId, worldSeed = 0): ZoneMap {
     const kind = landCfg.kinds[Math.floor(seededRand(seed + 900, li) * landCfg.kinds.length)]
     scenery.push({ x: c, y: r, kind })
     lmPlaced++
+  }
+
+  // Step 7b: canopy giants. Same placement discipline as the structures above and
+  // deliberately sharing their separation test — `kind >= SCENERY_KIND.HUT` covers both
+  // groups, so running this pass second keeps giants apart from each other AND stops an
+  // oak growing up through a watchtower. A tighter spacing than the structures get: a
+  // grove of three reads as forest, whereas three towers in sight of each other read as a
+  // mistake.
+  const canopyCfg = BIOME_CANOPY[zoneId]
+  let cpPlaced = 0, cpAttempts = 0
+  const canopySep = 7
+  while (cpPlaced < canopyCfg.count && cpAttempts < 160) {
+    const ci = cpAttempts++
+    const r = Math.floor(seededRand(seed + 1100, ci) * MAP_SIZE)
+    const c = Math.floor(seededRand(seed + 1200, ci) * MAP_SIZE)
+    const t = tiles[r][c].type
+    if (t === 'water' || t === 'cliff') continue
+    if (nodeSet.has(r * MAP_SIZE + c)) continue
+    if (scenery.some(s => s.kind >= SCENERY_KIND.HUT &&
+        Math.abs(s.x - c) < canopySep && Math.abs(s.y - r) < canopySep)) continue
+    const kind = canopyCfg.kinds[Math.floor(seededRand(seed + 1300, ci) * canopyCfg.kinds.length)]
+    scenery.push({ x: c, y: r, kind })
+    cpPlaced++
   }
 
   // Step 8: reachability pass. Build the walkable mask (which seals off small pockets)

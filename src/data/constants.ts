@@ -13,8 +13,57 @@ export const OFFLINE_MIN_SECONDS = 60
  *  player actually left behind — a long τ keeps stale low-level play weighted in and
  *  systematically under-pays anyone mid-progression. */
 export const OFFLINE_RATE_WINDOW_SECONDS = 600
-/** Below this much measured combat there is nothing honest to extrapolate from. */
-export const OFFLINE_MIN_MEASURED_SECONDS = 120
+/**
+ * Below this much measured combat there is nothing honest to extrapolate from.
+ *
+ * Was 120s, and that number quietly cancelled the single most important moment in a new
+ * player's life: play for ninety seconds, close the app, come back tomorrow to NOTHING. An
+ * idle game gets one chance to prove it pays you while you are away, and the gate meant a
+ * short first session forfeited it. (Flagged in the 2026-08-08 audit as nullifying the
+ * first "come back richer" moment; this is that fix.)
+ *
+ * The gate itself is still right — a hero who has never swung cannot have a rate. It just
+ * has to be a floor on "did anything happen", not a floor on "played long enough to
+ * matter". Thin samples are handled by clamping the WINDOW instead; see below.
+ */
+export const OFFLINE_MIN_MEASURED_SECONDS = 30
+/**
+ * A rate measured over less than this is real but noisy — one lucky elite in a 40-second
+ * sample projects into an absurd hour. So it is trusted, but not extrapolated far: the
+ * projection window is clamped to `OFFLINE_THIN_SAMPLE_CAP_SECONDS` until the hero has
+ * played enough for the average to mean something.
+ *
+ * This is the honest middle the old all-or-nothing gate had no room for. A first absence
+ * now pays a real, bounded amount instead of zero.
+ */
+export const OFFLINE_THIN_SAMPLE_SECONDS = 120
+/** How much absence a thin sample may be projected across. One hour: enough to feel like
+ *  a reward, too little for a noisy rate to distort the economy. */
+export const OFFLINE_THIN_SAMPLE_CAP_SECONDS = 3600
+
+// ── The Watch ────────────────────────────────────────────────────────────────
+// The offline budget, made into a thing the player can see and act on.
+//
+// It always existed — `OFFLINE_CAP_HOURS` — but invisibly: nothing in the UI said how long
+// the hero would keep going, or that the last absence had run out hours before you came
+// back. A resource nobody can see cannot motivate anything, which is why it never did.
+//
+// Three ways to have more of it, and they are deliberately different KINDS of thing:
+//   • the free base, which is generous and binds on almost nobody;
+//   • `long_watch`, a permanent upgrade bought with earned gold (data/upgrades.ts);
+//   • a BANKED extension, bought per-trip with gold, consumed by the absence that uses it.
+// The bank is the new one, and it is the sink for the specific moment the other two cannot
+// serve: "I am going away for the weekend and I want the hero to still be there."
+/** Ceiling on banked extension. Without one, gold late-game buys effectively infinite
+ *  absence and the cap stops meaning anything at all. */
+export const WATCH_BANK_CAP_HOURS = 24
+/** How much one purchase adds. */
+export const WATCH_EXTEND_HOURS = 2
+/** Opening price of a 2-hour extension, and the same geometric ladder the standing
+ *  upgrades use — so the tenth trip costs what the tenth rank of anything else costs, and
+ *  banking to the ceiling is a real decision rather than a rounding error. Resets as the
+ *  bank drains, because the price is a function of what is currently banked. */
+export const WATCH_EXTEND_BASE_COST = 1500
 
 // ── XP Curve ────────────────────────────────────────────────────────────────
 // xpForLevel(n) = BASE * n^EXPONENT

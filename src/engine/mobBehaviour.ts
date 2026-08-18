@@ -109,8 +109,43 @@ export function aggroRadiusFor(mob: Pick<MobInstance, 'name' | 'isBoss'>): numbe
 //
 // So: change these numbers, and the renderer follows. Never hardcode a gap beside them.
 export const MELEE_ATTACK_RANGE = 1.0
-/** A caster's reach — owner's call, two tiles. */
+/** A ranged MOB's reach — owner's call, two tiles. Deliberately not the hero's number:
+ *  see `HERO_RANGED_ATTACK_RANGE`. */
 export const RANGED_ATTACK_RANGE = 2.0
+/**
+ * A caster HERO's reach — 3.5× melee, owner's call.
+ *
+ * Split from `RANGED_ATTACK_RANGE` rather than raised with it, because the two numbers
+ * answer opposite questions and only one of them was wrong. At two tiles a caster stood
+ * one tile further out than a warrior, which is not a playstyle, it is a rounding error —
+ * the class reads as melee that throws. Raising the shared constant instead would have
+ * handed every archer and shaman in the game the same 75% reach increase, turning a
+ * caster fix into a difficulty change nobody asked for.
+ *
+ * `restGapFor` derives the renderer's parking distance from whichever range it is handed,
+ * so the bodies follow this without a second number to keep in step.
+ */
+export const HERO_RANGED_ATTACK_RANGE = 3.5
+
+/**
+ * How long a thrown bolt is in the air, in REAL seconds.
+ *
+ * Shared, because two clocks have to agree on it or the fix it exists for comes back: the
+ * renderer flies the orb over this long, and the store holds the target's HP for exactly
+ * the same window so the bar drops when the orb lands rather than when it leaves the hand.
+ * A second copy of this number in either place is a desync waiting to happen — the same
+ * failure `restGapFor` and `attackRangeOf` were consolidated to prevent.
+ *
+ * Real seconds specifically: the renderer's own `dt` stops during hit-stop, and a bolt that
+ * freezes while the store keeps counting would land early.
+ */
+export const PROJECTILE_FLIGHT_SECONDS = 0.72
+
+/** Does this class throw its blows rather than swing them? One answer, asked by the store
+ *  (which holds the damage) and the renderer (which draws the orb). */
+export function heroThrowsProjectile(playerClass: string): boolean {
+  return playerClass === 'mage' || playerClass === 'warlock'
+}
 
 /**
  * Where the renderer should PARK a mob of each kind, as a per-axis gap.
@@ -137,7 +172,7 @@ export function restGapFor(attackRange: number): number {
  */
 export function heroAttackRange(playerClass: string): number {
   return playerClass === 'mage' || playerClass === 'warlock'
-    ? RANGED_ATTACK_RANGE
+    ? HERO_RANGED_ATTACK_RANGE
     : MELEE_ATTACK_RANGE
 }
 

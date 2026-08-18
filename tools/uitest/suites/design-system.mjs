@@ -1,4 +1,4 @@
-import { evaluate, enterGame } from '../cdp.mjs'
+import { evaluate, enterGame, sleep } from '../cdp.mjs'
 
 // The design system, checked where it actually resolves: in the browser.
 //
@@ -67,6 +67,17 @@ export async function run({ send, appUrl, check, note }) {
   check('no visible text resolved to a transparent colour', invisible.length === 0, invisible[0])
 
   // ── The type system holds: serif is for chrome, sans is for data ───────────
+  // The stat rows live inside the character sheet, which is the FOLDED member of the left
+  // rail's accordion by default (Zones takes the open slot — see CollapsiblePanel's
+  // `group`). Probing without opening it found no stat row at all and reported the type
+  // system broken, which is the failure mode of asserting against whatever happens to be on
+  // screen rather than against the thing named in the assertion.
+  await evaluate(send, `(() => {
+    const head = [...document.querySelectorAll('.collapsible-toggle')]
+      .find(b => /Warrior|Mage|Warlock|Rogue/i.test(b.textContent || ''));
+    if (head && head.getAttribute('aria-expanded') === 'false') head.click();
+  })()`)
+  await sleep(400)
   const type = await evaluate(send, `(() => {
     const face = el => getComputedStyle(el).fontFamily.split(',')[0].replace(/["']/g, '');
     const statRow = [...document.querySelectorAll('.rp-glass span')]

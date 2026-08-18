@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { WardrobePanel } from './WardrobePanel'
 import { LadderModal } from './LadderPanel'
 import { GameMenu } from './GameMenu'
+import { SpriteIcon } from '../ui/SpriteIcon'
 
 // Account-level navigation for the left rail: how you look, who else is out there, and the
 // way back to character select.
@@ -35,7 +36,10 @@ export function HeroBar() {
         aria-label="Menu — character select"
         aria-haspopup="dialog"
       >
-        ☰
+        {/* The sprite, not the '☰' character. It is the same hamburger the mobile dock and
+            the rail's collapsed chip now draw, and a font glyph beside pixel icons reads
+            wrong at this size — different weight, different grid, system font. */}
+        <SpriteIcon ui="menu" size={15} />
       </button>
       <button
         className="rp-button hero-bar-btn"

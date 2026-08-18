@@ -128,14 +128,26 @@ reg('icon/base', paletteFromHex([
   '#2e7a34', '#e0b028', '#a050e0',            // 13 nature-green · 14 treasure-gold · 15 arcane-purple
 ]))
 
-// ── FX: full-body flash palettes (swap in for ~100ms on hit/heal — pure palette trick) ──
-const flash = (hex: string) => {
-  const o: Partial<Record<number, string>> = {}
-  for (let s = 1; s < 16; s++) o[s] = hex
-  return o
-}
-reg('fx/hitflash', composePalette(BASE_UNIT, flash('#f4f0e8')))
-reg('fx/healflash', composePalette(BASE_UNIT, flash('#8ce88c')))
+// ── FX: flash palettes (swapped in for ~100ms on hit/heal — pure palette trick) ──
+//
+// These used to set EVERY slot 1–15 to one colour, which is not a flash, it is a
+// silhouette: for the duration the sprite stopped being a sprite and became a solid white
+// (or green) cut-out of itself. In a fight with several combatants landing blows at once,
+// most of the screen was blank shapes — you could not see who was hitting whom, or what
+// anything was, precisely at the moment you most wanted to.
+//
+// A MIX instead of a replacement. Every slot moves 20% toward the flash colour, so the
+// whole body brightens together — reading unmistakably as an impact — while the armour,
+// the weapon and the silhouette detail all survive it. `ambientMix` is the same function
+// the biome atmosphere uses, for the same reason: mixing moves hue and value together,
+// which is what light actually does to a thing it lands on.
+//
+// 0.2 is deliberately low. The flash is not carrying the hit on its own — hit-stop, the
+// impact ring, the lunge and the damage floater are all firing on the same frame, and the
+// flash only has to say WHICH body was struck.
+const FLASH_MIX = 0.2
+reg('fx/hitflash', ambientMix(BASE_UNIT, 0xf4, 0xf0, 0xe8, FLASH_MIX))
+reg('fx/healflash', ambientMix(BASE_UNIT, 0x8c, 0xe8, 0x8c, FLASH_MIX))
 
 // ── Spell schools: effect rigs read only the accent channel (13–15) ──────────
 reg('spell/fire', composePalette(BASE_UNIT, { 13: '#c83c14', 14: '#f47820', 15: '#ffd23c' }))
@@ -315,6 +327,73 @@ reg('prop/barren', paletteFromHex([
   '#3a2a2a', '#583838', '#7a5050', '#e86030', // 9–12 dark + ember accent
   '#4c4c54', '#74747e', '#a4a4b0',            // 13–15 charred stone
 ]))
+
+// ── Per-biome prop palettes ───────────────────────────────────────────────────
+// `prop/verdant` and `prop/barren` above are two palettes covering twelve zones, and it
+// shows most on the landmarks: a ruined arch is the same slab of neutral grey in the
+// bloodfields, the gloom and the venom hollows, sitting on ground that is red, violet and
+// sickly green respectively. Stone that ignores its own geology reads as a sprite pasted
+// onto a biome rather than as something quarried out of it.
+//
+// So each biome gets its own prop palette, built by pulling the base prop ramps PART OF
+// THE WAY toward that biome's own ramps. Not all the way, deliberately — going the whole
+// distance is just using the ground palette, which is what props avoid so they do not
+// camouflage into the terrain they stand on (the original reason prop palettes exist).
+// Half-way keeps the hue of the zone and the value separation of a prop.
+//
+// Per-channel strength, because the channels are not equally safe to move:
+//   13-15 stone   0.58 — the whole point. Bloodfields granite, gloom slate, ashfire basalt.
+//   5-8  foliage  0.50 — ivy and moss belong to the local flora.
+//   1-4  wood     0.38 — timber is felled, not grown in place; it drifts less than leaves.
+//   9-12 accent   0     — the LIT channel. Lamplight and forge-glow are the one thing that
+//                         must not take the local colour, or a window stops reading as lit.
+// After mixing, 13 is darkened and 15 lightened a touch, because mixing toward a mid-value
+// biome ramp compresses the stone's own contrast — and contrast is what keeps a tower's
+// silhouette legible against a cliff of nearly the same hue.
+const PROP_MIX: readonly (readonly [slots: readonly number[], k: number])[] = [
+  [[13, 14, 15], 0.58],
+  [[5, 6, 7, 8], 0.50],
+  [[1, 2, 3, 4], 0.38],
+]
+
+/** Mix two packed slots and return the hex `composePalette` wants. */
+function mixSlot(a: number, b: number, k: number, lift = 0): string {
+  const ch = (c: number, s: number) => (c >> s) & 0xff
+  const cl = (v: number) => Math.max(0, Math.min(255, Math.round(v)))
+  const m = (s: number) => cl((ch(a, s) + (ch(b, s) - ch(a, s)) * k) * (1 + lift))
+  const hex = (v: number) => v.toString(16).padStart(2, '0')
+  return `#${hex(m(0))}${hex(m(8))}${hex(m(16))}`
+}
+
+function propPalette(baseId: 'prop/verdant' | 'prop/barren', biomeId: string): Palette {
+  const base = REGISTRY.get(baseId)!
+  const biome = REGISTRY.get(biomeId)
+  if (!biome) return base
+  const o: Record<number, string> = {}
+  for (const [slots, k] of PROP_MIX) {
+    for (const s of slots) {
+      // Only the ends of the stone ramp get the contrast lift; the mid stays put so the
+      // ramp keeps an even perceptual step.
+      const lift = s === 13 ? -0.10 : s === 15 ? 0.10 : 0
+      o[s] = mixSlot(base[s], biome[s], k, lift)
+    }
+  }
+  return composePalette(base, o)
+}
+
+// Which base each biome starts from — living foliage and brown timber, or dead scrub and
+// grey deadwood. This table used to live in combatAdapter as `BARREN_SCENERY`; it is a
+// fact about palettes, so it lives with them now and the adapter just asks for an id.
+const PROP_BIOMES: readonly (readonly [biome: string, barren: boolean])[] = [
+  ['biome/meadow', false], ['biome/forest', false], ['biome/jungle', false],
+  ['biome/venom', false], ['biome/gloom', false],
+  ['biome/badlands', true], ['biome/ashfire', true], ['biome/cinder', true],
+  ['biome/wastes', true], ['biome/bloodfields', true], ['biome/maw', true],
+]
+for (const [biomeId, barren] of PROP_BIOMES) {
+  reg(`prop/${biomeId.slice('biome/'.length)}`,
+    propPalette(barren ? 'prop/barren' : 'prop/verdant', biomeId))
+}
 
 export function getPalette(id: string): Palette {
   const p = REGISTRY.get(id)

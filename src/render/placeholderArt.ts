@@ -809,6 +809,291 @@ export function makePropEntities(): Record<number, IndexedSprite> {
   }
 }
 
+// ── Landmarks ────────────────────────────────────────────────────────────────
+// The four structures that are supposed to DOMINATE a biome: the watchtower, the
+// homestead, the ruined gate, and the boss's lair.
+//
+// They were authored on the 32×48 tall-prop sheet with everything else, and at that size a
+// tower is 40px of art against a 30px hero — a watchtower shorter than the man watching
+// from it, a hut you could step over. The same mistake `makeTownBuildings` already fixed
+// once for the town square (see the note there), and the same fix: a bigger canvas.
+//
+// 64×96 on a (32, 88) feet anchor, against 24×32 / (12, 30) for a hero. So a landmark
+// stands ~3× the height of a figure, which is roughly where a silhouette stops reading as
+// an object and starts reading as architecture. Nothing else changes: the scene culls and
+// shadows off `frameW`/`frameH` (see scene.ts step 2), so a taller sprite depth-sorts and
+// occludes exactly like the small ones did — a hero still walks behind a tower.
+//
+// Ids are the SCENERY_KIND / TALL_PROP ids they replace, deliberately: every save on disk
+// already carries `scenery: [{kind: 17}, …]`, so re-authoring at a new size must not
+// renumber anything. The adapter prefers this sheet and falls back to the small one.
+//
+// Slot discipline, against both prop palettes (see palettes.ts):
+//   13–15 stone — masonry. Verdant reads cold grey; barren reads charred.
+//   1–4  wood/earth — timber, thatch, doors, barrow soil.
+//   5–8  foliage — the ivy and moss that make a ruin look old. Dry scrub when barren.
+//   12   the LIT channel, and the reason these are worth palette-indexing: it is pale
+//        blue in a verdant biome and ember-orange in a barren one, so the same window is
+//        lamplight in a meadow and furnace-glow in the wastes, from one sprite.
+
+// The last three are CANOPY trees, and they are here rather than on the small sheet for a
+// reason that is about scale rather than about landmarks: with only the 32×48 trees, every
+// living thing in a biome was the same height as every other, and a world where the tallest
+// tree and the shortest shrub agree to within a few pixels has no depth — nothing to walk
+// behind, nothing to give the hero a size. A few giants among the small ones is what makes
+// the rest read as small. They are scattered sparsely by mapGen (see BIOME_CANOPY), not
+// swapped in for the ordinary trees.
+export const LANDMARK = {
+  LAIR: 3, HUT: 17, TOWER: 18, ARCH: 19,
+  GREAT_TREE: 26, GREAT_PINE: 27, GREAT_DEADTREE: 28,
+} as const
+
+const LM_W = 64
+const LM_H = 96
+/** Frame slots are indexed by art id, so the array has to reach the highest one (28). */
+const LM_N = 29
+
+export function makeLandmarks(): Record<number, IndexedSprite> {
+  const p = new Painter(LM_W, LM_H, LM_N)
+  const L = LANDMARK
+
+  // ── 18 TOWER — a keep tower: battered plinth, tapering shaft, machicolated parapet,
+  // crenellations and a lit beacon. The tallest thing in any biome, and the one that has
+  // to read from across the screen, so its silhouette does the work: wide base, narrow
+  // shaft, wider crown.
+  p.rect(L.TOWER, 10, 78, 44, 10, 13)          // battered plinth
+  p.rect(L.TOWER, 10, 78, 8, 10, 14)           // lit face of the plinth
+  p.rect(L.TOWER, 8, 85, 48, 3, 13)            // ground course
+  p.rect(L.TOWER, 16, 26, 32, 52, 14)          // shaft
+  p.rect(L.TOWER, 16, 26, 7, 52, 15)           // lit west face
+  p.rect(L.TOWER, 44, 26, 4, 52, 13)           // shade east face
+  p.rect(L.TOWER, 14, 46, 36, 3, 15)           // string course
+  p.rect(L.TOWER, 14, 47, 36, 1, 13)
+  p.rect(L.TOWER, 29, 34, 3, 7, 1)             // arrow slits
+  p.rect(L.TOWER, 29, 58, 3, 7, 1)
+  p.px(L.TOWER, 30, 35, 12); p.px(L.TOWER, 30, 59, 12)   // torchlight behind them
+  p.rect(L.TOWER, 12, 22, 40, 5, 15)           // corbels / machicolation
+  for (let i = 0; i < 6; i++) p.rect(L.TOWER, 14 + i * 7, 27, 3, 2, 1)  // murder holes
+  p.rect(L.TOWER, 14, 14, 36, 8, 14)           // parapet wall
+  p.rect(L.TOWER, 14, 14, 5, 8, 15)
+  for (let i = 0; i < 4; i++) {                // merlons
+    p.rect(L.TOWER, 15 + i * 9, 8, 6, 7, 15)
+    p.rect(L.TOWER, 15 + i * 9, 8, 2, 7, 14)
+  }
+  p.rect(L.TOWER, 27, 3, 10, 5, 13)            // beacon brazier
+  p.rect(L.TOWER, 28, 0, 8, 3, 12)             // and its flame — the lit channel
+  p.px(L.TOWER, 31, 1, 12); p.px(L.TOWER, 33, 1, 12)
+  p.rect(L.TOWER, 27, 72, 10, 16, 1)           // door
+  p.rect(L.TOWER, 26, 69, 12, 3, 2)            // lintel
+  p.px(L.TOWER, 18, 60, 6); p.px(L.TOWER, 19, 64, 6)     // moss creeping up the base
+  p.px(L.TOWER, 17, 70, 6); p.px(L.TOWER, 21, 74, 6)
+  p.px(L.TOWER, 45, 52, 13); p.px(L.TOWER, 44, 56, 13)   // cracks
+
+  // ── 17 HUT — a longhouse, not a shed: stone ground floor, timber-framed gable under a
+  // deep thatch roof, chimney, three lit windows. The one landmark that reads as
+  // inhabited, which is what makes a meadow feel settled rather than empty.
+  p.rect(L.HUT, 8, 62, 48, 26, 14)             // stone walls
+  p.rect(L.HUT, 8, 62, 7, 26, 15)              // lit face
+  p.rect(L.HUT, 49, 62, 7, 26, 13)             // shade face
+  p.rect(L.HUT, 6, 84, 52, 4, 13)              // plinth
+  p.rect(L.HUT, 6, 84, 52, 1, 15)
+  p.rect(L.HUT, 12, 44, 40, 18, 3)             // timber-framed gable
+  for (let i = 0; i < 5; i++) p.rect(L.HUT, 14 + i * 9, 44, 2, 18, 1)
+  p.rect(L.HUT, 12, 44, 40, 2, 4)
+  p.rect(L.HUT, 4, 38, 56, 7, 2)               // eaves — the overhang sells the roof
+  p.rect(L.HUT, 4, 38, 56, 2, 3)
+  p.rect(L.HUT, 8, 24, 48, 14, 4)              // thatch, lower course
+  p.rect(L.HUT, 8, 30, 48, 1, 3)
+  p.rect(L.HUT, 17, 16, 30, 9, 3)              // thatch, upper course
+  p.rect(L.HUT, 25, 11, 14, 6, 4)              // ridge
+  p.rect(L.HUT, 43, 8, 9, 17, 13)              // chimney
+  p.rect(L.HUT, 43, 8, 3, 17, 14)
+  p.rect(L.HUT, 41, 5, 13, 4, 15)              // chimney cap
+  p.rect(L.HUT, 27, 70, 11, 18, 1)             // door
+  p.rect(L.HUT, 27, 70, 3, 18, 2)
+  p.rect(L.HUT, 25, 67, 15, 3, 2)              // door lintel
+  p.rect(L.HUT, 14, 68, 9, 8, 12)              // lit windows, ground floor
+  p.rect(L.HUT, 41, 68, 9, 8, 12)
+  p.rect(L.HUT, 28, 50, 9, 7, 12)              // lit window, gable
+  p.px(L.HUT, 10, 78, 6); p.px(L.HUT, 12, 82, 6)         // moss at the footings
+  p.px(L.HUT, 53, 80, 6)
+
+  // ── 19 ARCH — a ruined gate: two massive piers, a span broken open on one side, a
+  // keystone still hanging, rubble at the feet, ivy taking it back. Reads as "something
+  // was here before you", which is the whole job of a ruin in a biome.
+  p.rect(L.ARCH, 5, 30, 16, 58, 14)            // west pier
+  p.rect(L.ARCH, 5, 30, 5, 58, 15)             // lit edge
+  p.rect(L.ARCH, 18, 30, 3, 58, 13)            // shade edge
+  p.rect(L.ARCH, 43, 30, 16, 58, 14)           // east pier
+  p.rect(L.ARCH, 43, 30, 4, 58, 15)
+  p.rect(L.ARCH, 56, 30, 3, 58, 13)
+  p.rect(L.ARCH, 3, 84, 20, 4, 13)             // pier bases
+  p.rect(L.ARCH, 41, 84, 20, 4, 13)
+  p.rect(L.ARCH, 5, 20, 38, 10, 15)            // span — stops short of the east pier
+  p.rect(L.ARCH, 5, 20, 38, 3, 14)
+  p.rect(L.ARCH, 43, 24, 8, 6, 15)             // the surviving stub, stepped down
+  p.rect(L.ARCH, 26, 15, 12, 6, 15)            // keystone
+  p.rect(L.ARCH, 26, 15, 12, 2, 14)
+  // Voussoirs curving into the opening, so the arch reads as an arch rather than a lintel.
+  p.rect(L.ARCH, 21, 30, 5, 6, 14); p.rect(L.ARCH, 26, 30, 5, 4, 14)
+  p.rect(L.ARCH, 38, 30, 5, 6, 14); p.rect(L.ARCH, 33, 30, 5, 4, 14)
+  p.rect(L.ARCH, 21, 30, 22, 2, 15)
+  p.rect(L.ARCH, 1, 82, 7, 6, 13)              // rubble
+  p.rect(L.ARCH, 56, 80, 7, 8, 13)
+  p.rect(L.ARCH, 24, 85, 6, 3, 13)
+  p.px(L.ARCH, 8, 40, 6); p.px(L.ARCH, 9, 46, 6); p.px(L.ARCH, 7, 52, 6)   // ivy, west pier
+  p.px(L.ARCH, 10, 58, 6); p.px(L.ARCH, 8, 64, 6); p.px(L.ARCH, 11, 70, 6)
+  p.px(L.ARCH, 46, 62, 6); p.px(L.ARCH, 48, 68, 6)                          // and east
+  p.px(L.ARCH, 19, 44, 13); p.px(L.ARCH, 44, 50, 13)                        // cracks
+
+  // ── 3 LAIR — the boss's front door. A barrow maw between two standing stones, teeth of
+  // bone, a skull totem over it and a light on inside. This one is a NODE marker rather
+  // than scenery: it is the thing the objective tracker is pointing at, so it has to be
+  // findable from a distance and unmistakable when you get there.
+  p.rect(L.LAIR, 4, 56, 56, 32, 1)             // barrow mound
+  p.rect(L.LAIR, 8, 50, 48, 8, 2)
+  p.rect(L.LAIR, 16, 46, 32, 6, 2)
+  p.rect(L.LAIR, 2, 84, 60, 4, 1)              // spoil at the base
+  p.rect(L.LAIR, 20, 60, 24, 28, 1)            // the maw — void, not shadow
+  p.rect(L.LAIR, 20, 60, 24, 3, 13)            // lintel stone over it
+  p.rect(L.LAIR, 22, 74, 20, 12, 12)           // light from inside
+  p.rect(L.LAIR, 24, 78, 16, 8, 12)
+  for (let i = 0; i < 5; i++) {                // bone teeth, upper and lower
+    p.rect(L.LAIR, 22 + i * 5, 63, 2, 4, 15)
+    p.rect(L.LAIR, 24 + i * 5, 82, 2, 4, 15)
+  }
+  p.rect(L.LAIR, 5, 40, 11, 44, 14)            // west standing stone
+  p.rect(L.LAIR, 5, 40, 4, 44, 15)
+  p.rect(L.LAIR, 5, 40, 11, 3, 15)
+  p.rect(L.LAIR, 48, 34, 11, 50, 14)           // east standing stone, taller
+  p.rect(L.LAIR, 48, 34, 4, 50, 15)
+  p.rect(L.LAIR, 48, 34, 11, 3, 15)
+  p.rect(L.LAIR, 7, 46, 7, 3, 12)              // warding fires on both stones
+  p.rect(L.LAIR, 50, 40, 7, 3, 12)
+  p.rect(L.LAIR, 24, 22, 16, 16, 15)           // skull totem
+  p.rect(L.LAIR, 26, 38, 12, 5, 15)            // jaw
+  p.rect(L.LAIR, 27, 27, 4, 5, 1)              // sockets
+  p.rect(L.LAIR, 33, 27, 4, 5, 1)
+  p.px(L.LAIR, 28, 29, 12); p.px(L.LAIR, 34, 29, 12)     // and what is looking out of them
+  p.rect(L.LAIR, 30, 33, 4, 3, 1)              // nasal
+  p.rect(L.LAIR, 31, 16, 2, 6, 2)              // the stake it is mounted on
+  p.rect(L.LAIR, 22, 20, 20, 2, 2)             // crossbar
+  p.px(L.LAIR, 20, 21, 2); p.px(L.LAIR, 43, 21, 2)
+
+  // ── 26 GREAT_TREE — a canopy oak. Root flare, a trunk thick enough to hide behind, and
+  // a crown that spills past the tile it stands on. Lit from the upper-left like every
+  // other sprite in the game, so it sits in the same imagined light.
+  p.rect(L.GREAT_TREE, 19, 80, 26, 8, 1)       // root flare
+  p.rect(L.GREAT_TREE, 15, 84, 34, 4, 1)
+  p.rect(L.GREAT_TREE, 19, 80, 8, 8, 2)        // lit side of the roots
+  p.rect(L.GREAT_TREE, 26, 44, 12, 40, 2)      // trunk
+  p.rect(L.GREAT_TREE, 26, 44, 4, 40, 3)       // lit face
+  p.rect(L.GREAT_TREE, 35, 44, 3, 40, 1)       // shade face
+  p.px(L.GREAT_TREE, 31, 58, 1); p.px(L.GREAT_TREE, 32, 66, 1)   // bark
+  for (let i = 0; i < 7; i++) {                // boughs forking into the crown
+    p.rect(L.GREAT_TREE, 25 - i, 46 - i, 3, 3, 2)
+    p.rect(L.GREAT_TREE, 37 + i, 48 - i, 3, 3, 2)
+  }
+  p.rect(L.GREAT_TREE, 6, 20, 52, 20, 6)       // crown — widest band
+  p.rect(L.GREAT_TREE, 10, 12, 44, 9, 6)
+  p.rect(L.GREAT_TREE, 18, 6, 28, 7, 7)        // top, catching the light
+  p.rect(L.GREAT_TREE, 12, 39, 40, 9, 5)       // underside, in shade
+  p.rect(L.GREAT_TREE, 18, 46, 28, 5, 5)
+  p.rect(L.GREAT_TREE, 6, 20, 16, 14, 7)       // lit upper-left shoulder
+  p.rect(L.GREAT_TREE, 44, 26, 14, 14, 5)      // shaded lower-right
+  p.px(L.GREAT_TREE, 20, 10, 8); p.px(L.GREAT_TREE, 28, 8, 8); p.px(L.GREAT_TREE, 14, 24, 8)
+  p.px(L.GREAT_TREE, 34, 14, 8); p.px(L.GREAT_TREE, 10, 30, 8); p.px(L.GREAT_TREE, 40, 20, 8)
+  p.px(L.GREAT_TREE, 24, 44, 5); p.px(L.GREAT_TREE, 42, 43, 5)
+  // Round the crown. The bands above are drawn as rectangles because rectangles are how
+  // you lay in volume and shading cheaply — but a stack of them reads as a stack of them,
+  // and the one silhouette in the game that has to say "tree" from across the screen
+  // cannot be a box. Clipping to an ellipse afterwards keeps the internal shading and
+  // fixes the outline, and it only touches FOLIAGE slots, so the trunk and the boughs
+  // running out through the crown survive the pass.
+  {
+    const cx = 32, cy = 27, rx = 27.5, ry = 22.5
+    const base = L.GREAT_TREE * LM_W * LM_H
+    for (let y = 2; y <= 46; y++) {
+      for (let x = 0; x < LM_W; x++) {
+        const s = p.data[base + y * LM_W + x]
+        if (s < 5 || s > 8) continue
+        const nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry
+        if (nx * nx + ny * ny > 1) p.px(L.GREAT_TREE, x, y, 0)
+      }
+    }
+  }
+
+  // ── 27 GREAT_PINE — a spire conifer. Five skirts, each stepped in and lit on the
+  // left edge, which is what makes a stack of rectangles read as a tree.
+  p.rect(L.GREAT_PINE, 28, 56, 8, 32, 2)       // trunk
+  p.rect(L.GREAT_PINE, 28, 56, 3, 32, 3)
+  p.rect(L.GREAT_PINE, 22, 84, 20, 4, 1)       // root spread
+  // Each skirt is a TRAPEZOID, not a rectangle: narrow where it meets the trunk, widest at
+  // its lower lip. Rectangles stack into a ziggurat; a taper per row is what makes five
+  // stacked shapes read as one conifer.
+  const skirt = (y: number, h: number, halfW: number, dark: number, lit: number) => {
+    for (let i = 0; i < h; i++) {
+      const w = Math.max(2, Math.round(halfW * (0.42 + 0.58 * (i / (h - 1)))))
+      p.rect(L.GREAT_PINE, 32 - w, y + i, w * 2, 1, i >= h - 2 ? 5 : dark)
+      if (i < h - 2) p.rect(L.GREAT_PINE, 32 - w, y + i, w, 1, lit)  // lit west half
+    }
+  }
+  skirt(50, 12, 25, 6, 7)
+  skirt(38, 12, 21, 6, 7)
+  skirt(27, 11, 17, 6, 7)
+  skirt(17, 10, 13, 7, 8)
+  skirt(8, 9, 8, 7, 8)
+  p.rect(L.GREAT_PINE, 30, 2, 4, 6, 8)         // tip
+  p.px(L.GREAT_PINE, 31, 0, 8)
+  p.px(L.GREAT_PINE, 20, 44, 8); p.px(L.GREAT_PINE, 42, 33, 8); p.px(L.GREAT_PINE, 26, 22, 8)
+
+  // ── 28 GREAT_DEADTREE — the barren biomes' canopy: a huge forked skeleton. Same
+  // footprint as the oak so a dead forest has the same rhythm as a living one, but the
+  // silhouette is all gaps, which is what makes an ash waste feel picked clean.
+  p.rect(L.GREAT_DEADTREE, 18, 80, 28, 8, 1)   // root flare
+  p.rect(L.GREAT_DEADTREE, 14, 85, 36, 3, 1)
+  p.rect(L.GREAT_DEADTREE, 26, 30, 12, 54, 2)  // trunk
+  p.rect(L.GREAT_DEADTREE, 26, 30, 4, 54, 3)   // lit face
+  p.rect(L.GREAT_DEADTREE, 35, 30, 3, 54, 1)   // shade face
+  // Limbs: stepped diagonals, each thinning as it climbs, with a broken stub or two.
+  for (let i = 0; i < 12; i++) {
+    p.rect(L.GREAT_DEADTREE, 25 - i * 2, 40 - i, 3, 3, 2)          // long west limb
+    if (i < 9) p.rect(L.GREAT_DEADTREE, 38 + i * 2, 34 - i, 3, 3, 2) // east limb
+    if (i < 6) p.rect(L.GREAT_DEADTREE, 30 - i, 28 - i * 3, 3, 4, 2) // crown fork, west
+    if (i < 6) p.rect(L.GREAT_DEADTREE, 33 + i, 26 - i * 3, 3, 4, 2) // crown fork, east
+  }
+  for (let i = 0; i < 5; i++) {                // side twigs off the west limb
+    p.rect(L.GREAT_DEADTREE, 15 - i, 32 - i * 2, 2, 2, 1)
+    p.rect(L.GREAT_DEADTREE, 47 + i, 28 - i * 2, 2, 2, 1)
+  }
+  p.rect(L.GREAT_DEADTREE, 8, 44, 6, 2, 1)     // a snapped-off stub
+  p.px(L.GREAT_DEADTREE, 30, 50, 1); p.px(L.GREAT_DEADTREE, 32, 62, 1)  // splits in the bark
+  p.px(L.GREAT_DEADTREE, 29, 70, 1)
+
+  const still = (frame: number) => ({
+    se: { frames: [frame], fps: 1, loop: true },
+    ne: { frames: [frame], fps: 1, loop: true },
+  })
+  const slice = (f: number, id: string): IndexedSprite => {
+    const indices = new Uint8Array(LM_W * LM_H)
+    indices.set(p.data.subarray(f * LM_W * LM_H, (f + 1) * LM_W * LM_H))
+    return {
+      id, frameW: LM_W, frameH: LM_H, cols: 1, frameCount: 1, indices,
+      anchor: { x: 32, y: 88 },
+      animations: { idle: still(0), walk: still(0), attack: still(0), hit: still(0) },
+    }
+  }
+  return {
+    [L.LAIR]:  slice(L.LAIR,  'props/landmark/lair'),
+    [L.HUT]:   slice(L.HUT,   'props/landmark/hut'),
+    [L.TOWER]: slice(L.TOWER, 'props/landmark/tower'),
+    [L.ARCH]:  slice(L.ARCH,  'props/landmark/arch'),
+    [L.GREAT_TREE]:     slice(L.GREAT_TREE,     'props/landmark/greattree'),
+    [L.GREAT_PINE]:     slice(L.GREAT_PINE,     'props/landmark/greatpine'),
+    [L.GREAT_DEADTREE]: slice(L.GREAT_DEADTREE, 'props/landmark/greatdeadtree'),
+  }
+}
+
 // ── Town buildings ───────────────────────────────────────────────────────────
 // A separate, larger canvas from the tall-prop sheet: 64x80 on a (32,72) feet anchor,
 // against 24x32 for a hero. Authored at the tall-prop 32x48 these came out barely a head

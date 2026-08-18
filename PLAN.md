@@ -309,10 +309,14 @@ three palettes, before any batch work.
 
 ### Principles
 
-1. **Art is the product.** The long-term promise is every sprite/tile/item hand-drawn.
-   Monetization sells the art and its scarcity — not power, not progress relief from
-   artificial pain. This keeps App Store review clean, age rating low, and the "Best
-   Game / Design" judging story coherent.
+1. ~~**Art is the product.**~~ **AMENDED 2026-08-17 — see "The Watch" below.** The
+   original rule was: monetization sells the art and its scarcity, not power and not
+   progress relief. It was written when the hand-drawn art was expected to land before
+   launch. It has not: `placeholderArt.ts` is still programmatic, `ORIGINAL_SPRITE` still
+   pools 47 roster keys onto 21 sheets, and Track P (the PvP display case) is unbuilt — so
+   a cosmetic-only economy would be selling palette swaps of placeholder rigs to an
+   audience of one. Art remains the long-term promise and the premium tier; it cannot be
+   the launch SKU. Idle players convert on time, not on skins.
 2. **No gambling at launch.** Direct purchase only — you see exactly the palette/skin
    you're buying. Skips Apple/Google loot-box odds-disclosure requirements entirely,
    avoids regional gacha restrictions (e.g. Benelux), and keeps the age rating down.
@@ -322,6 +326,31 @@ three palettes, before any batch work.
    in-game.
 4. **Free to download, no forced ads.** Idle players expect F2P; interstitial ads would
    cheapen the art identity. Optional rewarded ads are a later experiment, not a pillar.
+
+### The Watch — the launch SKU (added 2026-08-17)
+
+Offline time, made visible and sellable. The mechanic already existed as
+`OFFLINE_CAP_HOURS` and was never once shown to the player, which is why it motivated
+nothing.
+
+- **Free tier stays generous — 8h, unchanged.** It sits on the sleep/workday boundary, so
+  a twice-daily player loses ~nothing and a once-daily player captures 8 of 24. The
+  pressure is already there; it was not manufactured. We are selling MORE, not relief.
+- **`long_watch`** — permanent, bought with earned gold. Unchanged, pre-existing.
+- **Banked extension** — gold, per-trip, consumed by the absence that uses it
+  (`extendWatch`). The early gold sink the 2026-08-08 audit asked for, aimed at the one
+  moment the permanent upgrades cannot serve: "I am away for the weekend."
+- **Standing Orders** — the real-money SKU. +8h permanently. **One-time, not a consumable
+  and not a currency**, which keeps principle 3 (real-money pricing, no opaque gem
+  currency) fully intact and stays clear of the EU regulatory direction. No gem ledger,
+  nothing to top up, nothing to run out of.
+- **A single local notification** when the watch ends. Not a drip, not a daily nag.
+
+Also fixed alongside it, because you cannot sell relief from a bug: offline had **no level
+ceiling** (it would grant up to 200 levels and strand a hero above their unlocked content
+— now bounded by `offlineLevelCeiling`), and `OFFLINE_MIN_MEASURED_SECONDS = 120` meant a
+new player's **first absence paid literally nothing** (now 30s, with thin samples clamped
+to a 1h projection window instead of being refused outright).
 
 ### Architecture → SKU map (why this renderer is the monetization engine)
 

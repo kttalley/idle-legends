@@ -23,7 +23,8 @@ const ensureDock = (label, openSelector) => `(() => {
   const b = [...document.querySelectorAll('.app-dock-btn')].find(x => /${label}/i.test(x.textContent));
   if (!b) return 'missing'; b.click(); return 'clicked';
 })()`
-const ensureHeroDrawer = ensureDock('Hero', '.app-sidebar-left.panel-open')
+// The dock button is captioned 'Menu' now (it opens the menu rail); it was 'Hero'.
+const ensureHeroDrawer = ensureDock('Menu', '.app-sidebar-left.panel-open')
 
 /** A real press at a viewport point, for exercising outside-dismissal. */
 const pressAt = (x, y) => `(() => {

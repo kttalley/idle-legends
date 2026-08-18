@@ -1,7 +1,11 @@
 import {
   OFFLINE_CAP_HOURS, TICK_RATE_MS, ITEM_DROP_CHANCE,
   OFFLINE_MIN_SECONDS, OFFLINE_RATE_WINDOW_SECONDS, OFFLINE_MIN_MEASURED_SECONDS,
+  OFFLINE_THIN_SAMPLE_SECONDS, OFFLINE_THIN_SAMPLE_CAP_SECONDS, GREY_LEVEL_GAP,
+  WATCH_EXTEND_HOURS, WATCH_EXTEND_BASE_COST,
 } from '../data/constants'
+import { UPGRADE_COST_GROWTH } from '../data/upgrades'
+import { ZONES } from '../data/zones'
 import { GATHER_SECONDS, GATHER_YIELD, purityToQuality } from './crafting'
 import type { GameState, Item, QualityTier, Slot } from '../data/types'
 import { generateItem } from '../data/items'
@@ -18,10 +22,16 @@ export interface OfflineSummary {
   cappedAt: number | null  // if capped, the cap in seconds
 }
 
-export function calculateOfflineTime(lastTimestamp: number, extraHours = 0): OfflineSummary {
+export function calculateOfflineTime(
+  lastTimestamp: number, extraHours = 0, extraSeconds = 0,
+): OfflineSummary {
   const now = Date.now()
   const rawMs = now - lastTimestamp
-  const capMs = (OFFLINE_CAP_HOURS + extraHours) * 60 * 60 * 1000
+  // `extraHours` is PERMANENT capacity (the free base, `long_watch` ranks, a unique, the
+  // watch pack); `extraSeconds` is the BANKED extension, which the absence consumes. They
+  // are added the same way here and told apart by the caller, which is what decides how
+  // much of the bank to spend.
+  const capMs = (OFFLINE_CAP_HOURS + extraHours) * 60 * 60 * 1000 + extraSeconds * 1000
 
   const effectiveMs = Math.min(rawMs, capMs)
   const secondsElapsed = Math.floor(effectiveMs / 1000)
@@ -152,6 +162,17 @@ export interface OfflineReport {
   /** Gold inside `gold` that came from the factor and from scrapping, for the summary. */
   soldGold: number
   salvagedGold: number
+  /** The absence hit the content ceiling — the hero has out-levelled everything they have
+   *  unlocked, and the surplus XP was dropped. The UI turns this into a nudge to go open
+   *  the next region rather than leaving it as unexplained missing progress. */
+  cappedByContent: boolean
+  /** Level the ceiling sat at, for that message. */
+  contentCeiling: number
+  /** Banked watch this absence consumed, in seconds. 0 when the free cap covered it, which
+   *  is the overwhelmingly common case and is meant to be. */
+  watchSpent: number
+  /** Banked watch still in hand afterwards. */
+  watchRemaining: number
 }
 
 export interface OfflineOutcome {
@@ -160,6 +181,37 @@ export interface OfflineOutcome {
 }
 
 const ALL_SLOTS: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket']
+
+/**
+ * The highest level an ABSENCE may take a hero to.
+ *
+ * Offline had no ceiling at all: the loop below would grant up to 200 levels in one
+ * projection. Zone unlocks are computed only in the live tick, so a long absence could
+ * hand back a hero fifteen levels above a region whose successor is still locked — massively
+ * over-levelled for the only content they can actually reach, every enemy in range grey
+ * (see GREY_LEVEL_GAP, which then pays them nothing), and no way forward but to grind a
+ * zone that has stopped teaching them anything. Unbounded offline levelling does not
+ * accelerate the game; it walks the player off the end of it.
+ *
+ * So an absence may carry you to the top of the content you have OPENED, plus the same
+ * grey-mob margin the live game already uses, and no further. Unlocking the next region is
+ * something you come back and do.
+ *
+ * Deliberately generous rather than tight: it binds only on a hero who was already near the
+ * ceiling of their unlocked world, which is exactly the hero for whom levelling further is
+ * meaningless anyway.
+ */
+export function offlineLevelCeiling(state: GameState): number {
+  let top = 0
+  for (const zoneId of state.unlockedZones ?? []) {
+    const band = ZONES[zoneId]?.levelRange
+    if (band) top = Math.max(top, band[1])
+  }
+  // No zone data (a corrupt or very old save) must not mean "no progress" — fall back to
+  // letting the hero keep what they have rather than clamping them backwards.
+  if (top <= 0) return Number.MAX_SAFE_INTEGER
+  return top + GREY_LEVEL_GAP
+}
 
 /**
  * Project a stretch of absence onto the hero, and return the state patch plus a report.
@@ -174,7 +226,17 @@ const ALL_SLOTS: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket'
  * play to extrapolate from honestly. Guessing a rate for a hero who has barely fought would
  * be inventing progress rather than continuing it.
  */
-export function projectOfflineProgress(state: GameState, now: number): OfflineOutcome | null {
+export function projectOfflineProgress(
+  state: GameState,
+  now: number,
+  opts: {
+    /** Permanent offline hours from a purchased entitlement. Passed IN rather than read
+     *  here, because this module also runs in the headless economy sim, which has neither
+     *  a DOM nor RevenueCat — and because an engine that reaches for a billing SDK is an
+     *  engine you cannot test. */
+    purchasedWatchHours?: number
+  } = {},
+): OfflineOutcome | null {
   const rates = state.offlineRates
   if (!rates || rates.seconds < OFFLINE_MIN_MEASURED_SECONDS) return null
 
@@ -182,10 +244,23 @@ export function projectOfflineProgress(state: GameState, now: number): OfflineOu
   // Meadowwarden extends the cap alongside the Long Watch upgrade — both are "the world
   // keeps paying while you are away", so they add rather than compete.
   const uniq = compileUniques(state.equipment)
-  const elapsed = calculateOfflineTime(state.lastTickTimestamp ?? now, fx.offlineHours + uniq.offlineHours)
+  // Permanent capacity vs. the banked extension. The split matters because only the second
+  // one gets spent: an absence draws on the free base and the permanent ranks first, and
+  // dips into the bank only for the overflow.
+  const permanentHours = fx.offlineHours + uniq.offlineHours + (opts.purchasedWatchHours ?? 0)
+  const banked = Math.max(0, state.watchBonusSeconds ?? 0)
+  const elapsed = calculateOfflineTime(state.lastTickTimestamp ?? now, permanentHours, banked)
   if (elapsed.secondsElapsed < OFFLINE_MIN_SECONDS) return null
+  const permanentSeconds = (OFFLINE_CAP_HOURS + permanentHours) * 3600
+  const bankSpent = Math.max(0, Math.min(banked, elapsed.secondsElapsed - permanentSeconds))
 
-  const secs = elapsed.secondsElapsed
+  // A thin sample is trusted but not extrapolated far — see OFFLINE_THIN_SAMPLE_SECONDS.
+  // This is what lets a 45-second first session still pay for an overnight absence
+  // instead of the old all-or-nothing gate paying it nothing at all.
+  const thin = rates.seconds < OFFLINE_THIN_SAMPLE_SECONDS
+  const secs = thin
+    ? Math.min(elapsed.secondsElapsed, OFFLINE_THIN_SAMPLE_CAP_SECONDS)
+    : elapsed.secondsElapsed
   const kills = Math.floor((rates.kills / rates.seconds) * secs)
   if (kills <= 0) return null
 
@@ -201,12 +276,21 @@ export function projectOfflineProgress(state: GameState, now: number): OfflineOu
   let xp = state.xp + gainedXp
   let talentPoints = state.talentPoints
   const startLevel = level
-  // Bounded: a pathological rate cannot spin here.
-  while (xp >= xpForLevel(level) && level - startLevel < 200) {
+  const ceiling = offlineLevelCeiling(state)
+  // Bounded twice: by the content the hero has opened (see offlineLevelCeiling) and, as a
+  // backstop against a pathological rate, by an absolute step count.
+  while (xp >= xpForLevel(level) && level - startLevel < 200 && level < ceiling) {
     xp -= xpForLevel(level)
     level++
     talentPoints++
   }
+  // At the ceiling the surplus is DROPPED, not banked. Banking it would hand the player
+  // three instant level-ups the moment they reopened the app, which is the same runaway
+  // one screen later — and it would mean the ceiling silently owed them something. The
+  // report says so, so it reads as "your hero has learned all this region can teach"
+  // rather than as XP quietly going missing.
+  const cappedByContent = level >= ceiling && xp >= xpForLevel(level)
+  if (cappedByContent) xp = xpForLevel(level) - 1
 
   // ── Drops, through the real ladder ────────────────────────────────────────
   const racialPassive = RACE_DEFINITIONS[state.playerRace]?.racialPassive ?? {}
@@ -259,6 +343,7 @@ export function projectOfflineProgress(state: GameState, now: number): OfflineOu
       xp, level, talentPoints, equipment, inventory, stats,
       totalSalvaged: (state.totalSalvaged ?? 0) + salvagedGold,
       totalAutoSold: (state.totalAutoSold ?? 0) + soldGold,
+      watchBonusSeconds: banked - bankSpent,
       lastTickTimestamp: now,
     },
     report: {
@@ -268,8 +353,33 @@ export function projectOfflineProgress(state: GameState, now: number): OfflineOu
       levelsGained: level - startLevel,
       itemsEquipped: equipped, itemsSold: sold, itemsBagged: bagged, itemsSalvaged: scrapped,
       soldGold, salvagedGold,
+      cappedByContent, contentCeiling: ceiling,
+      watchSpent: bankSpent, watchRemaining: banked - bankSpent,
     },
   }
+}
+
+/**
+ * Price of the next watch extension, given what is already banked.
+ *
+ * The same geometric ladder the standing upgrades ride (`upgradeCost`), for the same
+ * reason: gold income spans orders of magnitude between level 8 and level 200, so a fixed
+ * price is free late and impossible early. Keyed on the BANK rather than on a rank count,
+ * so it falls back as the bank drains — you are always paying for the next two hours, not
+ * for the number of times you have ever bought them.
+ */
+export function watchExtendCost(bankedSeconds: number): number {
+  const steps = Math.max(0, Math.floor(bankedSeconds / 3600 / WATCH_EXTEND_HOURS))
+  return Math.round(WATCH_EXTEND_BASE_COST * Math.pow(UPGRADE_COST_GROWTH, steps))
+}
+
+/** Total capacity of the watch right now, in seconds: free base + permanent + banked. */
+export function watchCapacitySeconds(
+  state: GameState, permanentHours: number,
+): { base: number; banked: number; total: number } {
+  const base = (OFFLINE_CAP_HOURS + permanentHours) * 3600
+  const banked = Math.max(0, state.watchBonusSeconds ?? 0)
+  return { base, banked, total: base + banked }
 }
 
 export function projectGathering(secondsElapsed: number): GatherProjection {

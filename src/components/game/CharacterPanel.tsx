@@ -20,8 +20,13 @@ export function CharacterPanel() {
     // `grow` rather than `h-full`: asking for 100% height made this panel claim the whole
     // rail and squeeze Zones down to a single clipped row. Growing into leftover space
     // shares the column instead of taking it.
+    // Shares the left rail's accordion with Zones. Stats and Talents are tall enough that
+    // with both sections open neither was readable — this is the one that yields, because
+    // it is the one you open deliberately rather than glance at.
     <CollapsiblePanel
       id="character"
+      group="rail-left"
+      defaultCollapsed
       grow
       title={
         // Gold, Looks and Heroes used to share this header; they are account-level

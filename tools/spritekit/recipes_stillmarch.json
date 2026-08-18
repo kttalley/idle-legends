@@ -1,0 +1,156 @@
+[
+  {
+    "id": "ffa_dire_boar",
+    "crown": "ffa_toughskin",
+    "body": "ffa_red_panther",
+    "base": "ffa_red_panther",
+    "note": "tusked charging quadruped \u2014 Rampaging Boar"
+  },
+  {
+    "id": "ffa_carrion_bird",
+    "crown": "ffa_floateye",
+    "body": "ffa_sprite",
+    "base": "ffa_floateye",
+    "note": "winged scavenger \u2014 Plains Vulture"
+  },
+  {
+    "id": "ffa_bog_troll",
+    "crown": "ffa_toughskin",
+    "body": "ffa_malboro",
+    "base": "ffa_goblin",
+    "note": "heavy maw-headed brute \u2014 Jungle Troll"
+  },
+  {
+    "id": "ffa_grave_hound",
+    "crown": "ffa_red_panther",
+    "body": "ffa_zombie",
+    "base": "ffa_red_panther",
+    "note": "rotting beast \u2014 undead hound"
+  },
+  {
+    "id": "ffa_magma_brute",
+    "crown": "ffa_goblin",
+    "body": "ffa_bomb",
+    "base": "ffa_goblin",
+    "note": "molten-crowned bruiser \u2014 Lava Golem"
+  },
+  {
+    "id": "ffa_stone_warden",
+    "crown": "ffa_toughskin",
+    "body": "ffa_tonberry",
+    "base": "ffa_tonberry",
+    "note": "squat armoured construct \u2014 Harrowfield Golem"
+  },
+  {
+    "id": "ffa_frost_wyrm",
+    "crown": "ffa_icedrake",
+    "body": "ffa_icedrake",
+    "base": "ffa_lamia",
+    "note": "serpentine dragon \u2014 Flame/Frost Wyrm"
+  },
+  {
+    "id": "ffa_ashen_maw",
+    "crown": "ffa_malboro",
+    "body": "ffa_malboro",
+    "base": "ffa_antlion",
+    "note": "many-legged devourer \u2014 deep-zone horror"
+  },
+  {
+    "id": "ffa_rot_crawler",
+    "crown": "ffa_jelly",
+    "body": "ffa_antlion",
+    "base": "ffa_zombie",
+    "note": "gelatinous crawler \u2014 Rotting Shambler"
+  },
+  {
+    "id": "ffa_bandit_brute",
+    "crown": "ffa_gladiator",
+    "body": "ffa_warrior",
+    "base": "ffa_fighter",
+    "note": "heavy melee bandit \u2014 Bandit Warlord"
+  },
+  {
+    "id": "ffa_bone_archer",
+    "crown": "ffa_assassin",
+    "body": "ffa_archer",
+    "base": "ffa_sniper",
+    "note": "gaunt ranged undead \u2014 Skeletal Archer"
+  },
+  {
+    "id": "ffa_dune_raider",
+    "crown": "ffa_thief",
+    "body": "ffa_ninja",
+    "base": "ffa_hunter",
+    "note": "light skirmisher \u2014 Dustwind Thug"
+  },
+  {
+    "id": "ffa_iron_sentinel",
+    "crown": "ffa_defender",
+    "body": "ffa_templar",
+    "base": "ffa_paladin",
+    "note": "armoured guardian \u2014 Siege War Golem escort"
+  },
+  {
+    "id": "ffa_storm_caller",
+    "crown": "ffa_elementalist",
+    "body": "ffa_time_mage",
+    "base": "ffa_summoner",
+    "note": "elemental caster \u2014 Flame Elemental handler"
+  },
+  {
+    "id": "ffa_grim_wolfkin",
+    "crown": "ffa_beastmaster",
+    "body": "ffa_morpher",
+    "base": "ffa_gladiator",
+    "note": "feral humanoid \u2014 Grimshade Wolfkin"
+  },
+  {
+    "id": "ffa_war_deserter",
+    "crown": "ffa_soldier",
+    "body": "ffa_fencer",
+    "base": "ffa_gunner",
+    "note": "ragged ex-soldier \u2014 War Deserter"
+  },
+  {
+    "id": "ffa_chimera",
+    "crown": "ffa_tonberry",
+    "body": "ffa_antlion",
+    "base": "ffa_antlion",
+    "note": "crested insectoid \u2014 Elder Meadow Beast"
+  },
+  {
+    "id": "ffa_direwolf",
+    "crown": "ffa_red_panther",
+    "body": "ffa_icedrake",
+    "base": "ffa_red_panther",
+    "note": "draconic wolf \u2014 Grey Wolf"
+  },
+  {
+    "id": "ffa_grimjaw",
+    "crown": "ffa_malboro",
+    "body": "ffa_toughskin",
+    "base": "ffa_antlion",
+    "note": "spiked maw beast"
+  },
+  {
+    "id": "ffa_frostmonk",
+    "crown": "ffa_white_monk",
+    "body": "ffa_thief",
+    "base": "ffa_soldier",
+    "note": "hooded martial humanoid"
+  },
+  {
+    "id": "ffa_hexknight",
+    "crown": "ffa_black_mage",
+    "body": "ffa_paladin",
+    "base": "ffa_warrior",
+    "note": "armoured caster-knight"
+  },
+  {
+    "id": "ffa_bogwyrm",
+    "crown": "ffa_jelly",
+    "body": "ffa_lamia",
+    "base": "ffa_tonberry",
+    "note": "swamp serpent"
+  }
+]

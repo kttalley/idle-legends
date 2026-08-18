@@ -90,25 +90,33 @@ export function ActionBar() {
       gap: 4,
       width: '100%',
     }}>
-      {/* Main action bar panel.
-          Five labelled mode toggles plus three ability slots do not fit across 390px —
-          measured at 45px of overflow, which clipped the third ability slot off the right
-          edge. Wrapping is the answer rather than shrinking: the ability slots are the
-          primary interaction and the toggles already sit near the minimum comfortable
-          thumb target, so trimming either to buy a row that only phones need would make
-          the common case worse to serve the narrow one. On anything wider this stays a
-          single row and the rule costs nothing.
-          The extra height is free of consequence now that --actionbar-h is measured from
-          this element rather than hardcoded — the chat sheet and whisper window reserve
-          whatever the bar actually is. */}
+      {/* Main action bar panel — TWO ROWS, spells over modes.
+          They used to sit side by side, modes first, which read as "what am I doing" being
+          the primary control and put the spell panes off-centre on every screen. It is the
+          other way round: the abilities are what you press, and what you press belongs
+          under your thumb in the middle of the bar. The modes are a switch you touch once
+          a session, so they sit beneath as a footer strip — and stacking also retires the
+          390px overflow the side-by-side layout had (measured at 45px, clipping the third
+          spell pane off the right edge) without shrinking either control.
+          The extra height is free of consequence: --actionbar-h is measured from this
+          element, so the chat sheet and whisper window reserve whatever the bar actually is. */}
       <div
         className="actionbar-shell"
         style={{
           rowGap: touch ? 4 : 6,
-          gap: touch ? 5 : 8,
           padding: touch ? '5px 7px' : 6,
         }}
       >
+        {/* Ability slots — only in active combat */}
+        {gameMode === 'combat' && (
+          <>
+            <SkillBar embedded compact={touch} />
+            {/* Hairline between the two rows, inset so it reads as a division inside one
+                sheet of glass rather than a border between two panels. */}
+            <div className="actionbar-rule" />
+          </>
+        )}
+
         {/* Activity modes only.
             Town and the idle/manual toggle used to sit here too, which put five buttons
             plus three spell panes on one 390px row and forced the whole bar to wrap. They
@@ -116,7 +124,7 @@ export function ActionBar() {
             right now", while town and auto-pilot are navigation and meta. Those two moved
             onto the minimap's free corners, where the map and zoom controls already live —
             see MinimapRadar. */}
-        <div style={{ display: 'flex', gap: touch ? 3 : 4 }}>
+        <div className="actionbar-modes" style={{ gap: touch ? 4 : 5 }}>
           {(['combat', 'gathering', 'crafting'] as const).map(m => (
             <button
               key={m}
@@ -133,14 +141,6 @@ export function ActionBar() {
             </button>
           ))}
         </div>
-
-        {/* Ability slots — only in active combat */}
-        {gameMode === 'combat' && (
-          <>
-            <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--glass-hairline)' }} />
-            <SkillBar embedded compact={touch} />
-          </>
-        )}
       </div>
 
       {/* XP strip: full-bleed and flush to the very bottom edge. The old "N XP to level

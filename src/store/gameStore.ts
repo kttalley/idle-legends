@@ -26,6 +26,7 @@ import {
   SPEC_OF_TALENT, TALENT_BY_ID, talentGate, canDeallocate, totalSpent,
 } from '../data/specs'
 import { ACTIVE_ABILITIES, getClassAbilities } from '../data/abilities'
+import type { ActiveAbilityDef } from '../data/types'
 import {
   compileStats, compileTalentEffects,
   resolvePlayerAttack, resolveMobAttack,
@@ -48,6 +49,7 @@ import {
 } from '../engine/walkability'
 import {
   aggroRadiusFor, attackRangeOf, heroAttackRange, MELEE_ATTACK_RANGE, CHASE_SPEED, LEASH_DISTANCE,
+  heroThrowsProjectile, PROJECTILE_FLIGHT_SECONDS,
   patrolRangeFor, PATROL_SPEED,
   temperamentOf,
 } from '../engine/mobBehaviour'
@@ -55,6 +57,7 @@ import {
   INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
   PARTY_MOB_HP_SCALE, PARTY_MOB_DAMAGE_SCALE, PARTY_MOB_REWARD_SCALE,
   ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE, GREY_LEVEL_GAP,
+  WATCH_BANK_CAP_HOURS, WATCH_EXTEND_HOURS,
   BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
   AUTOSAVE_INTERVAL_MS, ZONE_STUCK_SECONDS,
   BAG_SLOTS_MAX_PURCHASED, BAG_SLOT_BASE_COST, BAG_SLOT_COST_GROWTH,
@@ -69,7 +72,10 @@ import type { ThoughtEvent } from '../engine/nameGen'
 import { slotStorage, summarize, newSlotId, setLastSlotId } from './saveSlots'
 import { DEFAULT_COLORWAY, isColorwayUnlocked } from '../render/colorways'
 import { getPurchaseState } from '../monetization/purchases'
-import { emptyRates, accrueRates, projectOfflineProgress } from '../engine/offline'
+import {
+  emptyRates, accrueRates, projectOfflineProgress, watchExtendCost, watchCapacitySeconds,
+} from '../engine/offline'
+import { purchasedWatchHours } from '../monetization/purchases'
 import { compileUpgrades, upgradeCost, UPGRADE_BY_ID, type UpgradeId } from '../data/upgrades'
 import { compileUniques, UNIQUE_BY_ID } from '../data/uniques'
 import type { TownServiceKind } from '../data/townNpcs'
@@ -150,11 +156,29 @@ function defaultProcState(): CombatProcState {
 // ── Zoom preference (global UI pref, persisted outside the per-character save slot) ──
 const ZOOM_KEY = 'il_zoom_level'
 const ZOOM_STEPS = 3
+/**
+ * Where a player who has never touched the zoom control starts: CLOSE.
+ *
+ * Wide shows more of the world, which sounds like the friendlier default and is not: at
+ * step 0 the hero is a 24x32 sprite in a large viewport, the art is too small to read, and
+ * the game's whole visual argument — that this is a hand-made diorama — is thrown away on
+ * the one screen that has to make it, the first one. Close is where the sprites, the
+ * landmarks and the animation actually land.
+ */
+const DEFAULT_ZOOM = 2
 function readZoomPref(): number {
   try {
-    const n = Number(localStorage.getItem(ZOOM_KEY))
-    return Number.isFinite(n) ? Math.min(ZOOM_STEPS - 1, Math.max(0, Math.floor(n))) : 0
-  } catch { return 0 }
+    const raw = localStorage.getItem(ZOOM_KEY)
+    // A MISSING key is not a stored zero. The old form read the key straight into
+    // `Number(...)`, and `Number(null)` is 0 — which is finite, so it passed the guard and
+    // every new player silently got step 0. The default was never chosen; it fell out of a
+    // coercion. Explicit now, so changing it is a one-line decision rather than an
+    // archaeology exercise.
+    if (raw === null) return DEFAULT_ZOOM
+    const n = Number(raw)
+    if (!Number.isFinite(n)) return DEFAULT_ZOOM
+    return Math.min(ZOOM_STEPS - 1, Math.max(0, Math.floor(n)))
+  } catch { return DEFAULT_ZOOM }
 }
 function writeZoomPref(n: number): void {
   try { localStorage.setItem(ZOOM_KEY, String(n)) } catch { /* private mode / no storage */ }
@@ -380,6 +404,8 @@ function defaultState(): GameState {
     craftingTimer: 0,
     craftQuality: null,
     lastCraft: null,
+    lastLevelUp: null,
+    watchBonusSeconds: 0,
     // World Map
     zoneMaps: {},
     // Per-run world entropy. 0 = the original fixed world (what every save before this
@@ -519,6 +545,12 @@ function rehydrateState(saved: GameState): GameState {
   saved.craftingTimer = 0
   saved.craftQuality  = null
   saved.lastCraft     = null
+  // Transient like the craft card: a banner restored from disk would announce a level the
+  // player earned in a session they have already left.
+  saved.lastLevelUp   = null
+  // Banked watch is PERSISTENT — it is bought with gold and must survive a reload, unlike
+  // everything else in this block. `?? 0` is the pre-Watch save, which had no bank.
+  saved.watchBonusSeconds = saved.watchBonusSeconds ?? 0
   // Generate maps for all unlocked zones
   saved.worldSeed = saved.worldSeed ?? 0   // pre-worldSeed saves keep their original world
   const zoneMaps: GameState['zoneMaps'] = {}
@@ -592,6 +624,29 @@ function toSaveBlob(s: GameState): GameState {
  * the numbers. A counter is enough — these ids need to be unique, not unpredictable.
  */
 let presentationSeq = 0
+
+/**
+ * Is this ability's target out of the hero's reach right now?
+ *
+ * ONE definition, asked by three callers that were each answering it their own way:
+ * `activateAbility` (which did not ask at all), `finishCast`, and the action bar's dimming.
+ * The bug that motivated extracting it: the cast bar started regardless of range and only
+ * `finishCast` refused, so an auto-piloted caster out of reach played the full cast bar,
+ * failed, and immediately started another — a cast bar firing over and over with no spell
+ * ever leaving the hero's hands.
+ *
+ * Self-target abilities (heals, HoTs) are never out of range: a heal with no enemy in front
+ * of you is not mis-aimed, it is not aimed at anything.
+ */
+export function abilityOutOfRange(
+  s: Pick<GameState, 'currentMob' | 'playerClass'>,
+  ability: Pick<ActiveAbilityDef, 'effects'>,
+): boolean {
+  const needsTarget = !ability.effects.every(e => e.type === 'hot')
+  if (!needsTarget || !s.currentMob) return false
+  const { dx, dy } = s.currentMob.offset
+  return Math.sqrt(dx * dx + dy * dy) > heroAttackRange(s.playerClass)
+}
 
 function log(
   type: CombatLogEntry['type'],
@@ -1009,7 +1064,11 @@ function advancePlayerPosition(
     // it to 1.0: the hero walked to 1.2 tiles, stood there unable to swing, and online
     // income collapsed hard enough that the harness reported idling out-earning playing by
     // 123%. Derived now, so the approach can never again halt short of the blow.
-    if (d <= APPROACH_STOP_DIST) {
+    // …and "the hero's own reach" means THIS hero's. A warlock whose reach is 2.0 was
+    // still walking to 0.7 because this derived from the melee constant, so every caster
+    // closed to knife-fighting distance and their extra tile of range existed only in the
+    // constant. Same derivation, correct source.
+    if (d <= heroAttackRange(state.playerClass) * 0.7) {
       if (goalId) unreachableFor.delete(goalId)
       return here
     }
@@ -1752,12 +1811,44 @@ const TALENT_SCHEMA_VERSION = 2
  * later, which is exactly the class of silent loss the no-target branch was once famous
  * for.
  */
+/**
+ * Damage that has left the caster's hand but has not arrived yet.
+ *
+ * A thrown blow used to land the instant it was rolled, while the orb was still crossing
+ * the gap — the target's HP bar dropped, and then a graphic caught up with it. This holds
+ * the HP change for `PROJECTILE_FLIGHT_SECONDS`, the same window the renderer flies the
+ * orb over, so the bar moves when the bolt hits.
+ *
+ * Module-level and disposable, exactly like `unreachableFor`: it is in-flight state, not
+ * save state. Putting it on the store would mean a save blob carrying half-resolved blows,
+ * a rehydrate path deciding what to do with them, and a React subscription to something no
+ * component renders.
+ *
+ * The floating NUMBER is deliberately not held here — it is pushed at launch, and the
+ * renderer defers its display to the orb's arrival. Two mechanisms, one constant.
+ */
+let pendingImpacts: { mobId: string; damage: number; remaining: number }[] = []
+
+/** Damage already in the air against this target. The turn sequencer nets this out before
+ *  deciding whether to swing again, so a caster does not keep firing into a corpse-to-be
+ *  and quietly lose the DPS. A bolt CAN still land on a corpse — when a DoT, a minion or a
+ *  companion gets there first — and that one is overkill by design. */
+function inFlightAgainst(mobId: string | null | undefined): number {
+  if (!mobId) return 0
+  let total = 0
+  for (const p of pendingImpacts) if (p.mobId === mobId) total += p.damage
+  return total
+}
+
 export function resetCombatAccumulators() {
   useGameStore.setState({ combatAccum: freshCombatAccum() })
   playerPath.path   = null
   playerPath.pathCool = 0
   playerPath.failed = false
   unreachableFor.clear()
+  // A death, a zone change or a target handoff voids anything still in the air. Keeping it
+  // would land a blow thrown at a mob two zones ago on whatever now holds that id.
+  pendingImpacts = []
 }
 
 /** Seconds without a kill before Rampage sheds a stack. */
@@ -1808,6 +1899,9 @@ interface GameActions {
   startCrafting: (recipeId: RecipeId) => void
   strikeNode: () => void
   dismissCraftResult: () => void
+  dismissLevelUp: () => void
+  /** Spend gold to bank more unattended time. False if capped or unaffordable. */
+  extendWatch: () => boolean
   enterTown: (townId: TownId) => void
   leaveTown: () => void
   restInTown: () => void
@@ -1911,7 +2005,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // Grant time away BEFORE the state goes live, so the player never sees the
       // pre-offline numbers flash and then jump. `lastTickTimestamp` is stamped by
       // toSaveBlob at write time, which is what makes the elapsed window honest.
-      const offline = projectOfflineProgress(saved, Date.now())
+      const offline = projectOfflineProgress(saved, Date.now(), {
+        // Read LIVE from the billing cache rather than from the save, the same way
+        // `setColorway` gates cosmetics: a refund or an expired entitlement then takes
+        // effect on its own, with no migration and no save carrying a capacity the player
+        // no longer owns.
+        purchasedWatchHours: purchasedWatchHours(getPurchaseState().active),
+      })
       set(offline ? { ...saved, ...offline.patch, lastOffline: offline.report } : saved)
       get().saveGame()   // refreshes lastPlayedAt
       return true
@@ -2252,6 +2352,35 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Everything between those two points is the original single-target combat code,
     // untouched — only spawning, selection and death know about the collection.
     let mobs = state.mobs.map(m => ({ ...m, offset: { ...m.offset }, dots: m.dots.map(d => ({ ...d })) }))
+
+    // ── Bolts landing ─────────────────────────────────────────────────────────
+    // Drained before combat resolves, so a blow thrown last tick is already on the target
+    // when this tick asks whether it is still standing. Anything that reaches zero here is
+    // left at zero for the corpse sweep further down — the one place that pays a kill out.
+    //
+    // A target that is simply GONE (swept, despawned, a boss that cleared the field) takes
+    // its pending damage with it: there is nothing left to subtract from. The orb still
+    // arrives on screen, because the renderer is animating a corpse that fades for 2.8s,
+    // and lands as overkill on a body already going down.
+    if (pendingImpacts.length) {
+      const arrived: typeof pendingImpacts = []
+      const stillFlying: typeof pendingImpacts = []
+      for (const p of pendingImpacts) {
+        p.remaining -= deltaSeconds
+        ;(p.remaining <= 0 ? arrived : stillFlying).push(p)
+      }
+      pendingImpacts = stillFlying
+      for (const p of arrived) {
+        const i = mobs.findIndex(m => m.id === p.mobId)
+        if (i >= 0) mobs[i] = { ...mobs[i], currentHp: mobs[i].currentHp - p.damage, aggro: true }
+        // `currentMob` is a projection of the same mob and is written back over `mobs`
+        // later in this tick (see the fold at the end of the world-tick block), so it has
+        // to take the hit too or the fold would restore the pre-impact HP.
+        if (currentMob && currentMob.id === p.mobId) {
+          currentMob = { ...currentMob, currentHp: currentMob.currentHp - p.damage }
+        }
+      }
+    }
     let targetMobId = state.targetMobId
     let target = mobs.find(m => m.id === targetMobId) ?? null
     if (!target) {
@@ -2380,7 +2509,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           && (skillCooldowns[a.id] ?? 0) <= 0
           // Self-target abilities are the only ones castable with nothing engaged; the
           // guard above already requires a target, so this only filters heals-when-full.
-          && !(a.effects.some(e => e.type === 'hot') && stats.currentHp >= stats.maxHp))
+          && !(a.effects.some(e => e.type === 'hot') && stats.currentHp >= stats.maxHp)
+          // ── Reach ──
+          // THE auto-pilot bug: this list is the only thing standing between the hero and
+          // a cast bar, because the auto-caster builds `castState` right here rather than
+          // going through `activateAbility`. So the range gate added there did nothing for
+          // idle mode, which is the mode this game is mostly played in. An out-of-reach
+          // caster picked a spell every tick, filled the whole bar, had it refused by
+          // `finishCast`, and immediately started another — a cast bar cycling forever with
+          // no bolt ever leaving their hands, while the hero stood there.
+          && !abilityOutOfRange({ currentMob, playerClass: state.playerClass }, a))
         .sort((a, b) => (b.cooldownSeconds - a.cooldownSeconds) || (a.slot - b.slot))[0]
       if (ready) {
         const castTime = (ready.castTimeSeconds ?? 0) * (fx.abilityMods[ready.id]?.castTimeMult ?? 1)
@@ -2669,6 +2807,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       while (xp >= xpForLevel(level)) {
         xp -= xpForLevel(level)
         level++
+        const prevMaxHp = stats.maxHp
         const newStats = compileStats(state.playerClass, level, equipment, talentAllocs, racialPassive)
         stats = { ...newStats, currentHp: Math.min(newStats.maxHp, stats.currentHp + 20) }
         newLogs.push(log('level_up', `★ Level Up! Now level ${level}!`, '#ffd700'))
@@ -2676,17 +2815,35 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         // cap. Points used to accrue forever against a tree that could hold ~48 of
         // them; past that every level-up handed out a token with nowhere to spend it.
         // Levels beyond the cap still raise stats, they just stop paying talents.
+        let gainedTalentPoint = false
         set(s => {
           if (s.talentPoints + totalSpent(s.talentAllocs) >= TALENT_POINT_MAX) return {}
+          gainedTalentPoint = true
           return { talentPoints: s.talentPoints + 1 }
         })
         // An ability slot opening is worth saying out loud — it is the only moment in
         // levelling where the action bar itself changes.
+        const unlockedAbilities: string[] = []
         for (const ab of getClassAbilities(state.playerClass)) {
           if (ab.unlockLevel === level) {
+            unlockedAbilities.push(ab.name)
             newLogs.push(log('ability_use', `✦ ${ab.name} unlocked!`, '#ffd700'))
           }
         }
+        // The banner. Set through its own `set` rather than the tick's patch for the same
+        // reason the talent point is: this loop runs several times in one tick when a
+        // single kill spans levels, and the LAST level is the one to announce — a value
+        // folded into the tick's return would be whatever the first pass computed.
+        set({
+          lastLevelUp: {
+            id: `lvl_${level}_${Date.now()}`,
+            level,
+            talentPoint: gainedTalentPoint,
+            unlockedAbilities,
+            maxHpGain: Math.max(0, stats.maxHp - prevMaxHp),
+            createdAt: Date.now(),
+          },
+        })
         get().triggerThought('level_up', `level ${level}`)
         // Level-based unlock: only zones whose prerequisite boss is already down.
         for (const rawId of ZONE_ORDER) {
@@ -2846,10 +3003,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Gathering Dark Umbral Bolt proc
     if (nightfallProc && currentMob) {
       const boltDmg = makeShadowBoltHit(stats.weaponDps, stats.attackSpeedSeconds, 2.5)
-      currentMob = { ...currentMob, currentHp: currentMob.currentHp - boltDmg }
+      // A bolt, so it flies. `registerKill` is not called here any more for the same
+      // reason: nothing has died yet, and when the orb lands the corpse sweep pays it out
+      // through the one path that awards XP, counts the kill and records a boss.
+      pendingImpacts.push({
+        mobId: currentMob.id, damage: boltDmg, remaining: PROJECTILE_FLIGHT_SECONDS,
+      })
       newFns.push(fn(boltDmg, true, false, false, '#cc44ff'))
       newLogs.push(log('proc', `⚡ Gathering Dark! Umbral Bolt hits for ${boltDmg}`, '#cc44ff'))
-      registerKill()
     }
 
     // ── Summoned minion ──────────────────────────────────────────────────────
@@ -2936,7 +3097,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           talentAllocs,
           procState,
           activeBuffs,
-          targetHpFraction: currentMob!.currentHp / Math.max(1, currentMob!.maxHp),
+          // Net of what is already in the air, or a caster reads a target as healthy
+          // while three bolts are mid-flight — execute thresholds misfire and the turn
+          // keeps sequencing swings into something already dead.
+          targetHpFraction:
+            (currentMob!.currentHp - inFlightAgainst(currentMob!.id)) / Math.max(1, currentMob!.maxHp),
           playerHpFraction: stats.currentHp / Math.max(1, stats.maxHp),
           targetBurning: activeDoTs.some(d => d.sourceType === 'burn'),
           isOpener,
@@ -3005,7 +3170,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           }
 
           // ── Every hit ──
-          currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - hit.damage }
+          // A thrown blow is owed to the target, not yet dealt to it: the orb has to cross
+          // the gap first. A swung one connects on the spot, because there is nothing in
+          // the air to wait for.
+          if (heroThrowsProjectile(state.playerClass)) {
+            pendingImpacts.push({
+              mobId: currentMob!.id, damage: hit.damage, remaining: PROJECTILE_FLIGHT_SECONDS,
+            })
+          } else {
+            currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - hit.damage }
+          }
 
           if (hit.kind === 'swing') {
             if (state.settings.showDamageNumbers) {
@@ -3049,8 +3223,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           if (hit.sealFatePoint) awardComboPoint()
 
           return {
-            targetDied: !currentMob || currentMob.currentHp <= 0,
-            targetHpFraction: currentMob ? currentMob.currentHp / Math.max(1, currentMob.maxHp) : 0,
+            targetDied: !currentMob || currentMob.currentHp - inFlightAgainst(currentMob.id) <= 0,
+            targetHpFraction: currentMob
+              ? (currentMob.currentHp - inFlightAgainst(currentMob.id)) / Math.max(1, currentMob.maxHp)
+              : 0,
           }
         },
       )
@@ -3745,6 +3921,15 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (s.level < ability.unlockLevel) return      // slot not open yet
     // Allow self-target abilities (hot/heals) even without a mob; block others
     if (!s.currentMob && !ability.effects.some(e => e.type === 'hot')) return
+    // ── Reach, checked BEFORE the bar starts ──────────────────────────────────
+    // Only `finishCast` used to ask this, which meant an out-of-range cast played its
+    // whole bar and then quietly failed. On auto-pilot that loops: the caster is out of
+    // reach, so it starts a cast every time the last one fails, and the player watches a
+    // cast bar fill and empty forever while no bolt is ever thrown.
+    // Silent, deliberately — the auto-caster retries every tick and a log line here would
+    // be hundreds of them. `finishCast` keeps ITS message, because that one fires when the
+    // target walked away mid-cast, which is a thing worth telling the player once.
+    if (abilityOutOfRange(s, ability)) return
 
     // Timed ability → begin a channel. The effect fires in tick when the cast bar
     // fills; cooldown starts on completion so an interrupt doesn't burn it.
@@ -3765,6 +3950,24 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     const s = get()
     const ability = ACTIVE_ABILITIES.find(a => a.id === abilityId)
     if (!ability) return
+
+    // ── An ability has a reach, and it is the hero's own ───────────────────────
+    // The swing path has always gated on `heroAttackRange` (`heroInRange` in tick). This
+    // path gated on nothing at all: it checked that a target EXISTED and then landed full
+    // damage on it at any distance, so a target picked up with Tab — which reaches 12 tiles
+    // — could be killed from across the zone, off the edge of the screen, while the hero
+    // stood still. One reach, asked the same way by both paths, is the fix.
+    //
+    // Checked at completion rather than only at cast start, because a channelled spell's
+    // target can walk out of reach while the bar fills. Self-target abilities are exempt:
+    // a heal with no mob in front of you is not out of range, it is not aimed at anything.
+    if (abilityOutOfRange(s, ability)) {
+      set(prev => ({
+        combatLog: [log('proc', `${s.currentMob!.name} is out of range.`, '#8a8070'), ...prev.combatLog]
+          .slice(0, LOG_MAX),
+      }))
+      return
+    }
 
     const newFns: FloatingNumber[] = []
     const newLogs: CombatLogEntry[] = []
@@ -3801,7 +4004,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         case 'shadow_bolt':
           if (currentMob) {
             const dmg = makeShadowBoltHit(stats.weaponDps, stats.attackSpeedSeconds, effect.value * scale)
-            currentMob.currentHp -= dmg
+            // The bolt this whole feature is named for. It leaves now and lands in
+            // `PROJECTILE_FLIGHT_SECONDS`; the number below is the launch, which the
+            // renderer holds until the orb arrives. `finishCast` runs outside `tick`, but
+            // the queue is module-level and the next tick drains it either way.
+            pendingImpacts.push({
+              mobId: currentMob.id, damage: dmg, remaining: PROJECTILE_FLIGHT_SECONDS,
+            })
             newFns.push(fn(dmg, true, false, false, '#cc44ff'))
             newLogs.push(log('ability_use', `☠ Umbral Bolt strikes for ${dmg}!`, '#cc44ff'))
             // A caster's "attack" is the bolt, not a swing — and splash is spent by
@@ -3850,25 +4059,28 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       [abilityId]: ability.cooldownSeconds * mod.cooldownMult,
     }
 
-    // If mob died from shadow bolt
-    if (currentMob && currentMob.currentHp <= 0) {
-      // Minimal kill handling — full path is in tick; just clear mob
-      newLogs.push(log('mob_death', `${currentMob.name} dies to Umbral Bolt!`, '#ff4444'))
-      const loot = rollLoot(currentMob, s.level, stats.goldFindBonus)
-      const slainId = currentMob.id
-      set(prev => ({
-        // Only the slain mob leaves — the rest of the crowd is still standing there.
-        mobs: prev.mobs.filter(m => m.id !== slainId),
-        targetMobId: null, currentMob: null, mobRespawnTimer: 3,
-        activeDoTs: [], procState,
-        gold: prev.gold + loot.gold,
-        skillCooldowns,
-        activeBuffs: newBuffs,
-        floatingNumbers: [...prev.floatingNumbers, ...newFns],
-        combatLog: [...newLogs, ...prev.combatLog].slice(0, LOG_MAX),
-      }))
-      return
-    }
+    // ── A cast that kills does NOT bury its own corpse ─────────────────────────
+    // There used to be a branch here that filtered the slain mob out, paid `rollLoot`'s
+    // gold and returned. It is gone, and this comment is what replaces it, because the
+    // shape is a trap the codebase has fallen into twice:
+    //
+    //   A mob removed here never reaches the corpse sweep in `tick`, and the sweep is the
+    //   only thing that awards XP, counts the kill, runs `placeDrop`, records
+    //   `bossesDefeated` and completes the zone quest. So every kill landed by a cast paid
+    //   gold and NOTHING else.
+    //
+    // What that looked like from inside the game, measured on a level-5 warlock: 38 boss
+    // spawns in 100 minutes and zero progress. Umbral Bolt finished the boss each time, so
+    // the kill never registered, `bossesDefeated` stayed empty, and a fresh 400 HP boss
+    // replaced the one that had just died — while the missing XP kept the hero under the
+    // level 10 gate that the NEXT zone needs, making the whole game look frozen. A caster
+    // could not progress at all; the sweep's own comment already named this as a C6 trap,
+    // it just could not reach a corpse this branch had already carried off.
+    //
+    // The fall-through below folds the damage back into `mobs` — including a target now at
+    // or below zero — and the sweep pays it out on the next tick, once, through the same
+    // `registerKill` every other damage source uses. Splash has always relied on exactly
+    // this; the direct target simply had a shortcut it should never have had.
 
     set(prev => ({
       // Fold the damage back into the population, else the next tick re-projects from
@@ -4100,6 +4312,39 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
   dismissCraftResult: () => {
     if (get().lastCraft) set({ lastCraft: null })
+  },
+
+  dismissLevelUp: () => {
+    if (get().lastLevelUp) set({ lastLevelUp: null })
+  },
+
+  /**
+   * Buy `WATCH_EXTEND_HOURS` more of unattended time with earned gold.
+   *
+   * The gold sink the 2026-08-08 audit asked for, aimed at the one moment the permanent
+   * upgrades cannot serve: not "make my hero better forever" but "I am going away for the
+   * weekend and I want them still out there when I get back". Priced on a ladder keyed to
+   * the CURRENT bank (see `watchExtendCost`), so it gets expensive as you stack it and
+   * cheap again once it has been spent.
+   */
+  extendWatch: () => {
+    const s = get()
+    const banked = Math.max(0, s.watchBonusSeconds ?? 0)
+    const capSeconds = WATCH_BANK_CAP_HOURS * 3600
+    if (banked >= capSeconds) return false
+    const cost = watchExtendCost(banked)
+    if (s.gold < cost) return false
+    set({
+      gold: s.gold - cost,
+      // Clamped, so the last purchase before the ceiling cannot overshoot it and quietly
+      // hand out time that was paid for at the wrong price.
+      watchBonusSeconds: Math.min(capSeconds, banked + WATCH_EXTEND_HOURS * 3600),
+      combatLog: [log('proc',
+        `The watch is extended — your hero will range ${WATCH_EXTEND_HOURS}h longer unsupervised.`,
+        '#c8a100'), ...s.combatLog].slice(0, LOG_MAX),
+    })
+    get().saveGame()
+    return true
   },
 
   // ── Towns ─────────────────────────────────────────────────────────────────────

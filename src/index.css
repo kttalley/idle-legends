@@ -103,11 +103,19 @@ body {
      sharp. Blurring it harder is what buys the transparency; the tint alone cannot. */
   --chat-glass-bg:   rgba(17, 13, 8, 0.50);
   --chat-glass-blur: 24px;
-  /* Height of the zone-chat panel; the left rail subtracts it so the column stops where
-     the chat starts. This value is only the pre-measurement fallback — App.tsx overwrites
-     it from a ResizeObserver on the panel itself, because a hand-kept copy of a height
-     declared elsewhere in this file drifts the first time either one is touched. */
-  --log-h:           220px;
+  /* The chat feed's own height on desktop. One literal, read by `.app-log` and standing in
+     as the pre-measurement fallback for the slot below. */
+  --log-panel-h:     220px;
+  /* Height of whatever occupies the FOOT of the left column, which the rail subtracts so
+     the column stops where that thing starts. App.tsx overwrites it from a ResizeObserver,
+     because a hand-kept copy of a height declared elsewhere in this file drifts the first
+     time either one is touched.
+     It is the SLOT, not the panel — with the feed folded away the slot holds a 44px chat
+     button instead, and the rail is entitled to the 176px that frees up. Which is also why
+     `.app-log` must size itself off `--log-panel-h` and not off this: a panel whose height
+     is the variable it publishes cannot come back from being replaced by a smaller
+     element — it measures the button's 44px, adopts it, republishes it, and latches. */
+  --log-h:           var(--log-panel-h);
   /* Vertical space the action bar + strike meter occupy above the mobile dock. The chat
      sheet and the whisper window must stop short of this: the action bar is the primary
      interaction and neither is ever allowed to cover it. This value is only the
@@ -118,7 +126,17 @@ body {
   /* Height of the on-screen keyboard, published by engine/viewportInsets.ts. 0 when no
      keyboard is up, and on every platform whose keyboard resizes the layout viewport. */
   --kb-inset:        0px;
-  --dock-h:          58px;   /* mobile tab bar */
+  /* ── The mobile dock ──
+     It FLOATS: a frosted bar with air on all three edges, the same material as the action
+     bar above it, rather than an opaque strip welded to the bottom of the screen. That
+     costs the layout two numbers instead of one, and everything that has to stay clear of
+     the dock wants the OUTER band — so `--dock-h` keeps meaning exactly what its six call
+     sites already assume (the height reserved at the bottom of the world) and the bar's
+     own geometry gets its own tokens. Change the bar height here and the rails, the chat
+     sheet, the whisper window and the HUD bottom stack all follow. */
+  --dock-bar-h:      64px;   /* the floating bar itself — 56px of button + 4px padding */
+  --dock-gap:        8px;    /* air between the bar and the screen edges */
+  --dock-h:          calc(var(--dock-bar-h) + var(--dock-gap) * 2);
   --safe-b:          env(safe-area-inset-bottom, 0px);
   /* The other three insets, for the native wrap. The notch/Dynamic Island eats the top
      and the home indicator the bottom in portrait; in landscape the sensor housing eats
@@ -144,6 +162,18 @@ body {
      height of that top-right stack (HudOverlay), the counterpart of `--unit-h`. */
   --col-r-w: 250px;
   --hud-r-h: 190px;
+  /* On-screen diameter of the radar disc (the canvas draws at a fixed 128px regardless —
+     see MinimapRadar). Phone default here; the desktop rule below grows it out of
+     `--unit-h` so the disc's bottom edge lands on the unit frames' bottom edge and the two
+     columns start their panels on the same line. */
+  --radar-size: 74px;
+  /* The radar block's full footprint: disc + the satellite buttons that overhang it by 6px
+     a side + the zone caption beneath. Kept as a token because more than one rule needs to
+     reserve that space and a second hand-kept copy would drift the moment the disc grows. */
+  --radar-w: calc(var(--radar-size) + 12px);
+  /* Measured height of the right rail (HudOverlay), so the quest tracker can sit BELOW the
+     inventory rather than above it. Pre-measurement default only. */
+  --rail-r-h: 300px;
   /* Width each side is spending, which is what the bottom stack reserves against so the
      action bar never slides under a glass column.
      The left one does NOT shrink when the character rail is folded, because the CHAT FEED
@@ -202,6 +232,11 @@ h1, h2, h3, h4,
   /* Chat leans hardest on the blur, so it has the furthest to fall: without one, the
      world would read through sharp behind the text. Go fully opaque instead. */
   .app-log.rp-glass, .whisper-window { background: rgba(16, 13, 8, 0.95); }
+  /* The dock paints its own sheen + strong tint further down this file, which would
+     otherwise outrank the `.rp-glass` fallback above by source order and leave the
+     primary navigation translucent with nothing blurring behind it. Two classes, so the
+     override wins on specificity instead of position. */
+  .app-dock.rp-glass { background: rgba(16, 13, 8, 0.96); }
 }
 
 /* Some people turn transparency off at the OS level, and some devices should not be
@@ -218,6 +253,9 @@ h1, h2, h3, h4,
   /* Chat's whole readability budget is the blur, so removing it must also remove the
      transparency — otherwise text lands directly on raw pixel art. */
   .app-log.rp-glass, .whisper-window { background: rgba(16, 13, 8, 0.96); }
+  /* Same specificity fix as the @supports block: the dock's own background is declared
+     later in the file. */
+  .app-dock.rp-glass { background: rgba(16, 13, 8, 0.96); }
   .combat-log, .whisper-window-body, .whisper-window-header { text-shadow: none; }
 }
 
@@ -371,14 +409,22 @@ h1, h2, h3, h4,
 .app-sidebar-left.collapsed  .rail-head,
 .app-sidebar-right.collapsed .rail-head { border-bottom: none; padding: 0; }
 
-/* ── Collapsed left rail: one Menu chip ──
+/* ── Collapsed rails: one labelled chip each ──
    The stub was a bare ‹ arrow, then briefly a pair of icons — and a pair is one control too
    many for a thing whose entire job is "bring the panel back". One labelled button says what
    it does without a legend: everything the rail carries, including the ☰ that leads to
-   settings and character select, is one tap behind it. */
-.app-sidebar-left.collapsed { width: auto; padding: 6px; }
+   settings and character select, is one tap behind it.
+
+   Both rails get this, and that is the point: they are the same control with a different
+   noun behind it. The right one used to keep the bare 34px stub above while the left had a
+   labelled chip, so a "Gear" label added to it had nowhere to go — the rail clipped it and
+   squashed the icon against the edge. Two stubs on one screen doing one job read as one
+   thing or they read as a mistake. */
+.app-sidebar-left.collapsed,
+.app-sidebar-right.collapsed { width: auto; padding: 6px; }
 .app-sidebar-left.collapsed .hero-bar { display: none; }
-.app-sidebar-left.collapsed .rail-minimize {
+.app-sidebar-left.collapsed  .rail-minimize,
+.app-sidebar-right.collapsed .rail-minimize {
   width: auto;
   gap: 5px;
   padding: 0 10px;
@@ -411,7 +457,7 @@ h1, h2, h3, h4,
   bottom: 12px;
   z-index: 24;
   width: var(--col-l-w);   /* foot of the left column: frames, rail, then this */
-  height: var(--log-h);
+  height: var(--log-panel-h);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -421,6 +467,7 @@ h1, h2, h3, h4,
 .app-log-tabs {
   flex: 0 0 auto;
   display: flex;
+  align-items: center;
   gap: 6px;
   padding: 2px 6px 0;
   background:
@@ -454,6 +501,66 @@ h1, h2, h3, h4,
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+}
+
+/* ── Folding the feed away ────────────────────────────────────────────────────
+   Chat was the one panel with no way to dismiss it on desktop. The rails both fold, the
+   world is the thing the player is here to watch, and a permanent 232px feed pinned over
+   the bottom-left corner of it is furniture nobody chose. It now takes the same single
+   control the rails carry, in its own head, and leaves a floating chat button where its
+   corner was.
+   `margin-left: auto` is what pushes the control to the trailing edge of the tab row; the
+   rest of `.rail-minimize`'s look is inherited, so this reads as the same verb it does two
+   panels away. */
+.app-log-minimize {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+/* The restore control: a floating chat button standing exactly where the panel's
+   bottom-left corner was, so the feed expands out of the thing you pressed.
+   Rendered always and shown by class rather than mounted on demand, because App measures
+   it for `--log-h` — the left rail's max-height subtracts whatever occupies this slot, and
+   a button that does not exist yet measures 0 and lets the rail run to the screen edge for
+   a frame. */
+.app-log-fab {
+  display: none;
+  position: absolute;
+  left: calc(8px + var(--safe-l));
+  bottom: 12px;
+  z-index: 24;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background:
+    linear-gradient(155deg, rgba(255, 232, 170, 0.12) 0%, rgba(255, 232, 170, 0.04) 24%, transparent 58%),
+    var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-hairline);
+  color: var(--gold);
+  transition: transform 0.12s, border-color 0.15s, box-shadow 0.15s;
+}
+.app-log-fab.is-visible { display: flex; }
+.app-log-fab:hover { border-color: hsl(44 70% 70% / 0.55); box-shadow: var(--glass-shadow), 0 0 10px hsl(44 80% 50% / 0.28); }
+.app-log-fab:active { transform: scale(0.94); }
+
+@media (min-width: 900px) {
+  /* Retracted, the panel is GONE rather than a 34px stub. The rails keep a stub because
+     each is a column with a head worth leaving on screen; a feed has no head — its tabs
+     are the feed — so the honest retracted state is the button that brings it back. */
+  .app-log:not(.panel-open) { display: none; }
+}
+@media (max-width: 899px) {
+  /* On a phone the dock button is already the restore control, and the model is one panel
+     at a time (see `toggle` in App). A second floating chat button would be the same verb
+     drawn twice, in two places. */
+  .app-log-fab { display: none !important; }
 }
 
 /* Minimap satellites — the four controls tucked on the disc's corners (town, auto/manual,
@@ -545,6 +652,19 @@ h1, h2, h3, h4,
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.5);
 }
 
+/* Out of range reads DIFFERENTLY from on cooldown, because the two ask for different
+   things from the player: a cooldown says wait, a reach says move. Cooldown already owns
+   the sweep and the countdown number, so this takes the other axis — a cold slate wash
+   over the pane and a dashed edge, the visual language of "not connected to anything"
+   rather than "temporarily spent". */
+.skill-slot.is-out-of-range {
+  border-style: dashed;
+  border-color: rgba(150, 170, 200, 0.30);
+  background: linear-gradient(180deg, rgba(16, 20, 30, 0.62), rgba(8, 10, 16, 0.68));
+}
+.skill-slot.is-out-of-range .skill-slot-well > * { opacity: 0.35; filter: grayscale(1); }
+.skill-slot.is-out-of-range .skill-slot-name { color: rgba(150, 170, 200, 0.65); }
+
 /* The impression. A recessed well with the shadow at the TOP and the catchlight at the
    bottom — the inverse of the pane's own lighting, which is what the eye reads as
    "stamped in" rather than "raised". The icon takes a matching 1px light shadow so it
@@ -621,12 +741,20 @@ h1, h2, h3, h4,
   white-space: nowrap;
 }
 
-/* The bar itself is a single sheet of glass the panes sit on. */
+/* The bar itself is a single sheet of glass the panes sit on — TWO ROWS on it, spells
+   over modes.
+   It used to be one wrapping row with the modes leading, which put the spell panes
+   off-centre and, at 390px, wrapped the third pane off the bar entirely. `column` is what
+   makes the stack a layout rather than an accident of wrapping: the abilities are what you
+   press and sit centred under the thumb, the mode switch is a footer strip beneath them.
+   `flex-wrap` is deliberately GONE — with it, a mode caption long enough to overflow
+   (Leatherworking) would break the modes row up the side of the spells again. The row
+   scrolls sideways instead; see `.actionbar-modes`. */
 .actionbar-shell {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
   border-radius: 16px;
   border: 1px solid var(--glass-hairline);
   background: var(--glass-bg);
@@ -634,6 +762,34 @@ h1, h2, h3, h4,
   backdrop-filter: blur(var(--glass-blur)) saturate(160%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 4px 16px rgba(0, 0, 0, 0.4);
   max-width: calc(100vw - 16px);
+}
+
+/* The mode strip under the spells. One row, always — three buttons whose captions are
+   profession names, so the widest case ("Skinning / Leatherworking") is 40px past a 390px
+   viewport. It scrolls rather than wraps: a wrapped mode strip is the bug that put Fight
+   above Herbalism above Alchemy in a column beside the spell panes. */
+.actionbar-modes {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* The strip is a scroll container, so it must not swallow the vertical page gesture. */
+  touch-action: pan-x;
+}
+.actionbar-modes::-webkit-scrollbar { display: none; }
+
+/* Divides the two rows INSIDE one sheet of glass — inset from the edges and faint, so it
+   reads as a fold rather than as a border between two panels. */
+.actionbar-rule {
+  flex: 0 0 auto;
+  align-self: stretch;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent, var(--glass-hairline) 15%, var(--glass-hairline) 85%, transparent);
+  opacity: 0.75;
 }
 
 /* backdrop-filter is the whole effect; without it these panes are flat translucent
@@ -905,7 +1061,8 @@ h1, h2, h3, h4,
      with it. Undoing these one by one is deliberate: the alternative is a `.collapsed`
      block that means two different things at two breakpoints. */
   .app-sidebar-left.collapsed  .hero-bar { display: flex; gap: 6px; padding: 0 2px 6px; border-bottom: 1px solid rgba(200, 161, 0, 0.16); }
-  .app-sidebar-left.collapsed  .rail-minimize { width: 30px; padding: 0; font-family: inherit; }
+  .app-sidebar-left.collapsed  .rail-minimize,
+  .app-sidebar-right.collapsed .rail-minimize { width: 30px; padding: 0; font-family: inherit; }
   .app-sidebar-right.collapsed .rail-title { display: inline; }
   .app-sidebar-left.collapsed  .rail-head { border-bottom: 1px solid var(--edge-soft); padding: 0; }
   .app-sidebar-right.collapsed .rail-head { border-bottom: 1px solid var(--edge-soft); padding: 0 0 6px; }
@@ -939,26 +1096,36 @@ h1, h2, h3, h4,
     max-height: 40vh;
   }
 
-  /* ── Bottom dock ── */
+  /* ── Bottom dock ──
+     A floating frosted bar, not a strip welded to the edge. Same material and the same
+     16px-family radius as the action bar directly above it, so the two read as one system
+     of controls stacked at the bottom of the screen — which is what they are: the bar
+     above is what you do, this is where you go.
+     Held clear of the home indicator by `--safe-b` on top of its own gutter, so on a
+     notched phone it floats above the indicator rather than tucking under it. */
   .app-dock {
     display: flex;
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: calc(var(--dock-h) + var(--safe-b));
-    padding-bottom: var(--safe-b);
+    left: calc(var(--dock-gap) + var(--safe-l));
+    right: calc(var(--dock-gap) + var(--safe-r));
+    bottom: calc(var(--dock-gap) + var(--safe-b));
+    height: var(--dock-bar-h);
     z-index: 60;
     align-items: stretch;
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 18px;
+    /* Sheen over the strong tint. `.rp-glass-strong` would drop the raking highlight, and
+       the highlight is most of what separates "glass" from "a dark box" on a bar this
+       size. Primary navigation gets the heavier tint AND the sheen. */
+    background:
+      linear-gradient(155deg, rgba(255, 232, 170, 0.12) 0%, rgba(255, 232, 170, 0.04) 24%, transparent 58%),
+      var(--glass-bg-strong);
+    box-shadow:
+      var(--glass-shadow),
+      inset 0 1px 0 var(--glass-hairline),
+      0 6px 20px rgba(0, 0, 0, 0.5);
   }
-
-  /* Four dock buttons now instead of three. Labels shrink rather than the hit targets:
-     the buttons still stretch the full bar height, which is what keeps them thumb-sized. */
-  .app-dock-btn { font-size: 0.55rem; }
 }
 
 /* Text sits on a moving, high-contrast world. A tight shadow keeps every glass
@@ -1000,10 +1167,14 @@ h1, h2, h3, h4,
    LEFT of the radar instead of displacing it (see `.app-sidebar-right`), which is why the
    dependency and its transition are gone rather than merely retimed. */
 .hud-tr { position: absolute; top: calc(8px + var(--safe-t)); right: calc(8px + var(--safe-r)); }
-/* Same anti-jitter floor the unit frames get: the objective tracker collapses, gains a
-   second line, and stands down entirely when a zone is cleared, and without a reserved
-   height every one of those would shove the inventory rail up or down beneath it. */
-@media (min-width: 900px) { .hud-tr { min-height: 190px; } }
+/* On desktop this box is pinned to exactly the unit frames' measured height, which is what
+   squares the two columns off against each other: both rails position themselves under
+   their corner box (`--unit-h` left, `--hud-r-h` right), so making the two corner boxes the
+   same height lands both rails' tops on one line — without either rail knowing the other
+   exists. It also replaces the old 190px anti-jitter floor with something better than a
+   guess: a fixed height cannot be jogged by the tracker gaining a line at all, because the
+   tracker is no longer in this box (it sits below the rail now — see `.hud-quest`). */
+@media (min-width: 900px) { .hud-tr { height: var(--unit-h); } }
 
 /* The frames themselves. Width, scrim and reserved height live here rather than inline in
    UnitFrames.tsx because on desktop this box heads a column that two other elements belong
@@ -1165,39 +1336,70 @@ h1, h2, h3, h4,
   .app-sidebar-left, .app-sidebar-right, .app-log, .hud-tl, .hud-tr, .hud-bottom { transition: none; }
 }
 
-/* Gold chip on the bag button — replaces the old full-width top bar. */
+/* Gold chip on the Gear button — replaces the old full-width top bar.
+   A BADGE now, not a substituted caption. It used to stand where the other two buttons had
+   their labels, which left the dock reading as two navigation buttons and one number: the
+   only unlabelled control in the app, on the platform where a `title` tooltip does not
+   exist. Pinned to the button's top-right corner instead, the way an unread count is. */
 .app-dock-gold {
-  font-size: 0.55rem;
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-family: var(--font-ui);
+  font-size: 0.5rem;
   font-weight: 700;
   color: var(--gold);
   letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.42);
   text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+  pointer-events: none;
 }
 
-/* ── Dock buttons ─────────────────────────────────────────────────────────────── */
+/* ── Dock buttons ───────────────────────────────────────────────────────────────
+   Three identical controls: a pixel icon over a caption, filling the bar's height. The
+   dividing hairlines are gone with the strip they belonged to — inside a floating bar,
+   separators fight the rounded corners, and the pressed/active fill already says which
+   panel is up. */
 .app-dock-btn {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   background: none;
-  border: none;
-  border-right: 1px solid #2a2010;
-  color: var(--wood-lit);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: var(--muted-warm);
   cursor: pointer;
   font-family: var(--font-display);
-  font-size: 0.5rem;
+  font-size: 0.58rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.12s, color 0.12s, border-color 0.15s, transform 0.1s;
   padding: 0;
+  /* The icons are canvases; without this a stray press-drag selects them. */
+  -webkit-user-select: none;
+  user-select: none;
 }
-.app-dock-btn:last-child { border-right: none; }
-.app-dock-btn-icon { font-size: 1.1rem; line-height: 1; }
-.app-dock-btn:hover   { background: var(--ink); color: var(--gold-soft); }
-.app-dock-btn.is-active { background: #1e1a08; color: var(--gold); }
+.app-dock-btn-icon { display: flex; align-items: center; justify-content: center; line-height: 1; }
+.app-dock-btn-label { line-height: 1; }
+.app-dock-btn:hover { color: var(--gold-soft); }
+.app-dock-btn:active { transform: translateY(1px); }
+/* Active reads as a lit pane of the same glass, matching how `.mode-btn.is-active` and the
+   spell slots answer a press — one vocabulary for "this is the one that's on". */
+.app-dock-btn.is-active {
+  color: var(--gold);
+  border-color: hsl(44 70% 70% / 0.45);
+  background:
+    linear-gradient(150deg, hsl(44 85% 78% / 0.18) 0%, transparent 50%),
+    linear-gradient(180deg, hsl(44 60% 40% / 0.26), hsl(44 65% 20% / 0.30));
+  box-shadow: inset 0 1px 0 hsl(44 90% 88% / 0.32);
+}
 
 /* ── RPG UI Chrome ────────────────────────────────────────────────────────── */
 .rp-panel {
@@ -1288,16 +1490,43 @@ h1, h2, h3, h4,
 .rarity-legendary { color: var(--warn); text-shadow: 0 0 8px rgba(255,128,0,0.6); }
 
 /* ── Combat Log ───────────────────────────────────────────────────────────── */
+/* The COMBAT tab's feed. Deliberately built to `.chat-panel-body`'s measurements — same
+   padding, same scroll behaviour, same overscroll containment — because the two are tabs on
+   one panel and any difference between them reads as a bug rather than as a distinction. */
 .combat-log {
   /* Not `monospace` — the generic keyword resolves to Courier on macOS/iOS, which is
-     cramped and low-contrast at this size. A UI sans reads far better for chat. */
+     cramped and low-contrast at this size. A UI sans reads far better for a feed. */
   font-family: var(--font-ui);
   font-size: 0.78rem;
   line-height: 1.45;
   letter-spacing: 0.01em;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
   overflow-y: auto;
+  padding: 5px 7px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--wood) var(--ink-well);
+}
+.combat-log-empty { color: var(--muted-warm); padding: 4px 2px; font-size: 0.74rem; }
+.combat-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 1px 2px;
+  word-break: break-word;
+}
+.combat-line-time { color: #6a6258; font-size: 0.62rem; flex-shrink: 0; }
+/* The lines you scroll back to find get the chat bubble's treatment, so a level-up or a
+   boss spawn is picked out of a fast-moving feed by shape and not only by colour. */
+.combat-line-notable {
+  background: rgba(40, 34, 22, 0.9);
+  border: 1px solid #4a3a1e;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: 3px 0;
 }
 
 .combat-log::-webkit-scrollbar { width: 6px; }
@@ -2282,11 +2511,13 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   color: var(--muted);
 }
 
-/* The ☰ is a glyph, not a word, so it takes a square target instead of the label padding
+/* The ☰ is an icon, not a word, so it takes a square target instead of the label padding
    the lettered buttons need — the strip is 232px wide and already spends most of it. */
 .hero-bar-menu {
-  padding: 5px 7px;
-  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
   letter-spacing: 0;
   line-height: 1;
 }
@@ -2520,6 +2751,59 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   gap: 6px;
 }
 
+/* ── The radar ───────────────────────────────────────────────────────────────
+   Sizing lives here rather than inline in MinimapRadar because on desktop the disc's
+   diameter derives from `--unit-h`, a value only measurable at runtime. The canvas draws
+   at a fixed 128px whatever the display size, so growing the disc costs no sharpness. */
+.minimap-radar {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.minimap-disc {
+  position: relative;
+  width: var(--radar-size);
+  height: var(--radar-size);
+}
+.minimap-caption {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c8b890;
+  text-shadow: 0 1px 2px #000;
+  max-width: var(--radar-w);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (min-width: 900px) {
+  /* Fill the corner box, less the caption line and its gap, so the disc's bottom edge is
+     the box's bottom edge — which is the unit frames' bottom edge. Capped at the column
+     width so a tall party frame cannot push the disc wider than the rail beneath it. */
+  :root { --radar-size: min(var(--col-r-w), calc(var(--unit-h) - 15px)); }
+}
+
+/* ── Quest tracker, beneath the inventory ────────────────────────────────────
+   It used to sit between the radar and the rail, which pushed the rail down by its own
+   height — so the right column started lower than the left one, and moved every time a
+   quest line wrapped. Below the rail it cannot do either. `--rail-r-h` is measured
+   (HudOverlay), so this follows the inventory whether it is open, folded to a stub, or
+   grown by a bag upgrade. */
+.hud-quest {
+  position: absolute;
+  right: calc(8px + var(--safe-r));
+  top: calc(var(--hud-r-h) + 16px + var(--safe-t));
+  width: var(--col-r-w);
+  display: flex;
+  justify-content: flex-end;
+}
+@media (min-width: 900px) {
+  .hud-quest { top: calc(var(--hud-r-h) + var(--rail-r-h) + 24px + var(--safe-t)); }
+}
+
 .objective-tracker {
   width: 172px;
   max-width: 44vw;
@@ -2681,4 +2965,193 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   vertical-align: 1px;
+}
+
+/* ── Centre-screen announcements ──────────────────────────────────────────────
+   The two moments the game most needs to land: a craft finishing and a level gained.
+   Both used to live in the top-right stack under the minimap, where on desktop the
+   inventory rail (z 50) draws straight over the HUD layer (z 20) — the reward card was
+   behind a panel, which is how "the item creation tooltip is obscured" happened.
+
+   This layer is the fix, and it is deliberately not a corner: it is the middle of the
+   screen, over every panel, dock included. Click-through everywhere except on the cards
+   themselves, so an idle player watching a fight is never blocked — and both cards expire
+   on their own, so walking away never leaves one up.
+
+   `justify-content: center` with the action bar's measured height taken off the bottom
+   centres the stack on the WORLD rather than on the viewport; without it the cards drift
+   low, over the chrome, on a phone where that band is a fifth of the screen. */
+.toast-centre {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  /* Reserving the bottom chrome shifts the stack up by HALF of it, which is the whole
+     point: centred on the world, not on the viewport. */
+  padding: 0 12px var(--actionbar-h);
+  pointer-events: none;
+}
+@media (max-width: 899px) {
+  /* The dock is part of that chrome on a phone, and it is a fifth of the screen with the
+     action bar. */
+  .toast-centre { padding-bottom: calc(var(--actionbar-h) + var(--dock-h)); }
+}
+.toast-centre > * { pointer-events: auto; }
+
+/* ── The level-up banner ──
+   The loudest card in the game, and it should be: in an idle game this is the only beat
+   that says the last ten minutes counted for something. Gold ring, gold glow, one big
+   numeral, and three quiet lines of receipts under it. */
+.levelup-toast {
+  cursor: pointer;
+  width: min(320px, 86vw);
+  padding: 12px 16px 14px;
+  text-align: center;
+  border-radius: 14px;
+  border: 1px solid var(--gold-deep);
+  background:
+    linear-gradient(160deg, hsl(44 85% 78% / 0.16) 0%, transparent 46%),
+    linear-gradient(180deg, rgba(26, 21, 8, 0.95), rgba(10, 8, 5, 0.96));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 hsl(44 90% 88% / 0.35),
+    0 10px 34px rgba(0, 0, 0, 0.7),
+    0 0 26px hsl(44 85% 55% / 0.28);
+  animation: il-levelup-in 320ms cubic-bezier(0.2, 1.2, 0.35, 1);
+}
+.levelup-eyebrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+}
+.levelup-headline {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1.1;
+  color: var(--gold-bright);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+/* The number is the headline the eye actually lands on, so it gets the size and the word
+   next to it shrinks out of the way. */
+.levelup-level {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 2px;
+}
+.levelup-level-word {
+  font-family: var(--font-ui);
+  font-size: 0.55rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-warm);
+}
+.levelup-level-num {
+  font-family: var(--font-display);
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--gold);
+  text-shadow: 0 0 14px hsl(44 85% 55% / 0.5), 0 2px 6px rgba(0, 0, 0, 0.9);
+}
+.levelup-gains {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(200, 161, 0, 0.22);
+  font-size: 0.6rem;
+}
+.levelup-gain { color: var(--parchment); }
+/* A talent point and a new spell are actions waiting for the player, not statistics —
+   they read in gold so the difference is visible without another line of text. */
+.levelup-gain.is-lit { color: var(--gold-warm); font-weight: 700; }
+
+@keyframes il-levelup-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.92); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .levelup-toast { animation: none; }
+}
+
+/* ── The Watch ────────────────────────────────────────────────────────────────
+   The offline budget, finally visible. Two segments in one track: the STANDING watch
+   (permanent — free base, Long Watch ranks, Standing Orders) in gold, and the BANKED
+   extension (bought per trip, consumed by the absence that uses it) in a paler tint.
+   They read as one resource with two tempers, which is what they are. */
+.watch-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Sits at the foot of the rail under the zone track, so the breathing room goes ABOVE
+     it now rather than below. */
+  margin-top: 6px;
+  padding: 6px 7px;
+  border: 1px solid rgba(200, 161, 0, 0.22);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(200, 161, 0, 0.07), rgba(0, 0, 0, 0.18));
+}
+.watch-meter-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.watch-meter-title { color: var(--gold-soft); }
+.watch-meter-total { margin-left: auto; color: var(--gold); font-weight: 700; letter-spacing: 0; }
+.watch-meter-track {
+  position: relative;
+  display: flex;
+  height: 9px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--ink-well);
+  border: 1px solid var(--edge);
+}
+.watch-meter-fill { height: 100%; }
+.watch-meter-fill.is-base {
+  background: linear-gradient(180deg, var(--gold), var(--gold-deep));
+}
+/* Paler and hatched-feeling, so "borrowed time" does not read as more of the same thing. */
+.watch-meter-fill.is-bank {
+  background: linear-gradient(180deg, hsl(44 60% 72% / 0.85), hsl(44 45% 46% / 0.85));
+  border-left: 1px solid rgba(0, 0, 0, 0.45);
+}
+.watch-meter-legend { font-size: 0.5rem; color: var(--muted); line-height: 1.35; }
+.watch-meter-buy { display: flex; gap: 5px; }
+.watch-meter-banked { font-size: 0.5rem; color: var(--gold-soft); }
+/* Standing Orders — the permanent capacity SKU. Deliberately quieter than the gold
+   Extend button above it: the gold sink is the everyday action and should lead, the
+   real-money one is the occasional decision and should not shout over it. */
+.watch-meter-sku {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.52rem;
+  padding: 5px 7px;
+  color: var(--gold-soft);
+}
+.watch-meter-sku-price {
+  margin-left: auto;
+  color: var(--gold);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }

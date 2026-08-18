@@ -13,9 +13,16 @@ import { ChatPanel } from './components/game/ChatPanel'
 import { PlayerCard } from './components/game/PlayerCard'
 import { WhisperWindow } from './components/game/WhisperWindow'
 import { installViewportInsets } from './engine/viewportInsets'
+import { scheduleWatchEnd, cancelWatchEnd } from './engine/watchNotifications'
+import { watchCapacitySeconds } from './engine/offline'
+import { compileUpgrades } from './data/upgrades'
+import { compileUniques } from './data/uniques'
+import { getPurchaseState, purchasedWatchHours } from './monetization/purchases'
 import { useDismissable } from './components/ui/useDismissable'
 import { QuestToast } from './components/game/QuestToast'
 import { OfflineReportToast } from './components/game/OfflineReportToast'
+import { CraftResultToast } from './components/game/CraftResultToast'
+import { LevelUpToast } from './components/game/LevelUpToast'
 import { slotStorage, getLastSlotId, setLastSlotId } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
 import { initAudio, setZone as audioSetZone, setVolume as audioSetVolume, setWeather as audioSetWeather } from './engine/audio/audioEngine'
@@ -147,6 +154,31 @@ export default function App() {
   // Publish the iOS keyboard height as --kb-inset so fixed panels can ride above it.
   useEffect(installViewportInsets, [])
 
+  // ── The watch notification ───────────────────────────────────────────────────────
+  //
+  // Scheduled when the app goes to the BACKGROUND, because that is the only moment the
+  // length of the coming absence is knowable — the watch is base + permanent ranks +
+  // whatever is banked right now, and all three change during play. Cancelled on return,
+  // since a pending notice can then only fire wrongly.
+  //
+  // `visibilitychange` rather than a Capacitor App listener: it fires in WKWebView and in
+  // a browser tab alike, so the same code path is exercised in dev (where it no-ops on the
+  // native guard) as in the shipped app.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') { void cancelWatchEnd(); return }
+      const s = useGameStore.getState()
+      if (!s.initialized) return
+      const permanentHours =
+        compileUpgrades(s.upgradeRanks).offlineHours +
+        compileUniques(s.equipment).offlineHours +
+        purchasedWatchHours(getPurchaseState().active)
+      void scheduleWatchEnd(watchCapacitySeconds(s, permanentHours).total)
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
+
   // ── Procedural audio ─────────────────────────────────────────────────────────────
   //
   // iOS WKWebView only resumes an AudioContext off a user gesture, so the context is latched
@@ -258,7 +290,7 @@ export default function App() {
     return () => window.clearInterval(id)
   }, [])
 
-  // Publish the log panel's real height as --log-h.
+  // Publish whatever occupies the foot of the left column as --log-h.
   //
   // The left rail's max-height subtracts --log-h so the column stops where the chat
   // panel starts. That number was hand-kept in :root at 220px, matching a `height` set
@@ -266,9 +298,15 @@ export default function App() {
   // mis-sizes, either overlapping the chat or leaving a band of dead space above it.
   // Measuring it means the coupling cannot drift. (Mobile ignores the variable: the rail
   // is a drawer capped against the dock there, and the log is a floating sheet.)
+  //
+  // Which ELEMENT gets measured now depends on whether the feed is extended, because on
+  // desktop a retracted feed leaves the chat button in its place — a 44px control, not a
+  // 220px panel. Measuring the panel unconditionally would reserve the whole feed's
+  // height for a button and strand the rail 180px short of the bottom of the screen.
   const logRef = useRef<HTMLDivElement>(null)
+  const logFabRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
-    const el = logRef.current
+    const el: HTMLElement | null = panels.log ? logRef.current : logFabRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
     const publish = () => {
       const h = el.getBoundingClientRect().height
@@ -278,7 +316,7 @@ export default function App() {
     ro.observe(el)
     publish()
     return () => ro.disconnect()
-  }, [initialized])
+  }, [initialized, panels.log])
   const [slots, setSlots]   = useState<SaveSlotMeta[]>(() => slotStorage.list())
   // Show creation directly when there are no heroes yet; otherwise the select screen.
   const [creating, setCreating] = useState<boolean>(() => slotStorage.list().length === 0)
@@ -444,7 +482,7 @@ export default function App() {
             aria-label={panels.hero ? 'Close character panel' : 'Show character panel'}
             aria-expanded={panels.hero}
           >
-            {panels.hero ? '✕' : <><SpriteIcon emoji="☰" size={14} /><span className="rail-restore-label">Menu</span></>}
+            {panels.hero ? '✕' : <><SpriteIcon ui="menu" size={14} /><span className="rail-restore-label">Menu</span></>}
           </button>
         </div>
         <div className="rail-body">
@@ -485,7 +523,13 @@ export default function App() {
             aria-label={panels.bag ? 'Close inventory' : 'Show inventory'}
             aria-expanded={panels.bag}
           >
-            {panels.bag ? '✕' : <SpriteIcon ui="bag" size={15} />}
+            {/* Collapsed, this button is the only thing left of the rail, so it says what
+                it reopens — the same treatment the character rail's "Menu" gets. An
+                unlabelled bag glyph on a 62px stub is a guess, not a control. */}
+            {/* Sword, not a bag — the same swap the dock's Gear button makes. This rail is
+                what you fight with; the backpack glyph belonged to the old "Inventory"
+                framing and the two breakpoints have to show one control, not two. */}
+            {panels.bag ? '✕' : <><SpriteIcon emoji="⚔" size={15} /><span className="rail-restore-label">Gear</span></>}
           </button>
         </div>
         <div className="rail-body">
@@ -507,11 +551,36 @@ export default function App() {
             className={`app-log-tab${logTab === 'chat' ? ' is-active' : ''}`}
             onClick={() => setLogTab('chat')}
           >CHAT</button>
+          {/* The feed folds away like the rails do, and carries the same single control in
+              its own head. It was the one panel on desktop with no way to dismiss it: the
+              world is the thing you are here to watch, and a permanent 232px feed over the
+              bottom-left corner of it is furniture the player never agreed to. */}
+          <button
+            className="rail-minimize app-log-minimize"
+            onClick={() => toggle('log')}
+            title="Close chat"
+            aria-label="Close chat"
+            aria-expanded={panels.log}
+          >✕</button>
         </div>
         <div className="app-log-content">
           {logTab === 'combat' ? <CombatLog /> : <ChatPanel />}
         </div>
       </div>
+      {/* Restore control for the folded feed — a floating chat button standing exactly
+          where the panel's own corner was, so it expands back out of the thing you
+          pressed. Desktop only: on a phone the dock button is already the way back, and
+          the model there is one panel at a time (see `toggle`). */}
+      <button
+        ref={logFabRef}
+        className={`app-log-fab${panels.log ? '' : ' is-visible'}`}
+        onClick={() => toggle('log')}
+        title="Show chat"
+        aria-label="Show chat"
+        aria-expanded={panels.log}
+      >
+        <SpriteIcon ui="chat" size={20} />
+      </button>
 
       {/* Target card for a tapped hero, and the whisper conversation it can open.
           Both are fixed overlays so they work identically at every breakpoint — in
@@ -519,31 +588,63 @@ export default function App() {
       <PlayerCard />
       <WhisperWindow />
 
-      {/* ── Mobile dock ── */}
-      <div className="app-dock rp-glass-strong">
+      {/* ── Mobile dock ──
+          The phone's primary navigation, and now dressed as one: a floating frosted bar
+          held off the bottom edge, the same material as the action bar above it, rather
+          than an opaque strip welded to the screen.
+
+          Three buttons, each an icon over a caption of the same weight. The captions used
+          to disagree with each other — a sword glyph labelled "Hero" for what is actually
+          the menu rail, a scroll labelled "Log" for what people use as chat, and a
+          backpack with a gold figure where the other two had words. Now each button says
+          what it opens and shows the icon that panel already uses on desktop: ☰ Menu for
+          the character rail (the same hamburger its collapsed chip carries), a speech
+          bubble for chat, and a sword for Gear — because Gear is the equipment you fight
+          with, and the bag glyph belonged to the old "Inventory" framing. */}
+      <div className="app-dock rp-glass">
         <button
           className={`app-dock-btn${panels.hero ? ' is-active' : ''}`}
+          aria-label="Menu and character"
+          aria-expanded={panels.hero}
           onClick={() => toggle('hero')}
         >
-          <span className="app-dock-btn-icon"><SpriteIcon emoji="⚔" size={18} /></span>
-          <span>Hero</span>
+          <span className="app-dock-btn-icon"><SpriteIcon ui="menu" size={20} /></span>
+          <span className="app-dock-btn-label">Menu</span>
         </button>
         <button
           className={`app-dock-btn${panels.log ? ' is-active' : ''}`}
+          aria-label="Chat and combat log"
+          aria-expanded={panels.log}
           onClick={() => toggle('log')}
         >
-          <span className="app-dock-btn-icon"><SpriteIcon emoji="📜" size={18} /></span>
-          <span>Log</span>
+          <span className="app-dock-btn-icon"><SpriteIcon ui="chat" size={20} /></span>
+          <span className="app-dock-btn-label">Chat</span>
         </button>
         <button
           className={`app-dock-btn${panels.bag ? ' is-active' : ''}`}
+          aria-label={`Gear — ${formatGold(gold)} gold`}
+          aria-expanded={panels.bag}
           onClick={() => toggle('bag')}
         >
-          <span className="app-dock-btn-icon"><SpriteIcon ui="bag" size={18} /></span>
-          {/* Gold rides the bag rather than occupying a bar across the top of the world:
-              it belongs with the things you spend it on, and costs no vertical space. */}
+          <span className="app-dock-btn-icon"><SpriteIcon emoji="⚔" size={20} /></span>
+          <span className="app-dock-btn-label">Gear</span>
+          {/* Gold rides the Gear button rather than occupying a bar across the top of the
+              world: it belongs with the things you spend it on, and costs no vertical
+              space. As a badge rather than a substituted caption, so all three buttons
+              still read as the same control. */}
           <span className="app-dock-gold">{formatGold(gold)}</span>
         </button>
+      </div>
+
+      {/* ── Centre-screen announcements ──
+          Craft reveals and level-ups used to be tucked into the top-right stack under the
+          minimap, where on desktop the inventory rail (z 50) draws straight over the HUD
+          layer (z 20) — the card the player earned was literally behind a panel. These are
+          the two moments the game most needs to land, so they land in the middle of the
+          screen, over everything, and expire on their own. */}
+      <div className="toast-centre">
+        <LevelUpToast />
+        <CraftResultToast />
       </div>
 
       {/* No scrim. The hero and inventory drawers used to dim the world behind them, which

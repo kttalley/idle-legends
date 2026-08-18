@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useGameStore } from '../../store/gameStore'
+import { useGameStore, abilityOutOfRange } from '../../store/gameStore'
 import { getClassAbilities } from '../../data/abilities'
 import { compileTalentEffects } from '../../engine/combat'
 import { SpriteIcon } from '../ui/SpriteIcon'
@@ -29,15 +29,23 @@ interface SlotProps {
   cooldown: number
   /** Null once unlocked; the required level while the slot is still shut. */
   lockedUntil: number | null
+  /** Target is further away than this hero can reach — the slot is dead until they close.
+   *  Distinct from cooldown so the two can read differently to the player. */
+  outOfRange?: boolean
   onActivate: () => void
   onInspect: () => void
   compact?: boolean
 }
 
-function SkillSlot({ ability, remaining, cooldown, lockedUntil, onActivate, onInspect, compact }: SlotProps) {
+function SkillSlot({ ability, remaining, cooldown, lockedUntil, outOfRange = false, onActivate, onInspect, compact }: SlotProps) {
   const pct = remaining > 0 ? remaining / Math.max(0.1, cooldown) : 0
   const onCd = remaining > 0
   const locked = lockedUntil !== null
+  // Two different reasons a press does nothing, and the player is owed both. The store
+  // refuses an out-of-range cast (finishCast), but a button that looks live and answers
+  // with a log line is indistinguishable from a broken one — which is exactly how it was
+  // reported. Disabled here, so the bar shows reach as a state rather than a surprise.
+  const blocked = onCd || outOfRange
 
   // 64px slots plus four mode toggles overflowed a 390px viewport, which is why the bar
   // was pressed against both edges. 56 still clears the touch minimum comfortably.
@@ -65,15 +73,17 @@ function SkillSlot({ ability, remaining, cooldown, lockedUntil, onActivate, onIn
   // live only in a `title` attribute, i.e. nowhere at all on a phone — moves to
   // press-and-hold. The corner dot is there so the gesture is discoverable rather than
   // folklore.
-  const press = useLongPress(onInspect, () => { if (!onCd) onActivate() })
+  const press = useLongPress(onInspect, () => { if (!blocked) onActivate() })
 
   return (
     <button
-      className="skill-slot"
-      title={`${ability.name}\n${ability.description}\nCooldown: ${+cooldown.toFixed(1)}s — hold to inspect`}
+      className={`skill-slot${outOfRange ? " is-out-of-range" : ""}`}
+      title={outOfRange
+        ? `${ability.name} — out of range. Get closer.`
+        : `${ability.name}\n${ability.description}\nCooldown: ${+cooldown.toFixed(1)}s — hold to inspect`}
       {...press}
-      aria-label={`${ability.name}. Hold to inspect.`}
-      disabled={onCd}
+      aria-label={`${ability.name}.${outOfRange ? " Out of range." : ""} Hold to inspect.`}
+      disabled={blocked}
       style={{
         width: size,
         height: size,
@@ -145,7 +155,7 @@ function SkillSlot({ ability, remaining, cooldown, lockedUntil, onActivate, onIn
 
 export function SkillBar({ embedded = false, compact = false }:
   { embedded?: boolean; compact?: boolean } = {}) {
-  const { playerClass, level, talentAllocs, skillCooldowns, activateAbility, isAlive } = useGameStore()
+  const { playerClass, level, talentAllocs, skillCooldowns, activateAbility, isAlive, currentMob } = useGameStore()
   const abilities = getClassAbilities(playerClass)
   const [inspected, setInspected] = useState<ActiveAbilityDef | null>(null)
 
@@ -157,6 +167,21 @@ export function SkillBar({ embedded = false, compact = false }:
   )
   const cooldownOf = (a: ActiveAbilityDef) => a.cooldownSeconds * (mods[a.id]?.cooldownMult ?? 1)
   const lockOf = (a: ActiveAbilityDef) => (level < a.unlockLevel ? a.unlockLevel : null)
+
+  // ── Reach, asked the same way the store asks it ────────────────────────────
+  // Literally the same function now: `abilityOutOfRange` is what gates the cast at start
+  // (`activateAbility`) and at completion (`finishCast`), so the bar cannot show a spell as
+  // live that the store is about to refuse. This used to be a third hand-rolled copy of the
+  // distance check, which is how the three managed to disagree.
+  //
+  // One difference is kept on purpose: with NO target at all the store lets a cast begin
+  // (there is nothing to be out of range of yet), while the bar still greys the slot —
+  // a targetless offensive spell has nothing to hit, and showing it as live invites a press
+  // that does nothing.
+  const outOfRangeFor = (a: ActiveAbilityDef) =>
+    a.effects.every(e => e.type === 'hot')
+      ? false
+      : currentMob === null || abilityOutOfRange({ currentMob, playerClass }, a)
 
   const inspectedMod = inspected ? mods[inspected.id] : undefined
 
@@ -227,6 +252,7 @@ export function SkillBar({ embedded = false, compact = false }:
             remaining={skillCooldowns[ability.id] ?? 0}
             cooldown={cooldownOf(ability)}
             lockedUntil={lockOf(ability)}
+            outOfRange={outOfRangeFor(ability)}
             onActivate={() => isAlive && activateAbility(ability.id)}
             onInspect={() => setInspected(ability)}
             compact={compact}
@@ -264,6 +290,7 @@ export function SkillBar({ embedded = false, compact = false }:
           remaining={skillCooldowns[ability.id] ?? 0}
           cooldown={cooldownOf(ability)}
           lockedUntil={lockOf(ability)}
+          outOfRange={outOfRangeFor(ability)}
           onActivate={() => isAlive && activateAbility(ability.id)}
           onInspect={() => setInspected(ability)}
         />

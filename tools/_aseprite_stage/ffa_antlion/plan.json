@@ -1,0 +1,542 @@
+{
+  "rigId": "ffa_antlion",
+  "frameW": 32,
+  "frameH": 40,
+  "anchor": {
+    "x": 16,
+    "y": 40
+  },
+  "palette": [
+    "transparent",
+    "#000000",
+    "#587868",
+    "#f8f8e8",
+    "#183038",
+    "#a05800",
+    "#f89000",
+    "#f8f000",
+    "#2050d8",
+    "#5880f8",
+    "#78c8e8",
+    "#b0e8e0",
+    "#a0c0b0",
+    "#207808",
+    "#30b010",
+    "#80e820"
+  ],
+  "layerStack": [
+    "outline",
+    "body",
+    "accent",
+    "highlight",
+    "pixel"
+  ],
+  "tags": [
+    {
+      "name": "idle-se",
+      "anim": "idle",
+      "facing": "se",
+      "fps": 3,
+      "loop": true,
+      "frameCount": 1,
+      "framePaths": [
+        "idle/se/f00.png"
+      ],
+      "durationsMs": [
+        333
+      ],
+      "sourceFrames": [
+        0
+      ]
+    },
+    {
+      "name": "idle-ne",
+      "anim": "idle",
+      "facing": "ne",
+      "fps": 3,
+      "loop": true,
+      "frameCount": 1,
+      "framePaths": [
+        "idle/ne/f00.png"
+      ],
+      "durationsMs": [
+        333
+      ],
+      "sourceFrames": [
+        4
+      ]
+    },
+    {
+      "name": "walk-se",
+      "anim": "walk",
+      "facing": "se",
+      "fps": 11,
+      "loop": true,
+      "frameCount": 4,
+      "framePaths": [
+        "walk/se/f00.png",
+        "walk/se/f01.png",
+        "walk/se/f02.png",
+        "walk/se/f03.png"
+      ],
+      "durationsMs": [
+        91,
+        91,
+        91,
+        91
+      ],
+      "sourceFrames": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "name": "walk-ne",
+      "anim": "walk",
+      "facing": "ne",
+      "fps": 11,
+      "loop": true,
+      "frameCount": 4,
+      "framePaths": [
+        "walk/ne/f00.png",
+        "walk/ne/f01.png",
+        "walk/ne/f02.png",
+        "walk/ne/f03.png"
+      ],
+      "durationsMs": [
+        91,
+        91,
+        91,
+        91
+      ],
+      "sourceFrames": [
+        4,
+        5,
+        6,
+        7
+      ]
+    },
+    {
+      "name": "attack-se",
+      "anim": "attack",
+      "facing": "se",
+      "fps": 10,
+      "loop": false,
+      "frameCount": 9,
+      "framePaths": [
+        "attack/se/f00.png",
+        "attack/se/f01.png",
+        "attack/se/f02.png",
+        "attack/se/f03.png",
+        "attack/se/f04.png",
+        "attack/se/f05.png",
+        "attack/se/f06.png",
+        "attack/se/f07.png",
+        "attack/se/f08.png"
+      ],
+      "durationsMs": [
+        100,
+        100,
+        300,
+        100,
+        300,
+        100,
+        300,
+        100,
+        100
+      ],
+      "sourceFrames": [
+        8,
+        9,
+        10,
+        13,
+        14,
+        17,
+        18,
+        21,
+        22
+      ]
+    },
+    {
+      "name": "attack-ne",
+      "anim": "attack",
+      "facing": "ne",
+      "fps": 10,
+      "loop": false,
+      "frameCount": 9,
+      "framePaths": [
+        "attack/ne/f00.png",
+        "attack/ne/f01.png",
+        "attack/ne/f02.png",
+        "attack/ne/f03.png",
+        "attack/ne/f04.png",
+        "attack/ne/f05.png",
+        "attack/ne/f06.png",
+        "attack/ne/f07.png",
+        "attack/ne/f08.png"
+      ],
+      "durationsMs": [
+        100,
+        100,
+        300,
+        100,
+        300,
+        100,
+        300,
+        100,
+        100
+      ],
+      "sourceFrames": [
+        23,
+        24,
+        25,
+        28,
+        29,
+        32,
+        33,
+        36,
+        37
+      ]
+    },
+    {
+      "name": "cast-se",
+      "anim": "cast",
+      "facing": "se",
+      "fps": 10,
+      "loop": false,
+      "frameCount": 9,
+      "framePaths": [
+        "cast/se/f00.png",
+        "cast/se/f01.png",
+        "cast/se/f02.png",
+        "cast/se/f03.png",
+        "cast/se/f04.png",
+        "cast/se/f05.png",
+        "cast/se/f06.png",
+        "cast/se/f07.png",
+        "cast/se/f08.png"
+      ],
+      "durationsMs": [
+        100,
+        100,
+        300,
+        100,
+        300,
+        100,
+        300,
+        100,
+        100
+      ],
+      "sourceFrames": [
+        38,
+        39,
+        40,
+        43,
+        44,
+        47,
+        48,
+        51,
+        52
+      ]
+    },
+    {
+      "name": "cast-ne",
+      "anim": "cast",
+      "facing": "ne",
+      "fps": 10,
+      "loop": false,
+      "frameCount": 9,
+      "framePaths": [
+        "cast/ne/f00.png",
+        "cast/ne/f01.png",
+        "cast/ne/f02.png",
+        "cast/ne/f03.png",
+        "cast/ne/f04.png",
+        "cast/ne/f05.png",
+        "cast/ne/f06.png",
+        "cast/ne/f07.png",
+        "cast/ne/f08.png"
+      ],
+      "durationsMs": [
+        100,
+        100,
+        300,
+        100,
+        300,
+        100,
+        300,
+        100,
+        100
+      ],
+      "sourceFrames": [
+        53,
+        54,
+        55,
+        58,
+        59,
+        62,
+        63,
+        66,
+        67
+      ]
+    },
+    {
+      "name": "ready-se",
+      "anim": "ready",
+      "facing": "se",
+      "fps": 6,
+      "loop": true,
+      "frameCount": 2,
+      "framePaths": [
+        "ready/se/f00.png",
+        "ready/se/f01.png"
+      ],
+      "durationsMs": [
+        167,
+        167
+      ],
+      "sourceFrames": [
+        90,
+        91
+      ]
+    },
+    {
+      "name": "ready-ne",
+      "anim": "ready",
+      "facing": "ne",
+      "fps": 6,
+      "loop": true,
+      "frameCount": 2,
+      "framePaths": [
+        "ready/ne/f00.png",
+        "ready/ne/f01.png"
+      ],
+      "durationsMs": [
+        167,
+        167
+      ],
+      "sourceFrames": [
+        92,
+        93
+      ]
+    },
+    {
+      "name": "flinch-se",
+      "anim": "flinch",
+      "facing": "se",
+      "fps": 11,
+      "loop": false,
+      "frameCount": 2,
+      "framePaths": [
+        "flinch/se/f00.png",
+        "flinch/se/f01.png"
+      ],
+      "durationsMs": [
+        728,
+        91
+      ],
+      "sourceFrames": [
+        68,
+        76
+      ]
+    },
+    {
+      "name": "flinch-ne",
+      "anim": "flinch",
+      "facing": "ne",
+      "fps": 11,
+      "loop": false,
+      "frameCount": 2,
+      "framePaths": [
+        "flinch/ne/f00.png",
+        "flinch/ne/f01.png"
+      ],
+      "durationsMs": [
+        728,
+        91
+      ],
+      "sourceFrames": [
+        77,
+        85
+      ]
+    },
+    {
+      "name": "kneel-se",
+      "anim": "kneel",
+      "facing": "se",
+      "fps": 3,
+      "loop": true,
+      "frameCount": 1,
+      "framePaths": [
+        "kneel/se/f00.png"
+      ],
+      "durationsMs": [
+        333
+      ],
+      "sourceFrames": [
+        86
+      ]
+    },
+    {
+      "name": "kneel-ne",
+      "anim": "kneel",
+      "facing": "ne",
+      "fps": 3,
+      "loop": true,
+      "frameCount": 1,
+      "framePaths": [
+        "kneel/ne/f00.png"
+      ],
+      "durationsMs": [
+        333
+      ],
+      "sourceFrames": [
+        87
+      ]
+    },
+    {
+      "name": "ko-se",
+      "anim": "ko",
+      "facing": "se",
+      "fps": 3,
+      "loop": false,
+      "frameCount": 1,
+      "framePaths": [
+        "ko/se/f00.png"
+      ],
+      "durationsMs": [
+        333
+      ],
+      "sourceFrames": [
+        88
+      ]
+    },
+    {
+      "name": "ko-ne",
+      "anim": "ko",
+      "facing": "ne",
+      "fps": 3,
+      "loop": false,
+      "frameCount": 1,
+      "framePaths": [
+        "ko/ne/f00.png"
+      ],
+      "durationsMs": [
+        333
+      ],
+      "sourceFrames": [
+        89
+      ]
+    },
+    {
+      "name": "jump-se",
+      "anim": "jump",
+      "facing": "se",
+      "fps": 10,
+      "loop": false,
+      "frameCount": 3,
+      "framePaths": [
+        "jump/se/f00.png",
+        "jump/se/f01.png",
+        "jump/se/f02.png"
+      ],
+      "durationsMs": [
+        100,
+        200,
+        100
+      ],
+      "sourceFrames": [
+        94,
+        95,
+        97
+      ]
+    },
+    {
+      "name": "jump-ne",
+      "anim": "jump",
+      "facing": "ne",
+      "fps": 10,
+      "loop": false,
+      "frameCount": 2,
+      "framePaths": [
+        "jump/ne/f00.png",
+        "jump/ne/f01.png"
+      ],
+      "durationsMs": [
+        200,
+        200
+      ],
+      "sourceFrames": [
+        98,
+        100
+      ]
+    }
+  ],
+  "frames": [
+    "idle/se/f00.png",
+    "idle/ne/f00.png",
+    "walk/se/f00.png",
+    "walk/se/f01.png",
+    "walk/se/f02.png",
+    "walk/se/f03.png",
+    "walk/ne/f00.png",
+    "walk/ne/f01.png",
+    "walk/ne/f02.png",
+    "walk/ne/f03.png",
+    "attack/se/f00.png",
+    "attack/se/f01.png",
+    "attack/se/f02.png",
+    "attack/se/f03.png",
+    "attack/se/f04.png",
+    "attack/se/f05.png",
+    "attack/se/f06.png",
+    "attack/se/f07.png",
+    "attack/se/f08.png",
+    "attack/ne/f00.png",
+    "attack/ne/f01.png",
+    "attack/ne/f02.png",
+    "attack/ne/f03.png",
+    "attack/ne/f04.png",
+    "attack/ne/f05.png",
+    "attack/ne/f06.png",
+    "attack/ne/f07.png",
+    "attack/ne/f08.png",
+    "cast/se/f00.png",
+    "cast/se/f01.png",
+    "cast/se/f02.png",
+    "cast/se/f03.png",
+    "cast/se/f04.png",
+    "cast/se/f05.png",
+    "cast/se/f06.png",
+    "cast/se/f07.png",
+    "cast/se/f08.png",
+    "cast/ne/f00.png",
+    "cast/ne/f01.png",
+    "cast/ne/f02.png",
+    "cast/ne/f03.png",
+    "cast/ne/f04.png",
+    "cast/ne/f05.png",
+    "cast/ne/f06.png",
+    "cast/ne/f07.png",
+    "cast/ne/f08.png",
+    "ready/se/f00.png",
+    "ready/se/f01.png",
+    "ready/ne/f00.png",
+    "ready/ne/f01.png",
+    "flinch/se/f00.png",
+    "flinch/se/f01.png",
+    "flinch/ne/f00.png",
+    "flinch/ne/f01.png",
+    "kneel/se/f00.png",
+    "kneel/ne/f00.png",
+    "ko/se/f00.png",
+    "ko/ne/f00.png",
+    "jump/se/f00.png",
+    "jump/se/f01.png",
+    "jump/se/f02.png",
+    "jump/ne/f00.png",
+    "jump/ne/f01.png"
+  ]
+}

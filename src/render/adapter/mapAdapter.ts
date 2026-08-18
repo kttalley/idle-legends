@@ -5,6 +5,7 @@
 import type { TileMapData } from '../types'
 import type { ZoneMap, ZoneId } from '../../data/types'
 import { TILE } from '../placeholderArt'
+import { hasPalette } from '../palettes'
 import { useScaffoldArt } from './fftaRoster'
 
 export const MAP_SIZE = 64
@@ -256,4 +257,17 @@ const BIOME_PALETTE: Record<ZoneId, string> = {
 
 export function biomePaletteId(zoneId: ZoneId): string {
   return BIOME_PALETTE[zoneId] ?? 'biome/meadow'
+}
+
+/**
+ * Palette for the zone's scenery props — trees, boulders, ruins, landmarks.
+ *
+ * Derived from the ground palette's id rather than a second hand-kept table, so a zone
+ * added to `BIOME_PALETTE` cannot silently miss out and fall back to neutral grey stone.
+ * The registry has a `prop/<biome>` for every biome (see palettes.ts); the guard is only
+ * for a biome registered without one.
+ */
+export function propPaletteId(zoneId: ZoneId): string {
+  const id = `prop/${biomePaletteId(zoneId).slice('biome/'.length)}`
+  return hasPalette(id) ? id : 'prop/verdant'
 }

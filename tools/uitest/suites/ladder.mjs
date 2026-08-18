@@ -29,7 +29,7 @@ export async function run({ send, appUrl, check, note }) {
   // beside Looks; if it ever stops being reachable that is a store-metadata problem, not
   // a UX nitpick.
   const openedHero = await evaluate(send, `(() => {
-    const b = [...document.querySelectorAll('.app-dock-btn')].find(x => /hero/i.test(x.textContent));
+    const b = [...document.querySelectorAll('.app-dock-btn')].find(x => /menu/i.test(x.textContent));
     if (!b) return false; b.click(); return true;
   })()`)
   check('the hero drawer opens from the dock', openedHero)
@@ -171,7 +171,12 @@ export async function run({ send, appUrl, check, note }) {
   })()`)
   note(`desktop stub: ${JSON.stringify(stub)}`)
   check('the retracted rail is still rendered', stub && stub.display !== 'none')
-  check('it leaves a stub on screen', stub && stub.onScreen && stub.width > 0 && stub.width < 80)
+  // The bound was `< 80`, which encoded a stub that was a single 34px arrow. It is now a
+  // labelled "☰ Menu" chip, because the arrow left the game's menu — settings, character
+  // select — reachable only by first restoring a panel you had deliberately put away. What
+  // the assertion is actually for is that retracting yields the world without stranding the
+  // way back, so it bounds the stub against the RAIL it replaces, not against a past width.
+  check('it leaves a stub on screen', stub && stub.onScreen && stub.width > 0 && stub.width < 140)
   check('the restore control is visible inside the stub', stub?.restoreVisible === true)
 
   await evaluate(send, `document.querySelector('.app-sidebar-left .rail-minimize')?.click()`)

@@ -13,20 +13,22 @@
 import { Scene, type Camera, type Entity } from '../scene'
 import { bakeGround, feetX, feetY, HALF_W, HALF_H, type GroundBuffer } from '../tilemap'
 import { loadSprite, loadSpriteOrPlaceholder } from '../indexedSprite'
-import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeBoltRig, makeBurstRig, TILE_ANIMS, TILE, makeTownBuildings, TOWN_BUILDING } from '../placeholderArt'
+import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeLandmarks, makeBoltRig, makeBurstRig, TILE_ANIMS, TILE, makeTownBuildings, TOWN_BUILDING } from '../placeholderArt'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { composePalette } from '../palette'
 import { heroPaletteId, type AccentKey } from './heroWardrobe'
-import { zoneMapToTileMap, biomePaletteId, MAP_SIZE, PAD, loadFftaTerrain } from './mapAdapter'
+import { zoneMapToTileMap, biomePaletteId, propPaletteId, MAP_SIZE, PAD, loadFftaTerrain } from './mapAdapter'
 import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } from '../../engine/walkability'
 import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } from '../../data/townNpcs'
 import { PARTY_MAX } from '../../engine/party'
 import { Animator } from '../animation'
-import { HERO_SPRITES, HERO_ORIGINAL_IDS, MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, isMonsterSprite, isHumanoidMonster, heroSpriteId, useScaffoldArt } from './fftaRoster'
+import { MONSTER_SPRITES, ORIGINAL_SPRITE, resolveMobSprite, DEFAULT_MOB_SPRITE, isMonsterSprite, isHumanoidMonster, heroSpriteId, heroPreloadIds, useScaffoldArt } from './fftaRoster'
 import { mulberry32, subStream, type Rng } from '../../engine/rng'
 import { deepestSpec } from '../../data/specs'
 import { AGGRESSIVE_RE, combatantOnlyWorldFields, isRangedMob, restGapFor,
-  MELEE_ATTACK_RANGE, RANGED_ATTACK_RANGE } from '../../engine/mobBehaviour'
+  MELEE_ATTACK_RANGE, RANGED_ATTACK_RANGE, PROJECTILE_FLIGHT_SECONDS,
+  heroThrowsProjectile } from '../../engine/mobBehaviour'
+import { hitStyleOf, type HitStyle } from '../../data/items'
 import { runFight, type FightEvent, type HeroCombatant } from '../../engine/fight'
 import {
   makeAmbientHero, pickBark, BARK_CHANCE, BARK_SECONDS, BARK_COOLDOWN_SECONDS,
@@ -301,9 +303,8 @@ const CLASS_SCHOOL: Record<string, string> = {
   mage: 'spell/frost', warlock: 'spell/shadow',
 }
 /** Casters throw their attacks; melee classes carry them in. */
-const CLASS_THROWS: Record<string, boolean> = {
-  warrior: false, rogue: false, mage: true, warlock: true,
-}
+// Was a local table; now the shared predicate, because the STORE has to agree about which
+// classes throw — it is the half that holds the damage back until the orb lands.
 function heroSchool(cls: ClassType, allocs: Record<string, number>): string {
   const spec = deepestSpec(cls, allocs)
   return (spec && SPEC_SCHOOL[spec.id]) || CLASS_SCHOOL[cls] || 'fx/steel'
@@ -326,12 +327,36 @@ const BIOME_AMBIENT: Partial<Record<ZoneId, AmbientCfg>> = {
   the_bloodfields:   { color: '#ff5555', count: 9,  rise: -6,  drift: 10, size: 1.3 },                // war embers
 }
 
-// Biomes whose scenery reads as dead/rocky (grey wood, charred stone) vs. living
-// (green foliage). Drives the scenery prop palette choice.
-const BARREN_SCENERY = new Set<ZoneId>([
-  'dustwind_plains', 'ironcrag_badlands', 'warsong_mesa', 'ashfire_peaks',
-  'the_bloodfields', 'cinderfall_wastes', 'the_maw_eternal',
-])
+// What the roaming crowd is MADE OF, per biome. Repeats are weights (see
+// `ambientMonsterSprite`), so `ffa_zombie` three times in a five-slot pool means roughly
+// three in five of the monsters wandering that zone are the skeleton.
+//
+// The undead biomes lead with it deliberately: it is the most characterful rig in the set
+// and it was previously a 1-in-13 draw in every zone, i.e. rare in the graveyards and
+// equally rare (and out of place) in the meadow.
+const AMBIENT_MONSTERS: Partial<Record<ZoneId, readonly string[]>> = {
+  sunhollow_meadows:  ['ffa_red_panther', 'ffa_goblin', 'ffa_toughskin', 'ffa_antlion', 'ffa_jelly'],
+  shattered_crossing: ['ffa_red_panther', 'ffa_goblin', 'ffa_zombie', 'ffa_toughskin', 'ffa_antlion'],
+  thornvale_jungle:   ['ffa_red_panther', 'ffa_malboro', 'ffa_lamia', 'ffa_toughskin', 'ffa_antlion', 'ffa_red_panther'],
+  the_maw_eternal:    ['ffa_zombie', 'ffa_zombie', 'ffa_malboro', 'ffa_floateye', 'ffa_jelly', 'ffa_zombie'],
+  dustwind_plains:    ['ffa_antlion', 'ffa_toughskin', 'ffa_goblin', 'ffa_red_panther', 'ffa_floateye'],
+  ironcrag_badlands:  ['ffa_goblin', 'ffa_toughskin', 'ffa_antlion', 'ffa_tonberry', 'ffa_zombie'],
+  warsong_mesa:       ['ffa_toughskin', 'ffa_goblin', 'ffa_red_panther', 'ffa_antlion', 'ffa_icedrake'],
+  ashfire_peaks:      ['ffa_bomb', 'ffa_icedrake', 'ffa_bomb', 'ffa_toughskin', 'ffa_floateye'],
+  the_bloodfields:    ['ffa_zombie', 'ffa_zombie', 'ffa_vampire', 'ffa_toughskin', 'ffa_zombie', 'ffa_floateye'],
+  cinderfall_wastes:  ['ffa_bomb', 'ffa_zombie', 'ffa_vampire', 'ffa_zombie', 'ffa_floateye'],
+  grimshade_forest:   ['ffa_zombie', 'ffa_zombie', 'ffa_vampire', 'ffa_red_panther', 'ffa_zombie', 'ffa_floateye'],
+  venom_hollows:      ['ffa_lamia', 'ffa_malboro', 'ffa_zombie', 'ffa_jelly', 'ffa_zombie', 'ffa_toughskin'],
+}
+
+/** One font string, shared by the nameplate rasteriser and its measuring pass — they must
+ *  agree or every plate is mis-sized. */
+const NAMEPLATE_FONT = '600 8px system-ui, -apple-system, "Segoe UI", sans-serif'
+
+// (The barren/verdant scenery split used to live here as `BARREN_SCENERY`. It is a fact
+// about palettes, not about the scene, and it now sits beside the palettes it selects —
+// see `PROP_BIOMES` in palettes.ts, which also gives every biome its own prop ramp rather
+// than one of two.)
 
 // ── Simulated MMO ambience (Track L0) ─────────────────────────────────────────
 // Other heroes + monsters roam each zone so the world reads like a populated server
@@ -599,7 +624,16 @@ export class WorldSceneController {
   private boltRig!: IndexedSprite
   // In-flight projectiles; retired on arrival. Small list — splice on retirement
   // is fine (events are infrequent, not per-entity-per-frame).
-  private bolts: { entity: Entity; fromX: number; fromY: number; toX: number; toY: number; t: number; palette: string; impact: Entity | null; mag: number }[] = []
+  // `payload` is what the blow DOES, held back until the orb arrives. The number and the
+  // particle ring used to fire at cast time while the orb was still crossing the gap, so a
+  // spell read as "damage now, graphic later" — the projectile was decoration arriving
+  // after the fact. Carried here as data rather than a closure so a bolt cannot capture a
+  // target that has already died and been recycled out of the pool.
+  private bolts: {
+    entity: Entity; fromX: number; fromY: number; toX: number; toY: number; t: number
+    palette: string; impact: Entity | null; mag: number
+    payload: { target: Entity; text: string; crit: boolean; color: string; ring: number } | null
+  }[] = []
 
   private ground: GroundBuffer | null = null
   private zone: string | null = null
@@ -607,6 +641,11 @@ export class WorldSceneController {
   private propSheet: IndexedSprite
   /** Tall prop sprite per kind (Phase E), spawned as depth-sorted entities at nodes. */
   private tallProps: Record<number, IndexedSprite>
+  /** The four LANDMARKS — tower, hut, ruined gate, boss lair — on their own 64x96 canvas.
+   *  Keyed by the same art ids as `tallProps`, and preferred over it (see `propSprite`),
+   *  which is how a save written before the re-authoring picks up the big art with no
+   *  migration: the ids in `scenery` never changed, only what they resolve to. */
+  private landmarks: Record<number, IndexedSprite>
   /** The four town premises, on their own larger canvas (64x80). Built lazily: the
    *  overwhelming majority of sessions in a zone never enter town. Distinct from
    *  `townBuildings` below, which is the label list the HUD draws. */
@@ -747,6 +786,8 @@ export class WorldSceneController {
    *  every tree, and an auto-attack fires several times a second. */
   private heroFxSchool = 'fx/steel'
   private heroThrows = false
+  /** Cut, crush or puncture — derived from the equipped weapon, refreshed on sync. */
+  private heroHitStyle: HitStyle = 'slash'
   // Bystanders still walking in from beyond the horizon → their station (wx,wy above).
   private arriving = new Set<string>()
   /** Which mob `this.mob` currently represents. Identity, not sprite — see the handoff. */
@@ -856,6 +897,7 @@ export class WorldSceneController {
     this.tileset = makeTileset()   // programmatic default; init() may swap in the scaffold
     this.propSheet = makePropSheet()
     this.tallProps = makePropEntities()
+    this.landmarks = makeLandmarks()
   }
 
   async init(): Promise<void> {
@@ -870,17 +912,16 @@ export class WorldSceneController {
     const scaffoldArt = useScaffoldArt
     const realUnits = `${base}sprites/units/`
     const unitIds = new Set<string>()
-    if (scaffoldArt) {
-      for (const race of ['human', 'dwarf', 'elf', 'orc', 'troll', 'goblin', 'gnome', 'tauren'] as RaceType[]) {
-        for (const cls of ['warrior', 'mage', 'rogue', 'warlock'] as ClassType[]) {
-          for (const id of HERO_SPRITES[race][cls]) unitIds.add(id)
-        }
-      }
-    } else {
-      // One drawn rig per race x class combination — what heroSpriteId now returns.
-      for (const id of HERO_ORIGINAL_IDS) unitIds.add(id)
-    }
+    // Whatever heroSpriteId() will hand out for the active mode. This tracks the KEY KIND,
+    // not the art source: `?original` uses the pooled keys like the scaffold does, but loads
+    // shipped art like the default does, so branching this on `scaffoldArt` would preload the
+    // wrong set and every hero would fall through to a placeholder rig on its first frame.
+    for (const id of heroPreloadIds()) unitIds.add(id)
     for (const id of MONSTER_SPRITES) unitIds.add(id)
+    // The fallback sheet, preloaded unconditionally. A fallback that is not in the cache is
+    // not a fallback — it would itself fall through to the programmatic rig, which is the
+    // exact blank humanoid it exists to replace.
+    unitIds.add(DEFAULT_MOB_SPRITE)
     const loadUnit = async (id: string): Promise<IndexedSprite> => {
       if (scaffoldArt) {
         return loadSpriteOrPlaceholder(`${ffaUnits}${id}.json`, () =>
@@ -933,9 +974,7 @@ export class WorldSceneController {
   private swapEntitySprite(e: Entity, id: string): void {
     if (e.sprite.id === id) return
     const isPlayer = e === this.player
-    const fallback = isPlayer
-      ? this.rigs!.player
-      : (isMonsterSprite(id) ? this.rigs!.mobBeast : this.rigs!.mobHumanoid)
+    const fallback = isPlayer ? this.rigs!.player : this.mobFallback(id)
     const sprite = this.spriteCache[id] ?? fallback
     e.sprite = sprite
     e.animator = new Animator(sprite)
@@ -1022,11 +1061,15 @@ export class WorldSceneController {
     e.shadow = false
   }
 
-  private spawnBolt(fromX: number, fromY: number, toX: number, toY: number, paletteId: string, impact: Entity | null = null, mag = 0): void {
+  private spawnBolt(
+    fromX: number, fromY: number, toX: number, toY: number, paletteId: string,
+    impact: Entity | null = null, mag = 0,
+    payload: { target: Entity; text: string; crit: boolean; color: string; ring: number } | null = null,
+  ): void {
     const e = this.scene.spawn(this.boltRig, paletteId, fromX, fromY)
     e.animator.set('idle') // looping pulse
     e.shadow = false
-    this.bolts.push({ entity: e, fromX, fromY, toX, toY, t: 0, palette: paletteId, impact, mag })
+    this.bolts.push({ entity: e, fromX, fromY, toX, toY, t: 0, palette: paletteId, impact, mag, payload })
   }
 
   /** True while an entity is playing out its death fade — its pose, palette and alpha
@@ -1078,6 +1121,72 @@ export class WorldSceneController {
     }
     this.push(x, y, 0, 0, 1, 3.0, 4 * scale, color, glow, P_RING)
     this.push(x, y, 0, 0, 1, 5.5, 10 * scale, glow, glow, P_FLASH)
+  }
+
+  /**
+   * A physical blow, shaped by what threw it.
+   *
+   * `emitImpact` above is the generic version — a radial spray, which is what an explosion
+   * looks like and what every weapon in the game used to look like. A sword, a mace and a
+   * dagger are three different events, and the difference is geometry rather than colour:
+   *
+   *   slash  — sparks thrown ACROSS the blow, in a crescent perpendicular to the swing,
+   *            because a cut travels sideways through what it hits
+   *   blunt  — almost no spray; a heavy slow shock ring and debris knocked DOWNWARD, since
+   *            a crush drives force into a body rather than off it
+   *   pierce — a tight fast cone straight along the thrust, the narrowest event of the
+   *            three, with a small bright core where the point went in
+   *
+   * `angle` is the direction of the blow in screen space (attacker → target).
+   */
+  private emitPhysicalHit(
+    x: number, y: number, angle: number, style: HitStyle,
+    color: string, glow: string, scale = 1,
+  ): void {
+    if (style === 'slash') {
+      // The crescent: sparks fan out along the perpendicular, so the eye reads a sweep
+      // rather than a burst. Slight forward bias keeps it from looking like a clean split.
+      const across = angle + Math.PI / 2
+      const n = Math.round(13 * scale)
+      for (let i = 0; i < n; i++) {
+        const t = i / (n - 1) - 0.5                       // -0.5 … 0.5 along the arc
+        const a = across + t * 2.2 + Math.cos(t * Math.PI) * 0.35 * Math.sign(t || 1)
+        const sp = (150 + Math.random() * 190) * scale * (1 - Math.abs(t) * 0.45)
+        this.push(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 24,
+                  1, 2.4 + Math.random() * 1.4, (1.2 + Math.random() * 1.5) * scale,
+                  color, glow, P_SPARK)
+      }
+      this.push(x, y, 0, 0, 1, 4.6, 7 * scale, glow, glow, P_FLASH)
+      return
+    }
+
+    if (style === 'blunt') {
+      // Weight, not spray. One big slow ring carries the concussion; a second smaller one
+      // behind it gives the shock somewhere to travel FROM. Debris falls rather than flies.
+      this.push(x, y, 0, 0, 1, 1.7, 6.5 * scale, color, glow, P_RING)
+      this.push(x, y, 0, 0, 1, 2.9, 3.4 * scale, glow, glow, P_RING)
+      const n = Math.round(7 * scale)
+      for (let i = 0; i < n; i++) {
+        const a = angle + (Math.random() - 0.5) * 2.4
+        const sp = (40 + Math.random() * 70) * scale
+        this.push(x, y, Math.cos(a) * sp, Math.abs(Math.sin(a)) * sp * 0.4 + 30,
+                  1, 1.9 + Math.random(), (1.8 + Math.random() * 2.2) * scale,
+                  color, glow, P_SPARK)
+      }
+      this.push(x, y, 0, 0, 1, 4.0, 11 * scale, glow, glow, P_FLASH)
+      return
+    }
+
+    // pierce — everything travels the way the point did.
+    const n = Math.round(9 * scale)
+    for (let i = 0; i < n; i++) {
+      const a = angle + (Math.random() - 0.5) * 0.55
+      const sp = (190 + Math.random() * 210) * scale
+      this.push(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 14,
+                1, 3.0 + Math.random() * 1.5, (0.9 + Math.random() * 1.0) * scale,
+                color, glow, P_SPARK)
+    }
+    this.push(x, y, 0, 0, 1, 6.5, 4.5 * scale, glow, glow, P_FLASH)
   }
 
   /**
@@ -1448,6 +1557,26 @@ export class WorldSceneController {
     const inTown = state.gameMode === 'in_town'
     if (inTown && !this.townMode) {
       this.townMode = true
+      // ── Why the combat flags have to be cleared HERE ──────────────────────────
+      // `mobEngaged` / `mobAggressive` are written in exactly one place (the combat sync
+      // further down this method), and the `if (this.townMode) return` two lines below
+      // means that code never runs while the player is in a town. So both flags KEEP
+      // whatever value they held at the moment of entry — and you enter a town from the
+      // overworld, where an idle hero is almost always toe-to-toe with something. Result:
+      // `mobEngaged` stays true for the whole visit.
+      //
+      // That is the bug behind "I can't tap to move around town on mobile". Movement is
+      // fine and `moveTo` is reached — the tap resolves, clamps into the town box and sets
+      // `tapMoveActive` — but the very next frame runs `if (this.mobEngaged) tapMoveActive
+      // = false` (engagement cancelling a stale walk order, which is right in the world
+      // and meaningless in a town, where there are no mobs at all). The target was being
+      // wiped before the walk code could ever act on it, every single frame.
+      //
+      // Cleared at the transition rather than special-cased at that one guard, because a
+      // stale "you are in melee" is wrong for every reader of these flags, not just that
+      // one — it also gates the follow path, the auto-approach and the target commitment.
+      this.mobEngaged = false
+      this.mobAggressive = false
       this.enterTownScene().catch(err => console.error('[town] enter failed', err))
       return
     }
@@ -1647,10 +1776,9 @@ export class WorldSceneController {
       this.mobPlacedDx = this.mobApproachDx * mag
       this.mobPlacedDy = this.mobApproachDy * mag
 
-      const wantedMobSprite = resolveMobSprite(mob.baseName ?? mob.name)
+      const wantedMobSprite = resolveMobSprite(mob.baseName ?? mob.name, mob.templateId)
       if (!this.mob) {
-        const sprite = this.spriteCache[wantedMobSprite] ??
-          (isMonsterSprite(wantedMobSprite) ? this.rigs.mobBeast : this.rigs.mobHumanoid)
+        const sprite = this.spriteCache[wantedMobSprite] ?? this.mobFallback(wantedMobSprite)
         this.mob = this.scene.spawn(
           sprite, mobPaletteId(mob), this.player.tx + this.mobPlacedDx, this.player.ty + this.mobPlacedDy,
         )
@@ -1671,8 +1799,7 @@ export class WorldSceneController {
         // Released rather than merely hidden, so the `spawn` on the next line reclaims
         // this very slot — which is what "keeps the pool entity" has always meant.
         this.scene.despawn(this.mob)
-        const sprite = this.spriteCache[wantedMobSprite] ??
-          (isMonsterSprite(wantedMobSprite) ? this.rigs.mobBeast : this.rigs.mobHumanoid)
+        const sprite = this.spriteCache[wantedMobSprite] ?? this.mobFallback(wantedMobSprite)
         this.mob = this.scene.spawn(
           sprite, mobPaletteId(mob), this.player.tx + this.mobPlacedDx, this.player.ty + this.mobPlacedDy,
         )
@@ -1726,7 +1853,8 @@ export class WorldSceneController {
     this.mobWasPresent = this.showMob
     this.playerDead = !state.isAlive
     this.heroFxSchool = heroSchool(state.playerClass, state.talentAllocs)
-    this.heroThrows = CLASS_THROWS[state.playerClass] ?? false
+    this.heroThrows = heroThrowsProjectile(state.playerClass)
+    this.heroHitStyle = hitStyleOf(state.equipment?.weapon?.name, state.playerClass)
   }
 
   /**
@@ -1757,9 +1885,8 @@ export class WorldSceneController {
         alive.add(m.id)
         let rec = this.otherMobEnts.get(m.id)
         if (!rec || !rec.e.active) {
-          const spriteId = resolveMobSprite(m.baseName ?? m.name)
-          const sprite = this.spriteCache[spriteId] ??
-            (isMonsterSprite(spriteId) ? this.rigs!.mobBeast : this.rigs!.mobHumanoid)
+          const spriteId = resolveMobSprite(m.baseName ?? m.name, m.templateId)
+          const sprite = this.spriteCache[spriteId] ?? this.mobFallback(spriteId)
           // Place on walkable ground near its spawn offset, then keep that world spot.
           let wx = this.player.tx + m.offset.dx
           let wy = this.player.ty + m.offset.dy
@@ -1974,18 +2101,32 @@ export class WorldSceneController {
     // tint and the delivery follow from what the hero actually is.
     const mm = this.worldMid(target)
     const mc = fxColors(this.heroFxSchool)
+    const text = `${fn.value}${fn.isCrit ? '!' : ''}`
+    const color = fn.color ?? (fn.isCrit ? '#ffcc00' : '#88bbff')
+    const ring = fn.isCrit ? 1.7 : 0.9
     if (this.heroThrows) {
-      // Casters throw it. The lunge above still plays — it reads as the cast gesture —
-      // but the damage arrives with the bolt rather than with the body.
+      // Casters throw it. The lunge above still plays — it reads as the cast gesture — and
+      // the damage now genuinely arrives WITH the bolt, which is what this comment claimed
+      // while the ring and the number were still being emitted here, mid-flight.
       this.emitCharge(this.worldMid(this.player).x, this.worldMid(this.player).y, mc.core, mc.glow)
       this.spawnBolt(this.player.tx, this.player.ty, target.tx, target.ty,
-                     this.heroFxSchool, target, fn.isCrit ? 1.6 : 1)
+                     this.heroFxSchool, target, fn.isCrit ? 1.6 : 1,
+                     { target, text, crit: fn.isCrit, color, ring })
+    } else {
+      // Melee connects on the swing; there is no flight to wait for. The blow is shaped by
+      // the weapon holding it — direction taken from the hero's own body to the target's,
+      // so a cut sweeps across the line of attack and a thrust runs down it.
+      const pm = this.worldMid(this.player)
+      const angle = Math.atan2(mm.y - pm.y, mm.x - pm.x)
+      this.emitPhysicalHit(mm.x, mm.y, angle, this.heroHitStyle, mc.core, mc.glow, ring)
+      // Weight lives in the pause, not the particles: a crush holds the frame longer than
+      // a cut, and a thrust barely holds it at all. Crits scale it, so the heaviest moment
+      // in the game is still a critical mace blow.
+      const stop = this.heroHitStyle === 'blunt' ? 0.055 : this.heroHitStyle === 'slash' ? 0.03 : 0.018
+      this.impactHit(target, 'fx/hitflash', ring * (this.heroHitStyle === 'blunt' ? 1.6 : 1),
+                     stop * (fn.isCrit ? 1.5 : 1) * FX_TIME_SCALE)
+      this.spawnFloater(target, text, fn.isCrit, color)
     }
-    this.emitImpact(mm.x, mm.y, mc.core, mc.glow, fn.isCrit ? 1.7 : 0.9)
-    this.spawnFloater(
-      target, `${fn.value}${fn.isCrit ? '!' : ''}`, fn.isCrit,
-      fn.color ?? (fn.isCrit ? '#ffcc00' : '#88bbff'),
-    )
   }
 
   /**
@@ -2105,8 +2246,9 @@ export class WorldSceneController {
       this.player.tx - r, this.player.ty - r,
       target.tx - r, target.ty - r,
       'spell/shadow', target, 4.2,
+      // The heavy one. Its whole point is the landing, so the number waits for it too.
+      { target, text: `${fn.value}!`, crit: true, color: fn.color ?? SHADOW_BOLT_COLOR, ring: 0 },
     )
-    this.spawnFloater(target, `${fn.value}!`, true, fn.color ?? SHADOW_BOLT_COLOR)
   }
 
   triggerDotTick(fn: FloatingNumber): void {
@@ -2167,7 +2309,10 @@ export class WorldSceneController {
         src.e.tx - r, src.e.ty - r,
         this.player.tx - r, this.player.ty - r,
         'spell/shadow', this.player, 2.6,
+        // Incoming fire reads the same way round: the hero takes it when it arrives.
+        { target: this.player, text: `-${fn.value}`, crit: false, color: '#ff6666', ring: 0 },
       )
+      return
     } else {
       // Melee: lunge in and the hit lands immediately.
       this.beginLunge(src.lunge, src.e, this.player)
@@ -2627,13 +2772,28 @@ export class WorldSceneController {
     if (this.bolts.length) {
       for (let i = this.bolts.length - 1; i >= 0; i--) {
         const b = this.bolts[i]
-        b.t += (dt * 5.5) / FX_TIME_SCALE // ~0.18s flight at full speed; scaled for slow-mo
+        // REAL seconds, and the same constant the store defers damage by. It used to run on
+        // the scaled `dt`, which stops dead during hit-stop — so a bolt could hang in the
+        // air while the store's clock kept going, and the two would disagree about when the
+        // blow landed. That disagreement is the entire bug this pairing exists to prevent.
+        b.t += realDt / PROJECTILE_FLIGHT_SECONDS
         if (b.t >= 1) {
           b.entity.active = false
           // Impact reaction on arrival (this is where a spell should *land* and feel
           // heavy) — flash/recoil the target, burst, rumble; else just a burst.
           if (b.impact && b.impact.active) this.impactHit(b.impact, b.palette, b.mag, 0.05 * FX_TIME_SCALE)
           else this.spawnBurst(b.toX, b.toY, b.palette)
+          // …and the blow itself lands HERE, with the orb, rather than at cast time. The
+          // ring is emitted at the target's mid point as it stands now, not where it stood
+          // when the spell left the hand — a mob that walked during the flight still gets
+          // hit where it actually is.
+          if (b.payload && b.payload.target.active) {
+            const p = b.payload
+            const pc = fxColors(b.palette)
+            const mid = this.worldMid(p.target)
+            if (p.ring > 0) this.emitImpact(mid.x, mid.y, pc.core, pc.glow, p.ring)
+            this.spawnFloater(p.target, p.text, p.crit, p.color)
+          }
           this.bolts.splice(i, 1)
         } else {
           b.entity.tx = b.fromX + (b.toX - b.fromX) * b.t
@@ -2868,11 +3028,38 @@ export class WorldSceneController {
 
   // ── Tall-prop entity lifecycle (Phase E) ──────────────────────────────────────
 
+  /** Art for a prop kind: the 64x96 landmark if this kind has one, else the 32x48 prop.
+   *  One lookup so every spawner agrees — a tower that is architecture when scattered as
+   *  scenery and a doll's house when placed as a node would be worse than either. */
+  private propSprite(kind: number): IndexedSprite | undefined {
+    return this.landmarks[kind] ?? this.tallProps[kind]
+  }
+
+  /**
+   * What a mob draws as when its own sheet is missing: the SKELETON.
+   *
+   * It used to be `rigs.mobHumanoid` — `makeHumanoidRig()`, a programmatic blank figure
+   * with no face, no weapon and no character. Every unloaded or unmapped enemy in the game
+   * came out as that same generic person, which is worse than a wrong sprite: a wrong
+   * sprite is a creature you can at least read, while the blank rig announces that the game
+   * does not know what this thing is.
+   *
+   * The skeleton is the right default for the same reasons it is the resolver's default
+   * (see `resolveMobSprite`): it is drawn, it is strong, it reads as hostile at a glance,
+   * and there is no zone in this world where an undead thing is out of place. The
+   * programmatic rigs stay as the last resort beneath it, for the window before the sheet
+   * finishes loading.
+   */
+  private mobFallback(id: string): IndexedSprite {
+    return this.spriteCache[DEFAULT_MOB_SPRITE]
+      ?? (isMonsterSprite(id) ? this.rigs!.mobBeast : this.rigs!.mobHumanoid)
+  }
+
   private nodeTallProp(type: MapNode['type']): IndexedSprite | null {
     switch (type) {
       case 'ore': return this.tallProps[TALL_PROP.ORE_OUTCROP]
       case 'herb': return this.tallProps[TALL_PROP.HERB_BUSH]
-      case 'boss_lair': return this.tallProps[TALL_PROP.LAIR]
+      case 'boss_lair': return this.propSprite(TALL_PROP.LAIR) ?? null
       case 'mob_spawn': return this.tallProps[TALL_PROP.CAIRN]
       default: return null
     }
@@ -2905,9 +3092,12 @@ export class WorldSceneController {
   // Props carry their OWN palette (verdant/barren), not the biome ground palette, so
   // they read as distinct objects instead of camouflaging into the terrain.
   private spawnScenery(scenery: MapScenery[]): void {
-    const spal = BARREN_SCENERY.has(this.currentZone) ? 'prop/barren' : 'prop/verdant'
+    // Per-BIOME now, not one of two. See palettes.ts: the same ruined arch is red granite
+    // in the bloodfields and violet slate in the gloom, because stone that ignores its own
+    // geology reads as a sprite pasted onto a biome rather than quarried out of it.
+    const spal = propPaletteId(this.currentZone)
     for (const sc of scenery) {
-      const sprite = this.tallProps[sc.kind]
+      const sprite = this.propSprite(sc.kind)
       if (!sprite) continue
       const e = this.scene.spawn(
         sprite, spal,
@@ -3011,8 +3201,8 @@ export class WorldSceneController {
       }
       for (let k = 0; k < tmpl.m; k++) {
         const s = gi * 100 + k * 11 + 60
-        const monsterId = MONSTER_SPRITES[Math.floor(rnd(s) * MONSTER_SPRITES.length)]
-        const sprite = this.spriteCache[monsterId] ?? this.rigs.mobBeast
+        const monsterId = this.ambientMonsterSprite(rnd(s))
+        const sprite = this.spriteCache[monsterId] ?? this.mobFallback(monsterId)
         const pal = rnd(s + 1) < 0.25 ? 'elite' : 'team/enemy'
         const gx = WorldSceneController.wrapMod(a.gx + jitter(s + 2))
         const gy = WorldSceneController.wrapMod(a.gy + jitter(s + 3))
@@ -3030,6 +3220,29 @@ export class WorldSceneController {
         })
       }
     }
+  }
+
+  /**
+   * Which monster the roaming ambient crowd spawns, given a 0..1 roll.
+   *
+   * This used to be a flat draw from all thirteen sheets in every zone, which produced two
+   * problems at once and they are the same problem: the crowd said nothing about where you
+   * were. A meadow got carnivorous plants and ice drakes; a graveyard biome got them too,
+   * in the same proportion. And the one undead rig in the shipped set — `mob_gravewalker`,
+   * the skeleton — was 1-in-13 everywhere and therefore rare everywhere, which is exactly
+   * how a distinctive sprite ends up feeling unused.
+   *
+   * Now each biome has a POOL, with repeats as weights. The undead zones are mostly
+   * skeletons, the peaks are mostly fire, the jungle is mostly beasts and vines. Nothing is
+   * exclusive — a stray of any kind still turns up — because a zone whose crowd is one
+   * creature repeated is its own kind of flat.
+   *
+   * Falls back to the full set for a zone with no pool, so a zone added later degrades to
+   * the old behaviour rather than to an empty world.
+   */
+  private ambientMonsterSprite(roll: number): string {
+    const pool = AMBIENT_MONSTERS[this.currentZone] ?? MONSTER_SPRITES
+    return pool[Math.min(pool.length - 1, Math.floor(roll * pool.length))]
   }
 
   // ── Town hub ────────────────────────────────────────────────────────────────
@@ -4434,25 +4647,67 @@ export class WorldSceneController {
   // Nameplates over ambient heroes — match the HUD's own-hero text: small, crisp,
   // heavy black outline (mirrors the HUD TEXT_SHADOW) so they read at any biome without
   // a muddy box. Faction-tinted; name only (no level) to keep the viewport clean.
+  /**
+   * Nameplates, rasterised ONCE per name and then blitted.
+   *
+   * This was the most expensive function in the whole renderer — measured at 4.3% of self
+   * time under a CPU profile, more than `drawImage` itself. The cause was
+   * `strokeText` with a 3px round join, which is path-based text rendering (build the
+   * glyph outline, stroke it, join every corner), run for every ambient hero on every
+   * frame. Twenty heroes at 60fps is 1,200 text rasterisations a second to draw twenty
+   * strings that never change.
+   *
+   * Names ARE stable — an ambient hero is named once when it spawns — so this is the same
+   * trade the rest of this renderer already makes everywhere else: pay the cost once per
+   * distinct thing, cache the pixels, and blit from then on (see `bakedSheet`, which does
+   * exactly this for sprites). Per-frame work drops to one `drawImage` per plate.
+   */
+  private nameplateCache = new Map<string, HTMLCanvasElement>()
+
+  /** Rasterise one nameplate (outline + fill) onto its own little canvas. */
+  private nameplateFor(name: string, faction: string): HTMLCanvasElement {
+    const key = `${name}\u0000${faction}`
+    const hit = this.nameplateCache.get(key)
+    if (hit) return hit
+    const pad = 4
+    // A scratch context purely to measure, since the plate's size depends on the text.
+    const probe = document.createElement('canvas').getContext('2d')!
+    probe.font = NAMEPLATE_FONT
+    const w = Math.ceil(probe.measureText(name).width) + pad * 2
+    const h = 14
+    const c = document.createElement('canvas')
+    c.width = w; c.height = h
+    const g = c.getContext('2d')!
+    g.font = NAMEPLATE_FONT
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.lineJoin = 'round'
+    g.lineWidth = 3
+    g.strokeStyle = 'rgba(0,0,0,0.95)'
+    g.strokeText(name, w / 2, h / 2)
+    g.fillStyle = faction === 'horde' ? '#ff8a7a' : '#8ac0ff'
+    g.fillText(name, w / 2, h / 2)
+    // Bounded, like the sprite bake cache. The crowd recycles as the player travels, so
+    // without a cap this grows for the length of the session.
+    if (this.nameplateCache.size >= 128) {
+      const oldest = this.nameplateCache.keys().next().value
+      if (oldest !== undefined) this.nameplateCache.delete(oldest)
+    }
+    this.nameplateCache.set(key, c)
+    return c
+  }
+
   private drawAmbientNameplates(): void {
     if (!this.ambient.length) return
     const ctx = this.ctx
-    ctx.save()
-    ctx.font = '600 8px system-ui, -apple-system, "Segoe UI", sans-serif'
-    ctx.textAlign = 'center'
-    ctx.lineJoin = 'round'
-    ctx.lineWidth = 3
-    ctx.strokeStyle = 'rgba(0,0,0,0.95)'
     for (const a of this.ambient) {
-      if (a.kind !== 'hero') continue
+      if (a.kind !== 'hero' || !a.name) continue
       const sx = Math.round(a.e.screenX - this.cam.x)
       const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 2)
       if (sx < -40 || sx > this.cam.w + 40 || sy < 6 || sy > this.cam.h) continue
-      ctx.strokeText(a.name, sx, sy)
-      ctx.fillStyle = a.faction === 'horde' ? '#ff8a7a' : '#8ac0ff'
-      ctx.fillText(a.name, sx, sy)
+      const plate = this.nameplateFor(a.name, a.faction)
+      ctx.drawImage(plate, sx - (plate.width >> 1), sy - (plate.height >> 1))
     }
-    ctx.restore()
     this.drawAmbientBarks()
   }
 

@@ -4,7 +4,6 @@ import { MinimapRadar } from './MinimapRadar'
 import { ObjectiveTracker } from './ObjectiveTracker'
 import { UnitFrames } from './UnitFrames'
 import { ActionBar } from './ActionBar'
-import { CraftResultToast } from '../CraftResultToast'
 import { TravelOverlay } from '../TravelOverlay'
 import { GatheringPanel } from '../GatheringPanel'
 import { CraftingPanel } from '../CraftingPanel'
@@ -38,7 +37,14 @@ export function HudOverlay() {
   const trRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined') return
-    const pairs: [HTMLDivElement | null, string][] = [[tlRef.current, '--unit-h'], [trRef.current, '--hud-r-h']]
+    // The inventory rail is not ours — it is rendered by App — but the quest tracker below
+    // it has to know how tall it is. Queried rather than ref-passed so the rail's own
+    // component stays unaware of anything positioned off it; if it is absent (mobile, where
+    // it is a drawer) the tracker just keeps its default top.
+    const railR = document.querySelector<HTMLElement>('.app-sidebar-right')
+    const pairs: [HTMLElement | null, string][] = [
+      [tlRef.current, '--unit-h'], [trRef.current, '--hud-r-h'], [railR, '--rail-r-h'],
+    ]
     const ro = new ResizeObserver(() => {
       for (const [el, prop] of pairs) {
         if (!el) continue
@@ -59,16 +65,22 @@ export function HudOverlay() {
   return (
     <div className="hud-layer">
       <div ref={tlRef} className="hud-tl"><UnitFrames /></div>
-      {/* One top-right column, in reading order: where you are, what you are doing, what
-          you just made. This used to be two `.hud-tr` layers with the second pushed down by
-          a hardcoded `marginTop: 150` guessed from the minimap's height — a number that
-          silently overlapped or floated the moment the minimap changed size. Stacking them
-          lets the layout do that arithmetic. */}
+      {/* Top-right corner: where you are.
+          The craft reveal used to sit under the radar in this stack, and it was the wrong
+          place twice over — on desktop the inventory rail (z 50) draws over the whole HUD
+          layer (z 20), so the card was behind a panel, and its height fed `--hud-r-h`, so
+          a craft nudged the rail beneath it down. It is a centre-screen announcement now;
+          see `.toast-centre` in App. */}
       <div ref={trRef} className="hud-tr hud-tr-stack">
         <MinimapRadar />
-        <ObjectiveTracker />
-        <CraftResultToast />
       </div>
+      {/* The objective tracker used to live in the stack above, which meant its height was
+          part of `--hud-r-h` — so the inventory rail started lower than the character rail
+          on the left, and shifted whenever a quest line wrapped. It belongs under the rail:
+          the radar heads the column, the inventory follows it, and the quest sits at the
+          foot. Positioned off the measured `--rail-r-h` rather than nested inside the rail
+          so it stays put when the rail scrolls its own contents. */}
+      <div className="hud-quest"><ObjectiveTracker /></div>
       {/* Bottom stack: mode panel above the action bar, in ONE flow. Positioning them
           independently meant guessing the bar's height, which changes with the mode —
           the panel sat on top of it and the XP strip. */}

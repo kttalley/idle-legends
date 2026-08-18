@@ -185,7 +185,15 @@ export function DimetricWorldScene() {
     let downX = 0, downY = 0, downT = 0, downId = -1, moved = false
     const onPointerDown = (e: PointerEvent) => {
       downId = e.pointerId; downX = e.clientX; downY = e.clientY
-      downT = performance.now(); moved = false
+      // The EVENT's timestamp, not the clock when the handler happens to run. Both events
+      // carry the moment the finger actually moved, so this measures the gesture; reading
+      // `performance.now()` inside the handlers measures the gesture PLUS however long the
+      // main thread made the events wait. Those are the same number on an idle frame and
+      // wildly different on a busy one — entering a town bakes a whole new scene, and a
+      // perfectly ordinary tap could arrive measured at over half a second and be thrown
+      // away as a drag. Dropped taps exactly where the app is busiest, on a build whose
+      // primary input is touch.
+      downT = e.timeStamp; moved = false
     }
     const onPointerMove = (e: PointerEvent) => {
       if (e.pointerId !== downId) return
@@ -194,7 +202,7 @@ export function DimetricWorldScene() {
     const onPointerUp = (e: PointerEvent) => {
       if (e.pointerId !== downId) return
       downId = -1
-      if (!moved && performance.now() - downT < 500) {
+      if (!moved && e.timeStamp - downT < 500) {
         controller.moveTo(e.clientX, e.clientY)
         useGameStore.getState().bumpManualInput()
         navigator.vibrate?.(8)

@@ -51,6 +51,39 @@ const PREFIX: Record<Rarity, string[]> = {
   legendary: ['Ancient', 'Mythic', 'Godforged', 'Eternal'],
 }
 
+/**
+ * How a physical blow LANDS — the difference between a cut, a crush and a puncture.
+ *
+ * Read by the renderer to pick an impact, so a mace and a dagger stop producing the same
+ * spray of sparks. Derived from the weapon's NAME rather than a new field on `Item`,
+ * because the name is the only thing that already distinguishes them and it is generated
+ * from `SLOT_NAMES.weapon` below — a field would have to be backfilled onto every drop in
+ * every existing save, and set correctly on all twelve authored uniques, to say something
+ * the word "Dagger" already says.
+ *
+ * The class fallback is what makes that safe: an unrecognised or missing weapon still gets
+ * the blow its class would throw bare-handed, so a name this table has never seen degrades
+ * to plausible rather than to nothing.
+ */
+export type HitStyle = 'slash' | 'blunt' | 'pierce'
+
+const HIT_STYLE_WORDS: [RegExp, HitStyle][] = [
+  [/dagger|dirk|stiletto|fang|tusk|pick|spike|needle|talon|claw|shiv/i, 'pierce'],
+  [/mace|hammer|maul|club|cudgel|staff|stave|bludgeon|crusher|stomper/i, 'blunt'],
+  [/sword|axe|blade|sabre|saber|scythe|cleaver|edge|glaive|falchion/i, 'slash'],
+]
+
+const CLASS_HIT_STYLE: Record<string, HitStyle> = {
+  warrior: 'slash', rogue: 'pierce', mage: 'blunt', warlock: 'blunt',
+}
+
+export function hitStyleOf(weaponName: string | undefined, playerClass: string): HitStyle {
+  if (weaponName) {
+    for (const [re, style] of HIT_STYLE_WORDS) if (re.test(weaponName)) return style
+  }
+  return CLASS_HIT_STYLE[playerClass] ?? 'slash'
+}
+
 const SLOT_NAMES: Record<Slot, string[]> = {
   weapon:  ['Sword', 'Axe', 'Staff', 'Dagger', 'Mace', 'Blade'],
   helm:    ['Helm', 'Cap', 'Crown', 'Hood', 'Coif'],

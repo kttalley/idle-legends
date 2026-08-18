@@ -14,6 +14,41 @@
 import { Capacitor } from '@capacitor/core'
 import { FOUNDER_ENTITLEMENT } from '../render/colorways'
 
+/**
+ * Standing Orders — a permanent extension to how long the hero will range unsupervised.
+ *
+ * This is the first SKU that is not cosmetic, and that is a deliberate reversal of the
+ * original Track M principle ("sells the art and its scarcity — not power, not progress
+ * relief"). The reasoning, recorded here because the header above still states the old
+ * rule and a future reader deserves to know it was changed on purpose rather than
+ * forgotten: the art thesis cannot fund the game yet. The rigs are placeholders, the
+ * de-pooling is unfinished, and there is no PvP display case — so a cosmetic economy would
+ * be selling palette swaps of placeholder sprites to an audience of one. Idle players
+ * convert on time, not on skins.
+ *
+ * What is NOT being done, and why the shape matters:
+ *   • It is a ONE-TIME permanent upgrade, not a consumable refill and not a currency. No
+ *     gem ledger, no dual pricing, nothing to top up — which keeps principle 3 (real-money
+ *     pricing, no opaque currency) and stays clear of the regulator-hostile direction.
+ *   • The free cap stays GENEROUS (8h) and still binds on almost nobody. This sells more
+ *     of a good thing to the people who hit the ceiling; it does not manufacture a
+ *     ceiling in order to sell relief from it.
+ */
+export const STANDING_ORDERS_ENTITLEMENT = 'standing_orders'
+
+/** Permanent offline hours the Standing Orders entitlement grants. */
+export const STANDING_ORDERS_HOURS = 8
+
+/**
+ * Permanent watch hours the player's entitlements are worth.
+ *
+ * Takes the active set as an argument rather than reading module state, so the engine and
+ * the headless sim can call it with an empty set and get the honest free-tier answer.
+ */
+export function purchasedWatchHours(active: ReadonlySet<string>): number {
+  return active.has(STANDING_ORDERS_ENTITLEMENT) ? STANDING_ORDERS_HOURS : 0
+}
+
 export interface PurchaseState {
   /** True once configure() has resolved (or been skipped on web). */
   ready: boolean
@@ -21,6 +56,8 @@ export interface PurchaseState {
   active: ReadonlySet<string>
   /** Localized price string for the founder pack, or null if offerings aren't loaded. */
   founderPrice: string | null
+  /** Localized price for Standing Orders, or null if offerings aren't loaded. */
+  standingOrdersPrice: string | null
   /** Last user-facing error, or null. */
   error: string | null
   /** True while a purchase or restore is in flight. */
@@ -28,7 +65,8 @@ export interface PurchaseState {
 }
 
 let state: PurchaseState = {
-  ready: false, active: new Set(), founderPrice: null, error: null, busy: false,
+  ready: false, active: new Set(), founderPrice: null, standingOrdersPrice: null,
+  error: null, busy: false,
 }
 
 type Listener = (s: PurchaseState) => void
@@ -90,24 +128,46 @@ export async function initPurchases(): Promise<void> {
   }
 }
 
-/** Fetch the price string for the paywall. Best-effort. */
+/**
+ * Find a package in the current offering.
+ *
+ * There are two SKUs now, so `availablePackages[0]` is no longer an answer — it silently
+ * became "whichever product RevenueCat happens to list first", which would sell the wrong
+ * thing the moment the dashboard reordered. Matched on identifier instead, with a
+ * first-package fallback ONLY for the founder pack, which is what shipped against that
+ * assumption and whose offering has a single product.
+ */
+type Pkg = { identifier?: string; product: { identifier?: string; priceString: string } }
+function findPackage(pkgs: Pkg[] | undefined, needle: string, fallbackFirst = false): Pkg | undefined {
+  const hit = pkgs?.find(p =>
+    (p.identifier ?? '').toLowerCase().includes(needle) ||
+    (p.product?.identifier ?? '').toLowerCase().includes(needle))
+  return hit ?? (fallbackFirst ? pkgs?.[0] : undefined)
+}
+
+/** Fetch the price strings for the paywalls. Best-effort. */
 export async function loadOfferings(): Promise<void> {
   if (!isNative) return
   try {
     const Purchases = await plugin()
     const { current } = await Purchases.getOfferings()
-    const pkg = current?.availablePackages?.[0]
-    if (pkg) set({ founderPrice: pkg.product.priceString })
+    const pkgs = current?.availablePackages as Pkg[] | undefined
+    const founder = findPackage(pkgs, 'founder', true)
+    const watch = findPackage(pkgs, 'standing')
+    set({
+      founderPrice: founder?.product?.priceString ?? null,
+      standingOrdersPrice: watch?.product?.priceString ?? null,
+    })
   } catch (e) {
     console.warn('[iap] getOfferings failed', e)
   }
 }
 
 /**
- * Buy the founder pack. Resolves true if the entitlement is active afterwards.
+ * Buy one SKU. Resolves true if `entitlement` is active afterwards.
  * A user cancellation is NOT an error and must not show one.
  */
-export async function buyFounderPack(): Promise<boolean> {
+async function buy(needle: string, entitlement: string, fallbackFirst: boolean): Promise<boolean> {
   if (!isNative) {
     set({ error: 'In-app purchases are only available in the app.' })
     return false
@@ -116,12 +176,12 @@ export async function buyFounderPack(): Promise<boolean> {
   try {
     const Purchases = await plugin()
     const { current } = await Purchases.getOfferings()
-    const pkg = current?.availablePackages?.[0]
+    const pkg = findPackage(current?.availablePackages as Pkg[] | undefined, needle, fallbackFirst)
     if (!pkg) { set({ busy: false, error: 'Store unavailable. Try again shortly.' }); return false }
-    const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg })
+    const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg as never })
     const active = activeFrom(customerInfo)
     set({ busy: false, active })
-    return active.has(FOUNDER_ENTITLEMENT)
+    return active.has(entitlement)
   } catch (e) {
     const cancelled = !!(e as { code?: string; userCancelled?: boolean })?.userCancelled
       || (e as { code?: string })?.code === '1'
@@ -130,6 +190,10 @@ export async function buyFounderPack(): Promise<boolean> {
     return false
   }
 }
+
+export const buyFounderPack = () => buy('founder', FOUNDER_ENTITLEMENT, true)
+/** Buy Standing Orders — permanent watch capacity. See STANDING_ORDERS_ENTITLEMENT. */
+export const buyStandingOrders = () => buy('standing', STANDING_ORDERS_ENTITLEMENT, false)
 
 /**
  * Restore Purchases. Apple requires this to exist and to be reachable without a purchase,
