@@ -229,6 +229,23 @@ export function __devGrant(ids: string[]): void {
   set({ active: new Set(ids) })
 }
 
+/**
+ * Test seam: supply the localized price strings StoreKit would have returned, so the SKU
+ * buttons render in a browser. They are gated on a non-null price precisely because a
+ * priceless button could only ever fail — which also means the App Store review
+ * screenshots cannot be captured off the web build without this. Same `import.meta.env
+ * .DEV` guard as __devGrant, so it is stripped from every release bundle.
+ */
+export function __devPrices(founder: string | null, standing: string | null): void {
+  if (!import.meta.env.DEV) return
+  set({ ready: true, founderPrice: founder, standingOrdersPrice: standing })
+}
+
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  ;(window as unknown as { __ilGrant?: (ids: string[]) => void }).__ilGrant = __devGrant
+  const w = window as unknown as {
+    __ilGrant?: (ids: string[]) => void
+    __ilPrices?: (f: string | null, s: string | null) => void
+  }
+  w.__ilGrant = __devGrant
+  w.__ilPrices = __devPrices
 }
