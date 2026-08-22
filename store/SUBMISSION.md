@@ -14,8 +14,25 @@ exactly these, they are what RevenueCat will map.
 | Founder Pack | `com.stillmarch.game.founder` | Tier 5 ($4.99) | Founder Pack | Three exclusive colourways for your hero, and the founder's mark. Cosmetic only — nothing here changes your progress. |
 | Standing Orders | `com.stillmarch.game.standing_orders` | Tier 3 ($2.99) | Standing Orders | Your hero ranges unsupervised for 8 hours longer. A one-time, permanent extension — never a refill. |
 
-Each needs a **review screenshot** of the purchase surface: shoot the Wardrobe panel
-(`HERO` dock tab -> `Looks`) on device.
+### The two image fields on each product — different slots, different rules
+
+| Field | Size | File | Notes |
+|---|---|---|---|
+| Review Information > Screenshot | **640x920** | `~/Desktop/stillmarch-iap-screenshots/founder-pack.png`, `standing-orders.png` | `npm run iap-shots` |
+| Image (Optional) | **1024x1024** | same folder, `*-1024.png` | `npm run iap-art` |
+
+Two traps, both hit for real on 2026-08-22:
+
+- **Do not upload a 1290x2796 app screenshot into the Review Screenshot slot.** It is a
+  valid App Store screenshot size and ASC still rejects it here with "The dimensions of
+  one or more screenshots are wrong" — this slot takes the legacy device sizes. 640x920 is
+  the size Apple's own help page names, and is what `iap-shots` now emits.
+- **Neither image may carry an alpha channel**, even a fully opaque one. Both tools write
+  `colorType: 2`.
+
+The Image field is marked optional and genuinely is — but it is what appears in **offer
+code redemptions**, which is exactly how the Shipaton judges will redeem their access. Fill
+it in.
 
 ## 2. RevenueCat mapping — ids must match the code exactly
 

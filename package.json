@@ -11,6 +11,8 @@
     "build:native": "BUILD_TARGET=native tsc && BUILD_TARGET=native vite build",
     "cap:sync": "npm run build:native && npx cap sync ios",
     "ios": "npm run cap:sync && npx cap open ios",
+    "iap-art": "node tools/spritegen/makeIapArt.mjs",
+    "iap-shots": "node tools/uitest/shoot-iap.mjs",
     "icon": "node tools/spritegen/makeAppIcon.mjs",
     "bundle:duel": "node tools/bundleDuelResolver.mjs",
     "deploy:duel": "npm run bundle:duel && supabase functions deploy duel",

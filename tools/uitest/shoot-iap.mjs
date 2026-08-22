@@ -25,6 +25,8 @@ import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { PNG } from 'pngjs'
 import { launchChrome, openTab, evaluate, enterGame, seedSave, screenshot, sleep } from './cdp.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -97,6 +99,53 @@ const onScreen = sel => `(() => {
       && r.x + r.width <= innerWidth + 1 && r.y + r.height <= innerHeight + 1;
 })()`
 
+/**
+ * Refit a capture to a size the IAP Review Screenshot slot will actually take.
+ *
+ * 1290x2796 is a valid APP screenshot size and App Store Connect rejects it here with
+ * "The dimensions of one or more screenshots are wrong" — the in-app-purchase review slot
+ * takes the legacy device sizes, not the 6.9" one. 640x920 is the size Apple's own help
+ * page names, so that is what we emit.
+ *
+ * The frame is box-downscaled to fit and centred on a dark field rather than cropped: a
+ * 0.461 capture into a 0.696 slot would have to cut ~34% of the width, and the thing being
+ * cut is the left rail — which is where both purchases live. Padding keeps the whole
+ * surface visible, which is the entire point of a review screenshot.
+ */
+function fitTo(file, outW, outH, pad = [0x0b, 0x0d, 0x14]) {
+  const src = PNG.sync.read(readFileSync(file))
+  const scale = Math.min(outW / src.width, outH / src.height)
+  const dw = Math.max(1, Math.round(src.width * scale))
+  const dh = Math.max(1, Math.round(src.height * scale))
+  const ox = Math.round((outW - dw) / 2), oy = Math.round((outH - dh) / 2)
+  const out = new PNG({ width: outW, height: outH })
+  for (let y = 0; y < outH; y++) for (let x = 0; x < outW; x++) {
+    const i = (outW * y + x) << 2
+    out.data[i] = pad[0]; out.data[i + 1] = pad[1]; out.data[i + 2] = pad[2]; out.data[i + 3] = 255
+  }
+  // Box filter. The source is a 3x-density capture being reduced ~3x, so averaging the
+  // whole source box is what keeps the HUD text readable; nearest-neighbour here drops
+  // strokes entirely and the price string turns to noise.
+  const bw = src.width / dw, bh = src.height / dh
+  for (let y = 0; y < dh; y++) {
+    const sy0 = Math.floor(y * bh), sy1 = Math.max(sy0 + 1, Math.floor((y + 1) * bh))
+    for (let x = 0; x < dw; x++) {
+      const sx0 = Math.floor(x * bw), sx1 = Math.max(sx0 + 1, Math.floor((x + 1) * bw))
+      let r = 0, g = 0, b = 0, n = 0
+      for (let sy = sy0; sy < sy1; sy++) for (let sx = sx0; sx < sx1; sx++) {
+        const s = (src.width * sy + sx) << 2
+        r += src.data[s]; g += src.data[s + 1]; b += src.data[s + 2]; n++
+      }
+      const d = (outW * (oy + y) + (ox + x)) << 2
+      out.data[d] = Math.round(r / n); out.data[d + 1] = Math.round(g / n); out.data[d + 2] = Math.round(b / n)
+      out.data[d + 3] = 255
+    }
+  }
+  // colorType 2 — no alpha channel at all, same trap as the app icon.
+  writeFileSync(file, PNG.sync.write(out, { colorType: 2 }))
+  return `${outW}x${outH}`
+}
+
 async function shoot(send, name, label, expect) {
   mkdirSync(OUT, { recursive: true })
   const deadline = Date.now() + 10000
@@ -110,8 +159,10 @@ async function shoot(send, name, label, expect) {
   if (await evaluate(send, `/combat gates/i.test(document.body.innerText || '')`)) {
     throw new Error(`${name}: dev readout still visible`)
   }
-  await screenshot(send, join(OUT, name))
-  console.log(`  ✓ ${name}  ${label}`)
+  const path = join(OUT, name)
+  await screenshot(send, path)
+  const dims = fitTo(path, 640, 920)
+  console.log(`  ✓ ${name}  ${dims}  ${label}`)
 }
 
 const { url, proc } = await startDevServer()
