@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useGameStore } from './store/gameStore'
 import { startGameLoop, stopGameLoop } from './engine/gameLoop'
 import { CharacterCreate } from './components/game/CharacterCreate'
 import { CharacterSelect } from './components/game/CharacterSelect'
+import { CloudSaveNotice } from './components/game/CloudSaveNotice'
 import { CombatView } from './components/game/CombatView'
 import { CharacterPanel } from './components/game/CharacterPanel'
 import { InventoryPanel } from './components/game/InventoryPanel'
@@ -10,9 +11,12 @@ import { ZoneTrack } from './components/game/ZoneTrack'
 import { HeroBar } from './components/game/HeroBar'
 import { CombatLog } from './components/game/CombatLog'
 import { ChatPanel } from './components/game/ChatPanel'
+import { PartyChatPanel } from './components/game/PartyChatPanel'
+import { getParty, subscribeParty } from './engine/party'
 import { PlayerCard } from './components/game/PlayerCard'
 import { WhisperWindow } from './components/game/WhisperWindow'
 import { installViewportInsets } from './engine/viewportInsets'
+import { deleteCloudSlot, installCloudSaveFlush } from './net/cloudSave'
 import { scheduleWatchEnd, cancelWatchEnd } from './engine/watchNotifications'
 import { watchCapacitySeconds } from './engine/offline'
 import { compileUpgrades } from './data/upgrades'
@@ -136,9 +140,19 @@ export default function App() {
   const gold         = useGameStore(s => s.gold)
   const currentZone  = useGameStore(s => s.currentZone)
   const devJumpZone  = useGameStore(s => s.devJumpZone)
+  const talentPoints = useGameStore(s => s.talentPoints)
 
   const [panels, setPanels] = useState<PanelState>(() => defaultPanels(isNarrow()))
-  const [logTab, setLogTab] = useState<'combat' | 'chat'>('chat')
+  const [logTab, setLogTab] = useState<'combat' | 'chat' | 'party'>('chat')
+
+  // Party size gates the PARTY tab: with no party there is no group chat. Subscribed
+  // directly so a join/disband re-renders the tab row without going through the store.
+  const partySize = useSyncExternalStore(subscribeParty, () => getParty().length)
+  // If the party disbands while the PARTY tab is active, fall back to CHAT so the
+  // panel does not sit on an empty notice until the next user click.
+  useEffect(() => {
+    if (partySize === 0 && logTab === 'party') setLogTab('chat')
+  }, [partySize, logTab])
 
   // Crossing the breakpoint re-seeds the defaults. Without this, rotating a tablet from
   // portrait to landscape carries the phone's "everything retracted" state into a desktop
@@ -153,6 +167,13 @@ export default function App() {
 
   // Publish the iOS keyboard height as --kb-inset so fixed panels can ride above it.
   useEffect(installViewportInsets, [])
+
+  // Push the last save up before the app goes away. `queueCloudSave` throttles uploads to
+  // one a minute during play, so without this the final minute of a session — the part a
+  // player is most likely to notice missing — would be the part most likely to be lost.
+  // Listens on `visibilitychange`/`pagehide` rather than `beforeunload`, which mobile
+  // browsers routinely skip when killing a backgrounded tab.
+  useEffect(installCloudSaveFlush, [])
 
   // ── The watch notification ───────────────────────────────────────────────────────
   //
@@ -425,7 +446,17 @@ export default function App() {
         slots={slots}
         onContinue={(id) => loadSlot(id)}
         onCreate={() => setCreating(true)}
-        onDelete={(id) => { slotStorage.delete(id); refreshSlots() }}
+        onDelete={(id) => {
+          slotStorage.delete(id)
+          // Delete the backup too, or the cloud-save notice restores it on the very next
+          // visit to this screen and the character becomes undeletable.
+          void deleteCloudSlot(id)
+          refreshSlots()
+        }}
+        // Restores anything the cloud has that this device does not, and offers (never
+        // applies) a cloud save that is further along. Lives on the select screen because
+        // that is the only moment a restore cannot land on top of a run in progress.
+        banner={<CloudSaveNotice onSlotsChanged={refreshSlots} />}
       />
     )
   }
@@ -551,6 +582,17 @@ export default function App() {
             className={`app-log-tab${logTab === 'chat' ? ' is-active' : ''}`}
             onClick={() => setLogTab('chat')}
           >CHAT</button>
+          {/* Party tab — sits next to CHAT, disabled when the player has no party. The
+              panel itself shows an empty-party notice when reached, but greying the
+              button up front keeps the affordance honest: a tab you cannot use should
+              not look like one you can. */}
+          <button
+            className={`app-log-tab${logTab === 'party' ? ' is-active' : ''}`}
+            onClick={() => setLogTab('party')}
+            disabled={partySize === 0}
+            title={partySize === 0 ? 'Invite a hero to your party to enable party chat' : 'Party chat'}
+            aria-label="Party chat"
+          >PARTY</button>
           {/* The feed folds away like the rails do, and carries the same single control in
               its own head. It was the one panel on desktop with no way to dismiss it: the
               world is the thing you are here to watch, and a permanent 232px feed over the
@@ -564,7 +606,9 @@ export default function App() {
           >✕</button>
         </div>
         <div className="app-log-content">
-          {logTab === 'combat' ? <CombatLog /> : <ChatPanel />}
+          {logTab === 'combat' ? <CombatLog />
+            : logTab === 'party' ? <PartyChatPanel />
+            : <ChatPanel />}
         </div>
       </div>
       {/* Restore control for the folded feed — a floating chat button standing exactly
@@ -610,6 +654,37 @@ export default function App() {
         >
           <span className="app-dock-btn-icon"><SpriteIcon ui="menu" size={20} /></span>
           <span className="app-dock-btn-label">Menu</span>
+          {/* Unspent talent points ride the Menu button as a badge rather than the
+              character panel itself: the panel collapses behind the accordion, and a
+              point that only shows up when the panel is open is one the player will
+              forget about. Gold + glow matches the in-panel "TALENTS" highlight, so
+              the dock and the rail agree on "you have something to spend". */}
+          {talentPoints > 0 && (
+            <span
+              data-talent-points={talentPoints}
+              title={`${talentPoints} talent point${talentPoints === 1 ? '' : 's'} to spend`}
+              style={{
+                position: 'absolute',
+                top: 4,
+                right: 6,
+                zIndex: 10,
+                fontFamily: 'var(--font-ui)',
+                fontSize: 14,
+                fontWeight: 700,
+                color: '#ffd86b',
+                lineHeight: 1,
+                padding: '3px 8px',
+                borderRadius: 999,
+                background: 'rgba(0,0,0,0.7)',
+                border: '1px solid rgba(255,216,107,0.8)',
+                textShadow: '0 0 6px rgba(255,216,107,0.9)',
+                boxShadow: '0 0 8px rgba(255,216,107,0.7), 0 0 16px rgba(255,216,107,0.3)',
+                pointerEvents: 'none',
+              }}
+            >
+              +{talentPoints}
+            </span>
+          )}
         </button>
         <button
           className={`app-dock-btn${panels.log ? ' is-active' : ''}`}

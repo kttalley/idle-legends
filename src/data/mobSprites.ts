@@ -75,7 +75,7 @@ export const MOB_SPRITE: Record<MobId, string> = {
   // Ashfire Peaks
   dragonkin_whelp: 'ffa_lamia',   // was ffa_icedrake — ashfire: icedrake and frost_wyrm both collapse to mob_ashdrake
   flame_elemental: 'ffa_bomb',
-  lava_golem: 'ffa_toughskin',   // was ffa_magma_brute — ashfire: magma_brute and bomb both collapse to mob_cinderwisp
+  lava_golem: 'ffa_iron_sentinel',   // was ffa_magma_brute (collided with bomb on mob_cinderwisp), then ffa_toughskin — a golem belongs on the construct sheet
   flame_wyrm: 'ffa_frost_wyrm',
 
   // Shattered Crossing

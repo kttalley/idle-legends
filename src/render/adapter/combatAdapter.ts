@@ -22,6 +22,7 @@ import {
 } from '../../engine/pvp'
 import { ghostVersion, releaseGhosts, takeGhost } from '../../engine/ghosts'
 import { factionNameColor, HOSTILE_MARK, isHostile } from '../../data/factions'
+import { MOB_SPRITE } from '../../data/mobSprites'
 import { zoneMapToTileMap, biomePaletteId, propPaletteId, MAP_SIZE, PAD, loadFftaTerrain } from './mapAdapter'
 import { getWalkMask, isWalkable, nearestWalkable, hasLineOfWalk, findPath } from '../../engine/walkability'
 import { TOWN_NPCS, NPC_TALK_RADIUS, type TownNpcDef, type TownServiceKind } from '../../data/townNpcs'
@@ -46,6 +47,9 @@ import {
 import { pushChat, resolveChat } from '../../engine/chatLog'
 import { getParty, disbandParty, setCompanionStatuses } from '../../engine/party'
 import type { CompanionStatusMap } from '../../engine/party'
+import {
+  subscribePartyBubbles, tryPartyBanter, tryPartyTrashTalk, tickPartyBanter, type PartyBubbleEvent,
+} from '../../engine/partyChat'
 import { entityKey } from '../../engine/whisper'
 import { ZONES } from '../../data/zones'
 import type { Facing, IndexedSprite } from '../types'
@@ -562,6 +566,10 @@ interface Ambient {
   /** Current bark text and the seconds it stays up. */
   bark: string | null
   barkT: number
+  /** Which channel this bark belongs to. Zone barks keep the original neutral bubble;
+   *  party barks use the faction tint so a glance at the world and a glance at the
+   *  party panel land on the same answer to "whose voice is that?". */
+  barkChannel: 'zone' | 'party' | null
   /** Seconds until this hero may speak again. */
   barkCd: number
 
@@ -946,6 +954,28 @@ export class WorldSceneController {
     this.propSheet = makePropSheet()
     this.tallProps = makePropEntities()
     this.landmarks = makeLandmarks()
+
+    // ── Party-chat bubbles ────────────────────────────────────────────────────
+    // Wire the engine's bubble channel straight into the per-ambient `bark` field so
+    // `drawAmbientBarks` paints them with no extra work. The match walks the ambient
+    // list because the engine publishes keys (entityKey) while the ambient list holds
+    // full ChatSpeakers — building a map each fire would be cheaper only above several
+    // hundred ambients, which the budget does not allow.
+    subscribePartyBubbles((e: PartyBubbleEvent) => {
+      for (const a of this.ambient) {
+        if (a.kind !== 'hero' || !a.identity) continue
+        const aKey = `${a.identity.name}:${a.identity.playerClass}:${a.identity.race}:${a.level}`
+        if (aKey !== e.key) continue
+        a.bark = e.text
+        a.barkT = e.duration
+        a.barkChannel = 'party'
+        // The ambient bark rate-gate uses `barkCd`; party lines should never collide
+        // with it because we want a party bubble to surface immediately even if the
+        // hero just spoke in zone chat. Reset cd so the next zone-channel bark waits
+        // the normal interval.
+        break
+      }
+    })
   }
 
   async init(): Promise<void> {
@@ -966,6 +996,17 @@ export class WorldSceneController {
     // wrong set and every hero would fall through to a placeholder rig on its first frame.
     for (const id of heroPreloadIds()) unitIds.add(id)
     for (const id of MONSTER_SPRITES) unitIds.add(id)
+    // ── Every rig the bestiary actually names ────────────────────────────────
+    // Without this the curated `MOB_SPRITE` table was decorative: `resolveMobSprite` would
+    // hand back e.g. `ffa_dire_boar`, the cache would not have it (it is in neither the
+    // hero set nor `MONSTER_SPRITES`), and the spawn would quietly take the fallback. Every
+    // mob whose rig was not coincidentally one of the thirteen monster sheets rendered as
+    // something else entirely, and nothing anywhere reported it — a miss and a deliberate
+    // choice look identical once they are both just "the fallback sprite".
+    //
+    // Cheap despite the count: 41 roster keys resolve through `ORIGINAL_SPRITE` onto ~21
+    // distinct files, so this is ~21 fetches that the HTTP cache collapses further.
+    for (const id of Object.values(MOB_SPRITE)) unitIds.add(id)
     // The fallback sheet, preloaded unconditionally. A fallback that is not in the cache is
     // not a fallback — it would itself fall through to the programmatic rig, which is the
     // exact blank humanoid it exists to replace.
@@ -3353,7 +3394,7 @@ export class WorldSceneController {
           fightT: 0, atkCd: rnd(s + 7) * 0.6,
           name: id.name, level: id.level, faction: id.faction, grp: gi,
           rng: subStream(seed, `beh:${gi}:${k}`), state: tmpl.fight ? 'approach' : 'wander',
-          identity: id, bark: null, barkT: 0, barkCd: rnd(s + 12) * BARK_COOLDOWN_SECONDS,
+          identity: id, bark: null, barkT: 0, barkChannel: null, barkCd: rnd(s + 12) * BARK_COOLDOWN_SECONDS,
           fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false, respawnT: 0, spawnFadeT: 0,
           rejoinAfter: false,
         })
@@ -3373,7 +3414,7 @@ export class WorldSceneController {
           fightT: 0, atkCd: rnd(s + 6) * 0.6,
           name: '', level: 0, faction: 'neutral', grp: gi,
           rng: subStream(seed, `beh:${gi}:m${k}`), state: 'idle',
-          identity: null, bark: null, barkT: 0, barkCd: 0,
+          identity: null, bark: null, barkT: 0, barkChannel: null, barkCd: 0,
           fightLog: null, playT: 0, playIdx: 0, foe: -1, wonLast: false, respawnT: 0, spawnFadeT: 0,
           rejoinAfter: false,
         })
@@ -3918,6 +3959,7 @@ export class WorldSceneController {
         a.e.active = false
         a.bark = null
         a.barkT = 0
+        a.barkChannel = null
       } else if (!hidden && !a.e.active && a.pvpHidden) {
         // Only revive what THIS pass put away. Ambient heroes can be inactive for other
         // reasons (a lost fight, a pooled slot released), and reviving those here would
@@ -4009,6 +4051,7 @@ export class WorldSceneController {
         a.playIdx = 0
         a.bark = null
         a.barkT = 0
+        a.barkChannel = null
         if (a.kind === 'mob') {
           a.state = 'idle'
           // A monster waiting out its respawn STAYS DEAD. Force-reviving it here (and
@@ -4050,7 +4093,11 @@ export class WorldSceneController {
       if (!anchor) continue
       if (a.barkT > 0) a.barkT -= dt
       if (a.barkCd > 0) a.barkCd -= dt
-      if (a.barkT <= 0) a.bark = null
+      if (a.barkT <= 0) { a.bark = null; a.barkChannel = null }
+      // Party-chat banter has its own cooldown (rare, gated separately from the zone
+      // bark rate). Tick it down in lockstep so a 60s window stays a 60s window whether
+      // the player is fighting or wandering.
+      tickPartyBanter(dt)
       if (a.state === 'fight') {
         // Position is held; the fight's beats are driven by the playback in
         // `ambientBrain`, which sets the attack animations.
@@ -4387,7 +4434,15 @@ export class WorldSceneController {
             { race: this.playerRace, level: this.playerLevel },
             distToPlayer, step, a.rng)) {
         markGank(Date.now())
-        speaking += this.tryBark(a, 'rivalFaction', speaking)
+        const fired = this.tryBark(a, 'rivalFaction', speaking)
+        if (fired) {
+          // The hostile in the world just declared on the player. Party members
+          // back-talk in zone chat — same channel as the bark itself, so the player
+          // and the world hear it together. The party channel stays for friendly
+          // group chat.
+          tryPartyTrashTalk(a.name, this.factionLabel(a.faction))
+        }
+        speaking += fired
         this.onHeroDeclares({
           name: a.name, playerClass: a.identity.playerClass, race: a.identity.race,
           faction: this.factionLabel(a.faction), level: a.level, spec: a.identity.specTitle,
@@ -4490,7 +4545,14 @@ export class WorldSceneController {
             const other = this.nearestAmbientHero(i)
             if (other >= 0) {
               const rival = this.ambient[other].faction !== a.faction
-              speaking += this.tryBark(a, rival ? 'rivalFaction' : 'passing', speaking)
+              const fired = this.tryBark(a, rival ? 'rivalFaction' : 'passing', speaking)
+              if (fired && rival) {
+                // The HERO in the world just trash talked the rival. Party members
+                // pile on in zone chat too — see `tryPartyTrashTalk`. (Party channel
+                // stays for friendly group chat; rivalry is public.)
+                tryPartyTrashTalk(this.ambient[other].name, this.ambient[other].faction)
+              }
+              speaking += fired
             }
           }
           break
@@ -4822,41 +4884,113 @@ export class WorldSceneController {
   private tryBark(a: Ambient, event: BarkEvent, speaking: number, detail?: string): number {
     if (a.barkT > 0 || a.barkCd > 0) return 0
     if (speaking >= BARK_MAX_CONCURRENT) return 0
-    if (a.rng() >= BARK_CHANCE[event]) return 0
+    // Round-robin penalty: if several other heroes have spoken in the last few seconds,
+    // this hero's chance drops so the crowd gets a turn before the same voice resumes.
+    // Without this, an `engage`/`kill` event that fires every frame lands on the same
+    // hero the moment their per-hero cooldown ends, and the chat reads as one person
+    // talking.
+    const chance = BARK_CHANCE[event] * this.recentSpeakerPenalty(a)
+    if (a.rng() >= chance) return 0
 
-    // Three tiers, best-available-immediately: a pre-generated pooled line if one is
-    // waiting, otherwise a canned one. Either way the hero speaks THIS frame.
+    // The world bubble reflects whatever lands first — a pooled line if one is queued,
+    // otherwise a canned line. The chat panel doesn't publish the canned line up front
+    // any more; see the live-bark branch below for why.
     const line = takeChatLine(event, a.rng) ?? pickBark(a.rng, event)
     a.bark = line
     a.barkT = BARK_SECONDS
+    a.barkChannel = 'zone'
     a.barkCd = BARK_COOLDOWN_SECONDS + a.rng() * 4
+    this.noteSpoke(a)
 
-    // Everything a hero says out loud also lands in zone chat, so the panel reads as the
-    // same conversation you can see happening in the world.
+    // Live-bark first. If the model accepts the call we publish a pending placeholder
+    // NOW and resolve it with the generated line when it lands (~4s, with a small
+    // grace so the player sees the "typing" beat). If the call is refused (LLM offline,
+    // this hero already has a live request in flight, or the model is backed off) we
+    // publish the canned line immediately — the chat shows the line ONCE in either
+    // case, never both.
     const faction = a.faction === 'horde' ? 'horde' : 'alliance'
-    const msg = pushChat({ channel: 'zone', from: a.name, faction, text: line })
-
-    // Tier three: ask for a line that knows what actually just happened. ~4s, so it
-    // arrives while the moment is still legible. If it lands and the hero is still
-    // showing the placeholder, upgrade both the bubble and the chat line in place.
     const ctx = this.chatContext()
-    if (ctx && a.identity) {
-      requestLiveBark(
-        event,
-        {
-          name: a.name, playerClass: a.identity.playerClass, race: a.identity.race,
-          faction: this.factionLabel(a.faction), level: a.level, spec: a.identity.specTitle,
-          talentAllocs: a.identity.talentAllocs,
-        },
-        ctx,
-        generated => {
-          if (a.bark === line && a.barkT > 0) a.bark = generated
-          resolveChat(msg.id, generated)
-        },
-        detail,
-      )
+    let msg!: ReturnType<typeof pushChat>
+    const sentLive = !!(ctx && a.identity && requestLiveBark(
+      event,
+      this.ambientSpeaker(a),
+      ctx,
+      generated => {
+        // Only upgrade if the hero is still showing the canned line and the bubble is
+        // still on screen. If they've already cycled past it (or moved on to a new
+        // line), the generated reply is no longer relevant — drop it.
+        if (a.bark === line && a.barkT > 0) a.bark = generated
+        resolveChat(msg.id, generated)
+      },
+      detail,
+    ))
+
+    if (sentLive) {
+      // Pending placeholder. The "…" gives the player a beat to see the bubble appear
+      // before the live line replaces it, which is what was missing before.
+      msg = pushChat({ channel: 'zone', from: a.name, faction, text: '…', pending: true })
+    } else {
+      // No live upgrade coming — publish the canned line now, so the chat and the
+      // world bubble agree on the same wording.
+      msg = pushChat({ channel: 'zone', from: a.name, faction, text: line })
     }
+
+    // Side branch — let one party member comment in the PARTY channel about the same
+    // event. Gated and single-speaker inside `tryPartyBanter` so this never stacks with
+    // the zone-channel upgrade above.
+    if (ctx) tryPartyBanter(event, ctx)
+
     return 1
+  }
+
+  // ── Round-robin between heroes in the zone ──────────────────────────────────
+  // When an event fires every frame (engaging, killing), the per-hero cooldown alone
+  // hands most speeches to whoever just spoke — they're now the only one past cooldown.
+  // Tracking a small rolling window of recent speakers and tapering their chance lets
+  // the OTHER heroes in the crowd get a turn before the same voice resumes.
+  private static readonly RECENT_SPEAKER_WINDOW_S = 6
+  private static readonly RECENT_SPEAKER_PENALTY = 0.45
+  private readonly recentSpeakers: { key: string; at: number }[] = []
+
+  /** Build a `ChatSpeaker` from an ambient hero's identity. Shared by the live-bark
+   *  call site and the round-robin key so the spec/level/class fields cannot drift
+   *  between them. */
+  private ambientSpeaker(a: Ambient): ChatSpeaker {
+    return {
+      name: a.name,
+      playerClass: a.identity!.playerClass,
+      race: a.identity!.race,
+      faction: this.factionLabel(a.faction),
+      level: a.level,
+      spec: a.identity!.specTitle,
+      talentAllocs: a.identity!.talentAllocs,
+    }
+  }
+
+  private noteSpoke(a: Ambient): void {
+    if (!a.identity) return
+    const key = entityKey(this.ambientSpeaker(a))
+    const now = performance.now() / 1000
+    this.recentSpeakers.push({ key, at: now })
+    // Bound the buffer so it can't grow forever.
+    if (this.recentSpeakers.length > 32) this.recentSpeakers.shift()
+  }
+
+  private recentSpeakerPenalty(a: Ambient): number {
+    if (!a.identity) return 1
+    const key = entityKey(this.ambientSpeaker(a))
+    const now = performance.now() / 1000
+    // Drop stale entries so the window stays a window.
+    while (this.recentSpeakers.length && now - this.recentSpeakers[0].at > WorldSceneController.RECENT_SPEAKER_WINDOW_S) {
+      this.recentSpeakers.shift()
+    }
+    // The penalty is multiplicative per OTHER hero who spoke recently. One other hero
+    // speaks → 0.55; two → 0.30; three → 0.16. The same hero re-rolling gets no extra
+    // penalty beyond what the per-hero cooldown already enforces.
+    let others = 0
+    for (const r of this.recentSpeakers) if (r.key !== key) others++
+    if (others === 0) return 1
+    return Math.max(0.15, 1 - others * WorldSceneController.RECENT_SPEAKER_PENALTY)
   }
 
   /** Display name for a faction, so generated lines use the game's own words. */
@@ -5020,10 +5154,28 @@ export class WorldSceneController {
       const h = 13
       const x = sx - w / 2, y = sy - h / 2
 
-      // Bubble body — matches ThoughtBubble's palette so the world and the HUD read as
-      // one game, even though they are two independent systems.
-      ctx.fillStyle = 'rgba(18,14,6,0.90)'
-      ctx.strokeStyle = '#5a4020'
+      // Faction-tinted bubble for party chat only. Zone chatter keeps the original
+      // neutral styling so the world doesn't go from one calm colour scheme to a
+      // blue/red one the moment a party is formed.
+      const partyTint = a.barkChannel === 'party'
+      const bubbleFill = partyTint && a.faction === 'alliance'
+        ? 'rgba(20,40,90,0.92)'
+        : partyTint && a.faction === 'horde'
+          ? 'rgba(90,20,18,0.92)'
+          : 'rgba(18,14,6,0.90)'
+      const bubbleStroke = partyTint && a.faction === 'alliance'
+        ? '#5a7fc0'
+        : partyTint && a.faction === 'horde'
+          ? '#c06060'
+          : '#5a4020'
+      const textColor = partyTint && a.faction === 'alliance'
+        ? '#bcd5ff'
+        : partyTint && a.faction === 'horde'
+          ? '#ffc0b8'
+          : '#d4b896'
+
+      ctx.fillStyle = bubbleFill
+      ctx.strokeStyle = bubbleStroke
       ctx.lineWidth = 1
       const r = 4
       ctx.beginPath()
@@ -5046,10 +5198,10 @@ export class WorldSceneController {
       ctx.lineTo(sx, y + h + 4)
       ctx.lineTo(sx + 3, y + h)
       ctx.closePath()
-      ctx.fillStyle = 'rgba(18,14,6,0.90)'
+      ctx.fillStyle = bubbleFill
       ctx.fill()
 
-      ctx.fillStyle = '#d4b896'
+      ctx.fillStyle = textColor
       ctx.fillText(a.bark, sx, y + h / 2)
       ctx.globalAlpha = 1
     }

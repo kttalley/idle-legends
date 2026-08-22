@@ -32,6 +32,7 @@ import { canGroupWith, HOSTILE_MARK, isHostile, resolveFaction } from '../data/f
 import type { ChatSpeaker } from './chatGen'
 import { pushChat, resolveChat } from './chatLog'
 import { isLlmReachable, llmGenerate, PRIORITY } from './llmClient'
+import { clearPartyChat } from './partyChat'
 import { entityKey } from './whisper'
 
 export interface PartyMember {
@@ -377,10 +378,14 @@ export function subscribeCompanionStatus(fn: () => void): () => void {
 /** Disband everything — called on zone change, since the crowd is regenerated. */
 export function disbandParty(reason?: string): void {
   setCompanionStatuses({})
-  if (!members.length) { pendingInvites.clear(); return }
+  if (!members.length) { pendingInvites.clear(); clearPartyChat(); return }
   const names = members.map(m => m.speaker.name).join(', ')
   members = []
   pendingInvites.clear()
+  // Party chat shares the lifetime of the party: a fresh zone is a fresh crowd, and any
+  // transcript left over would attach to a roster of strangers the moment the player
+  // groups up again. Drop the transcript here so a new party starts with no history.
+  clearPartyChat()
   pushChat({
     channel: 'system', from: null,
     text: reason ?? `${names} left your party — you went your separate ways.`,

@@ -79,6 +79,7 @@ import { rollLoot, placeDrop, salvageValue } from '../engine/loot'
 import { generateNames, generateThought, generateFactionNamesFallback, generatePlayerNameFallback } from '../engine/nameGen'
 import type { ThoughtEvent } from '../engine/nameGen'
 import { slotStorage, summarize, newSlotId, setLastSlotId } from './saveSlots'
+import { queueCloudSave } from '../net/cloudSave'
 import { DEFAULT_COLORWAY, isColorwayUnlocked } from '../render/colorways'
 import { getPurchaseState } from '../monetization/purchases'
 import {
@@ -2150,13 +2151,22 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // createdAt is cached at load/create time. Reading it back through
     // slotStorage.load() here meant every autosave parsed the whole multi-megabyte
     // saves file twice — once for this lookup and once inside save() itself.
-    slotStorage.save({
+    const slot = {
       id:           activeSlotId,
       createdAt:    activeSlotCreatedAt ?? now,
       lastPlayedAt: now,
       summary:      summarize(s),
       state:        toSaveBlob(s),
-    })
+    }
+    slotStorage.save(slot)
+    // Mirror to the cloud, at its own much slower cadence (see `queueCloudSave` — at most
+    // one upload a minute, plus a flush when the page hides). Local storage stays the thing
+    // the game plays from; this is the backstop for the eviction that localStorage and the
+    // IndexedDB mirror cannot survive.
+    //
+    // Deliberately not awaited and never able to throw: an autosave must not be able to
+    // take an exception, or to wait on a network, on the path the game loop runs.
+    queueCloudSave(slot)
   },
 
   // Save the active run and drop back to the character-select menu (no data loss —

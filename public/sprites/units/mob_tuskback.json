@@ -1,0 +1,122 @@
+{
+  "id": "mob_tuskback",
+  "image": "mob_tuskback.png",
+  "frameW": 28,
+  "frameH": 22,
+  "anchor": {
+    "x": 14,
+    "y": 20
+  },
+  "sourcePalette": [
+    "",
+    "#3a2a26",
+    "#5c4038",
+    "#7c5a4c",
+    "#9c7a68",
+    "#2e2018",
+    "#4a3324",
+    "#664630",
+    "#8a6242",
+    "#241c1c",
+    "#3a2c2c",
+    "#54403c",
+    "#70564e",
+    "#8a8272",
+    "#c8bfa4",
+    "#f0e8d0"
+  ],
+  "animations": {
+    "idle": {
+      "se": {
+        "frames": [
+          0,
+          1
+        ],
+        "fps": 3,
+        "loop": true
+      },
+      "ne": {
+        "frames": [
+          0,
+          1
+        ],
+        "fps": 3,
+        "loop": true
+      }
+    },
+    "walk": {
+      "se": {
+        "frames": [
+          2,
+          3
+        ],
+        "fps": 6,
+        "loop": true
+      },
+      "ne": {
+        "frames": [
+          2,
+          3
+        ],
+        "fps": 6,
+        "loop": true
+      }
+    },
+    "attack": {
+      "se": {
+        "frames": [
+          4,
+          5,
+          6
+        ],
+        "fps": 8,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          4,
+          5,
+          6
+        ],
+        "fps": 8,
+        "loop": false
+      }
+    },
+    "hit": {
+      "se": {
+        "frames": [
+          7,
+          8
+        ],
+        "fps": 10,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          7,
+          8
+        ],
+        "fps": 10,
+        "loop": false
+      }
+    },
+    "death": {
+      "se": {
+        "frames": [
+          9,
+          10
+        ],
+        "fps": 5,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          9,
+          10
+        ],
+        "fps": 5,
+        "loop": false
+      }
+    }
+  }
+}

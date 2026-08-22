@@ -11,7 +11,7 @@
 // React subscribes through `useSyncExternalStore`, so the panel re-renders on new
 // messages without the store or the render loop knowing this file exists.
 
-export type ChatChannel = 'zone' | 'whisper' | 'system'
+export type ChatChannel = 'zone' | 'whisper' | 'system' | 'party'
 
 export interface ChatMessage {
   id: string

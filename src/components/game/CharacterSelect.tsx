@@ -12,6 +12,12 @@ interface CharacterSelectProps {
   onContinue: (id: string) => void
   onCreate:   () => void
   onDelete:   (id: string) => void
+  /** Rendered above the hero cards, INSIDE this screen's scroll container.
+   *
+   *  Taken as a prop rather than composed as a sibling in `App` because this component
+   *  owns a `height: 100dvh` scroller: anything stacked outside it either pushes the whole
+   *  screen past the viewport or gets clipped. Used for the cloud-save notice. */
+  banner?:    React.ReactNode
 }
 
 function relativeTime(ts: number): string {
@@ -25,7 +31,7 @@ function relativeTime(ts: number): string {
   return `${d}d ago`
 }
 
-export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: CharacterSelectProps) {
+export function CharacterSelect({ slots, onContinue, onCreate, onDelete, banner }: CharacterSelectProps) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const full = slots.length >= MAX_SLOTS
 
@@ -62,6 +68,8 @@ export function CharacterSelect({ slots, onContinue, onCreate, onDelete }: Chara
           CHOOSE YOUR HERO
         </p>
       </div>
+
+      {banner}
 
       <div className="flex gap-5 flex-wrap justify-center px-4" style={{ maxWidth: 900 }}>
         {slots.map(slot => {

@@ -197,17 +197,11 @@ export const ORIGINAL_SPRITE: Record<string, string> = {
   // comes from palette, and `resolveMobSprite` guarantees no two mobs in one zone land on
   // the same sheet.
   ffa_direwolf: 'mob_duskcat', ffa_grim_wolfkin: 'mob_duskcat',
-  // The boar is FOUR-LEGGED and was drawing on `mob_gnarljaw`, which is a bipedal brute in
-  // a loincloth. A quadruped on a two-legged rig is the most obviously wrong a sprite can
-  // be, so it moves to the dog-shaped sheet even though the wolf in its starting zone is
-  // already there — two similar quadrupeds beat one boar standing upright.
-  //
-  // KNOWN ART GAP, recorded rather than papered over: `mob_duskcat` is the ONLY drawn
-  // quadruped, and mob palettes vary by boss/elite/normal rather than per mob, so the Grey
-  // Wolf and the Rampaging Boar are now the same figure in Sunhollow. The fix is a second
-  // four-legged sheet (something tusked and heavy); until that exists this is the least
-  // wrong arrangement available.
-  ffa_dire_boar: 'mob_duskcat',
+  // The boar was drawing on `mob_gnarljaw`, a bipedal brute in a loincloth. It went to the
+  // cat sheet as a stopgap, which fixed the number of legs and left the Grey Wolf and the
+  // Rampaging Boar as the same animal in Sunhollow. `mob_tuskback` is that gap closed
+  // properly — the second drawn quadruped, authored by tools/spritegen/beast_tuskback.mjs.
+  ffa_dire_boar: 'mob_tuskback',
   ffa_bog_troll: 'mob_gnarljaw',
   ffa_chimera: 'mob_ashdrake', ffa_frost_wyrm: 'mob_ashdrake', ffa_carrion_bird: 'mob_ashdrake',
   ffa_rot_crawler: 'mob_scuttler',
@@ -220,8 +214,13 @@ export const ORIGINAL_SPRITE: Record<string, string> = {
   // Humanoid mobs take hero rigs — they are people, and the enemy palette is what makes
   // them read as hostile.
   ffa_dune_raider: 'hero_shade',
-  ffa_bandit_brute: 'hero_colossus', ffa_stone_warden: 'hero_colossus',
-  ffa_iron_sentinel: 'hero_colossus',
+  ffa_bandit_brute: 'hero_colossus',
+  // Constructs get a construct. `hero_colossus` was carrying seven mobs, and three of them
+  // were golems wearing a person's silhouette and a person's proportions — the same
+  // category error the boar-on-a-biped was, only harder to notice because a golem is
+  // roughly person-shaped to begin with. `mob_stoneward` is authored by
+  // tools/spritegen/mob_stoneward.mjs.
+  ffa_stone_warden: 'mob_stoneward', ffa_iron_sentinel: 'mob_stoneward',
   ffa_war_deserter: 'hero_vanguard',
   ffa_storm_caller: 'hero_magus',
   ffa_hexknight: 'hero_oathbound',
@@ -229,7 +228,9 @@ export const ORIGINAL_SPRITE: Record<string, string> = {
 
 // Original monster rigs authored on the HUMANOID frame (24×32) rather than the beast frame
 // — governs which placeholder generator to use if an original rig fails to load.
-const HUMANOID_ORIGINALS = new Set<string>(['mob_gravewalker', 'mob_shivtail', 'mob_gnarljaw', 'mob_grubkin'])
+const HUMANOID_ORIGINALS = new Set<string>([
+  'mob_gravewalker', 'mob_shivtail', 'mob_gnarljaw', 'mob_grubkin', 'mob_stoneward',
+])
 
 /** True if an original rig id uses the humanoid frame (24×32). */
 export function isHumanoidMonster(originalId: string): boolean {

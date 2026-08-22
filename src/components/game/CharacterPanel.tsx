@@ -53,6 +53,21 @@ export function CharacterPanel() {
           )}
         </span>
       }
+      headerRight={
+        // Indicator on the COLLAPSED accordion. When the panel is open, the in-panel
+        // Talents tab carries its own badge; when it's folded, the player can't see
+        // that tab at all. The dock button already shows the count, but the dock can
+        // be off-screen on mobile, and the indicator here is the one that answers
+        // "is there anything for me in this drawer?" at a glance.
+        talentPoints > 0 ? (
+          <span
+            className="char-accordion-badge"
+            title={`${talentPoints} talent point${talentPoints === 1 ? '' : 's'} to spend`}
+          >
+            +{talentPoints}
+          </span>
+        ) : undefined
+      }
     >
 
       {/* Tab bar */}
@@ -76,16 +91,20 @@ export function CharacterPanel() {
                 position: 'absolute',
                 top: 2,
                 right: 4,
-                background: '#00cc66',
-                color: '#000',
-                borderRadius: '50%',
-                width: 14,
+                background: 'rgba(0,0,0,0.55)',
+                color: 'var(--gold)',
+                borderRadius: 999,
+                minWidth: 14,
                 height: 14,
-                fontSize: '0.5rem',
+                padding: '0 4px',
+                fontSize: '0.55rem',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                border: '1px solid rgba(255, 216, 107, 0.7)',
+                textShadow: '0 0 3px rgba(255, 216, 107, 0.85)',
+                boxShadow: '0 0 4px rgba(255, 216, 107, 0.45)',
               }}>
                 {talentPoints}
               </span>

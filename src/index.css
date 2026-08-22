@@ -496,6 +496,15 @@ h1, h2, h3, h4,
   font-weight: 700;
   border-bottom-color: var(--gold-warm);
 }
+/* Disabled tab (e.g. PARTY when no party is active): greyed out, no hover lift,
+   no pointer cursor. Keeps the affordance honest — a tab you cannot use should
+   not look like one you can. */
+.app-log-tab:disabled {
+  color: #4a4438;
+  cursor: default;
+  opacity: 0.55;
+}
+.app-log-tab:disabled:hover { color: #4a4438; }
 
 .app-log-content {
   flex: 1 1 auto;
@@ -1355,6 +1364,36 @@ h1, h2, h3, h4,
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.42);
   text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+  pointer-events: none;
+}
+
+/* Small status badge in the top-right corner of a dock button. Same placement as
+   `.app-dock-gold` (gold stays on the gear button) but the imagery is different: a
+   "+N" talent-point badge is an AFFORDANCE, not a tally — it is showing the player
+   something they can do, not something they have. Gold + glow matches the in-panel
+   "TALENTS" highlight, so the dock and the rail agree on the state. */
+.app-dock-badge {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  z-index: 1;
+  font-family: var(--font-ui);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--gold, #ffd86b);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 216, 107, 0.7);
+  /* A double-layer glow: the bright text-shadow halo for the immediate vicinity, and
+     a softer box-shadow for the wider bloom. Both are gold so the badge reads as
+     a single luminous element rather than a hard-edged pill. */
+  text-shadow: 0 0 4px rgba(255, 216, 107, 0.85);
+  box-shadow:
+    0 0 6px rgba(255, 216, 107, 0.55),
+    0 0 12px rgba(255, 216, 107, 0.25);
   pointer-events: none;
 }
 
@@ -2265,6 +2304,16 @@ h1, h2, h3, h4,
   color: #d8b878;
 }
 
+/* Party chat: the player's own line. Right-aligned and warmer-tinted, mirroring the
+   whisper window's bubble pair so a glance at either surface lands on "that's me".
+   Other party members' lines keep the default left-aligned, neutral-tinted style. */
+.chat-bubble-mine {
+  margin-left: auto;
+  background: rgba(90, 64, 32, 0.85);
+  border-color: var(--edge-soft);
+  color: #f7e3b8;
+}
+
 .chat-meta {
   display: flex;
   align-items: baseline;
@@ -2427,6 +2476,25 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
 }
 .collapsible-chevron.is-collapsed { transform: rotate(-90deg); }
 .collapsible-header-right { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+
+/* "+N" talent counter on the character accordion header. Same affordance language
+   as the dock badge, but smaller and quieter because the accordion header is denser
+   than a dock button. Gold + glow matches the in-panel Talents-tab highlight so the
+   accordion and the dock read as the same cue. */
+.char-accordion-badge {
+  font-family: var(--font-ui);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--gold, #ffd86b);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 216, 107, 0.6);
+  text-shadow: 0 0 3px rgba(255, 216, 107, 0.5);
+  box-shadow: 0 0 4px rgba(255, 216, 107, 0.35);
+}
 
 /* A collapsed section is exactly its header — no border remnant, no residual padding. */
 .rp-panel.collapsible.is-collapsed { overflow: hidden; }

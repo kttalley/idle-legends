@@ -101,8 +101,11 @@ export interface ChatContext {
  * scaffolding attached would appear verbatim over a hero's head, so this is not
  * cosmetic tidying — it is the difference between the feature working and it looking
  * broken.
+ *
+ * Exported for reuse by `engine/partyChat.ts`: party chat lines are short and this
+ * sanitiser is already stricter on length and stage directions than the whisper one.
  */
-function sanitize(raw: string): string[] {
+export function sanitize(raw: string): string[] {
   return raw
     .split('\n')
     .map(l => l.trim())
@@ -252,9 +255,12 @@ const liveBusy = new Set<string>()
 /**
  * Ask for a line about a specific event, delivered by callback when it arrives.
  *
- * Fire-and-forget: returns immediately, never throws, and simply does not call back if
- * generation is unavailable, backed off, stale or failed. The caller shows a canned line
- * up front and treats a late arrival as an upgrade, never as the thing it was waiting for.
+ * Returns true if a live line is on the way, false if the request was refused
+ * (generation unavailable, backed off, this hero already has a live request in flight,
+ * or the request went stale). Callers use the boolean to decide whether to publish a
+ * canned line NOW or wait — the previous behaviour of always publishing the canned
+ * line first and then overwriting it ~4s later caused the chat to visibly "double
+ * publish", which read as a bug.
  */
 export function requestLiveBark(
   event: BarkEvent,
@@ -262,9 +268,9 @@ export function requestLiveBark(
   ctx: ChatContext,
   onLine: (line: string) => void,
   detail?: string,
-): void {
-  if (!isChatLlmConfigured() || llmBackedOff()) return
-  if (liveBusy.has(speaker.name)) return
+): boolean {
+  if (!isChatLlmConfigured() || llmBackedOff()) return false
+  if (liveBusy.has(speaker.name)) return false
   liveBusy.add(speaker.name)
 
   const specStr = speaker.spec ? `${speaker.spec} ${speaker.playerClass}` : speaker.playerClass
@@ -296,6 +302,7 @@ Type ONE short chat message about it. Max 8 words, lowercase, casual MMO registe
     })
     .catch(() => { /* canned line already spoke; nothing to recover */ })
     .finally(() => { liveBusy.delete(speaker.name) })
+  return true
 }
 
 /** Pool sizes, for the dev/debug probe. */

@@ -34,9 +34,13 @@ export function ChatPanel() {
   const playerName = useGameStore(s => s.playerName)
   const playerFaction = useGameStore(s => s.playerFaction)
 
-  // Everything except private threads: zone chatter plus system notices (invites, duel
-  // results), which are answers to things the player just did and belong in view.
-  const shown = useMemo(() => messages.filter(m => m.channel !== 'whisper'), [messages])
+  // Everything except private threads AND party chatter: zone/system only here, since
+  // party has its own tab and whisper has its own window. An invite or a duel result is
+  // still in scope — those are answers to things the player just did.
+  const shown = useMemo(
+    () => messages.filter(m => m.channel !== 'whisper' && m.channel !== 'party'),
+    [messages],
+  )
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
