@@ -1787,8 +1787,8 @@ h1, h2, h3, h4,
   z-index: 901;
   /* Bounded and centred rather than edge-to-edge: at 1440px an inset-12 panel left the
      three trees clustered in the middle of a very large empty box. */
-  top: 12px;
-  bottom: 12px;
+  top: calc(12px + var(--safe-t));
+  bottom: calc(12px + var(--safe-b));
   left: 50%;
   transform: translateX(-50%);
   width: min(1060px, calc(100vw - 24px));
@@ -1806,7 +1806,13 @@ h1, h2, h3, h4,
     transform: none;
     width: 100vw;
     border-radius: 0;
-    padding: 8px 8px calc(8px + var(--safe-b));
+    /* --safe-t is NOT optional here. This padded the bottom for the home indicator and
+       left the top a bare 8px, so on any notch/Dynamic Island device the header — which
+       carries the ONLY Close button — rendered underneath the status bar and could not be
+       tapped. The panel is modal and traps focus, so the app had to be force-quit to
+       escape it. Reported from TestFlight build 1. */
+    padding: calc(8px + var(--safe-t)) calc(8px + var(--safe-r))
+             calc(8px + var(--safe-b)) calc(8px + var(--safe-l));
   }
 }
 
