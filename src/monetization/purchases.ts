@@ -93,6 +93,30 @@ export function subscribePurchases(fn: Listener): () => void {
  */
 const isNative = Capacitor.isNativePlatform()
 
+/**
+ * Every native call gets a deadline.
+ *
+ * The bridge can leave a promise permanently pending — StoreKit's product request has no
+ * timeout of its own, and a purchase sheet that never presents never resolves or rejects.
+ * `buy()` clears `busy` on success, on a missing package and in its catch, so the only way
+ * the paywall can sit on "Working…" forever is a promise that settles in none of them.
+ * That happened on TestFlight build 1 and left the button permanently disabled.
+ *
+ * This is the file whose header promises monetization can never break the game. A dead
+ * button breaks it, so the deadline is not defensive padding — it is that promise.
+ */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(Object.assign(new Error(`[iap] ${label} timed out after ${ms}ms`), { timedOut: true })), ms)
+    p.then(v => { clearTimeout(t); resolve(v) }, e => { clearTimeout(t); reject(e) })
+  })
+}
+
+/** Generous: the sheet involves the user typing an Apple ID password. */
+const PURCHASE_MS = 180_000
+/** Tight: this is a network product lookup with no human in the loop. */
+const OFFERINGS_MS = 20_000
+
 /** Cached dynamic import so the RevenueCat bundle never loads in a browser session. */
 async function plugin() {
   const mod = await import('@revenuecat/purchases-capacitor')
@@ -156,7 +180,7 @@ export async function loadOfferings(): Promise<void> {
   if (!isNative) return
   try {
     const Purchases = await plugin()
-    const { current } = await Purchases.getOfferings()
+    const { current } = await withTimeout(Purchases.getOfferings(), OFFERINGS_MS, 'getOfferings')
     const pkgs = current?.availablePackages as Pkg[] | undefined
     const founder = findPackage(pkgs, 'founder')
     const watch = findPackage(pkgs, 'standing')
@@ -181,19 +205,46 @@ async function buy(needle: string, entitlement: string): Promise<boolean> {
   set({ busy: true, error: null })
   try {
     const Purchases = await plugin()
-    const { current } = await Purchases.getOfferings()
+    const { current } = await withTimeout(Purchases.getOfferings(), OFFERINGS_MS, 'getOfferings')
     const pkg = findPackage(current?.availablePackages as Pkg[] | undefined, needle)
     if (!pkg) { set({ busy: false, error: 'Store unavailable. Try again shortly.' }); return false }
-    const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg as never })
+    const { customerInfo } = await withTimeout(
+      Purchases.purchasePackage({ aPackage: pkg as never }), PURCHASE_MS, 'purchasePackage')
     const active = activeFrom(customerInfo)
     set({ busy: false, active })
     return active.has(entitlement)
   } catch (e) {
     const cancelled = !!(e as { code?: string; userCancelled?: boolean })?.userCancelled
       || (e as { code?: string })?.code === '1'
+    // A timeout is NOT proof the purchase failed — StoreKit may have completed it while the
+    // bridge went quiet. Never tell the player it failed without asking who they are first;
+    // charging someone and then showing "could not be completed" is the worst outcome here.
+    if ((e as { timedOut?: boolean })?.timedOut) {
+      console.error('[iap] purchase timed out — re-reading entitlements', e)
+      const recovered = await refreshEntitlements()
+      set({ busy: false, error: recovered.has(entitlement) ? null : 'Still working. Check back in a moment, or use Restore Purchases.' })
+      return recovered.has(entitlement)
+    }
     set({ busy: false, error: cancelled ? null : 'Purchase could not be completed.' })
     if (!cancelled) console.error('[iap] purchase failed', e)
     return false
+  }
+}
+
+/**
+ * Ask RevenueCat who this customer is, right now. Used to recover from a timed-out
+ * purchase, where the transaction may well have gone through.
+ */
+async function refreshEntitlements(): Promise<ReadonlySet<string>> {
+  try {
+    const Purchases = await plugin()
+    const { customerInfo } = await withTimeout(Purchases.getCustomerInfo(), OFFERINGS_MS, 'getCustomerInfo')
+    const active = activeFrom(customerInfo)
+    set({ active })
+    return active
+  } catch (e) {
+    console.warn('[iap] refreshEntitlements failed', e)
+    return state.active
   }
 }
 
@@ -213,7 +264,7 @@ export async function restorePurchases(): Promise<boolean> {
   set({ busy: true, error: null })
   try {
     const Purchases = await plugin()
-    const { customerInfo } = await Purchases.restorePurchases()
+    const { customerInfo } = await withTimeout(Purchases.restorePurchases(), OFFERINGS_MS, 'restorePurchases')
     const active = activeFrom(customerInfo)
     set({ busy: false, active, error: active.size ? null : 'No previous purchases found.' })
     return active.has(FOUNDER_ENTITLEMENT)
