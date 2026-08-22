@@ -119,13 +119,27 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
               Three colourways, and the founder mark on your hero. Bought once, kept
               forever — and when the hand-drawn art lands, founder items upgrade with it.
             </p>
+            {/* No price means StoreKit gave us no product, and tapping would only call
+                getOfferings again and hang — which is exactly what TestFlight build 1 did,
+                sitting on "Working…" forever. A price is therefore the precondition for
+                the button being live, not merely a nicety in its label. Products stay
+                unvended until Apple has propagated them AND the Paid Applications
+                Agreement is fully active, so this state is normal before launch and must
+                read as "not yet", never as a broken button. */}
             <button
               className="rp-button"
               onClick={() => { void buyFounderPack() }}
-              disabled={iap?.busy}
-              style={{ width: '100%', padding: '11px 12px', minHeight: 44, fontSize: '0.72rem' }}
+              disabled={iap?.busy || !iap?.founderPrice}
+              style={{
+                width: '100%', padding: '11px 12px', minHeight: 44, fontSize: '0.72rem',
+                opacity: iap?.founderPrice ? 1 : 0.55,
+              }}
             >
-              {iap?.busy ? 'Working…' : `Unlock${iap?.founderPrice ? ` — ${iap.founderPrice}` : ''}`}
+              {iap?.busy
+                ? 'Working…'
+                : iap?.founderPrice
+                  ? `Unlock — ${iap.founderPrice}`
+                  : 'Store unavailable'}
             </button>
           </div>
         )}
