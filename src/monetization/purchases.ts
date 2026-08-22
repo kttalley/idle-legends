@@ -133,16 +133,22 @@ export async function initPurchases(): Promise<void> {
  *
  * There are two SKUs now, so `availablePackages[0]` is no longer an answer — it silently
  * became "whichever product RevenueCat happens to list first", which would sell the wrong
- * thing the moment the dashboard reordered. Matched on identifier instead, with a
- * first-package fallback ONLY for the founder pack, which is what shipped against that
- * assumption and whose offering has a single product.
+ * thing the moment the dashboard reordered. Matched on identifier instead — against the
+ * PACKAGE identifier or the PRODUCT identifier, because the dashboard constrains package
+ * identifiers to a preset list plus "Custom" and a future editor may not keep ours.
+ *
+ * **The first-package fallback is gone (2026-08-22).** It existed for the era when the
+ * offering held a single product, and it had become a live hazard: with two packages
+ * configured, a founder lookup that missed would return `availablePackages[0]` — which is
+ * whatever RevenueCat listed first, i.e. possibly Standing Orders. That is a paywall
+ * showing the wrong price and charging for the wrong thing, and it fails silently. A
+ * missing package must read as "store unavailable", never as "here is a different SKU".
  */
 type Pkg = { identifier?: string; product: { identifier?: string; priceString: string } }
-function findPackage(pkgs: Pkg[] | undefined, needle: string, fallbackFirst = false): Pkg | undefined {
-  const hit = pkgs?.find(p =>
+function findPackage(pkgs: Pkg[] | undefined, needle: string): Pkg | undefined {
+  return pkgs?.find(p =>
     (p.identifier ?? '').toLowerCase().includes(needle) ||
     (p.product?.identifier ?? '').toLowerCase().includes(needle))
-  return hit ?? (fallbackFirst ? pkgs?.[0] : undefined)
 }
 
 /** Fetch the price strings for the paywalls. Best-effort. */
@@ -152,7 +158,7 @@ export async function loadOfferings(): Promise<void> {
     const Purchases = await plugin()
     const { current } = await Purchases.getOfferings()
     const pkgs = current?.availablePackages as Pkg[] | undefined
-    const founder = findPackage(pkgs, 'founder', true)
+    const founder = findPackage(pkgs, 'founder')
     const watch = findPackage(pkgs, 'standing')
     set({
       founderPrice: founder?.product?.priceString ?? null,
@@ -167,7 +173,7 @@ export async function loadOfferings(): Promise<void> {
  * Buy one SKU. Resolves true if `entitlement` is active afterwards.
  * A user cancellation is NOT an error and must not show one.
  */
-async function buy(needle: string, entitlement: string, fallbackFirst: boolean): Promise<boolean> {
+async function buy(needle: string, entitlement: string): Promise<boolean> {
   if (!isNative) {
     set({ error: 'In-app purchases are only available in the app.' })
     return false
@@ -176,7 +182,7 @@ async function buy(needle: string, entitlement: string, fallbackFirst: boolean):
   try {
     const Purchases = await plugin()
     const { current } = await Purchases.getOfferings()
-    const pkg = findPackage(current?.availablePackages as Pkg[] | undefined, needle, fallbackFirst)
+    const pkg = findPackage(current?.availablePackages as Pkg[] | undefined, needle)
     if (!pkg) { set({ busy: false, error: 'Store unavailable. Try again shortly.' }); return false }
     const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg as never })
     const active = activeFrom(customerInfo)
@@ -191,9 +197,9 @@ async function buy(needle: string, entitlement: string, fallbackFirst: boolean):
   }
 }
 
-export const buyFounderPack = () => buy('founder', FOUNDER_ENTITLEMENT, true)
+export const buyFounderPack = () => buy('founder', FOUNDER_ENTITLEMENT)
 /** Buy Standing Orders — permanent watch capacity. See STANDING_ORDERS_ENTITLEMENT. */
-export const buyStandingOrders = () => buy('standing', STANDING_ORDERS_ENTITLEMENT, false)
+export const buyStandingOrders = () => buy('standing', STANDING_ORDERS_ENTITLEMENT)
 
 /**
  * Restore Purchases. Apple requires this to exist and to be reachable without a purchase,
