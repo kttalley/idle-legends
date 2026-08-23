@@ -146,6 +146,15 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
                   ? `Unlock — ${iap.founderPrice}`
                   : 'Store unavailable'}
             </button>
+            {/* Directly beneath the button it explains. This used to be the last element in
+                the panel, below Restore Purchases, where on a phone it sat past the end of
+                the sheet — so a diagnostic written specifically to be read went unseen for
+                two builds while we guessed at the cause instead. */}
+            {iap?.error && (
+              <p style={{ fontSize: '0.58rem', color: '#ff9a8a', margin: '8px 0 0', textAlign: 'center', lineHeight: 1.4 }}>
+                {iap.error}
+              </p>
+            )}
           </div>
         )}
 
@@ -164,9 +173,7 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
           Restore Purchases
         </button>
 
-        {iap?.error && (
-          <p style={{ fontSize: '0.6rem', color: '#ff9a8a', margin: '8px 0 0', textAlign: 'center' }}>{iap.error}</p>
-        )}
+
       </div>
     </div>,
     document.body,

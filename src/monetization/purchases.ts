@@ -177,7 +177,36 @@ export async function initPurchases(): Promise<void> {
  * showing the wrong price and charging for the wrong thing, and it fails silently. A
  * missing package must read as "store unavailable", never as "here is a different SKU".
  */
-type Pkg = { identifier?: string; product: { identifier?: string; priceString: string } }
+type Pkg = { identifier?: string; product?: Record<string, unknown> & { identifier?: string } }
+
+/**
+ * Pull a displayable price out of whatever shape the bridge handed back.
+ *
+ * `product.priceString` is the documented field, and reading only it produced the bug this
+ * exists for: a package matched (so no error was reported) while the price came back
+ * undefined (so no price was shown) — a paywall reading "Store unavailable" with nothing
+ * beneath it and no way to tell why. The plugin marshals StoreKit objects across a bridge
+ * and the casing has moved between versions, so accept the known aliases and keep the raw
+ * keys for the diagnostic rather than assuming one shape is the only shape.
+ */
+function priceOf(pkg: Pkg | undefined): string | null {
+  const p = pkg?.product
+  if (!p) return null
+  for (const k of ['priceString', 'price_string', 'localizedPriceString', 'localizedPrice']) {
+    const v = p[k]
+    if (typeof v === 'string' && v.length) return v
+  }
+  const n = p['price']
+  return typeof n === 'number' && Number.isFinite(n) ? `$${n.toFixed(2)}` : null
+}
+
+/** What the bridge actually gave us, for the on-screen diagnostic. */
+function shapeOf(pkg: Pkg | undefined): string {
+  if (!pkg) return 'no package'
+  const p = pkg.product
+  if (!p) return `pkg "${pkg.identifier ?? '?'}" has no product`
+  return `pkg "${pkg.identifier ?? '?'}" product keys: ${Object.keys(p).slice(0, 12).join(',')}`
+}
 function findPackage(pkgs: Pkg[] | undefined, needle: string): Pkg | undefined {
   return pkgs?.find(p =>
     (p.identifier ?? '').toLowerCase().includes(needle) ||
@@ -212,19 +241,23 @@ export async function loadOfferings(): Promise<void> {
     const pkgs = current?.availablePackages as Pkg[] | undefined
     const founder = findPackage(pkgs, 'founder')
     const watch = findPackage(pkgs, 'standing')
+    const fPrice = priceOf(founder), wPrice = priceOf(watch)
     set({
-      founderPrice: founder?.product?.priceString ?? null,
-      standingOrdersPrice: watch?.product?.priceString ?? null,
+      founderPrice: fPrice,
+      standingOrdersPrice: wPrice,
       // Say WHY there is no price. This used to fail silently into console.warn, which
       // meant the only symptom available to anyone without a Mac and a cable was the words
       // "Store unavailable" — true, unactionable, and identical for every possible cause.
       // StoreKit not vending, an empty offering and a package-name mismatch are three very
       // different problems and the player (and the developer reading a bug report) deserve
       // to know which one they have.
-      error: founder || watch ? null
-        : !pkgs ? 'Store: no current offering. If this persists, the products are not yet available from Apple.'
+      // The gap this closes: a matched package with an unreadable price used to report
+      // nothing at all, because "found a package" was treated as success.
+      error: (fPrice || wPrice) ? null
+        : !pkgs ? 'Store: no current offering. The products are not yet available from Apple.'
         : pkgs.length === 0 ? 'Store: the offering is empty. Apple is not serving these products yet.'
-        : `Store: ${pkgs.length} package(s) returned, none matching. Check package identifiers.`,
+        : (founder || watch) ? `Store: matched but no price. ${shapeOf(founder ?? watch)}`
+        : `Store: ${pkgs.length} package(s), none matching. ids: ${pkgs.map(p => p.identifier ?? '?').join(',').slice(0, 60)}`,
     })
   } catch (e) {
     const msg = (e as { message?: string })?.message ?? String(e)
