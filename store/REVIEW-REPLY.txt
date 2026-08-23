@@ -1,7 +1,7 @@
 Thank you for the review. A screen recording is attached, captured on a physical device and beginning from app launch.
 
 2. DEVICES TESTED
-iPhone [MODEL], iOS [VERSION], via TestFlight. iPad layout verified at 12.9 inches. Requires iOS 15.0 or later.
+iPhone Air on iOS 26.6, and iPad Pro 11-inch (2nd generation) on iPadOS 26.6. Both are physical devices, tested via TestFlight. Requires iOS 15.0 or later.
 
 3. WHAT THE APP DOES, AND FOR WHOM
 Stillmarch is an idle role-playing game. You create a hero, choose a class and spend talent points; combat then resolves automatically and continues while the app is closed. The player's decisions are the build, the equipment, and which zone and fights to take, rather than moment-to-moment input. It is for players who enjoy RPG progression but cannot commit long sessions: it delivers that progression in short visits.
@@ -19,16 +19,16 @@ No credentials are required. No demo account exists because the app has no accou
 RevenueCat for in-app purchase infrastructure, and Supabase for the optional leaderboard only. No advertising, analytics, attribution, AI or third-party data services. The IDFA is not used. Core gameplay needs no network connection.
 
 6. REGIONAL DIFFERENCES
-None. Behaviour is identical everywhere. English only, with no region-locked content, pricing logic or features.
+None. Behavior is identical everywhere. English only, with no region-locked content, pricing logic or features.
 
 7. REGULATED INDUSTRY OR THIRD-PARTY MATERIAL
-Not applicable. All artwork, music, text and code are original and owned by the developer. No gambling, loot boxes, randomised paid items or wagering.
+Not applicable. All artwork, music, text and code are original and owned by the developer. No gambling, loot boxes, randomized paid items or wagering.
 
 8. WHAT CAN BE PURCHASED, AND WHERE
 Two non-consumable purchases, both optional; neither is needed to complete the game.
-- Founder Pack (USD 4.99): three cosmetic colour schemes for the hero. Purely visual, granting no stats, speed or drop-rate change.
+- Founder Pack (USD 4.99): three cosmetic color schemes for the hero. Purely visual, granting no stats, speed or drop-rate change.
 - Standing Orders (USD 2.99): permanently extends unattended play from 8 hours to 16.
-To reach them, tap MENU in the bottom dock, then "Looks" at the top of the panel that opens. The Wardrobe shows five colour schemes; three carry a padlock and the word FOUNDER. Tapping a locked scheme, or the Unlock button beneath, begins the purchase. Standing Orders is on the same panel under "The Watch". Restore Purchases sits at the bottom of the Wardrobe and needs no prior purchase.
+To reach them, tap MENU in the bottom dock, then "Looks" at the top of the panel that opens. The Wardrobe shows five color schemes; three carry a padlock and the word FOUNDER. Tapping a locked scheme, or the Unlock button beneath, begins the purchase. Standing Orders is on the same panel under "The Watch". Restore Purchases sits at the bottom of the Wardrobe and needs no prior purchase.
 
 WHY A PRICE MAY BE ABSENT
 While these products remain "Ready to Submit" they are not served by StoreKit, so the buttons read "Store unavailable" rather than showing a price. They become purchasable once approved alongside this version, so the recording shows where the purchases are reached rather than a completed transaction.
