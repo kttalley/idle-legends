@@ -201,9 +201,21 @@ export async function loadOfferings(): Promise<void> {
     set({
       founderPrice: founder?.product?.priceString ?? null,
       standingOrdersPrice: watch?.product?.priceString ?? null,
+      // Say WHY there is no price. This used to fail silently into console.warn, which
+      // meant the only symptom available to anyone without a Mac and a cable was the words
+      // "Store unavailable" — true, unactionable, and identical for every possible cause.
+      // StoreKit not vending, an empty offering and a package-name mismatch are three very
+      // different problems and the player (and the developer reading a bug report) deserve
+      // to know which one they have.
+      error: founder || watch ? null
+        : !pkgs ? 'Store: no current offering. If this persists, the products are not yet available from Apple.'
+        : pkgs.length === 0 ? 'Store: the offering is empty. Apple is not serving these products yet.'
+        : `Store: ${pkgs.length} package(s) returned, none matching. Check package identifiers.`,
     })
   } catch (e) {
+    const msg = (e as { message?: string })?.message ?? String(e)
     console.warn('[iap] getOfferings failed', e)
+    set({ error: `Store lookup failed: ${msg}`.slice(0, 160) })
   }
 }
 
