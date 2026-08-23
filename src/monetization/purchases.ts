@@ -90,8 +90,17 @@ export function subscribePurchases(fn: Listener): () => void {
  * calling it throws. The web/dev build therefore runs with zero entitlements, which is
  * also the correct default: it exercises the locked path, which is the one that has to
  * be right.
+ *
+ * **Evaluated per call, deliberately.** This was `const isNative =
+ * Capacitor.isNativePlatform()` at module scope, which freezes the answer at whatever it
+ * was the first time this module was imported. `isNativePlatform()` reads the bridge that
+ * the WebView injects, so an import that lands before injection latches `false` for the
+ * entire session — and every entry point here then returns early, silently, having set
+ * nothing at all. The visible result is a paywall reading "Store unavailable" with no
+ * error beneath it, forever, regardless of what Apple is serving. A function call costs
+ * nothing and cannot latch.
  */
-const isNative = Capacitor.isNativePlatform()
+const isNative = () => Capacitor.isNativePlatform()
 
 /**
  * Every native call gets a deadline.
@@ -129,7 +138,7 @@ function activeFrom(info: { entitlements: { active: Record<string, unknown> } })
 
 /** Call once at boot. Never throws. */
 export async function initPurchases(): Promise<void> {
-  if (!isNative) {
+  if (!isNative()) {
     // Not an error — just nothing to configure.
     set({ ready: true })
     return
@@ -191,7 +200,12 @@ function findPackage(pkgs: Pkg[] | undefined, needle: string): Pkg | undefined {
  * dead panel.
  */
 export async function loadOfferings(): Promise<void> {
-  if (!isNative) return
+  if (!isNative()) {
+    // Say so rather than returning mute. A silent early exit here is indistinguishable
+    // from "Apple is not vending", and the two need completely different fixes.
+    set({ error: 'Store unavailable: not running on a native platform (no StoreKit bridge).' })
+    return
+  }
   try {
     const Purchases = await plugin()
     const { current } = await withTimeout(Purchases.getOfferings(), OFFERINGS_MS, 'getOfferings')
@@ -224,7 +238,7 @@ export async function loadOfferings(): Promise<void> {
  * A user cancellation is NOT an error and must not show one.
  */
 async function buy(needle: string, entitlement: string): Promise<boolean> {
-  if (!isNative) {
+  if (!isNative()) {
     set({ error: 'In-app purchases are only available in the app.' })
     return false
   }
@@ -283,7 +297,7 @@ export const buyStandingOrders = () => buy('standing', STANDING_ORDERS_ENTITLEME
  * for players who reinstall or switch device.
  */
 export async function restorePurchases(): Promise<boolean> {
-  if (!isNative) {
+  if (!isNative()) {
     set({ error: 'Restore is only available in the app.' })
     return false
   }
