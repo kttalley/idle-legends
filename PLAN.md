@@ -1560,6 +1560,60 @@ strips types), and nothing at all covers `combatAdapter.ts`'s 3,547 lines.
 **Branch note:** work is on `battle-refactor`; the working practice at L112 names
 `hackathon-refactor` and allows a different branch only if stated — stated here.
 
+## Track C8 — the active layer (M1 in-event update, NOT 1.0)
+
+**Where this came from.** A first-time player — someone watching the game over the owner's
+shoulder on TestFlight build 2, 2026-08-22 — said combat felt like a missed opportunity:
+you watch it happen. That is independently the same finding as the 2026-08-08 audit's
+combat row, *"Juice is real … nothing to **do** (auto-cast handles all)"*. A stranger and a
+structured audit landing on the same complaint from opposite directions is the strongest
+signal in this document.
+
+**The proposal, as put:** the action bar stops being the thing that casts and becomes the
+thing that ARMS. Tap a slot to select an ability, tap the world to cast it — a real-time
+action RPG input model rather than an idle one.
+
+### Why this is not an engine rewrite (and what it actually costs)
+
+Abilities already resolve through a deterministic tick. Arming-and-tapping changes *who
+decides when*, not how anything resolves — it is an input layer over the existing sim, not
+a new one. The cost is days, not a rebuild. The instinct that it means a different engine
+is wrong and should not be the reason to drop it.
+
+### The three real objections, in order of severity
+
+1. **It breaks the PvP architecture.** `runFight` is pure, seeded and byte-identical
+   deterministic, and Track N's entire cheapness rests on that: the Edge Function imports
+   *the game's own combat code* and re-runs it, putting only a seed on the wire. A fight
+   whose outcome depends on when a human tapped cannot be reproduced server-side. Honouring
+   both would mean recording and shipping input timelines, and `fight.mjs`'s golden-log
+   gate — the only real test in the project — would stop meaning what it means today.
+2. **It contradicts the positioning.** The listing is `Stillmarch: Idle MMORPG`, the
+   subtitle `Offline AFK RPG`, and that ASO call was researched rather than guessed:
+   "idle rpg" carries ~750x the competition. An idle game that requires tapping to win is
+   not what those searches want, and offline progression becomes incoherent the moment
+   combat needs a person present.
+3. **It is the wrong thing to do with 39 days left** and an unsubmitted 1.0.
+
+### What to build instead — the optional active layer
+
+Keep auto-cast as the floor; add agency ON TOP of it, never in place of it.
+
+- Tapping a ready ability fires it **early or empowered**; not tapping changes nothing.
+- The sim continues without the player. Offline and PvP fights simply run the auto path,
+  so `runFight` stays pure, the duel resolver stays honest, and the golden log still gates.
+- Framed as a bonus for being present, never a tax for being absent. This is how AFK Arena
+  and Idle Slayer square the same circle.
+
+**Cheaper wins first, from the same audit row:** level-ups and self-buffs are HUD-only with
+no world-space telegraphy, and a 10x-HP boss renders at the same pixel size as trash. Those
+probably buy more felt engagement per hour of work than any input change, and neither
+touches determinism.
+
+**Sequencing: M1, not 1.0.** Track M already schedules an in-event update, and "growth
+activities during the event" is exactly what the Shipaton Grand Prize judges. A combat-depth
+update shipped mid-window is worth more than the same work delaying launch.
+
 ## Track S — accounts, character slots & creation (launch-critical; local now → hosted later)
 
 **Status (2026-08-08 audit): save slots + character select + boot-resume all SHIPPED and
