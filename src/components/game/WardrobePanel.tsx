@@ -5,7 +5,7 @@ import { useDismissable } from '../ui/useDismissable'
 import { HeroAvatar } from '../sprites/HeroAvatar'
 import { COLORWAYS, isColorwayUnlocked, FOUNDER_ENTITLEMENT } from '../../render/colorways'
 import {
-  subscribePurchases, buyFounderPack, restorePurchases,
+  subscribePurchases, buyFounderPack, restorePurchases, loadOfferings,
   type PurchaseState,
 } from '../../monetization/purchases'
 
@@ -25,6 +25,11 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
 
   const [iap, setIap] = useState<PurchaseState | null>(null)
   useEffect(() => subscribePurchases(setIap), [])
+  // Refetch on open. Offerings were previously fetched once at boot and never again, so a
+  // launch that happened before StoreKit was vending left the paywall permanently reading
+  // "Store unavailable" until the app was force-quit. Opening the shop is exactly the
+  // moment the answer matters, so ask again.
+  useEffect(() => { void loadOfferings() }, [])
   const surface = useRef<HTMLDivElement>(null)
   useDismissable(true, onClose, { ref: surface, closeOnOutside: true, trapFocus: true })
   const active = iap?.active ?? new Set<string>()

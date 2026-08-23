@@ -175,7 +175,21 @@ function findPackage(pkgs: Pkg[] | undefined, needle: string): Pkg | undefined {
     (p.product?.identifier ?? '').toLowerCase().includes(needle))
 }
 
-/** Fetch the price strings for the paywalls. Best-effort. */
+/**
+ * Fetch the price strings for the paywalls. Best-effort, and safe to call repeatedly.
+ *
+ * This used to run ONCE, from initPurchases() at boot, and nothing ever called it again.
+ * A single failed or empty fetch therefore stuck the paywall at "Store unavailable" for the
+ * entire session — reopening it could not help, because the panel only subscribes to
+ * already-fetched state. That is not a rare edge: a brand-new app's products are not vended
+ * by StoreKit at all until the app has been submitted for review, so every launch before
+ * submission poisoned the session, and the first launch AFTER Apple started vending still
+ * showed nothing until the app was force-quit.
+ *
+ * The paywall now refetches when it opens. Cheap (a cached StoreKit lookup), and it means a
+ * player who opens the shop a minute after a transient failure sees prices rather than a
+ * dead panel.
+ */
 export async function loadOfferings(): Promise<void> {
   if (!isNative) return
   try {
