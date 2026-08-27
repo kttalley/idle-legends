@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { CLASS_PROFESSIONS, MATERIALS, ZONE_MATERIALS } from '../../data/professions'
 import {
-  GATHER_SECONDS, MAX_PURITY_PER_UNIT, QUALITY_LABEL, RICHNESS_COLOR, RICHNESS_LABEL,
+  GATHER_SECONDS, MAX_PURITY_PER_UNIT, QUALITY_LABEL,
   STRIKES_PER_HARVEST, purityToQuality, QUALITY_RARITY,
 } from '../../engine/crafting'
 import { rarityColor } from '../../store/gameStore'
@@ -69,18 +69,15 @@ export function StrikeMeter() {
         padding: '6px 8px 7px',
         boxShadow: session.richness === 2 ? '0 0 12px rgba(200,168,100,0.25)' : 'none',
       }}>
-        {/* Header: what vein, how rich, how good the current unit is turning out */}
+        {/* Header: what is being worked, and how good the current unit is turning out.
+            The richness badge ("Thin vein" / "Solid vein" / "Rich vein") was removed: it
+            named a mechanic the player has no way to act on — you cannot make a node
+            richer, and the words told you nothing you could use. Richness still drives
+            yield and a RICH node still announces itself, through this panel's gold frame
+            and glow (the border and boxShadow above, both gated on `richness === 2`). */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
           <span style={{ fontSize: '0.62rem', color: 'var(--parchment)' }}>
             {prof.gatherIcon} {mat.icon} {mat.name}
-          </span>
-          <span style={{
-            fontSize: '0.5rem', textTransform: 'uppercase', letterSpacing: 1,
-            color: RICHNESS_COLOR[session.richness],
-            border: `1px solid ${RICHNESS_COLOR[session.richness]}55`,
-            borderRadius: 3, padding: '0 3px',
-          }}>
-            {RICHNESS_LABEL[session.richness]} vein
           </span>
           <span style={{ marginLeft: 'auto', fontSize: '0.58rem', color: qColor, fontWeight: 700 }}>
             {QUALITY_LABEL[quality]}

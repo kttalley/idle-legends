@@ -1,0 +1,61 @@
+Addresses submission ceda5a4d-d43b-41c6-a3e7-49f658564d2e (guidelines 2.3.6, 1.2, 2.1b).
+
+GUIDELINE 1.2 — USER-GENERATED CONTENT
+The user-generated content in this app is the CHARACTER NAME, shown on the leaderboard and
+above other players in the world. Zone chat, party chat and whispers are generated on the
+device; no text a player types is ever sent to another player.
+
+1. EULA — launch the app after installing. The Terms of Use screen is the FIRST screen,
+   before character selection and before any account exists. It cannot be dismissed; the
+   only way past is "I agree". Its first clause, visible without scrolling, states there is
+   zero tolerance for objectionable content and abusive users.
+   (There is no login or registration. The account is anonymous and is created silently the
+   first time the leaderboard is contacted, so this is the earliest possible moment.)
+   Full terms: https://design.kristiantalley.com/stillmarch/terms/
+
+2. FILTER — on character creation, tap the quill icon by the hero name and type a slur or
+   sexual term. The name is rejected on screen and "Begin Your Legend" is disabled until it
+   changes. The filter normalises leet substitution, letter spacing, repeated letters and
+   Cyrillic/Greek lookalikes. Names published before this build are masked on display.
+
+3. FLAG — open LADDER (tap MENU in the bottom dock, then LADDER at the top of the panel).
+   Every other player's row has a flag control on the right. It opens a report dialog with
+   five reasons: hate speech or a slur, sexual or explicit content, harassment or threats,
+   impersonation, and something else objectionable.
+
+4. BLOCK — the same dialog offers "Block and report". Blocking removes that player from the
+   leaderboard immediately on the same tap with no refresh, removes them from the player's
+   world, notifies us by filing a report automatically, and persists across reinstalls and
+   devices because it is stored server-side.
+
+5. 24 HOURS — we review every report within 24 hours, remove the offending content and
+   eject the account responsible. Ejection blanks the published name and bars that account
+   from publishing again, enforced by database policy rather than by the app, so a modified
+   client cannot bypass it. Abuse may also be reported to talleykristian@gmail.com, which is
+   printed in the terms and on the terms screen.
+
+GUIDELINE 2.1(b) — IN-APP PURCHASES
+Both products are now on one SHOP screen reachable from anywhere: tap MENU in the bottom
+dock, then the hamburger control, then SHOP (the first item in the menu). It lists Founder
+Pack (com.stillmarch.game.founder) and Standing Orders
+(com.stillmarch.game.standing_orders), and Restore Purchases, which is reachable without
+making a purchase first.
+
+The previous build fetched prices only through a RevenueCat "Offering", which is external
+dashboard configuration; when that returned nothing the app showed only "Store unavailable"
+and the Standing Orders control was hidden entirely. This build also requests the product
+identifiers directly from StoreKit, can complete a purchase by that path, states the
+specific reason when a price cannot load, and offers a Retry. A product row is now always
+shown even when its price is unavailable. We have confirmed the Paid Apps Agreement is in
+effect.
+
+GUIDELINE 2.3.6 — AGE RATING
+"Messaging and Chat" and "User-Generated Content" are both now set to Yes.
+
+GENERAL
+No credentials are needed; there is no account system and no demo account. Combat resolves
+automatically. MENU opens the character sheet, talents, zone travel and The Watch; GEAR
+opens equipment; CHAT opens the on-device message feed; LADDER opens the leaderboard.
+Services: RevenueCat (purchases) and Supabase (leaderboard, blocks, reports). No ads, no
+analytics, no IDFA. No location, contacts, camera, microphone or photos are requested. All
+artwork, music, text and code are original and owned by the developer.

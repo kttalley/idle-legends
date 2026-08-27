@@ -1,39 +1,109 @@
-Thank you for the review. A screen recording is attached, captured on a physical device and beginning from app launch.
+Thank you for the detailed review of submission ceda5a4d-d43b-41c6-a3e7-49f658564d2e. All
+three issues are addressed below. A screen recording captured on a physical device is
+attached and is also referenced in App Review Information > Notes.
 
-2. DEVICES TESTED
-iPhone Air on iOS 26.6, and iPad Pro 11-inch (2nd generation) on iPadOS 26.6. Both are physical devices, tested via TestFlight. Requires iOS 15.0 or later.
+--------------------------------------------------------------------------------
+GUIDELINE 2.3.6 - AGE RATING - MESSAGING AND CHAT
+--------------------------------------------------------------------------------
 
-3. WHAT THE APP DOES, AND FOR WHOM
-Stillmarch is an idle role-playing game. You create a hero, choose a class and spend talent points; combat then resolves automatically and continues while the app is closed. The player's decisions are the build, the equipment, and which zone and fights to take, rather than moment-to-moment input. It is for players who enjoy RPG progression but cannot commit long sessions: it delivers that progression in short visits.
+Corrected. "Messaging and Chat" is now set to Yes on the App Information page.
 
-4. SETTING UP AND REACHING EVERY FEATURE
-No credentials are required. No demo account exists because the app has no account system and no login.
-- Launch, pick a class and race, tap Begin. Play starts immediately.
-- Combat runs by itself. The bottom bar switches between Fight, Mining and Smithing.
-- MENU (bottom dock) opens the left panel: character sheet, talent trees, zone travel, and The Watch (the offline-progress timer).
-- GEAR (bottom dock) opens equipment and inventory.
-- CHAT (bottom dock) opens the message feed. These messages are generated on the device and are not sent between players.
-- LADDER (top of the left panel) opens the cross-player leaderboard.
+For context, though it does not change the answer: the chat feed in the game is generated
+on the device and no text is transmitted between players. We had answered the question
+about what the app transmits rather than about what the user sees on screen. The app
+presents a chat interface, so Yes is the correct selection, and it has been changed.
 
-5. EXTERNAL SERVICES
-RevenueCat for in-app purchase infrastructure, and Supabase for the optional leaderboard only. No advertising, analytics, attribution, AI or third-party data services. The IDFA is not used. Core gameplay needs no network connection.
+--------------------------------------------------------------------------------
+GUIDELINE 1.2 - USER-GENERATED CONTENT
+--------------------------------------------------------------------------------
 
-6. REGIONAL DIFFERENCES
-None. Behavior is identical everywhere. English only, with no region-locked content, pricing logic or features.
+All five precautions are now implemented. The user-generated content in this app is the
+CHARACTER NAME, which is published to the leaderboard and appears above other players'
+characters in the world. Every item below is demonstrated in the attached recording.
 
-7. REGULATED INDUSTRY OR THIRD-PARTY MATERIAL
-Not applicable. All artwork, music, text and code are original and owned by the developer. No gambling, loot boxes, randomized paid items or wagering.
+1. EULA AGREED BEFORE USE
+   A full-screen Terms of Use gate is the first screen on first launch, ahead of character
+   selection and ahead of any account being created. It cannot be dismissed; the only way
+   past it is the "I agree" button. The first clause on screen, above the fold, reads:
 
-8. WHAT CAN BE PURCHASED, AND WHERE
-Two non-consumable purchases, both optional; neither is needed to complete the game.
-- Founder Pack (USD 4.99): three cosmetic color schemes for the hero. Purely visual, granting no stats, speed or drop-rate change.
-- Standing Orders (USD 2.99): permanently extends unattended play from 8 hours to 16.
-To reach them, tap MENU in the bottom dock, then "Looks" at the top of the panel that opens. The Wardrobe shows five color schemes; three carry a padlock and the word FOUNDER. Tapping a locked scheme, or the Unlock button beneath, begins the purchase. Standing Orders is on the same panel under "The Watch". Restore Purchases sits at the bottom of the Wardrobe and needs no prior purchase.
+     "There is zero tolerance for objectionable content and abusive users. Character names
+     that contain hate speech, slurs, sexual content, threats, harassment, or that
+     impersonate staff are prohibited. Accounts that post them are removed from the
+     leaderboard and ejected, without warning and without refund."
 
-WHY A PRICE MAY BE ABSENT
-While these products remain "Ready to Submit" they are not served by StoreKit, so the buttons read "Store unavailable" rather than showing a price. They become purchasable once approved alongside this version, so the recording shows where the purchases are reached rather than a completed transaction.
+   The full terms are at https://design.kristiantalley.com/stillmarch/terms/
 
-FURTHER NOTES
-- Characters seen walking around the world are computer-controlled and are never presented as real players. The LADDER is the only real multiplayer surface and shows genuine player-submitted characters.
-- The chat feed is generated on the device; no user-generated content passes between players, so no reporting or blocking mechanism is required.
-- The app requests no sensitive permissions: no location, contacts, camera, microphone or photos, and no App Tracking Transparency prompt.
+2. FILTERING OBJECTIONABLE CONTENT
+   Character names are filtered at creation against hate speech, slurs, sexual content,
+   harassment terms and staff impersonation. The filter normalises the common evasions
+   first - leet substitution, letter spacing, repeated letters and Cyrillic and Greek
+   homoglyphs - so that alternate spellings are caught. A rejected name disables the
+   "Begin Your Legend" button and explains why. Names are additionally filtered on display,
+   so any name published before this build is masked wherever it would be shown.
+
+3. FLAGGING OBJECTIONABLE CONTENT
+   Every other player's row on the LADDER carries a flag control. It opens a report dialog
+   offering: hate speech or a slur, sexual or explicit content, harassment or threats,
+   impersonation, and something else objectionable. Reports are recorded server-side.
+
+4. BLOCKING ABUSIVE USERS
+   The same dialog offers "Block and report". Blocking:
+     - removes that player from the leaderboard immediately, on the same tap, with no
+       refresh required;
+     - removes them from the player's world, so their character no longer appears;
+     - notifies us, by filing a report automatically alongside the block;
+     - persists across reinstalls and devices, as it is stored server-side.
+
+5. ACTING WITHIN 24 HOURS
+   We commit to reviewing every report within 24 hours, removing the offending content and
+   ejecting the account responsible. Ejection blanks the published name and bars the account
+   from publishing again; this is enforced by database policy, not by the client. Our
+   internal runbook and the queries that measure compliance are kept with the project.
+
+RECORDING CONTENTS
+  0:00  Fresh install. Launch - the Terms of Use gate is the first screen.
+  0:20  "I agree", then character creation.
+  0:30  A name containing a slur is typed; it is rejected and Begin is disabled.
+  0:45  Play begins. LADDER is opened from the top of the left panel.
+  0:55  The flag control on another player's row; the reason list; "Report only".
+  1:10  The flag again; "Block and report" - the row disappears immediately.
+
+--------------------------------------------------------------------------------
+GUIDELINE 2.1(b) - IN-APP PURCHASE PRODUCTS FAILED TO LOAD
+--------------------------------------------------------------------------------
+
+Fixed. The specificity in your report was what led us to the defect, and we are grateful
+for it.
+
+The cause was in our code, not in our App Store Connect configuration. Our in-app purchase
+module loaded the StoreKit bridge through an asynchronous function that RETURNED the bridge
+object itself. JavaScript inspects any value returned this way for a `then` property to
+decide whether it is a promise; the bridge forwards every property access to a native
+method, so that inspection invoked a native method named `then`, which does not exist. The
+call rejected. This happened before configure(), before any product lookup, and before any
+purchase, on device only — so every store operation failed identically and silently, and
+the paywall could only ever report that no products were available.
+
+We found it by building for the iOS Simulator and reading the native console, where the
+error appears as: "Purchases.then() is not implemented on ios". With the bridge returned
+inside a wrapper object instead, the same build now configures successfully and receives
+both products from StoreKit.
+
+This build additionally:
+  - requests the product identifiers directly from StoreKit as well as through our
+    provider's configuration, so a provider-side misconfiguration cannot hide the products;
+  - states the specific reason on screen whenever a price cannot be loaded, and offers a
+    Retry;
+  - always shows a product row, even when its price is unavailable, rather than hiding it.
+
+WHERE THE PURCHASES ARE NOW
+A SHOP screen has been added as the first item of the menu (the hamburger control),
+reachable from anywhere in the game. It lists both products with their prices, and
+Restore Purchases, which is reachable without making a purchase first.
+
+We would like to correct our previous note on this point. We stated that Standing Orders
+could be reached from the "Looks" panel. That was inaccurate: its only control was inside
+the Watch meter, which on iPhone sits within the map view, two levels deep - and it was
+hidden entirely whenever a price failed to load. The reviewer was right that there was no
+way to reach it. Both products are now on one screen, and a product row is always shown
+even when its price is unavailable, rather than being hidden.

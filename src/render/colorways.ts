@@ -105,3 +105,52 @@ export function isColorwayUnlocked(id: string, activeEntitlements: ReadonlySet<s
 export function unlockedColorways(activeEntitlements: ReadonlySet<string>): Colorway[] {
   return COLORWAYS.filter(c => isColorwayUnlocked(c.id, activeEntitlements))
 }
+
+// ── The founder aura ─────────────────────────────────────────────────────────
+//
+// What a paid colorway is worth, made visible from across the field.
+//
+// A recolour alone is a poor premium object in an isometric game: at this sprite scale the
+// hero is ~24px tall and a palette swap of the tunic slots reads, honestly, as "a slightly
+// different brown". The aura is the part that carries at a glance — and it is the part a
+// player who bought it wants OTHER people to see, which is the whole social argument for
+// a cosmetic in a game with a leaderboard and ghosts standing in your world.
+//
+// ── Why it is derived from the colorway rather than authored ─────────────────
+// Each aura is built from the colorway's own ACCENT slots (13–15), which are the rarity
+// channel and already the brightest, most saturated colours in the set. So Lastlight glows
+// gold, Ashmarch burns orange, Drowned Verdigris runs cold green — each unmistakably the
+// same object as the armour it surrounds, with no second palette to keep in sync. Add a
+// colorway and its aura comes with it; retune a colorway and the aura follows.
+
+export interface ColorwayAura {
+  /** Bright inner colour — the core of the ground pool and the sprite bloom. */
+  core: string
+  /** Outer falloff. Reaches transparent by the edge of the glow. */
+  glow: string
+  /** Seconds per full pulse. Deliberately slow and slightly different per colorway, so
+   *  three founders standing together do not throb in lockstep like one object. */
+  period: number
+}
+
+/**
+ * The aura for a colorway, or null when it has none.
+ *
+ * Only entitlement-gated colorways get one — that is the point of it. The free colorways
+ * deliberately return null rather than a dim aura: a faint version of the premium effect
+ * makes the premium one look like a brightness setting.
+ */
+export function colorwayAura(id: string): ColorwayAura | null {
+  const cw = BY_ID.get(id)
+  if (!cw || !cw.requiresEntitlement) return null
+  const o = cw.overrides
+  // 15 is the brightest accent, 14 the mid. Falls back through the tunic highlight so a
+  // future colorway that leaves the accent channel alone still lights up rather than
+  // silently losing its aura.
+  const core = o[15] ?? o[8] ?? '#ffe9a8'
+  const glow = o[14] ?? o[7] ?? '#c9a03c'
+  // Periods are per-colorway constants rather than a hash: three values chosen to be
+  // mutually prime-ish so the pulses drift apart instead of beating.
+  const period = id === 'lastlight' ? 2.6 : id === 'ashmarch' ? 2.2 : 3.1
+  return { core, glow, period }
+}

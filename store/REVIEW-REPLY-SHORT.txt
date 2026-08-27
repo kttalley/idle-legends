@@ -1,0 +1,28 @@
+Thank you for the detailed review of submission ceda5a4d-d43b-41c6-a3e7-49f658564d2e. All three issues are addressed in build 1.0 (16). A screen recording captured on a physical device is attached.
+
+GUIDELINE 2.3.6 - AGE RATING
+Corrected. "Messaging and Chat" is now Yes, and we also set "User-Generated Content" to Yes. Chat is generated on the device and nothing is transmitted between players, but the app does present a chat interface and does let players publish a name others see, so Yes is correct for both.
+
+GUIDELINE 1.2 - USER-GENERATED CONTENT
+The user-generated content in this app is the CHARACTER NAME, shown on the leaderboard and above other players in the world. Zone chat, party chat and whispers are generated on the device; no text a player types is ever sent to another player.
+
+1. EULA. A full-screen Terms of Use gate is the FIRST screen on first launch, before character selection and before any account exists. It cannot be dismissed; the only way past it is "I agree". Its first clause, visible without scrolling, states there is zero tolerance for objectionable content and abusive users. There is no login or registration - the account is anonymous and created silently on first contact with our server, so this is the earliest possible moment. Full terms: https://design.kristiantalley.com/stillmarch/terms/
+
+2. FILTERING. Character names are filtered at creation against slurs, hate terms, sexual content, harassment and staff impersonation, normalising common evasions (leet substitution, letter spacing, repeated letters, Cyrillic/Greek lookalikes). A rejected name disables "Begin Your Legend" and explains why. Names are filtered on display too, so anything published before this build is masked.
+
+3. FLAGGING. Every other player's row on the LADDER carries a flag control. It opens a report dialog offering: hate speech or a slur, sexual or explicit content, harassment or threats, impersonation, and something else objectionable.
+
+4. BLOCKING. The same dialog offers "Block and report". Blocking removes that player from the leaderboard immediately on the same tap with no refresh, removes them from the player's world, notifies us by filing a report automatically, and persists across reinstalls and devices because it is stored server-side.
+
+5. ACTING WITHIN 24 HOURS. We review every report within 24 hours, remove the offending content and eject the account responsible. Ejection blanks the published name and bars that account from publishing again, enforced by database policy rather than by the app, so a modified client cannot bypass it. Abuse can also be reported to talleykristian@gmail.com, printed in the terms and on the terms screen.
+
+GUIDELINE 2.1(b) - IN-APP PURCHASES FAILED TO LOAD
+Fixed, and the cause was in our code rather than our App Store Connect configuration.
+
+Our purchase module returned the StoreKit bridge object from an async function. JavaScript inspects a returned value for a "then" property, and the bridge forwards any property access to a native method - so that check invoked a native method named "then", which does not exist, and every store call rejected before it began, on device only. The Simulator console shows it as "Purchases.then() is not implemented on ios". With the bridge wrapped in a plain object, the same build now configures and receives both products.
+
+This build also requests the product identifiers directly from StoreKit, states the specific reason on screen when a price cannot load, offers a Retry, and always shows a product row rather than hiding it.
+
+WHERE THE PURCHASES ARE: a SHOP screen reachable from anywhere - tap MENU in the bottom dock, then the hamburger control, then SHOP (the first item). It lists Founder Pack and Standing Orders with prices, and Restore Purchases, which needs no prior purchase. The Founder Pack is also reachable from MENU > Looks.
+
+We have confirmed the Paid Apps Agreement is in effect.

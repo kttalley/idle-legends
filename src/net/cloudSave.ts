@@ -30,6 +30,7 @@
 
 import type { GameState } from '../data/types'
 import type { SaveSlot, SlotSummary } from '../store/saveSlots'
+import { slotStorage } from '../store/saveSlots'
 import { cloudFetch, selectRows, upsertRow, type CloudResult } from './cloudClient'
 import { cloudEnabled, restUrl } from './cloudConfig'
 import { currentSession, ensureSession } from './session'
@@ -264,4 +265,55 @@ export function reconcile(
     }
   }
   return out
+}
+
+/**
+ * Pull down any cloud character this device does not have. Call once, at boot.
+ *
+ * ── The gap this closes ──────────────────────────────────────────────────────
+ * `CloudSaveNotice` already does this — and it is rendered ONLY as a banner on the
+ * character-SELECT screen. `App` shows character CREATE instead whenever there are zero
+ * local slots, which is precisely the state a player is in after reinstalling. So the one
+ * component that restores cloud saves was never mounted in the one situation it exists
+ * for: a returning player was dropped straight onto "choose a class", with their
+ * characters sitting safely on the server, unreached.
+ *
+ * That was invisible while the session did not survive an uninstall either — the identity
+ * was gone, so there was nothing to fetch and the missing restore looked like the same
+ * bug. Fixing the Keychain half exposed this one.
+ *
+ * Restores ONLY slots with no local counterpart. Conflicts — a cloud save further along
+ * than a local one — are deliberately left to the notice on the select screen, where the
+ * player can choose; silently overwriting a local character at boot is the one outcome
+ * worse than the loss this prevents.
+ *
+ * Never throws. Returns how many were restored.
+ */
+export async function restoreMissingCloudSlots(): Promise<number> {
+  if (!cloudEnabled()) return 0
+  try {
+    const res = await fetchCloudSlots()
+    if (!res.ok || res.data.length === 0) return 0
+    const local = slotStorage.list().map(meta => {
+      const full = slotStorage.load(meta.id)
+      return {
+        id: meta.id,
+        playTime: full?.state?.totalPlayTime ?? 0,
+        name: meta.summary.playerName ?? '',
+      }
+    })
+    let restored = 0
+    for (const v of reconcile(res.data, local)) {
+      if (v.kind !== 'restore') continue
+      // The same writer the game uses, so a restored character takes the identical path a
+      // local one does — including `rehydrateState` on load, which regenerates the world
+      // maps the cloud blob deliberately does not carry.
+      if (slotStorage.save(rowToSlot(v.row))) restored++
+    }
+    if (restored > 0) console.info(`[cloud] restored ${restored} character(s) from the cloud`)
+    return restored
+  } catch (e) {
+    console.warn('[cloud] restore at boot failed', e)
+    return 0
+  }
 }

@@ -3,6 +3,7 @@ import { CLASS_DEFINITIONS } from '../../data/classes'
 import { RACE_DEFINITIONS } from '../../data/races'
 import { FACTION_DEFINITIONS } from '../../data/factions'
 import { generatePlayerNameFallback } from '../../engine/nameGen'
+import { NAME_MAX, nameRejection } from '../../moderation/wordFilter'
 import { useGameStore } from '../../store/gameStore'
 import { HeroPreview } from './HeroPreview'
 import type { ClassType, RaceType, FactionType } from '../../data/types'
@@ -46,8 +47,22 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
     setNameSeed(randSeed())
   }
 
+  // ── The name filter (App Review 1.2) ──────────────────────────────────────
+  // A character name is the ONLY thing one player authors that another player sees — it is
+  // published to `roster_snapshots` and shown on the ladder and on ghosts in the world. So
+  // it is the whole user-generated surface, and this is where the filter belongs.
+  //
+  // Computed on every keystroke rather than checked on submit, so the player sees the
+  // problem while they are still typing rather than being bounced by a button that stopped
+  // working for no stated reason.
+  const rejection = nameRejection(name)
+
   function begin() {
     const finalName = name.trim() || generatePlayerNameFallback(nameSeed, cls)
+    // Belt and braces. The button is disabled while `rejection` is set, but a disabled
+    // button is a UI state and this is the gate — Enter, a stale render or a future
+    // refactor should not be able to walk past it.
+    if (nameRejection(finalName)) return
     onCreate(cls, race, { name: finalName, faction: effectiveFaction })
   }
 
@@ -107,7 +122,7 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
             onChange={e => setCustomName(e.target.value)}
             onBlur={() => setEditing(false)}
             onKeyDown={e => { if (e.key === 'Enter') setEditing(false) }}
-            maxLength={28}
+            maxLength={NAME_MAX}
             className="flex-1 rp-panel"
             style={{
               fontFamily: 'var(--font-display)', color: 'var(--gold-bright)', fontSize: '1rem',
@@ -130,6 +145,17 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
         <button className="rp-button" style={{ fontSize: '0.9rem', padding: '6px 10px' }} title="Reroll name" onClick={reroll}><SpriteIcon ui="dice" size={16} /></button>
         <button className="rp-button" style={{ fontSize: '0.75rem', padding: '6px 10px' }} title="Edit name" onClick={() => setEditing(true)}><SpriteIcon ui="quill" size={14} /></button>
       </div>
+
+      {/* Never quotes the offending term back. Echoing it would turn this message into a
+          probe for finding out exactly which spellings the filter lets through. */}
+      {rejection && (
+        <div role="alert" style={{
+          maxWidth: 340, fontSize: '0.55rem', color: '#e08a7a', textAlign: 'center',
+          lineHeight: 1.5, marginBottom: 2,
+        }}>
+          {rejection}
+        </div>
+      )}
 
       {/* ── Class ── */}
       <div className="mt-4" style={{ width: '100%', maxWidth: 460 }}>
@@ -234,8 +260,10 @@ export function CharacterCreate({ onCreate, onBack }: CharacterCreateProps) {
           width: '100%', maxWidth: 460, padding: '12px', fontSize: '0.95rem',
           fontFamily: 'var(--font-display)', letterSpacing: '0.08em',
           background: 'linear-gradient(180deg, #7a5f2c, #52401c)', borderColor: 'var(--gold)',
+          opacity: rejection ? 0.5 : 1,
         }}
         onClick={begin}
+        disabled={!!rejection}
       >
         Begin Your Legend
       </button>

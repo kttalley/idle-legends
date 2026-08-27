@@ -925,11 +925,22 @@ h1, h2, h3, h4,
   text-align: right;
 }
 
+/* The name cell holds the name AND its report flag, so the flag reads as a postfix on the
+   name rather than as a separate column. `min-width: 0` is what lets the text child shrink
+   and ellipsise inside a grid cell — without it the cell refuses to go below its content
+   width and a long name pushes the flag out of the row. */
 .ladder-name {
   color: var(--parchment);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.ladder-name-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .ladder-you {
@@ -959,6 +970,33 @@ h1, h2, h3, h4,
 }
 .ladder-duel-btn:hover:not(:disabled) { border-color: var(--gold-deep); }
 .ladder-duel-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* The report/block flag, on every other player's ladder row.
+   Quieter than Duel — it is a safety control, not an action anyone is looking for until
+   they need it — but a full 28px tap target, because a 10px glyph in a scrolling list is
+   not something a person can hit while angry. */
+.ladder-report-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 3px 4px;
+  /* Never shrinks and never grows: the name beside it takes all the slack. */
+  flex: 0 0 auto;
+  /* The tap target is enlarged with a pseudo-element rather than with min-height, which
+     would make the icon taller than the name it sits next to and re-introduce the ragged
+     look this was meant to fix. */
+  position: relative;
+}
+.ladder-report-btn::after {
+  content: '';
+  position: absolute;
+  inset: -8px -6px;
+}
+.ladder-report-btn:hover { color: var(--gold-soft); border-color: var(--edge); }
 
 .ladder-duel {
   flex: 0 0 auto;

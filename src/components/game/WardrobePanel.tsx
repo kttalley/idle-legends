@@ -122,7 +122,7 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
             </div>
             <p style={{ fontSize: '0.62rem', color: '#c8b890', margin: '0 0 10px', lineHeight: 1.5 }}>
               Three colourways, and the founder mark on your hero. Bought once, kept
-              forever — and when the hand-drawn art lands, founder items upgrade with it.
+              forever.
             </p>
             {/* No price means StoreKit gave us no product, and tapping would only call
                 getOfferings again and hang — which is exactly what TestFlight build 1 did,

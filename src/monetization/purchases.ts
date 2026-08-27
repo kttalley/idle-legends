@@ -40,6 +40,32 @@ export const STANDING_ORDERS_ENTITLEMENT = 'standing_orders'
 export const STANDING_ORDERS_HOURS = 8
 
 /**
+ * The App Store Connect product identifiers, verbatim (store/SUBMISSION.md §2).
+ *
+ * These exist because RevenueCat *Offerings* turned out to be the single point of failure
+ * for the entire paywall. An Offering is dashboard configuration: products have to be
+ * created in RevenueCat, attached to an entitlement, added to an Offering, and that
+ * Offering marked "Current". Miss any one of those and `getOfferings()` returns
+ * `current: null` forever — on a correctly configured App Store Connect, with the Paid
+ * Apps Agreement signed and StoreKit happily vending. The app is then unsellable and the
+ * only symptom is "Store unavailable", which is why six builds of client-side fixes did
+ * not move it.
+ *
+ * `getProducts()` asks StoreKit for these identifiers directly and does not consult
+ * Offerings at all. Entitlement granting is unaffected — that mapping lives on the
+ * product, not on the Offering — so a purchase made this way still unlocks the same
+ * entitlement. Offerings stay the preferred path (they are what makes prices editable
+ * without a build); this is the floor beneath them.
+ */
+export const PRODUCT_IDS = {
+  founder: 'com.stillmarch.game.founder',
+  standing: 'com.stillmarch.game.standing_orders',
+} as const
+
+/** StoreKit products fetched by identifier, kept so `buy()` can purchase without a package. */
+const storeProducts = new Map<string, unknown>()
+
+/**
  * Permanent watch hours the player's entitlements are worth.
  *
  * Takes the active set as an argument rather than reading module state, so the engine and
@@ -126,10 +152,29 @@ const PURCHASE_MS = 180_000
 /** Tight: this is a network product lookup with no human in the loop. */
 const OFFERINGS_MS = 20_000
 
-/** Cached dynamic import so the RevenueCat bundle never loads in a browser session. */
-async function plugin() {
+/**
+ * Cached dynamic import so the RevenueCat bundle never loads in a browser session.
+ *
+ * ── Why this returns a WRAPPER object and not the plugin itself ──────────────
+ * This is the bug that made the store unsellable for six TestFlight builds.
+ *
+ * `Purchases` is a Capacitor plugin PROXY: its `get` trap turns *any* property access into
+ * a native method call. When an `async` function returns a value, the JavaScript runtime
+ * checks whether that value is thenable — it reads `.then` — so returning the proxy made
+ * the runtime ask the proxy for `then`, the proxy dutifully bridged it to native, and iOS
+ * answered `"Purchases.then()" is not implemented on ios`.
+ *
+ * The result: EVERY `await plugin()` rejected before it did anything. configure(),
+ * getOfferings(), getProducts(), purchase, restore — all of them, on device only, because
+ * on the web the guard short-circuits first. The paywall could not have worked, and no
+ * amount of fixing the code downstream of this line would have made it work.
+ *
+ * Wrapping in a plain object breaks the thenable check: `{ Purchases }` has no `.then`,
+ * and destructuring at the call site hands back the untouched proxy.
+ */
+async function plugin(): Promise<{ Purchases: typeof import('@revenuecat/purchases-capacitor')['Purchases'] }> {
   const mod = await import('@revenuecat/purchases-capacitor')
-  return mod.Purchases
+  return { Purchases: mod.Purchases }
 }
 
 function activeFrom(info: { entitlements: { active: Record<string, unknown> } }): Set<string> {
@@ -144,20 +189,31 @@ export async function initPurchases(): Promise<void> {
     return
   }
   const apiKey = import.meta.env.VITE_REVENUECAT_IOS_KEY as string | undefined
+  console.info('[iap] initPurchases: native, apiKey', apiKey ? `present (${apiKey.slice(0, 9)}…)` : 'MISSING')
   if (!apiKey) {
     console.warn('[iap] VITE_REVENUECAT_IOS_KEY is unset — running with no entitlements')
     set({ ready: true, error: null })
     return
   }
   try {
-    const Purchases = await plugin()
+    const { Purchases } = await plugin()
     await Purchases.configure({ apiKey })
+    console.info('[iap] configured')
     const { customerInfo } = await Purchases.getCustomerInfo()
     set({ ready: true, active: activeFrom(customerInfo) })
     void loadOfferings()
   } catch (e) {
-    console.error('[iap] configure failed', e)
-    set({ ready: true, error: null })   // silent: a store outage is not the player's problem
+    // NOT silent any more, and the error is no longer swallowed into `null`.
+    //
+    // This catch used to set `error: null` and skip `loadOfferings()` entirely, so a failed
+    // `configure()` produced a paywall with no price AND no reason — the exact state the
+    // device was in while the diagnostic written to explain it sat one branch away, never
+    // reached. A store outage is still not the player's problem, but it is very much the
+    // developer's, and the panel is where it belongs.
+    const msg = (e as { message?: string })?.message ?? String(e)
+    console.error('[iap] configure failed:', msg)
+    set({ ready: true, error: `Store setup failed: ${msg}`.slice(0, 200) })
+    void loadOfferings()
   }
 }
 
@@ -235,35 +291,64 @@ export async function loadOfferings(): Promise<void> {
     set({ error: 'Store unavailable: not running on a native platform (no StoreKit bridge).' })
     return
   }
+  const notes: string[] = []
+  let founder: Pkg | undefined, standing: Pkg | undefined
+
+  // ── Path 1: Offerings ──────────────────────────────────────────────────────
   try {
-    const Purchases = await plugin()
+    const { Purchases } = await plugin()
     const { current } = await withTimeout(Purchases.getOfferings(), OFFERINGS_MS, 'getOfferings')
     const pkgs = current?.availablePackages as Pkg[] | undefined
-    const founder = findPackage(pkgs, 'founder')
-    const watch = findPackage(pkgs, 'standing')
-    const fPrice = priceOf(founder), wPrice = priceOf(watch)
-    set({
-      founderPrice: fPrice,
-      standingOrdersPrice: wPrice,
-      // Say WHY there is no price. This used to fail silently into console.warn, which
-      // meant the only symptom available to anyone without a Mac and a cable was the words
-      // "Store unavailable" — true, unactionable, and identical for every possible cause.
-      // StoreKit not vending, an empty offering and a package-name mismatch are three very
-      // different problems and the player (and the developer reading a bug report) deserve
-      // to know which one they have.
-      // The gap this closes: a matched package with an unreadable price used to report
-      // nothing at all, because "found a package" was treated as success.
-      error: (fPrice || wPrice) ? null
-        : !pkgs ? 'Store: no current offering. The products are not yet available from Apple.'
-        : pkgs.length === 0 ? 'Store: the offering is empty. Apple is not serving these products yet.'
-        : (founder || watch) ? `Store: matched but no price. ${shapeOf(founder ?? watch)}`
-        : `Store: ${pkgs.length} package(s), none matching. ids: ${pkgs.map(p => p.identifier ?? '?').join(',').slice(0, 60)}`,
-    })
+    founder = findPackage(pkgs, 'founder')
+    standing = findPackage(pkgs, 'standing')
+    if (!pkgs) notes.push('no current offering')
+    else if (!pkgs.length) notes.push('offering empty')
+    else if (!founder && !standing) notes.push(`offering has ${pkgs.length} pkg(s), none matching: ${pkgs.map(p => p.identifier ?? '?').join(',').slice(0, 60)}`)
   } catch (e) {
-    const msg = (e as { message?: string })?.message ?? String(e)
+    notes.push(`getOfferings failed: ${(e as { message?: string })?.message ?? String(e)}`)
     console.warn('[iap] getOfferings failed', e)
-    set({ error: `Store lookup failed: ${msg}`.slice(0, 160) })
   }
+
+  // ── Path 2: ask StoreKit for the product ids directly ──────────────────────
+  //
+  // Runs whenever Offerings did not yield a usable price — which includes the case where a
+  // package matched but its price was unreadable. Offerings are dashboard state and can be
+  // wrong; the product identifiers are compiled in and cannot be. See PRODUCT_IDS.
+  let fPrice = priceOf(founder), wPrice = priceOf(standing)
+  if (!fPrice || !wPrice) {
+    try {
+      const { Purchases } = await plugin()
+      const wanted = [PRODUCT_IDS.founder, PRODUCT_IDS.standing]
+      const { products } = await withTimeout(
+        Purchases.getProducts({ productIdentifiers: wanted }), OFFERINGS_MS, 'getProducts')
+      const list = (products ?? []) as unknown as Array<Record<string, unknown> & { identifier?: string }>
+      for (const prod of list) {
+        if (prod?.identifier) storeProducts.set(prod.identifier, prod)
+      }
+      if (!fPrice) fPrice = priceOf({ product: storeProducts.get(PRODUCT_IDS.founder) as Pkg['product'] })
+      if (!wPrice) wPrice = priceOf({ product: storeProducts.get(PRODUCT_IDS.standing) as Pkg['product'] })
+      if (!list.length) {
+        // The decisive diagnostic. Offerings can be misconfigured; this call cannot be —
+        // an empty result here means StoreKit itself is not vending these identifiers, so
+        // the problem is in App Store Connect (agreement, product state, bundle id), not
+        // in RevenueCat and not in this app.
+        notes.push('StoreKit returned 0 products for the compiled ids — App Store Connect is not vending them')
+      }
+    } catch (e) {
+      notes.push(`getProducts failed: ${(e as { message?: string })?.message ?? String(e)}`)
+      console.warn('[iap] getProducts failed', e)
+    }
+  }
+
+  set({
+    founderPrice: fPrice,
+    standingOrdersPrice: wPrice,
+    // Say WHY there is no price, and say it from BOTH paths. "Store unavailable" is true,
+    // unactionable, and identical for every possible cause; the notes distinguish a
+    // RevenueCat dashboard problem from an App Store Connect one, which need opposite fixes.
+    error: (fPrice && wPrice) ? null
+      : `Store: ${notes.join(' · ') || 'no price returned'}`.slice(0, 220),
+  })
 }
 
 /**
@@ -277,12 +362,30 @@ async function buy(needle: string, entitlement: string): Promise<boolean> {
   }
   set({ busy: true, error: null })
   try {
-    const Purchases = await plugin()
+    const { Purchases } = await plugin()
     const { current } = await withTimeout(Purchases.getOfferings(), OFFERINGS_MS, 'getOfferings')
     const pkg = findPackage(current?.availablePackages as Pkg[] | undefined, needle)
-    if (!pkg) { set({ busy: false, error: 'Store unavailable. Try again shortly.' }); return false }
-    const { customerInfo } = await withTimeout(
-      Purchases.purchasePackage({ aPackage: pkg as never }), PURCHASE_MS, 'purchasePackage')
+
+    // Prefer the package; fall back to the store product loadOfferings() cached by id.
+    // Without this fallback the button is dead whenever the RevenueCat Offering is
+    // misconfigured — even though a price is on screen, fetched by the other path.
+    // `purchaseStoreProduct` grants the same entitlement: that mapping lives on the
+    // product in RevenueCat, not on the Offering.
+    const productId = needle === 'founder' ? PRODUCT_IDS.founder : PRODUCT_IDS.standing
+    let direct = storeProducts.get(productId)
+    if (!pkg && !direct) {
+      // The price may have come from a fetch in an earlier session state; re-ask once
+      // rather than telling the player to come back later.
+      await loadOfferings()
+      direct = storeProducts.get(productId)
+    }
+    if (!pkg && !direct) {
+      set({ busy: false, error: state.error ?? 'Store unavailable. Try again shortly.' })
+      return false
+    }
+    const { customerInfo } = pkg
+      ? await withTimeout(Purchases.purchasePackage({ aPackage: pkg as never }), PURCHASE_MS, 'purchasePackage')
+      : await withTimeout(Purchases.purchaseStoreProduct({ product: direct as never }), PURCHASE_MS, 'purchaseStoreProduct')
     const active = activeFrom(customerInfo)
     set({ busy: false, active })
     return active.has(entitlement)
@@ -310,7 +413,7 @@ async function buy(needle: string, entitlement: string): Promise<boolean> {
  */
 async function refreshEntitlements(): Promise<ReadonlySet<string>> {
   try {
-    const Purchases = await plugin()
+    const { Purchases } = await plugin()
     const { customerInfo } = await withTimeout(Purchases.getCustomerInfo(), OFFERINGS_MS, 'getCustomerInfo')
     const active = activeFrom(customerInfo)
     set({ active })
@@ -336,7 +439,7 @@ export async function restorePurchases(): Promise<boolean> {
   }
   set({ busy: true, error: null })
   try {
-    const Purchases = await plugin()
+    const { Purchases } = await plugin()
     const { customerInfo } = await withTimeout(Purchases.restorePurchases(), OFFERINGS_MS, 'restorePurchases')
     const active = activeFrom(customerInfo)
     set({ busy: false, active, error: active.size ? null : 'No previous purchases found.' })

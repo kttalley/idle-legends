@@ -86,6 +86,18 @@ let muted = false
 // "too droney" was the pad + noise washing out everything on top.
 const PAD_BASE_GAIN = 0.09
 
+/**
+ * The one knob for how loud the ambience is against the music. ~40% ambience / 60% music.
+ *
+ * The bed's bus used to ramp to 1.0 — no master attenuation at all — while it summed four
+ * layers (pad, tension, swell, noise) plus the weather bus. Each layer's own gain looked
+ * modest in isolation, which is exactly how a bed that buries a 0.55 music track gets
+ * written without anyone noticing: nothing in the file stated the intended balance, so
+ * there was no number to get wrong. This is that number. Tune the mix HERE rather than by
+ * nudging individual layers, which changes the bed's internal character as a side effect.
+ */
+export const BED_MIX = 0.4
+
 interface Bed {
   zone: ZoneId
   bus: GainNode
@@ -144,7 +156,7 @@ function buildWeatherLayer(): void {
   weatherFilter.frequency.value = 1200
   weatherFilter.Q.value = 0.7
   weatherBus = ctx.createGain()
-  weatherBus.gain.value = 0.02
+  weatherBus.gain.value = 0.02 * BED_MIX
   noise.connect(weatherFilter).connect(weatherBus).connect(masterGain)
   noise.start()
   // Hold the source so it is never GC'd mid-session.
@@ -169,7 +181,7 @@ export function setZone(zone: ZoneId, worldSeed = 0): void {
   const now = ctx.currentTime
   const fade = recipe.crossfadeMs / 1000
   next.bus.gain.setValueAtTime(0, now)
-  next.bus.gain.linearRampToValueAtTime(1, now + fade)
+  next.bus.gain.linearRampToValueAtTime(BED_MIX, now + fade)
 
   if (currentBed) {
     const old = currentBed
@@ -298,7 +310,7 @@ export function setWeather(type: WeatherType): void {
   const now = ctx.currentTime
   weatherBus.gain.cancelScheduledValues(now)
   weatherBus.gain.setValueAtTime(weatherBus.gain.value, now)
-  weatherBus.gain.linearRampToValueAtTime(w.gain, now + 2.0)
+  weatherBus.gain.linearRampToValueAtTime(w.gain * BED_MIX, now + 2.0)
   weatherFilter.frequency.cancelScheduledValues(now)
   weatherFilter.frequency.setValueAtTime(weatherFilter.frequency.value, now)
   weatherFilter.frequency.linearRampToValueAtTime(w.freq, now + 2.0)

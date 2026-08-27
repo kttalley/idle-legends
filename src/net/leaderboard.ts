@@ -15,6 +15,7 @@ import type { GameState } from '../data/types'
 import { selectRows, upsertRow, type CloudResult } from './cloudClient'
 import { ensureSession, currentSession } from './session'
 import { buildSnapshot, sanityCheck, type RosterSnapshot } from './snapshot'
+import { maskName } from '../moderation/wordFilter'
 
 export const TABLE = 'roster_snapshots'
 
@@ -41,6 +42,9 @@ export interface LeaderboardEntry {
   rank: number
   name: string
   playerClass: string
+  /** Needed to build a `ChatSpeaker` when the Duel button turns a board row into a real
+   *  fight — the body has to wear the right race. Read from the snapshot, not a column. */
+  race: string
   level: number
   power: number
   faction: string
@@ -137,8 +141,14 @@ export async function fetchLeaderboard(limit = 50, kind: BoardKind = 'power'): P
     entries.push({
       userId: r.user_id,
       rank: entries.length + 1,
-      name: r.hero_name,
+      // Masked on the way OUT, not trusted on the way in. The name filter runs at
+      // character creation, but this table holds rows written before that filter existed
+      // and rows written by other clients — which a modified build could have skipped it
+      // in entirely. A creation-time check only ever constrains honest clients, so the
+      // display path checks too.
+      name: maskName(r.hero_name),
       playerClass: r.player_class,
+      race: r.snapshot?.playerRace ?? 'human',
       level: r.level,
       power: r.power,
       faction: r.faction,

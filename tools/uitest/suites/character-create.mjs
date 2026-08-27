@@ -1,4 +1,4 @@
-import { evaluate, waitFor, sleep } from '../cdp.mjs'
+import { clickByText, evaluate, waitFor, sleep } from '../cdp.mjs'
 
 // The first real decision the game asks for.
 //
@@ -28,6 +28,14 @@ export async function run({ send, appUrl, check, note }) {
     setTimeout(() => r(1), 2000);
   }))()`)
   await send('Page.navigate', { url: appUrl })
+
+  // The terms gate (App Review 1.2) stands ahead of character create on a cold origin, and
+  // clearing localStorage above clears its acceptance too. A first-time player agrees and
+  // then lands here; so does this suite.
+  await waitFor(send, `document.readyState === 'complete'`)
+  await waitFor(send, `!!document.querySelector('[aria-label="Terms of Use"]')`, { timeout: 15000 })
+  await evaluate(send, clickByText('/^I agree$/i'))
+
   const reached = await waitFor(send, `!!document.querySelector('.create-class-blurb')`, { timeout: 25000 })
   check('a first-time player lands on character create with a class blurb', reached)
   if (!reached) return

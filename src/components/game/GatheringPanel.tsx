@@ -6,7 +6,7 @@ import { HealthBar } from '../ui/HealthBar'
 import { SpriteIcon } from '../ui/SpriteIcon'
 import { StrikeMeter } from './StrikeMeter'
 import {
-  GATHER_SECONDS, QUALITY_LABEL, QUALITY_RARITY, RICHNESS_COLOR, RICHNESS_LABEL,
+  GATHER_SECONDS, QUALITY_LABEL, QUALITY_RARITY,
   stockPurity, stockQuality,
 } from '../../engine/crafting'
 import { projectGathering } from '../../engine/offline'
@@ -53,11 +53,6 @@ export function GatheringPanel() {
         </div>
         <div style={{ fontSize: '0.6rem', color: '#aaa', marginTop: 1 }}>
           Harvesting <SpriteIcon emoji={mat.icon} size={14} title={mat.name} /> {mat.name}
-          {gatherSession && (
-            <span style={{ color: RICHNESS_COLOR[gatherSession.richness], marginLeft: 5 }}>
-              · {RICHNESS_LABEL[gatherSession.richness]} vein
-            </span>
-          )}
         </div>
       </div>
 

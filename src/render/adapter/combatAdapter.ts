@@ -17,10 +17,11 @@ import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEnti
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
 import { composePalette } from '../palette'
 import { heroPaletteId, type AccentKey } from './heroWardrobe'
+import { colorwayAura, type ColorwayAura } from '../colorways'
 import {
   gankReady, isSuppressed as isPvpSuppressed, markGank, wouldAttackUnprovoked,
 } from '../../engine/pvp'
-import { ghostVersion, releaseGhosts, takeGhost } from '../../engine/ghosts'
+import { getGhost, ghostVersion, releaseGhosts, takeGhost } from '../../engine/ghosts'
 import { factionNameColor, HOSTILE_MARK, isHostile } from '../../data/factions'
 import { MOB_SPRITE } from '../../data/mobSprites'
 import { zoneMapToTileMap, biomePaletteId, propPaletteId, MAP_SIZE, PAD, loadFftaTerrain } from './mapAdapter'
@@ -563,6 +564,15 @@ interface Ambient {
   state: AmbientState
   /** Full identity for heroes (class/race/level/spec/talents); null for monsters. */
   identity: AmbientIdentity | null
+  /**
+   * The generated identity this body had BEFORE a ghost was folded into it, if one was.
+   *
+   * Kept so the body can be handed back its own name when the ghost has to leave — which
+   * happens when the player blocks that person. `withGhost` overwrites name, class, race
+   * and level in place, so without a copy there is nothing to restore and the only way to
+   * remove a blocked player from the world would be to rebuild the entire crowd.
+   */
+  preGhostIdentity: AmbientIdentity | null
   /** Current bark text and the seconds it stays up. */
   bark: string | null
   barkT: number
@@ -931,7 +941,22 @@ export class WorldSceneController {
   // Death choreography. A slain mob is moved off `this.mob` into dyingMobs so it keeps
   // rendering its 'death' pose while fading out, then retires. playerDead forces the
   // player's downed pose while !isAlive. mobWasPresent gates kill-detection in sync.
-  private dyingMobs: { e: Entity; t: number }[] = []
+  private dyingMobs: { e: Entity; t: number; sink: boolean }[] = []
+  /**
+   * Ids of bodies that are in a friendly DUEL rather than a fight to the death.
+   *
+   * Captured while the mob is still in `state.mobs`, because the moment it leaves — which
+   * is the moment we have to decide how to send it off — its `pvp.duel` flag has gone with
+   * it. Without this every duel ended in the full kill choreography: death pose, holy
+   * burst, screen punch and a body sinking into the ground, for an opponent the rules say
+   * merely yielded and got back up.
+   */
+  private duelBodies = new Set<string>()
+  /** The equipped colorway's aura, or null for the free ones. See `colorwayAura`. */
+  private playerAura: ColorwayAura | null = null
+  /** Seconds since the scene started, for the aura's pulse. Real time, so the glow keeps
+   *  breathing through hit-stop — a frozen aura reads as a dropped frame. */
+  private auraClock = 0
   private mobWasPresent = false
   private playerDead = false
   // The mob slain by the most recent sync(), held for exactly one floatingNumbers diff.
@@ -1337,6 +1362,81 @@ export class WorldSceneController {
     }
   }
 
+  /**
+   * The ground pool: a soft elliptical wash of light the hero stands in.
+   *
+   * An ELLIPSE rather than a circle because the world is drawn dimetrically — a circular
+   * pool reads as a sphere hovering at the feet, where a squashed one lies down on the
+   * ground plane with the rest of the art. Its size breathes on a slow sine so it reads as
+   * a live effect and not a decal baked into the tile.
+   */
+  private drawAuraPool(ctx: CanvasRenderingContext2D): void {
+    const a = this.playerAura
+    if (!a || !this.player.active || this.townMode) return
+    // Two sines at different rates: one alone is a metronome, and the eye locks onto it.
+    const t = this.auraClock / a.period
+    const pulse = 0.5 + 0.5 * Math.sin(t * Math.PI * 2)
+    const shimmer = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * 1.7 + 1.1)
+    const x = this.player.tx - this.cam.x
+    // Down at the feet rather than the sprite's origin, or the pool sits at the waist.
+    const y = this.player.ty - this.cam.y + 3
+    const rx = 15 + pulse * 2.5
+    const ry = rx * 0.42   // the dimetric squash
+
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.globalAlpha = 0.30 + pulse * 0.16
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rx)
+    g.addColorStop(0, a.core)
+    g.addColorStop(0.42, a.glow)
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2)
+    ctx.fill()
+
+    // A thin rim that counter-rotates against the pulse, which is what stops the whole
+    // thing reading as a single fading blob.
+    ctx.globalAlpha = 0.16 + shimmer * 0.14
+    ctx.strokeStyle = a.core
+    ctx.lineWidth = 0.8
+    ctx.beginPath()
+    ctx.ellipse(x, y, rx * (0.72 + shimmer * 0.12), ry * (0.72 + shimmer * 0.12), 0, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.restore()
+    ctx.globalAlpha = 1
+  }
+
+  /**
+   * The bloom: an additive halo over the hero's body.
+   *
+   * Kept deliberately weak (peak alpha ~0.18). The sprite is 15 flat palette slots with
+   * hard pixel edges, and a strong additive wash over it turns those slots into mush —
+   * the aura has to look like light AROUND the armour, never like a filter applied to it.
+   */
+  private drawAuraBloom(): void {
+    const a = this.playerAura
+    if (!a || !this.player.active || this.townMode) return
+    const ctx = this.ctx
+    const t = this.auraClock / a.period
+    const pulse = 0.5 + 0.5 * Math.sin(t * Math.PI * 2)
+    const x = this.player.tx - this.cam.x
+    const y = this.player.ty - this.cam.y - 7   // mid-torso, not the feet
+    const r = 15 + pulse * 2.5
+
+    ctx.save()
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.globalAlpha = 0.16 + pulse * 0.12
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+    g.addColorStop(0, a.core)
+    g.addColorStop(0.5, a.glow)
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = g
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
+    ctx.restore()
+    ctx.globalAlpha = 1
+  }
+
   private drawParticles(): void {
     const ps = this.particles
     if (!ps.length) return
@@ -1694,6 +1794,7 @@ export class WorldSceneController {
       // once the ground is rebaked.
       for (const rec of this.otherMobEnts.values()) this.scene.despawn(rec.e)
       this.otherMobEnts.clear()
+      this.duelBodies.clear()
       const zm = state.zoneMaps[state.currentZone]
       if (zm) {
         const palId = biomePaletteId(state.currentZone)
@@ -1757,6 +1858,8 @@ export class WorldSceneController {
       this.swapEntitySprite(this.player, wantedPlayerSprite)
     }
     this.playerFaction = state.playerFaction
+    // Founder colorways carry an aura; free ones resolve to null and draw nothing.
+    this.playerAura = colorwayAura(state.colorway)
     this.playerBasePalette = heroPaletteId(
       state.playerClass, state.playerRace, state.playerFaction, bestEquipmentRarity(state),
       state.colorway,
@@ -1814,15 +1917,24 @@ export class WorldSceneController {
           // silently become the next enemy.
           const e = this.mob
           e.paletteId = this.mobBasePalette
-          e.animator.set('death')
-          e.animator.restart()
-          this.dyingMobs.push({ e, t: 0 })
-          this.slainMob = e            // keep the killing blow's VFX target alive
-          this.spawnBurst(e.tx, e.ty, 'spell/holy')
-          this.punch(2.6, 0.05 * FX_TIME_SCALE)
-          const dm = this.worldMid(e)
-          const dc = fxColors('spell/holy')
-          this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 1.7)
+          // A duel is not a death. The loser yields at 1 HP and the store releases them
+          // back into the crowd (`markDisengaged`), so the body fades out standing rather
+          // than collapsing — no death pose, no burst, no screen punch, no sink. The
+          // ambient copy returns a moment later and walks off under its own steam.
+          if (this.mobId && this.duelBodies.has(this.mobId)) {
+            this.duelBodies.delete(this.mobId)
+            this.dyingMobs.push({ e, t: 0, sink: false })
+          } else {
+            e.animator.set('death')
+            e.animator.restart()
+            this.dyingMobs.push({ e, t: 0, sink: true })
+            this.slainMob = e            // keep the killing blow's VFX target alive
+            this.spawnBurst(e.tx, e.ty, 'spell/holy')
+            this.punch(2.6, 0.05 * FX_TIME_SCALE)
+            const dm = this.worldMid(e)
+            const dc = fxColors('spell/holy')
+            this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 1.7)
+          }
         }
       }
       this.mob = null
@@ -1919,15 +2031,26 @@ export class WorldSceneController {
       if (slain) {
         const e = this.mob
         e.paletteId = this.mobBasePalette   // clear any lingering hit-flash
-        e.animator.set('death')
-        e.animator.restart()
-        this.dyingMobs.push({ e, t: 0 })
-        this.slainMob = e                   // let the killing blow's VFX still find it
-        this.spawnBurst(e.tx, e.ty, 'spell/holy') // loot/impact pop
-        this.punch(2.6, 0.05 * FX_TIME_SCALE)
-        const dm = this.worldMid(e)
-        const dc = fxColors('spell/holy')
-        this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 1.7)
+        // Same duel rule as the ID-change branch above: a yielded opponent fades out on
+        // its feet rather than dying. This is the path a one-on-one duel actually takes,
+        // since it ends with no replacement target.
+        //
+        // Note this only replaces the CHOREOGRAPHY — the shared cleanup below (entity
+        // released, lunge, flash, anchors, `mobId`, target lock) still has to run, so this
+        // must not return early out of `sync`.
+        const yielded = !!this.mobId && this.duelBodies.has(this.mobId)
+        if (yielded) this.duelBodies.delete(this.mobId!)
+        this.dyingMobs.push({ e, t: 0, sink: !yielded })
+        if (!yielded) {
+          e.animator.set('death')
+          e.animator.restart()
+          this.slainMob = e                 // let the killing blow's VFX still find it
+          this.spawnBurst(e.tx, e.ty, 'spell/holy') // loot/impact pop
+          this.punch(2.6, 0.05 * FX_TIME_SCALE)
+          const dm = this.worldMid(e)
+          const dc = fxColors('spell/holy')
+          this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 1.7)
+        }
       } else {
         this.scene.despawn(this.mob)
       }
@@ -1992,6 +2115,7 @@ export class WorldSceneController {
       || state.gameMode === 'gathering' || state.gameMode === 'crafting'
     if (inWorld && state.isAlive && !this.townMode) {
       for (const m of state.mobs) {
+        if (m.pvp?.duel) this.duelBodies.add(m.id)
         if (m.id === targetId) continue
         alive.add(m.id)
         let rec = this.otherMobEnts.get(m.id)
@@ -2093,6 +2217,13 @@ export class WorldSceneController {
     const liveCombat = inWorld && state.isAlive && !this.townMode
     for (const [id, rec] of this.otherMobEnts) {
       if (alive.has(id)) continue
+      if (liveCombat && rec.e.active && !this.isDying(rec.e) && this.duelBodies.has(id)) {
+        // A duel opponent leaving the field yielded; see the note on `duelBodies`.
+        this.duelBodies.delete(id)
+        this.dyingMobs.push({ e: rec.e, t: 0, sink: false })
+        this.otherMobEnts.delete(id)
+        continue
+      }
       if (liveCombat && rec.e.active && !this.isDying(rec.e)) {
         const e = rec.e
         // Palette deliberately left as-is. The target's death restores `mobBasePalette`,
@@ -2101,7 +2232,7 @@ export class WorldSceneController {
         // "the whirlwind got that one" rather than as a lost palette.
         e.animator.set('death')
         e.animator.restart()
-        this.dyingMobs.push({ e, t: 0 })
+        this.dyingMobs.push({ e, t: 0, sink: true })
         this.spawnBurst(e.tx, e.ty, 'spell/holy')
         const dm = this.worldMid(e)
         const dc = fxColors('spell/holy')
@@ -2942,7 +3073,9 @@ export class WorldSceneController {
           this.dyingMobs.splice(i, 1)
         } else {
           d.e.alpha = 1 - d.t * d.t     // ease-out fade
-          d.e.z = -Math.min(3, d.t * 3) // slight sink into the ground
+          // Only the slain sink. A duel loser is walking away, and a body settling into
+          // the ground is the single strongest "this one died" cue in the whole effect.
+          if (d.sink) d.e.z = -Math.min(3, d.t * 3)
         }
       }
     }
@@ -2980,7 +3113,16 @@ export class WorldSceneController {
       try { this.updateAmbient(realDt) } catch (err) { console.error('[ambient] update failed:', err) }
     }
 
-    this.scene.render(this.ctx, this.cam, g, dt, this.drawTargetReticle)
+    this.auraClock += realDt
+    // The ground pool goes through the GROUND-DECAL hook, not before `render()`: the first
+    // thing `render` does is `clearRect`, so anything painted beforehand is wiped. The hook
+    // exists for exactly this — decals drawn after the ground blit and under every unit, so
+    // bodies occlude the pool correctly instead of it floating over the crowd.
+    this.scene.render(this.ctx, this.cam, g, dt, this.drawGroundDecals)
+
+    // ...and the bloom sits OVER it, so the sprite itself glows rather than merely standing
+    // in a lit circle. Additive, soft, and centred on the hero's mid-height.
+    this.drawAuraBloom()
 
     // Particle FX over the world (bloom via additive compositing). Advanced on real
     // time so glows keep flowing through hit-stop.
@@ -3330,6 +3472,28 @@ export class WorldSceneController {
    */
   private applyGhostRoster(): void {
     if (!this.rigs) return
+
+    // ── Ghosts LEAVING ────────────────────────────────────────────────────────
+    // A ghost is removed from the roster when the player blocks that person, and App
+    // Review 1.2 asks for a block to take effect instantly. Placing them nowhere new is
+    // not enough on its own — the body they are already wearing is standing in the zone
+    // with their name over it, and it would stay there until the next zone change.
+    //
+    // The body is not despawned: `ambientGroups` and `followerIdxs` hold INDICES into
+    // `this.ambient`, so removing an element would silently repoint a companion at
+    // whoever landed in that slot. It is handed back its own generated identity instead,
+    // which is what it had before the ghost was folded in.
+    for (const a of this.ambient) {
+      const gone = a.identity?.ghostUserId && !getGhost(a.identity.ghostUserId)
+      if (!gone || !a.preGhostIdentity) continue
+      const base = a.preGhostIdentity
+      a.identity = base
+      a.preGhostIdentity = null
+      a.name = base.name
+      a.level = base.level
+      this.reskinAmbient(a, base)
+    }
+
     for (const a of this.ambient) {
       if (a.kind !== 'hero' || !a.identity || a.identity.ghostUserId) continue
       // Not a companion: a party member is someone the player recruited by name, and
@@ -3337,26 +3501,38 @@ export class WorldSceneController {
       if (a.partySlot >= 0) continue
       const id = this.withGhost(a.identity)
       if (!id.ghostUserId) continue
+      // Remember who this body was, so a later block can give it back rather than
+      // leaving the blocked player's name standing in the zone.
+      a.preGhostIdentity = a.identity
       a.identity = id
       a.name = id.name
       a.level = id.level
-      // The body has to change with the identity — a ghost's race and class are their own,
-      // and leaving the old rig would put a dwarf's name on an elf. Released and re-spawned
-      // at the same spot, the same trade the mob sprite swap makes.
-      const spriteId = heroSpriteId(id.race, id.playerClass, id.name)
-      const sprite = this.spriteCache[spriteId] ?? this.rigs.player
-      const tx = a.e.tx, ty = a.e.ty
-      this.scene.despawn(a.e)
-      const e = this.scene.spawn(
-        sprite, heroPaletteId(id.playerClass, id.race, id.faction, id.rarity), tx, ty,
-      )
-      e.shadow = true
-      e.animator.set('idle')
-      // Fade in rather than hard-cut, matching every other body that arrives mid-scene.
-      e.alpha = 0
-      a.spawnFadeT = SPAWN_FADE
-      a.e = e
+      this.reskinAmbient(a, id)
     }
+  }
+
+  /**
+   * Swap the body under an ambient hero to match a new identity, in place.
+   *
+   * The body has to change with the identity — a ghost's race and class are their own, and
+   * leaving the old rig would put a dwarf's name on an elf. Despawned and re-spawned at the
+   * same spot, the same trade the mob sprite swap makes, and it fades in rather than
+   * hard-cutting like every other body that arrives mid-scene.
+   */
+  private reskinAmbient(a: Ambient, id: AmbientIdentity): void {
+    if (!this.rigs) return
+    const spriteId = heroSpriteId(id.race, id.playerClass, id.name)
+    const sprite = this.spriteCache[spriteId] ?? this.rigs.player
+    const tx = a.e.tx, ty = a.e.ty
+    this.scene.despawn(a.e)
+    const e = this.scene.spawn(
+      sprite, heroPaletteId(id.playerClass, id.race, id.faction, id.rarity), tx, ty,
+    )
+    e.shadow = true
+    e.animator.set('idle')
+    e.alpha = 0
+    a.spawnFadeT = SPAWN_FADE
+    a.e = e
   }
 
   private spawnAmbient(groupCount = AMBIENT_GROUPS_WORLD): void {
@@ -3391,6 +3567,7 @@ export class WorldSceneController {
         this.ambient.push({
           ...freshAmbientPath(this.ambient.length),
           e, kind: 'hero', gx, gy, tgx: gx, tgy: gy, t: rnd(s + 8) * 3,
+          preGhostIdentity: null,
           fightT: 0, atkCd: rnd(s + 7) * 0.6,
           name: id.name, level: id.level, faction: id.faction, grp: gi,
           rng: subStream(seed, `beh:${gi}:${k}`), state: tmpl.fight ? 'approach' : 'wander',
@@ -3411,6 +3588,7 @@ export class WorldSceneController {
         this.ambient.push({
           ...freshAmbientPath(this.ambient.length),
           e, kind: 'mob', gx, gy, tgx: gx, tgy: gy, t: rnd(s + 4) * 3,
+          preGhostIdentity: null,
           fightT: 0, atkCd: rnd(s + 6) * 0.6,
           name: '', level: 0, faction: 'neutral', grp: gi,
           rng: subStream(seed, `beh:${gi}:m${k}`), state: 'idle',
@@ -3605,6 +3783,7 @@ export class WorldSceneController {
     if (this.mob) { this.scene.despawn(this.mob); this.mob = null }
     for (const rec of this.otherMobEnts.values()) this.scene.despawn(rec.e)
     this.otherMobEnts.clear()
+    this.duelBodies.clear()
     this.manualMode = false
     this.tapMoveActive = false
     this.input = { up: false, down: false, left: false, right: false }
@@ -5254,6 +5433,13 @@ export class WorldSceneController {
    * wider faint single ring while the mob is still walking in. Elevation comes free —
    * feetY is height-aware, so the ring sits on the hillside the mob is standing on.
    */
+  /** Everything that belongs on the ground, under the units. The scene takes one callback,
+   *  so the aura pool and the target reticle are composed here rather than fighting over it. */
+  private drawGroundDecals = (ctx: CanvasRenderingContext2D): void => {
+    this.drawAuraPool(ctx)
+    this.drawTargetReticle(ctx)
+  }
+
   private drawTargetReticle = (ctx: CanvasRenderingContext2D): void => {
     const g = this.ground
     const target = this.mob

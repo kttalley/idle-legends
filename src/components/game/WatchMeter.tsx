@@ -114,17 +114,26 @@ function WatchMeterInner() {
       {/* Standing Orders — the one permanent, real-money way to raise the ceiling. Shown
           only when it is not already owned, and phrased as MORE rather than as relief: the
           free watch is generous and stays generous, and this doubles it for the players who
-          are actually hitting it. Hidden entirely on the web build, where there is no
-          StoreKit behind the bridge and the button could only ever fail. */}
-      {!purchases.active.has(STANDING_ORDERS_ENTITLEMENT) && purchases.standingOrdersPrice && (
+          are actually hitting it.
+
+          The row is rendered whether or not a price arrived — disabled and labelled
+          "Unavailable" rather than absent. It used to be hidden on a null price, which made
+          a store outage look exactly like an app with nothing to sell; that is precisely
+          what App Review saw, and what the shop screen in the menu now answers properly. */}
+      {!purchases.active.has(STANDING_ORDERS_ENTITLEMENT) && (
         <button
           className="rp-button watch-meter-sku"
           onClick={() => { void buyStandingOrders() }}
-          disabled={purchases.busy}
-          title={`Permanently adds ${STANDING_ORDERS_HOURS} hours to every watch.`}
+          disabled={purchases.busy || !purchases.standingOrdersPrice}
+          title={purchases.standingOrdersPrice
+            ? `Permanently adds ${STANDING_ORDERS_HOURS} hours to every watch.`
+            : 'The store is not reachable right now — open the menu to retry.'}
+          style={{ opacity: purchases.standingOrdersPrice ? 1 : 0.55 }}
         >
           Standing Orders · +{STANDING_ORDERS_HOURS}h forever
-          <span className="watch-meter-sku-price">{purchases.standingOrdersPrice}</span>
+          <span className="watch-meter-sku-price">
+            {purchases.standingOrdersPrice ?? 'Unavailable'}
+          </span>
         </button>
       )}
       {purchases.active.has(STANDING_ORDERS_ENTITLEMENT) && (

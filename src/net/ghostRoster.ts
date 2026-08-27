@@ -19,6 +19,8 @@ import { setGhosts, type Ghost } from '../engine/ghosts'
 import type { RosterRow } from './leaderboard'
 import { TABLE } from './leaderboard'
 import { resolveFaction } from '../data/factions'
+import { isBlocked } from '../moderation/blocks'
+import { maskName } from '../moderation/wordFilter'
 import { CLASS_DEFINITIONS } from '../data/classes'
 import { RACE_DEFINITIONS } from '../data/races'
 import { deepestSpec } from '../data/specs'
@@ -48,6 +50,11 @@ const SLOTS: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket']
 function toGhost(row: RosterRow): Ghost | null {
   const snap = row.snapshot
   if (!snap || !sanityCheck(snap)) return null
+  // A blocked player is not placed in the world at all. "Removed from the user's feed"
+  // (App Review 1.2) has to mean the world too — the ladder is not the only place another
+  // player's name is rendered, and a blocked player standing in your zone with a nameplate
+  // is exactly the thing the block was asked for.
+  if (isBlocked(row.user_id)) return null
   const faction = resolveFaction(row.faction || snap.playerFaction)
   if (faction === 'neutral') return null
   const playerClass = snap.combatant?.playerClass
@@ -61,7 +68,7 @@ function toGhost(row: RosterRow): Ghost | null {
   const talentAllocs = snap.combatant.talentAllocs ?? {}
   return {
     userId: row.user_id,
-    name: snap.combatant.name || row.hero_name || 'Someone',
+    name: maskName(snap.combatant.name || row.hero_name || 'Someone'),
     playerClass: playerClass as ClassType,
     race: race as RaceType,
     faction,

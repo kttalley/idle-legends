@@ -40,7 +40,14 @@ export function BossBeacon() {
 
   return (
     <div style={{
-      position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+      position: 'absolute',
+      // Top-aligned with the rest of the HUD (`.hud-tl` / `.hud-tr` use the same
+      // expression). A bare `top: 8` put this banner UNDER the Dynamic Island on a Pro
+      // phone and ate the first line of it — the one naming the boss. This element sits in
+      // the scene wrapper, which is full-bleed and applies no inset of its own, so the
+      // safe-area has to be added here.
+      top: 'calc(8px + var(--safe-t))',
+      left: '50%', transform: 'translateX(-50%)',
       zIndex: 40, pointerEvents: 'none',
       background: 'rgba(24,8,4,0.88)', border: '1px solid var(--warn)', borderRadius: 4,
       padding: '5px 10px', minWidth: 200, textAlign: 'center',

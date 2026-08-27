@@ -87,8 +87,11 @@ export function qualityAtLeast(q: QualityTier, min: QualityTier): boolean {
 // Derived, not stored: a pure hash of (world seed, tile coords) so every hero's world
 // lays out its good veins differently with **no map-format change** and no save
 // migration. 0 thin · 1 solid · 2 rich.
-export const RICHNESS_LABEL = ['Thin', 'Solid', 'Rich'] as const
-export const RICHNESS_COLOR = ['#8a8578', '#88bb66', '#ffd700'] as const
+// RICHNESS_LABEL / RICHNESS_COLOR lived here and are gone. They existed only to render a
+// "Thin vein" / "Solid vein" / "Rich vein" badge in the gathering UI, which named something
+// the player cannot act on — you do not choose a node's richness, and no decision follows
+// from knowing it. `nodeRichness` below is unaffected and still drives yield and the band
+// width; a rich node is signalled by the strike meter's gold frame instead of by a word.
 
 export function nodeRichness(seed: number, x: number, y: number): 0 | 1 | 2 {
   let h = (seed ^ 0x9e3779b9) | 0

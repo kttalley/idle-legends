@@ -92,6 +92,25 @@ export function releaseGhosts(): void {
   placed.clear()
 }
 
+/**
+ * Remove one person from the roster — they have been blocked.
+ *
+ * Bumping `version` is the load-bearing half: the renderer version-gates its ghost pass, so
+ * without it the body already wearing this identity keeps standing in the zone with the
+ * blocked player's name over it until the next zone change. With it, the pass runs on the
+ * next frame and hands that body back its own generated identity.
+ *
+ * `placed` keeps its entry deliberately — the claim is void either way, and clearing it
+ * would let a DIFFERENT ghost be placed into the same body on the same frame, which reads
+ * as the blocked player simply changing their name.
+ */
+export function dropGhost(userId: string): void {
+  const next = ghosts.filter(g => g.userId !== userId)
+  if (next.length === ghosts.length) return
+  ghosts = next
+  version++
+}
+
 export function getGhost(userId: string): Ghost | null {
   return ghosts.find(g => g.userId === userId) ?? null
 }

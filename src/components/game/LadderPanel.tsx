@@ -8,7 +8,7 @@
 // cloud switched off in a dev clone, offline on a train, signed in with an empty board on
 // launch day. The panel says which, in one line, and offers the action that resolves it.
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { useGameStore } from '../../store/gameStore'
 import { useDismissable } from '../ui/useDismissable'
@@ -21,24 +21,35 @@ import {
   type LeaderboardEntry,
 } from '../../net/leaderboard'
 import { factionNameColor, HOSTILE_MARK, isHostile } from '../../data/factions'
+import { getBlocks, subscribeBlocks } from '../../moderation/blocks'
+import { ReportDialog } from './ReportDialog'
 import { honorRank, nextHonorRank, readPvpRecord } from '../../engine/pvp'
 import { FACTION_DEFINITIONS } from '../../data/factions'
-import {
-  challenge,
-  fetchDuelHistory,
-  type DuelResponse,
-  type ResolvedDuel,
-} from '../../net/cloudDuel'
+// `challenge` (the server-resolved duel) is deliberately no longer imported — duels are
+// fought in the world now, through the store. The RECORD tab still reads the history the
+// old flow wrote, so past duels remain visible; it simply stops gaining new rows.
+import { fetchDuelHistory, type DuelResponse } from '../../net/cloudDuel'
 import { buildSnapshot } from '../../net/snapshot'
 
 type Status = 'idle' | 'loading' | 'offline' | 'disabled' | 'ready'
 
-export function LadderPanel() {
+export function LadderPanel({ onClose }: { onClose?: () => void } = {}) {
   const [tab, setTab] = useState<'ladder' | 'record' | 'honor'>('ladder')
   const [status, setStatus] = useState<Status>('idle')
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([])
-  const [duel, setDuel] = useState<ResolvedDuel | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
+  const [fetched, setEntries] = useState<LeaderboardEntry[]>([])
+
+  // ── Blocked players never appear ────────────────────────────────────────────
+  // "Blocking should remove the content from the user's feed instantly" (App Review 1.2).
+  // Filtering HERE rather than at the fetch is what makes it instant: the block updates the
+  // shared set synchronously, this subscription repaints, and the row is gone on the same
+  // tap — no refetch, and it works with the network down.
+  const blocks = useSyncExternalStore(subscribeBlocks, getBlocks)
+  const entries = useMemo(
+    () => fetched.filter(e => !blocks.has(e.userId)),
+    [fetched, blocks])
+
+  // Which player the report dialog is open for, if any.
+  const [reporting, setReporting] = useState<{ userId: string; name: string } | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [history, setHistory] = useState<DuelResponse[] | null>(null)
 
@@ -77,28 +88,44 @@ export function LadderPanel() {
     return () => { cancelled = true }
   }, [tab, history])
 
-  const onChallenge = useCallback(async (opponentId: string, name: string) => {
-    setBusy(opponentId)
-    setNote(null)
-    setDuel(null)
-    const state = useGameStore.getState()
-    if (!(await ensureSession())) {
-      setNote('Could not reach the ladder.')
-      setBusy(null)
+  /**
+   * Take the fight into the world, rather than resolving it on a server.
+   *
+   * This used to POST to the `duel` edge function and render the result as a scoreboard —
+   * a fight you could not watch, decided elsewhere, in a game whose every other fight
+   * happens in front of you. The store already has the right machinery for both halves
+   * (`attackPlayer` for the enemy faction, `duelPlayer` for your own): same body, same
+   * renderer, same combat, differing only in whether anything is at stake.
+   *
+   * So the button now closes the board, spawns them, and starts the fight.
+   */
+  const onChallenge = useCallback((e: LeaderboardEntry) => {
+    const store = useGameStore.getState()
+    const speaker = {
+      name: e.name,
+      playerClass: e.playerClass,
+      race: e.race,
+      faction: e.faction,
+      level: e.level,
+      spec: null,
+      // Marks them as a real player's character, so the fight uses their PUBLISHED gear
+      // rather than a generated stand-in. See `attackPlayer`.
+      ghostUserId: e.userId,
+    }
+    const hostile = isHostile(e.faction, store.playerFaction)
+    const started = hostile ? store.attackPlayer(speaker) : store.duelPlayer(speaker)
+    if (!started) {
+      // Both actions refuse rather than throw, and the reasons are all states the player
+      // can see and fix — so say which, instead of leaving a button that does nothing.
+      setNote(!store.isAlive ? 'You are in no shape to fight.'
+        : store.gameMode !== 'combat' ? 'Finish what you are doing first — you are not in the field.'
+        : `Could not reach ${e.name}.`)
       return
     }
-    const res = await challenge(state, opponentId)
-    setBusy(null)
-    if (!res.ok) {
-      setNote(res.status === 429 ? 'Too many duels just now — try again shortly.'
-        : res.reason === 'offline' ? 'Offline. The duel was not fought.'
-        : `Could not duel ${name}.`)
-      return
-    }
-    setDuel(res.data)
-    // A duel changes nothing about the player's character, so nothing is republished and
-    // no local state is written. See the standing rule in `engine/duel.ts`.
-  }, [])
+    // The board is a menu over people; once one of them is a body three tiles away it is
+    // in the way of the fight it just started.
+    onClose?.()
+  }, [onClose])
 
   if (status === 'disabled') {
     return (
@@ -141,23 +168,6 @@ export function LadderPanel() {
         </button>
       </div>
 
-      {duel && (
-        <div className={`ladder-duel${duel.playerWon ? ' won' : ' lost'}`}>
-          <strong>{duel.playerWon ? 'Victory' : 'Defeat'}</strong>
-          <span> vs {duel.opponentName}</span>
-          {duel.result && (
-            <span className="ladder-duel-detail">
-              {' · '}{duel.result.duration.toFixed(0)}s, {duel.result.events.length} exchanges
-            </span>
-          )}
-          {/* Version skew between this client's combat code and the server's. Saying so is
-              better than rendering a fight that contradicts the banner above it. */}
-          {!duel.replayVerified && (
-            <span className="ladder-duel-detail"> · result recorded; replay unavailable on this build</span>
-          )}
-        </div>
-      )}
-
       {note && <div className="ladder-note">{note}</div>}
 
       {status === 'offline' && (
@@ -182,8 +192,23 @@ export function LadderPanel() {
             <li key={e.userId} className={`ladder-row${e.isYou ? ' is-you' : ''}`}>
               <span className="ladder-rank">{e.rank}</span>
               <span className="ladder-name" style={{ color: factionNameColor(e.faction) }}>
-                {e.name}
-                {e.isYou && <span className="ladder-you"> you</span>}
+                <span className="ladder-name-text">
+                  {e.name}
+                  {e.isYou && <span className="ladder-you"> you</span>}
+                </span>
+                {/* The flag sits INSIDE the name cell, immediately after the name it refers
+                    to. `.ladder-row` is a four-column grid, so as a fifth child this button
+                    was pushed onto a line of its own — a stray icon under every row. */}
+                {!e.isYou && (
+                  <button
+                    className="ladder-report-btn"
+                    aria-label={`Report or block ${e.name}`}
+                    title={`Report or block ${e.name}`}
+                    onClick={() => setReporting({ userId: e.userId, name: e.name })}
+                  >
+                    ⚑
+                  </button>
+                )}
               </span>
               <span className="ladder-meta">
                 Lv {e.level}
@@ -192,10 +217,10 @@ export function LadderPanel() {
               {!e.isYou && (
                 <button
                   className="ladder-duel-btn"
-                  disabled={busy !== null}
-                  onClick={() => void onChallenge(e.userId, e.name)}
+                  onClick={() => onChallenge(e)}
+                  title={`Fight ${e.name} in the world`}
                 >
-                  {busy === e.userId ? '…' : 'Duel'}
+                  Duel
                 </button>
               )}
             </li>
@@ -203,6 +228,15 @@ export function LadderPanel() {
         </ol>
       ) : (
         <RecordTab history={history} />
+      )}
+
+      {reporting && (
+        <ReportDialog
+          userId={reporting.userId}
+          name={reporting.name}
+          surface="ladder"
+          onClose={() => setReporting(null)}
+        />
       )}
     </div>
   )
@@ -361,7 +395,7 @@ export function LadderModal({ onClose }: { onClose: () => void }) {
         aria-label="The ladder"
         className="rp-glass ladder-modal"
       >
-        <LadderPanel />
+        <LadderPanel onClose={onClose} />
         <button
           onClick={onClose}
           className="rp-button"

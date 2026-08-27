@@ -17,8 +17,26 @@
 // Losing the session is always survivable — it costs a sign-in, never a character.
 
 import { authUrl, cloudEnabled, REQUEST_TIMEOUT_MS, SUPABASE_ANON_KEY } from './cloudConfig'
+import { keychainGet, keychainRemove, keychainSet } from './keychain'
 
 const SESSION_KEY = 'stillmarch_session_v1'
+
+/**
+ * The same session, mirrored where an uninstall cannot reach it.
+ *
+ * iOS deletes the whole app container when the app is deleted — WebView `localStorage`
+ * included — so a session stored only there means a reinstall mints a BRAND NEW anonymous
+ * user and the player's characters stay on the server owned by an identity nobody can
+ * prove any more. There is no login and no email to match them against, so that loss is
+ * permanent and silent, which is the worst combination.
+ *
+ * The Keychain is the one iOS store that survives deletion. Mirroring the refresh token
+ * there turns a reinstall into an invisible recovery, with no account system, no sign-in
+ * screen, and nothing for the player to remember. It does NOT follow the player to a new
+ * device — that needs a real identity (`signInWithApple`, already written and still
+ * unused) — so this is the floor, not the ceiling.
+ */
+const KEYCHAIN_SESSION_KEY = 'session_v1'
 
 /**
  * Refresh this many milliseconds before the token actually expires.
@@ -66,6 +84,43 @@ function write(s: Session | null): void {
   } catch {
     // Quota or private mode. The in-memory `cached` still works for this session, so the
     // player is signed in until they close the app. Strictly better than throwing.
+  }
+  // Mirror to the Keychain on EVERY write, not just at sign-in. Supabase rotates the
+  // refresh token on each refresh, so a mirror taken once would go stale and be rejected
+  // the first time it was ever actually needed — the failure would surface months later,
+  // on the one reinstall it existed to survive.
+  if (s) void keychainSet(KEYCHAIN_SESSION_KEY, JSON.stringify(s))
+  else void keychainRemove(KEYCHAIN_SESSION_KEY)
+}
+
+/**
+ * Restore the session from the Keychain when local storage has none. Call once, at boot,
+ * BEFORE anything reads a session — `main.tsx` awaits it beside the save recovery.
+ *
+ * Deliberately does nothing when a local session already exists: localStorage is the live
+ * copy and the Keychain is its backup, so preferring the backup could hand back a token
+ * older than the one in use.
+ */
+export async function recoverSessionFromKeychain(): Promise<boolean> {
+  if (readStored()) return false
+  const raw = await keychainGet(KEYCHAIN_SESSION_KEY)
+  if (!raw) return false
+  try {
+    const s = JSON.parse(raw) as Partial<Session>
+    if (
+      typeof s.accessToken !== 'string' ||
+      typeof s.refreshToken !== 'string' ||
+      typeof s.expiresAt !== 'number' ||
+      typeof s.userId !== 'string'
+    ) return false
+    // Straight through `write`, so localStorage and the in-memory cache are both filled.
+    // The access token may well be expired — that is fine and expected after a reinstall;
+    // `getAccessToken` refreshes it from the refresh token on the next call.
+    write(s as Session)
+    console.info('[session] recovered from the keychain after a reinstall')
+    return true
+  } catch {
+    return false
   }
 }
 

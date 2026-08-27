@@ -1,0 +1,119 @@
+STILLMARCH — review information
+
+Submitted in response to submission ID ceda5a4d-d43b-41c6-a3e7-49f658564d2e (1.0 build 3),
+which was rejected under guidelines 2.3.6, 1.2 and 2.1(b). All three are addressed in this
+build. Sections 1 and 2 below are the walkthrough Apple asked to have in this field.
+
+1. USER-GENERATED CONTENT — WHERE THE REQUIRED MECHANISMS ARE (guideline 1.2)
+
+The user-generated content in this app is the CHARACTER NAME. It is published to the
+leaderboard and appears above other players' characters in the world. Zone chat, party chat
+and whispers are generated on the device by the app itself — no text a player types is ever
+transmitted to another player.
+
+  a) EULA, PRESENTED BEFORE ANY ACCOUNT EXISTS
+     Launch the app after installing. The Terms of Use screen is the FIRST screen, ahead of
+     character selection. It cannot be dismissed or skipped; the only way past it is the
+     "I agree" button. The first clause on screen, without scrolling, states that there is
+     zero tolerance for objectionable content and abusive users.
+     (The app has no login or registration of any kind. The account is anonymous and is
+     created silently the first time the leaderboard is contacted, so this screen is the
+     earliest possible moment.)
+
+  b) FILTERING OBJECTIONABLE CONTENT
+     On the character creation screen, tap the quill icon beside the hero's name and type a
+     slur or sexual term. The name is rejected on screen and the "Begin Your Legend" button
+     is disabled until it is changed. The filter also normalises common evasions — leet
+     substitution, letter spacing, repeated letters, and Cyrillic/Greek lookalike
+     characters. Names published before this build are additionally masked on display.
+
+  c) FLAGGING OBJECTIONABLE CONTENT
+     Open LADDER (top of the left panel; on iPhone, tap MENU in the bottom dock first).
+     Every other player's row carries a flag control (⚑) on the right. Tapping it opens a
+     report dialog with five reasons: hate speech or a slur, sexual or explicit content,
+     harassment or threats, impersonation, and something else objectionable.
+
+  d) BLOCKING AN ABUSIVE USER
+     The same dialog offers "Block and report". Tapping it:
+       - removes that player from your leaderboard immediately, on the same tap, with no
+         refresh and no network round trip;
+       - removes them from your game world, so their character stops appearing;
+       - notifies us, by filing a report automatically alongside the block;
+       - persists across reinstalls and devices, as the block is stored server-side.
+
+  e) ACTING WITHIN 24 HOURS
+     We review every report within 24 hours, remove the offending content and eject the
+     account responsible. Ejection blanks the published name and bars that account from
+     publishing again; this is enforced by database policy, not by the app, so a modified
+     client cannot bypass it. Abuse can also be reported directly to
+     talleykristian@gmail.com, which is printed in the terms and on the terms screen.
+
+2. IN-APP PURCHASES — WHERE THEY ARE (guideline 2.1(b))
+
+Both products are now on a single SHOP screen, reachable from anywhere in the game:
+tap MENU in the bottom dock, then the hamburger (☰) control, then SHOP — it is the first
+item in the menu.
+
+  - Founder Pack (USD 4.99, com.stillmarch.game.founder): three cosmetic colour schemes.
+    Purely visual; no stats, speed or drop-rate change.
+  - Standing Orders (USD 2.99, com.stillmarch.game.standing_orders): permanently extends
+    unattended play by 8 hours. One time, not a refill, not a currency.
+  - Restore Purchases is on the same screen and is reachable without making a purchase.
+
+The previous build failed here because the app fetched prices only through a RevenueCat
+"Offering", which is external dashboard configuration; when that lookup returned nothing,
+the app showed only "Store unavailable" and the Standing Orders control was hidden entirely.
+This build requests the product identifiers directly from StoreKit as well, can complete a
+purchase by that path, states the specific reason when a price cannot be loaded, and offers
+a Retry. A product row is now always displayed even when its price is unavailable.
+
+3. WHAT THE APP IS, AND FOR WHOM
+
+Stillmarch is an idle role-playing game. You create a hero, choose a class and spend talent
+points; combat then resolves automatically while you watch, and continues while the app is
+closed. The player's decisions are the build, the equipment, and which zone and fights to
+take, rather than moment-to-moment input. It is for players who enjoy RPG progression but
+cannot commit long sessions.
+
+4. SETTING UP AND REACHING EVERY FEATURE
+
+No credentials are required. There is no demo account because the app has no account system
+and no login.
+  - Launch, agree to the Terms of Use, pick a class and race, tap Begin. Play starts at once.
+  - Combat runs by itself. The bottom bar switches between Fight, Mining and Smithing.
+  - MENU (bottom dock) opens the left panel: character sheet, talent trees, zone travel, and
+    The Watch (the offline-progress timer).
+  - GEAR (bottom dock) opens equipment and inventory.
+  - CHAT (bottom dock) opens the message feed. These messages are generated on the device
+    and are not sent between players.
+  - LADDER (top of the left panel) opens the cross-player leaderboard.
+  - ☰ (in the MENU panel) opens Shop, Settings and Character Select.
+
+5. EXTERNAL SERVICES
+
+RevenueCat for in-app purchase infrastructure, and Supabase for the optional leaderboard,
+the block list and the report queue. No advertising, analytics, attribution or third-party
+data services. The IDFA is not used. Core gameplay needs no network connection.
+
+6. REGIONAL DIFFERENCES
+
+None. Behaviour is identical everywhere. English only, with no region-locked content,
+pricing logic or features.
+
+7. REGULATED INDUSTRY OR THIRD-PARTY MATERIAL
+
+Not applicable. All artwork, music, text and code are original and owned by the developer.
+No gambling, loot boxes, randomised paid items or wagering.
+
+8. AGE RATING (guideline 2.3.6)
+
+"Messaging and Chat" and "User-Generated Content" are both now set to Yes on the App
+Information page. The chat feature is generated on-device and transmits nothing between
+players, but the app does present a chat interface and does let players publish a name that
+other players see, so Yes is the correct answer to both.
+
+9. PERMISSIONS
+
+The app requests no sensitive permissions: no location, contacts, camera, microphone or
+photos, and no App Tracking Transparency prompt. Local notifications are optional and are
+scheduled on the device.

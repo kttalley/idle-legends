@@ -178,7 +178,7 @@ export async function centreOf(send, selector) {
   })()`)
 }
 
-const clickByText = pattern => `(() => {
+export const clickByText = pattern => `(() => {
   const b = [...document.querySelectorAll('button')].find(x => ${pattern}.test(x.textContent || ''));
   if (!b) return null;
   b.click();
@@ -244,6 +244,11 @@ export async function enterGame(send, appUrl, { device } = {}) {
       await sleep(1500)   // let the first frames and the HUD settle
       return
     }
+    // The terms gate (App Review 1.2) is the first screen of a cold boot, and `resetStorage`
+    // clears the acceptance along with everything else — so every suite meets it. Clicked
+    // rather than seeded into localStorage on purpose: seeding would route every suite
+    // around the gate, and then nothing here would ever notice if it stopped working.
+    await evaluate(send, clickByText('/^I agree$/i'))
     await evaluate(send, clickByText('/Begin Your Legend/i'))
     await evaluate(send, clickByText('/Continue/i'))
     await sleep(900)

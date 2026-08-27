@@ -46,6 +46,60 @@ A mismatch shows no price and silently sells nothing.
 
 Both packages go in **one offering**, marked current.
 
+### The offering is no longer a single point of failure — but still set it up
+
+Build 1.0(3) was rejected under 2.1(b), "the products in the store failed to load". The
+cause was not in the app: the paywall read prices ONLY from the offering above, and an
+offering is dashboard state. Products not attached, or an offering not marked current, and
+`getOfferings()` returns nothing forever — with App Store Connect perfectly configured.
+Six TestFlight builds of client-side fixes could not move it, because there was nothing
+client-side to fix.
+
+`loadOfferings()` now falls back to `Purchases.getProducts([...])` against the product ids
+compiled into `PRODUCT_IDS` (`src/monetization/purchases.ts`), which asks StoreKit directly
+and ignores offerings entirely; `buy()` can complete a purchase by that path via
+`purchaseStoreProduct`. Entitlements still grant, because that mapping lives on the product.
+
+**This is a floor, not a replacement.** Configure the offering anyway — it is what lets
+prices and packaging change without shipping a build.
+
+### Reading the on-screen diagnostic
+
+The shop shows the specific reason a price is missing. Which half is at fault:
+
+| Message contains | Fault lies in |
+|---|---|
+| `no current offering` / `offering empty` / `none matching` | **RevenueCat.** Products not attached, or the offering is not marked current. |
+| `StoreKit returned 0 products for the compiled ids` | **App Store Connect.** Paid Apps Agreement not in effect, product not in a reviewable state, or a bundle-id mismatch. RevenueCat is irrelevant here. |
+| `getProducts failed: …` | The bridge or the network. Retry. |
+
+### Paid Apps Agreement
+
+Business → Agreements must show **Paid Apps** as in effect. Without it StoreKit vends
+nothing at all and every path above returns empty. Apple named it explicitly in the 1.0(3)
+rejection, so confirm it before resubmitting.
+
+## 2b. Age rating — Messaging and Chat must be YES
+
+Guideline 2.3.6, from the same rejection. The app shows a chat interface, so the answer is
+Yes regardless of the fact that the chat is generated on-device and nothing is transmitted
+between players. The rating describes what the user can see and do on screen, not what
+crosses the network. App Information → Age Rating.
+
+## 2c. User-generated content — guideline 1.2
+
+Implemented in this build; the runbook and the required screen-recording script are in
+`store/MODERATION.md`, and the reply text is in `store/REVIEW-REPLY.txt`.
+
+Two things that are NOT in the app and must be done in the dashboard:
+
+- The migration `supabase/migrations/20260826000000_moderation_blocks_and_reports.sql`
+  must be applied to the live project (`supabase db push`). Without it, blocking and
+  reporting fail silently.
+- `public/terms.html` and `public/privacy.html` must be deployed and reachable at
+  `https://design.kristiantalley.com/stillmarch/terms/` and `…/privacy.html`. They
+  ship with `npm run build`. The privacy URL also goes on the listing.
+
 Then add to `.env` (gitignored, public SDK key, iOS key not the secret one):
 
     VITE_REVENUECAT_IOS_KEY=appl_...

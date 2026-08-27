@@ -4,6 +4,7 @@ import { useGameStore } from '../../store/gameStore'
 import { useDismissable } from '../ui/useDismissable'
 import { CLASS_DEFINITIONS } from '../../data/classes'
 import { getAudioState, setMuted as audioSetMuted, subscribeAudio } from '../../engine/audio/audioEngine'
+import { ShopView } from './ShopView'
 
 // The way back to character select.
 //
@@ -28,7 +29,7 @@ export function GameMenu({ onClose }: { onClose: () => void }) {
   const returnToMenu = useGameStore(s => s.returnToMenu)
 
   // 'root' → the list. 'settings' → a sub-page. 'leaving' → the armed exit.
-  const [view, setView] = useState<'root' | 'settings' | 'leaving'>('root')
+  const [view, setView] = useState<'root' | 'settings' | 'leaving' | 'shop'>('root')
   const surface = useRef<HTMLDivElement>(null)
   useDismissable(true, onClose, { ref: surface, closeOnOutside: true, trapFocus: true })
 
@@ -61,7 +62,7 @@ export function GameMenu({ onClose }: { onClose: () => void }) {
       >
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
           <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', color: 'var(--gold)' }}>
-            {view === 'settings' ? 'Settings' : 'Menu'}
+            {view === 'settings' ? 'Settings' : view === 'shop' ? 'Shop' : 'Menu'}
           </span>
           <span className={classDef.colorClass} style={{ fontSize: '0.6rem' }}>
             {playerName || classDef.name} · Lv {level}
@@ -96,6 +97,8 @@ export function GameMenu({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
+        {view === 'shop' && <ShopView onBack={() => setView('root')} />}
+
         {/* Settings. Sound was a lone 🔊 on the hero strip, where it was a fifth control
             crowding four others and reading as navigation. It is a preference, and
             preferences belong behind the menu — with somewhere obvious for the next one to
@@ -125,6 +128,16 @@ export function GameMenu({ onClose }: { onClose: () => void }) {
 
         {view === 'root' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* First row, deliberately. App Review 2.1(b) failed the build twice for
+                "the products in the store failed to load" — and the second time the
+                reviewer could not find the Standing Orders purchase at all, because its
+                only affordance lived inside the Watch meter, which on a phone sits in the
+                zone track inside the map modal. A paid app needs ONE obvious place where
+                everything purchasable is listed, reachable from anywhere, and it is here. */}
+            <button className="rp-button menu-row" onClick={() => setView('shop')}>
+              <span>Shop</span>
+              <span className="menu-row-note">Founder Pack, Standing Orders, and Restore Purchases</span>
+            </button>
             <button className="rp-button menu-row" onClick={() => setView('settings')}>
               <span>Settings</span>
               <span className="menu-row-note">Sound, and more to come</span>

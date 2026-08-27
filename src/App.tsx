@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore }
 import { useGameStore } from './store/gameStore'
 import { startGameLoop, stopGameLoop } from './engine/gameLoop'
 import { CharacterCreate } from './components/game/CharacterCreate'
+import { TermsGate } from './components/game/TermsGate'
+import { termsAccepted } from './moderation/terms'
 import { CharacterSelect } from './components/game/CharacterSelect'
 import { CloudSaveNotice } from './components/game/CloudSaveNotice'
 import { CombatView } from './components/game/CombatView'
@@ -30,10 +32,16 @@ import { LevelUpToast } from './components/game/LevelUpToast'
 import { slotStorage, getLastSlotId, setLastSlotId } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
 import { initAudio, setZone as audioSetZone, setVolume as audioSetVolume, setWeather as audioSetWeather } from './engine/audio/audioEngine'
-import {
-  initGenerative, setGenerativeZone, updateWorldSignals, playStinger,
-  startGenerative, stopGenerative,
-} from './engine/audio/generativeEngine'
+// The generative MUSIC layer is INITIALISED but never STARTED for this release — see
+// engine/audio/musicTrack.ts for why, and for how to turn it back on.
+//
+// The distinction matters and is easy to get wrong: the sequenced music runs on Tone's
+// Transport, which `startGenerative()` starts. The stingers do not — they trigger against
+// `Tone.now()` directly. But `playStinger` bails out unless `initGenerative()` has run, so
+// skipping init entirely (the first version of this change) silently removed every
+// level-up, boss-spawn and mob-death cue along with the music nobody wanted.
+import { initGenerative, playStinger, stopGenerative } from './engine/audio/generativeEngine'
+import { startMusicTrack, stopMusicTrack } from './engine/audio/musicTrack'
 import { ZONES, ZONE_ORDER } from './data/zones'
 import { SpriteIcon } from './components/ui/SpriteIcon'
 import { formatGold } from './components/ui/GoldDisplay'
@@ -219,13 +227,8 @@ export default function App() {
       audioSetWeather(s.weatherState.type)
       if (s.initialized) {
         audioSetZone(s.currentZone, s.worldSeed)
-        // Tone.js is dynamically imported inside initGenerative; chain the zone grammar on so
-        // the cells come up reading the right scale/tempo the moment they exist.
-        void initGenerative().then(() => {
-          setGenerativeZone(s.currentZone, s.worldSeed)
-          updateWorldSignals(worldSignals(s))
-          startGenerative()
-        })
+        void startMusicTrack()
+        void initGenerative()   // stingers only — the Transport is never started
       }
       window.removeEventListener('pointerdown', latch)
       window.removeEventListener('keydown', latch)
@@ -249,35 +252,27 @@ export default function App() {
         audioSetVolume(state.settings.volume)
         audioSetWeather(state.weatherState.type)
         lastLogLen = state.combatLog.length
-        void initGenerative().then(() => {
-          setGenerativeZone(state.currentZone, state.worldSeed)
-          updateWorldSignals(worldSignals(state))
-          startGenerative()
-        })
+        void startMusicTrack()
+        void initGenerative()   // stingers only — the Transport is never started
         return
       }
       if (!state.initialized) {
+        // Back at character select — the run is over, so the music goes with it.
+        stopMusicTrack()
+        // Still called: it resets the stinger voice cursors, which are absolute times on
+        // the audio clock and otherwise drift ahead of `Tone.now()` across a suspend.
         stopGenerative()
         lastLogLen = 0
         return
       }
+      // The BED still follows the zone — it is the layer that makes a swamp sound like a
+      // swamp. Only the music is now zone-independent: one authored track, everywhere.
       if (state.currentZone !== prev.currentZone) {
         audioSetZone(state.currentZone, state.worldSeed)
-        setGenerativeZone(state.currentZone, state.worldSeed)
-        updateWorldSignals(worldSignals(state))
       }
       if (state.settings.volume !== prev.settings.volume) audioSetVolume(state.settings.volume)
       if (state.weatherState.type !== prev.weatherState.type) {
         audioSetWeather(state.weatherState.type)
-        updateWorldSignals({ weather: state.weatherState.type })
-      }
-
-      // Generative reactivity: only when a watched slice actually changes (these change on
-      // spawns/deaths/transitions, not every tick) do we push new signals to the music.
-      const a = worldSignals(state), b = worldSignals(prev)
-      if (a.entityCount !== b.entityCount || a.gameMode !== b.gameMode ||
-          a.boss !== b.boss || a.danger !== b.danger) {
-        updateWorldSignals(a)
       }
 
       // Combat-log stinger tail: sonify level-ups, boss spawns, and mob deaths as the log grows.
@@ -297,19 +292,10 @@ export default function App() {
     return useGameStore.subscribe(onStore)
   }, [])
 
-  // Tile-reactivity sampler: every 0.5 s, histogram the tile types under a radius around the
-  // player and retune the generative grammar — water lifts and thins it, ember/rock drop and
-  // darken it, flowers/moss thicken it. This is the "walking changes the music" channel; it is
-  // deliberately off the per-tick store subscription so it never competes with the render loop.
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      const s = useGameStore.getState()
-      if (!s.initialized) return
-      const ts = tileSignals(s)
-      if (ts) updateWorldSignals(ts)
-    }, 500)
-    return () => window.clearInterval(id)
-  }, [])
+  // The tile-reactivity sampler that used to live here is gone with the generative layer.
+  // It histogrammed the tiles around the player every 0.5s to retune the music grammar —
+  // pure cost with nothing listening, and it ran for the whole session. Restore it together
+  // with `startGenerative()` if the generative engine comes back.
 
   // Publish whatever occupies the foot of the left column as --log-h.
   //
@@ -341,6 +327,10 @@ export default function App() {
   const [slots, setSlots]   = useState<SaveSlotMeta[]>(() => slotStorage.list())
   // Show creation directly when there are no heroes yet; otherwise the select screen.
   const [creating, setCreating] = useState<boolean>(() => slotStorage.list().length === 0)
+
+  // Read ONCE into state rather than called on every render: `termsAccepted()` touches
+  // localStorage, and this component re-renders on the game loop.
+  const [agreed, setAgreed] = useState<boolean>(() => termsAccepted())
 
   // Boot resume — the fix for "the app spontaneously returns to character select".
   //
@@ -431,6 +421,13 @@ export default function App() {
     }
     return () => stopGameLoop()
   }, [initialized])
+
+  // ── The terms gate, ahead of everything ─────────────────────────────────────
+  // App Review 1.2 wants the EULA "presented before registering or logging in". There is no
+  // login screen here — the Supabase session is created anonymously the first time the
+  // cloud is touched — so the earliest honest moment is before the app renders anything at
+  // all, which is here, ahead of both character select and character creation.
+  if (!agreed) return <TermsGate onAccept={() => setAgreed(true)} />
 
   if (!initialized) {
     if (creating) {

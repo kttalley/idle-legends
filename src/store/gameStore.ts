@@ -1883,6 +1883,42 @@ function nearestMob(mobs: MobInstance[]): MobInstance | null {
   return best
 }
 
+/**
+ * How close the player must walk to something, under MANUAL control, before the hero will
+ * consider itself to be in a fight with it.
+ *
+ * Wide enough that arriving at an enemy is unambiguous, narrow enough that it is never
+ * "auto-play picked a fight for me" — you have to have walked to it.
+ */
+const MANUAL_ENGAGE_RANGE = 3
+
+/**
+ * The nearest mob a manually-controlled player is standing close enough to be fighting.
+ *
+ * ── Why manual control needs this at all ─────────────────────────────────────
+ * Auto-acquisition is deliberately off under manual control, so the player can walk past
+ * things. But EVERY attack — including the plain auto-swing — requires `currentMob`, so
+ * with nothing acquired the hero cannot fight at all, and there is no on-screen control
+ * that says so.
+ *
+ * For ordinary mobs that mostly hides: they pursue, they hit you, and the player takes
+ * their hands off the keys, whereupon idle mode re-acquires. A LAIR BOSS never pursues
+ * (`advanceMobs` skips `temperament: 'lair'`) and spawns 14–20 tiles out, so the player
+ * walks all the way to it, stands on top of it, and nothing whatsoever happens until the
+ * 15-second manual timeout expires and auto-play takes the fight. Reported, correctly, as
+ * "boss combat is broken in manual mode".
+ *
+ * Acquiring a target is not the same as playing for the player: the ability auto-caster
+ * stays gated on `controlMode === 'idle'`, so a manual player still spends their own
+ * cooldowns. This only lets the swing land on the thing they walked up to.
+ */
+function engageableMobNearby(mobs: MobInstance[]): MobInstance | null {
+  const near = nearestMob(mobs.filter(m => m.currentHp > 0))
+  if (!near) return null
+  const d = Math.sqrt(near.offset.dx ** 2 + near.offset.dy ** 2)
+  return d <= MANUAL_ENGAGE_RANGE ? near : null
+}
+
 let mobInstanceSeq = 0
 /** A fresh set of combat clocks. See `CombatAccumulators` for why these are no longer
  *  module-level `let`s. */
@@ -2548,6 +2584,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           ? resumed
           : nearestMob(mobs)
         targetMobId = target?.id ?? null
+      } else {
+        // Manual control still engages what you have WALKED UP TO. See
+        // `engageableMobNearby` — without this a lair boss is unfightable by hand.
+        target = engageableMobNearby(mobs)
+        targetMobId = target?.id ?? null
       }
     }
     currentMob = target
@@ -2765,7 +2806,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // to it, neither of which ever consults `controlMode`.
       if (!currentMob) {
         target = mobs.find(m => m.id === targetMobId)
-          ?? (controlMode === 'idle' ? nearestMob(mobs) : null)
+          ?? (controlMode === 'idle' ? nearestMob(mobs) : engageableMobNearby(mobs))
         targetMobId = target?.id ?? null
         currentMob = target
         activeDoTs = target ? target.dots : []
