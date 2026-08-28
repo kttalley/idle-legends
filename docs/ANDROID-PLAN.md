@@ -5,31 +5,51 @@ Written 2026-08-27. Branch: `ship/android`. Target: Google Play, in time for
 
 ---
 
-## Read this first: the clock, and what actually gates it
+## Read this first: what the deadline does and does not require
 
-**Google Play's 12-tester / 14-day rule is the binding constraint, not the code.**
+**The old Play account is gone.** `talleykristian@gmail.com` held a developer account from
+before Nov 2023 — which would have been exempt from the testing rule below — but Google
+closed it on **30 March 2024 for inactivity** (warning sent 22 Jan 2024, deadline 22 Mar
+2024). The $25 is not refundable and Google's stated remedy is to create a new account.
+There is an appeal link in the Policy Center; inactivity closures are rarely reversed, but
+it costs ten minutes and a reinstated account would restore the exemption, so it is worth
+one attempt.
 
-Personal Play developer accounts created after 13 Nov 2023 must run a **closed test with at
-least 12 testers, continuously opted in for 14 days**, before they can even *apply* for
-production access. Testers who opt out and back in reset their streak. Organization accounts
-and pre-Nov-2023 personal accounts are exempt.
+**So this is a new personal account, created in 2026, and the 12-tester rule applies.**
+A minimum of **12 testers continuously opted in for 14 days** before you can even *apply*
+for production access. A tester who opts out and back in resets their streak.
 
-Counting backwards from 30 Sept: the 14 days must start by roughly **10 September**, and
-that leaves no slack for the production-access application plus Play review. Realistically
-**start the closed test within the first week of this work**, with whatever builds — the
-RevenueCat guidance for Shipaton entrants is explicit: *"start the clock on day one"* and
-upload *anything* to begin the countdown while you keep developing.
+### Android is NOT required for Shipaton, and should not be treated as urgent
 
-**This does NOT gate Shipaton eligibility.** The iOS release already satisfies "first public
-version released between 1 Aug and 30 Sept". Android is upside: a second store, faster
-iteration, and better retention data. So if the 14-day clock cannot be met, ship Android
-after the deadline and lose nothing that matters.
+This is the most important line in this document, and it reverses an earlier read.
 
-**Therefore the first task is not code.** It is: create the Play account, create the app
-listing, and get *some* signed AAB into a closed track with testers opted in. Everything
-else runs in parallel behind that clock.
+The **iOS release already satisfies Shipaton eligibility** — "first public version released
+between 1 Aug and 30 Sept 2026". Android adds a second store, but the contest's winnable
+categories (HAMM/monetization, Best Game, Design) are judged on the app and the argument
+behind it, not on store count. Grand Prize is judged on traction that five weeks and no
+budget will not produce.
 
----
+**Therefore Android's value is to the business, not to the contest:** retention data that
+iOS will not surface fast enough, cheaper UA testing, and reach. Do not let 30 September
+drive engineering decisions here. If the clock is missed, Android ships in October and
+nothing of consequence is lost.
+
+What that means in practice:
+
+- **Start the clock in the background anyway.** Register the account, get any signed AAB into
+  a closed track, recruit testers. It is nearly free and it preserves the option.
+- **Do not spend the five weeks here.** The higher-value use of that time is the iOS
+  Shipaton entry: the 2-minute demo video, the HAMM writeup (half-drafted already in the
+  header of `src/monetization/purchases.ts` — a documented reversal from a cosmetic-only
+  thesis to a time-based SKU, with the counter-argument preserved), and build-in-public
+  material from the six-build store bug.
+- **If it lands by ~25 Sept, submit both.** If not, submit iOS alone and finish Android
+  without a clock.
+
+Rough timeline if pursued: register 28–31 Aug → identity verification a few days → closed
+test live ~2–4 Sept → 14 continuous days → ~16–18 Sept → apply for production → Play review
+→ live ~20–25 Sept. It fits with no room for a single slip, which is precisely why it must
+not be load-bearing.
 
 ## Context a fresh session needs
 
@@ -70,8 +90,11 @@ Key files to understand before changing anything:
 ## Work breakdown
 
 ### Phase 0 — start the clock (day 1, before any code)
-- [ ] Create/confirm the Google Play developer account ($25 one-time). **Note whether it is a
-      personal or organization account** — this decides whether the 14-day rule applies.
+- [ ] File the appeal on the closed account (Policy Center → appeal). Low odds; a reinstated
+      pre-Nov-2023 account would be exempt from the 14-day rule, so it is worth one attempt.
+- [ ] Register a NEW Google Play developer account ($25 one-time, non-refundable). Budget a
+      few days for Google's identity verification — that time is pure dead clock, so start it
+      immediately even if no code is ready.
 - [ ] Create the app entry: package `com.stillmarch.game` (match iOS for consistency).
 - [ ] `npx cap add android`, produce a signed AAB of whatever currently builds, upload to a
       **closed testing** track.
