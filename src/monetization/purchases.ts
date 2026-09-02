@@ -188,10 +188,20 @@ export async function initPurchases(): Promise<void> {
     set({ ready: true })
     return
   }
-  const apiKey = import.meta.env.VITE_REVENUECAT_IOS_KEY as string | undefined
-  console.info('[iap] initPurchases: native, apiKey', apiKey ? `present (${apiKey.slice(0, 9)}…)` : 'MISSING')
+  // One RevenueCat app, one key per store. The key is selected by platform rather than
+  // hardcoded, because the Android build would otherwise configure against the iOS key
+  // and every Billing call would fail with an app-mismatch error. On iOS this reads the
+  // same key it always has — no behaviour change.
+  const platform = Capacitor.getPlatform()
+  const apiKey = platform === 'ios'
+    ? import.meta.env.VITE_REVENUECAT_IOS_KEY as string | undefined
+    : platform === 'android'
+      ? import.meta.env.VITE_REVENUECAT_ANDROID_KEY as string | undefined
+      : undefined
+  const keyName = platform === 'ios' ? 'VITE_REVENUECAT_IOS_KEY' : 'VITE_REVENUECAT_ANDROID_KEY'
+  console.info(`[iap] initPurchases: native (${platform}), apiKey`, apiKey ? `present (${apiKey.slice(0, 9)}…)` : 'MISSING')
   if (!apiKey) {
-    console.warn('[iap] VITE_REVENUECAT_IOS_KEY is unset — running with no entitlements')
+    console.warn(`[iap] ${keyName} is unset — running with no entitlements`)
     set({ ready: true, error: null })
     return
   }

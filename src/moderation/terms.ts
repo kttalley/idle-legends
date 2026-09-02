@@ -28,6 +28,20 @@ export const TERMS_VERSION = 1
 const KEY = 'stillmarch.terms.accepted'
 
 /**
+ * Which store the purchase clause should name. Read lazily off the Capacitor global the
+ * native WebView injects rather than an import from @capacitor/core, so this module stays
+ * loadable anywhere (the Node harnesses read TERMS_SUMMARY's siblings). Not part of the
+ * accepted-version contract: the policy is identical on every platform, only the store
+ * named in it differs, so no TERMS_VERSION bump.
+ */
+function purchasePlatform(): 'ios' | 'android' | 'web' {
+  if (typeof window === 'undefined') return 'web'
+  const cap = (window as { Capacitor?: { getPlatform?: () => string } }).Capacitor
+  const p = cap?.getPlatform?.()
+  return p === 'ios' || p === 'android' ? p : 'web'
+}
+
+/**
  * Where the full documents live.
  *
  * `/stillmarch/` is canonical. The pages previously sat under `/idle-legends/` — the
@@ -81,8 +95,9 @@ export const TERMS_SUMMARY: ReadonlyArray<{ title: string; body: string }> = [
   {
     title: 'Purchases',
     body:
-      'In-app purchases are one-time and permanent. They are handled by Apple; ' +
-      'refunds are requested through Apple, not through us.',
+      'In-app purchases are one-time and permanent. They are handled by ' +
+      (purchasePlatform() === 'android' ? 'Google Play; ' : 'Apple; ') +
+      'refunds are requested through the store, not through us.',
   },
 ]
 

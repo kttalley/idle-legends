@@ -29,37 +29,81 @@ const WATCH_NOTIFICATION_ID = 1001
 let permissionAsked = false
 let granted = false
 
-async function plugin() {
+/**
+ * The plugin proxy is NOT awaitable, and this file is where that lesson was relearned:
+ * the proxy answers every property read — including the `.then` probe a bare `await`
+ * makes — with a bridge call, so `await plugin()` used to reject with
+ * `"LocalNotifications.then()" is not implemented` before a single notification call ran
+ * (on BOTH platforms; the iOS build shipped this way and the feature never fired).
+ * Wrapping in a plain object breaks the thenable check, exactly as purchases.ts does:
+ * `{ LocalNotifications }` has no `.then`, and destructuring at the call site hands back
+ * the untouched proxy. Only ever await METHOD CALLS on the proxy, never the proxy.
+ */
+async function plugin(): Promise<{ LocalNotifications: typeof import('@capacitor/local-notifications')['LocalNotifications'] }> {
   const mod = await import('@capacitor/local-notifications')
-  return mod.LocalNotifications
+  return { LocalNotifications: mod.LocalNotifications }
 }
 
 /**
- * Ask once, lazily.
+ * Check (and optionally ask for) notification permission.
  *
- * NOT at boot: a permission sheet in the first three seconds of a game the player has not
- * decided they like yet is the most reliable way to get a permanent "no". The natural
- * moment is the first time the watch is actually going to matter, which is when the app
- * goes to the background with progress banked — so that is where `scheduleWatchEnd` calls
- * this from.
+ * The philosophy is unchanged — never at boot, a sheet in the first three seconds of a game
+ * the player has not decided they like yet is the most reliable way to get a permanent
+ * "no" — but the moment moved. It used to ride the visibilitychange-HIDDEN path inside
+ * `scheduleWatchEnd`, which is exactly where Android forbids the ask: an app 10+ never
+ * surfaces a permission dialog for a backgrounded activity, it silently answers DENIED,
+ * and the once-only latch then kept the feature off for the life of the install (verified
+ * on the emulator: `checkPermissions` → prompt at background time, `requestPermissions` →
+ * denied, never asked again). So `request=false` only ever CHECKS, and `request=true`
+ * (from `primeWatchPermission`, on return to the foreground) is the only path that shows
+ * the dialog. `permissionAsked` latches only once a dialog has actually been shown — an
+ * explicit "no" must not be re-litigated every session.
  */
-async function ensurePermission(): Promise<boolean> {
-  if (!isNative) return false
-  if (permissionAsked) return granted
-  permissionAsked = true
+async function ensurePermission(request: boolean): Promise<boolean> {
+  if (!isNative || granted) return granted
+  if (permissionAsked) return false
   try {
-    const LN = await plugin()
+    const { LocalNotifications: LN } = await plugin()
     const check = await LN.checkPermissions()
     granted = check.display === 'granted'
-    if (!granted && check.display === 'prompt') {
-      const req = await LN.requestPermissions()
-      granted = req.display === 'granted'
-    }
+    if (granted) return true
+    if (!request || check.display !== 'prompt') return false
+    if (document.visibilityState !== 'visible') return false
+    // The WebView fires visibilitychange→visible during the resume transition — before the
+    // activity is top-resumed — and a permission dialog launched inside that window is
+    // killed by the background-activity-launch rules (logcat: "Background activity launch
+    // blocked! ... callingUidHasVisibleActivity: false"), resolving the request as denied
+    // with no sheet ever shown. Let the resume settle, re-check, only then ask.
+    await new Promise((r) => setTimeout(r, 1200))
+    if (document.visibilityState !== 'visible') return false
+    permissionAsked = true
+    const req = await LN.requestPermissions()
+    granted = req.display === 'granted'
+    if (granted) return true
+    // A blocked launch resolves 'denied' without a human involved, and the system state
+    // still reads 'prompt' — only a real answer flips it to 'denied'. Latch on the state,
+    // not on the request result, so a blocked ask retries at the next foreground moment
+    // instead of switching the feature off for the life of the install.
+    const after = await LN.checkPermissions()
+    permissionAsked = after.display === 'denied'
+    granted = false
+    return false
   } catch (err) {
     console.warn('[watch] notification permission failed', err)
     granted = false
+    return false
   }
-  return granted
+}
+
+/**
+ * The foreground ask. Called on return to VISIBLE: the first time, the "While you were
+ * away" modal is on screen — the watch notification's value proposition made visible,
+ * which is the honest moment to ask for it. Until permission exists, `scheduleWatchEnd`
+ * checks without asking and simply waits for the next foreground moment to prime.
+ */
+export function primeWatchPermission(): void {
+  if (!isNative) return
+  void ensurePermission(true)
 }
 
 /**
@@ -71,9 +115,12 @@ async function ensurePermission(): Promise<boolean> {
  */
 export async function scheduleWatchEnd(secondsFromNow: number): Promise<void> {
   if (!isNative || secondsFromNow <= 60) return
-  if (!(await ensurePermission())) return
+  // Check without asking: this runs at visibility-HIDDEN, where an Android ask is
+  // auto-denied (see ensurePermission). Players who have not yet granted are picked up by
+  // primeWatchPermission on their next return to the foreground.
+  if (!(await ensurePermission(false))) return
   try {
-    const LN = await plugin()
+    const { LocalNotifications: LN } = await plugin()
     await LN.cancel({ notifications: [{ id: WATCH_NOTIFICATION_ID }] })
     await LN.schedule({
       notifications: [{
@@ -92,7 +139,7 @@ export async function scheduleWatchEnd(secondsFromNow: number): Promise<void> {
 export async function cancelWatchEnd(): Promise<void> {
   if (!isNative) return
   try {
-    const LN = await plugin()
+    const { LocalNotifications: LN } = await plugin()
     await LN.cancel({ notifications: [{ id: WATCH_NOTIFICATION_ID }] })
   } catch { /* nothing pending, or no permission — both are fine */ }
 }

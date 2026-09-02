@@ -19,7 +19,7 @@ import { PlayerCard } from './components/game/PlayerCard'
 import { WhisperWindow } from './components/game/WhisperWindow'
 import { installViewportInsets } from './engine/viewportInsets'
 import { deleteCloudSlot, installCloudSaveFlush } from './net/cloudSave'
-import { scheduleWatchEnd, cancelWatchEnd } from './engine/watchNotifications'
+import { scheduleWatchEnd, cancelWatchEnd, primeWatchPermission } from './engine/watchNotifications'
 import { watchCapacitySeconds } from './engine/offline'
 import { compileUpgrades } from './data/upgrades'
 import { compileUniques } from './data/uniques'
@@ -31,7 +31,9 @@ import { CraftResultToast } from './components/game/CraftResultToast'
 import { LevelUpToast } from './components/game/LevelUpToast'
 import { slotStorage, getLastSlotId, setLastSlotId } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
-import { initAudio, setZone as audioSetZone, setVolume as audioSetVolume, setWeather as audioSetWeather } from './engine/audio/audioEngine'
+import { initAudio, setZone as audioSetZone, setVolume as audioSetVolume, setWeather as audioSetWeather, suspendAudio, resumeAudio } from './engine/audio/audioEngine'
+import { requestAudioFocus } from './engine/audio/audioFocus'
+import { Capacitor } from '@capacitor/core'
 // The generative MUSIC layer is INITIALISED but never STARTED for this release — see
 // engine/audio/musicTrack.ts for why, and for how to turn it back on.
 //
@@ -195,7 +197,14 @@ export default function App() {
   // native guard) as in the shipped app.
   useEffect(() => {
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') { void cancelWatchEnd(); return }
+      if (document.visibilityState === 'visible') {
+        void cancelWatchEnd()
+        // Android never shows a permission dialog for a backgrounded activity, so the ask
+        // lives here (return to the foreground) rather than inside scheduleWatchEnd's
+        // hidden path — see watchNotifications.ensurePermission.
+        primeWatchPermission()
+        return
+      }
       const s = useGameStore.getState()
       if (!s.initialized) return
       const permanentHours =
@@ -241,6 +250,47 @@ export default function App() {
     }
   }, [])
 
+  // ── Android: yield the audio output when the game is not the media in front ──────
+  //
+  // Two sources of "stop playing", one response:
+  //   - The activity is backgrounded (visibilitychange → hidden). iOS WKWebView suspends
+  //     its audio by itself; the Android WebView does not — verified on the emulator, the
+  //     app's players stay `started` after HOME — so the suspend is ours to do.
+  //   - Another app or a call took audio focus (`stillmarch-audiofocus` event from
+  //     AudioFocusPlugin.java → 'loss').
+  // Resume happens on visible + focus 'gain'; after a loss, returning to the foreground
+  // re-requests focus first so a call that ended or a podcast that was paused does not
+  // leave the game silently muted OR talking over the thing the player switched to.
+  // Android-gated: on iOS this would add a second resume path to WebKit's own
+  // suspend/resume, and in a browser tab, audio continuing while hidden is the point.
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return
+    let focusHeld = true
+    const apply = async (visible: boolean) => {
+      if (!visible) {
+        void suspendAudio()
+        return
+      }
+      if (focusHeld) {
+        void resumeAudio()
+      } else {
+        focusHeld = await requestAudioFocus()
+        if (focusHeld) void resumeAudio()
+      }
+    }
+    const onVisibility = () => void apply(document.visibilityState === 'visible')
+    const onFocus = (e: Event) => {
+      focusHeld = (e as CustomEvent<string>).detail === 'gain'
+      void apply(document.visibilityState === 'visible')
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('stillmarch-audiofocus', onFocus)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('stillmarch-audiofocus', onFocus)
+    }
+  }, [])
+
   useEffect(() => {
     // Tracks how much of combatLog we have already sonified, so only NEW entries fire stingers.
     let lastLogLen = 0
@@ -254,6 +304,11 @@ export default function App() {
         lastLogLen = state.combatLog.length
         void startMusicTrack()
         void initGenerative()   // stingers only — the Transport is never started
+        // Sound is actually starting, so this is the moment the game asks the OS to be
+        // treated as media (Android only; no-op elsewhere). Taken here rather than at the
+        // gesture latch because the latch can fire at character select, where there is
+        // nothing to play yet.
+        void requestAudioFocus()
         return
       }
       if (!state.initialized) {

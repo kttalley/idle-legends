@@ -143,6 +143,30 @@ async function maybeResume(): Promise<void> {
   }
 }
 
+// ── Backgrounding / focus ────────────────────────────────────────────────────────────────
+/**
+ * Suspend the shared context: the Android WebView keeps rendering Web Audio while the
+ * activity is backgrounded (iOS WKWebView suspends on its own — verified by watching the
+ * app's AAudio players stay `started` after HOME), and an idle game that keeps playing
+ * over the player's podcast is a removal-review bug. Suspending freezes the audio clock,
+ * which also keeps Tone's absolute-time voice cursors coherent across the gap (the same
+ * property `stopGenerative` relies on across a suspend). No-op when not running.
+ */
+export async function suspendAudio(): Promise<void> {
+  if (!ctx || ctx.state !== 'running') return
+  try { await ctx.suspend() } catch { /* ignore — a failed suspend is just today's behaviour */ }
+}
+
+/**
+ * Undo suspendAudio — Android only (App.tsx gates the listeners to the android platform);
+ * on iOS WebKit owns suspend/resume and must not gain a second resume path. The context
+ * was unlocked by a user gesture at latch time, so a programmatic resume is permitted
+ * after that. No-op unless suspended.
+ */
+export async function resumeAudio(): Promise<void> {
+  await maybeResume()
+}
+
 // Held so the weather noise source is never GC'd mid-session (a connected AudioBufferSourceNode
 // can still be collected without a JS reference).
 const weatherSources: AudioScheduledSourceNode[] = []

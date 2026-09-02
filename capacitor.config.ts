@@ -25,6 +25,28 @@ const config: CapacitorConfig = {
     // depend on being served from the root of this scheme.
     iosScheme: 'capacitor',
   },
+  android: {
+    // DEBUGGING AID — flip OFF before the store build. Release builds otherwise swallow
+    // all JS console output (no CapacitorConsole tag in logcat at all), which is exactly
+    // the debugging blindness that cost six TestFlight builds on iOS. With this on,
+    // chrome://inspect#devices attaches to the release WebView and console.error output
+    // is observable. It also enables CapacitorConsole logcat forwarding.
+    // TODO(ship): set to false before the production-track upload.
+    webContentsDebuggingEnabled: true,
+    // Capacitor's default logBehavior is 'debug', which disables console forwarding in
+    // release builds entirely (CapConfig.java: loggingEnabled = isDebug). 'production'
+    // keeps the Capacitor/Console tag alive in logcat on release, so [iap]/[session]/
+    // [keychain] lines are observable without a debugger attached.
+    // TODO(ship): remove before the production-track upload (with webContentsDebuggingEnabled).
+    loggingBehavior: 'production',
+    // Same rationale as the iOS backgroundColor: over-scroll or a slow first paint must
+    // show the game's own black, never a white flash. Android also uses this for the
+    // WebView's background behind transparent page regions.
+    backgroundColor: '#0b0906',
+    // Left at the default `https` scheme (Capacitor 6+): the relative asset base resolves
+    // identically under https://localhost as under capacitor://localhost. Declared here
+    // only to document that no override is deliberate.
+  },
 }
 
 export default config
