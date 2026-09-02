@@ -1,6 +1,7 @@
 import React from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { SpriteIcon } from '../ui/SpriteIcon'
+import { maybeRequestReview } from '../../engine/appReview'
 
 /**
  * "While you were away" — shown once on load when time away was granted.
@@ -30,8 +31,20 @@ function Row({ label, value, color }: { label: string; value: string; color?: st
 export function OfflineReportToast() {
   const report = useGameStore(s => s.lastOffline)
   const dismiss = useGameStore(s => s.dismissOfflineReport)
+  const level = useGameStore(s => s.level)
 
   if (!report) return null
+
+  /**
+   * Dismissing a *good* absence is the one earned moment to ask for a rating — see the
+   * header of engine/appReview.ts for every gate that sits behind this call. It is
+   * deliberately not awaited: the toast must close on the tap, and a store prompt is
+   * never allowed to stand between a player and their game.
+   */
+  function onDismiss() {
+    dismiss()
+    void maybeRequestReview({ level, levelsGained: report!.levelsGained, gold: report!.gold })
+  }
 
   return (
     <div
@@ -140,7 +153,7 @@ export function OfflineReportToast() {
 
         <button
           className="rp-button"
-          onClick={dismiss}
+          onClick={onDismiss}
           style={{ fontSize: '0.6rem', padding: '3px 10px', alignSelf: 'flex-start', marginTop: 2 }}
         >
           Good to be back
