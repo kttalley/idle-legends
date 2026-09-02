@@ -150,11 +150,40 @@ however tempting given the niche's competitors all lead with it.
 | Privacy nutrition label | **todo** — RevenueCat is a purchase-data processor; fonts are self-hosted and there is no analytics SDK, so the surface is small |
 | Age rating | target 9–12+ (fantasy violence, no simulated gambling) |
 | Export compliance | no non-exempt encryption |
-| Promo code / free trial for judges | **todo** — generate promo codes in App Store Connect once the IAP is approved |
+| Code / free trial for judges | **todo** — an **offer code**, NOT a promo code (see §7) |
+
+## 5b. Judge access is an OFFER code — promo codes for IAPs no longer exist
+
+Corrected 2026-09-02. Both this file and `store/SUBMISSION.md` used to say "generate promo
+codes in App Store Connect once the IAP is approved". **That path was removed.** Apple
+discontinued the creation of promo codes for In-App Purchases on **26 March 2026**; only
+codes generated before then still redeem, and there are none. Following the old
+instructions at the deadline finds an empty menu and burns a day.
+
+The replacement is **offer codes**, which Apple extended in the same change to cover every
+IAP type — consumable, non-consumable, non-renewing and auto-renewable. Non-consumables
+are what this app sells, so they apply directly.
+
+App Store Connect → the app → **Monetization → In-App Purchases** → pick the product →
+**Offer Codes** → create an offer.
+
+Use a **custom code**, not one-time-use codes. A custom code is a single string redeemable
+by many people (up to 25,000 per batch), which is exactly the shape a Devpost submission
+field wants — one line of text that every judge can redeem — where a one-time-use batch
+would mean handing out and tracking individual codes. Limits: up to 10 active offers per
+app, and the code quotas are shared across all of the app's IAPs.
+
+Generate one for **Founder Pack** (`com.stillmarch.game.founder`) — it is the SKU that
+unlocks the colourways, so it is the one that demonstrates the paywall. Standing Orders is
+optional; a second code is free if you want judges to see both.
+
+Also fill in the offer's **Image** field. It is marked optional and genuinely is, but it is
+what appears in the redemption sheet — which is the first thing a judge sees. §1 of
+`store/SUBMISSION.md` covers the size and the no-alpha rule.
 
 ## 6. Judge-reachability note
 
-On a phone the paywall is **two taps deep**: the `HERO` dock tab opens the character
+On a phone the paywall is **two taps deep**: the `MENU` dock tab opens the character
 drawer, then `Looks`. Judges and App Review both need to find it. Consider surfacing it
 in the dock directly before submitting, or say so explicitly in the review notes.
 

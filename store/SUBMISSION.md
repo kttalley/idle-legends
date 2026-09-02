@@ -149,8 +149,8 @@ Free to play. Two optional one-time purchases, no subscriptions required.
 
 ## 4. App Review notes  — PASTE INTO "Notes" ON THE APP REVIEW PAGE
 
-The in-app purchases are two taps from the main screen: tap the HERO tab in the bottom
-dock, then the "Looks" tab in the drawer that opens. The Founder Pack colourways are the
+The in-app purchases are two taps from the main screen: tap the **MENU** tab in the bottom
+dock (leftmost, beside CHAT and GEAR), then the "Looks" button in the strip that opens. The Founder Pack colourways are the
 locked tiles there; tapping a locked tile opens the purchase sheet. Standing Orders is on
 the same drawer's watch meter.
 
@@ -175,5 +175,7 @@ never appear on the ladder.
 ## 6. Still blocked on other steps
 
 - **Demo video** (<=2 min, on device) — needs the TestFlight build.
-- **Promo codes for Shipaton judges** — App Store Connect > Pricing and Availability >
-  Promo Codes, only after the IAPs are approved.
+- **Judge access for Shipaton** — an **offer code**, not a promo code. Apple removed IAP
+  promo-code creation on 26 March 2026; the menu the old note pointed at is gone. Create a
+  *custom* offer code (one string, many redemptions) on the Founder Pack product under
+  Monetization → In-App Purchases → Offer Codes. Full reasoning in `store/LAUNCH.md` §5b.
