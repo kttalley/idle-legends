@@ -24,10 +24,25 @@ import { launchChrome, openTab, evaluate, enterGame, seedSave, screenshot, sleep
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
-const OUT = join(ROOT, 'store', 'screenshots')
+const OUT = join(ROOT, 'store', process.env.SHOT_DIR || 'screenshots')
 
-// 430×932 @3 = 1290×2796 — App Store Connect's 6.9" iPhone slot.
-const DEVICE = { width: 430, height: 932, scale: 3, mobile: true, touch: true }
+// 430×932 @3 = 1290×2796 — App Store Connect's 6.9" iPhone slot, and the default.
+//
+// Overridable because the App Store slot is not the only consumer any more: the Shipaton
+// Devpost submission asks for at least one shot at 1179×2556, which is 393×852 @3 (the
+// iPhone 15/16 Pro logical size). Re-shooting at the target size beats resampling the 6.9"
+// set — this is a pixel-art game, and a 91% downscale is exactly the ratio that turns
+// crisp 1px sprite edges into mush. Both sizes are the same 19.5:9 family, so no layout
+// reasoning changes; only the raster does.
+//
+//   SHOT_W=393 SHOT_H=852 SHOT_DIR=screenshots-1179 node tools/uitest/shoot-store.mjs
+const DEVICE = {
+  width: Number(process.env.SHOT_W) || 430,
+  height: Number(process.env.SHOT_H) || 932,
+  scale: Number(process.env.SHOT_SCALE) || 3,
+  mobile: true,
+  touch: true,
+}
 
 function startDevServer() {
   const proc = spawn('npm', ['run', 'dev'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -146,7 +161,15 @@ try {
     await evaluate(tab.send, `new Promise(r => setTimeout(r, 500))`)
     await tab.send('Page.navigate', { url })
   }
-  await sleep(4000)
+  // The terms gate (App Review 1.2) blocks a cold boot in front of character create.
+  // Written before the gate existed, this script never clicked through it, so 01
+  // was silently skipped on every fresh-profile reshoot.
+  await sleep(2500)
+  await evaluate(tab.send, `(() => {
+    const b = [...document.querySelectorAll('button')].find(x => /^I agree$/i.test(x.textContent.trim()));
+    if (b) { b.click(); return 'gate-clicked' } return 'no-gate'
+  })()`)
+  await sleep(1500)
   if (await evaluate(tab.send, `!!document.querySelector('.create-class-blurb')`)) {
     await shoot(tab.send, '01-create.png', 'character creation — classes, races, factions',
       `document.querySelectorAll('.create-class-blurb').length > 0`)
@@ -172,8 +195,12 @@ try {
     `document.querySelectorAll('.skill-slot').length > 0 && !document.querySelector('.app-sidebar-left.panel-open, .app-sidebar-right.panel-open')`)
 
   // ── The ladder ────────────────────────────────────────────────────────────
+  // The hero sheet is the first dock button (its label was re-worded to "Menu" after
+  // this script was written; its contents — hero name, Looks/Ladder tabs, zone track —
+  // are still the character sheet).
   const openedHero = await evaluate(tab.send, `(() => {
-    const b = [...document.querySelectorAll('.app-dock-btn')].find(x => /hero/i.test(x.textContent));
+    if (document.querySelector('.app-sidebar-left.panel-open')) return true;
+    const b = document.querySelectorAll('.app-dock-btn')[0];
     if (!b) return false; b.click(); return true;
   })()`)
   if (openedHero) {
@@ -209,7 +236,12 @@ try {
   }
 
   // ── Wardrobe (the paywall) ────────────────────────────────────────────────
-  const openedWardrobe = await evaluate(tab.send, `(() => {
+  const ensuredHeroOpen = await evaluate(tab.send, `(() => {
+    if (document.querySelector('.app-sidebar-left.panel-open')) return true;
+    const b = document.querySelectorAll('.app-dock-btn')[0];
+    if (!b) return false; b.click(); return true;
+  })()`)
+  const openedWardrobe = ensuredHeroOpen && await evaluate(tab.send, `(() => {
     const b = [...document.querySelectorAll('.hero-bar-btn')].find(x => /looks/i.test(x.textContent));
     if (!b) return false; b.click(); return true;
   })()`)
@@ -219,9 +251,9 @@ try {
       `!!document.querySelector('[data-surface="wardrobe"]')`)
   }
 
-  console.log(`\n${shots.length} screenshot(s) → store/screenshots/`)
+  console.log(`\n${shots.length} screenshot(s) → ${OUT}`)
   const dims = await evaluate(tab.send, `({ w: innerWidth * devicePixelRatio, h: innerHeight * devicePixelRatio })`)
-  console.log(`captured at ${dims.w}×${dims.h} (App Store 6.9" slot wants 1290×2796)`)
+  console.log(`captured at ${dims.w}×${dims.h} (App Store 6.9" slot wants 1290×2796; Devpost wants 1179×2556)`)
 } finally {
   kill()
   proc.kill()
