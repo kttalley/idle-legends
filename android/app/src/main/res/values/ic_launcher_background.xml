@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sampled from the app icon's ground (#030307 at the corners); replaces the
+         Capacitor-template blue so the masked edge of the adaptive icon blends into
+         the artwork instead of ringing it. -->
+    <color name="ic_launcher_background">#030307</color>
+</resources>

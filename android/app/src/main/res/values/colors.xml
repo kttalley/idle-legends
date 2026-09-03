@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's darkest background, matching capacitor.config.ts backgroundColor and
+         index.html theme-color. Used for the status/navigation bars so the chrome around
+         the WebView reads as part of the game rather than a light-theme default. -->
+    <color name="game_background">#0b0906</color>
+</resources>

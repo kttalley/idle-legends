@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API 27+: let the window draw into the display cutout.
+
+  The HUD positions itself with env(safe-area-inset-*) (the safe-t custom property and
+  siblings in index.css), which only resolves to non-zero in a WebView when viewport-fit=cover (already set in
+  index.html) AND the window is allowed to extend into the cutout. Without shortEdges the
+  system insets the window instead, env() reads 0, and the top HUD sits hard against the
+  status bar / camera hole with no inset applied.
+
+  This file only overrides on API 27+; older devices use the base styles.xml untouched
+  (windowLayoutInDisplayCutoutMode doesn't exist below 27).
+-->
+<resources>
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- A values-vNN style fully replaces the values/ one on this API level and up,
+             so the dark-window items from values/styles.xml must be repeated here or the
+             light parent theme paints the bar areas white. -->
+        <item name="android:windowBackground">@color/game_background</item>
+        <item name="android:statusBarColor">@color/game_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/game_background</item>
+    </style>
+
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:background">@drawable/splash</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>
