@@ -1,0 +1,34 @@
+Stillmarch is an idle MMORPG that plays itself: your hero marches, fights, loots and
+levels in a persistent world — for eight hours at a stretch, even while you are away.
+
+A WORLD THAT DOES NOT WAIT FOR YOU
+Set your route, gear up, and leave. Progress accrues offline. Come back to loot, levels,
+and a log of what your hero did while you slept.
+
+A REAL SHARED WORLD — NOT A SIMULATED ONE
+The Marching Ladder is a genuine cross-player leaderboard: every rank on it is another
+person's hero, measured on the same server. Challenge real players' legends to duels.
+No fabricated "players", no fake activity — the MMO in the title is load-bearing.
+
+SKILL TREES WITH CONSEQUENCES
+WoW-style talent trees where every point is a choice. Respec is free; indecision is the
+only cost. Build the paladin who never dies, the warlock who melts elites, or something
+the meta has not seen yet.
+
+LOOT THAT MEANS SOMETHING
+Pixel-art gear rendered from the same sheets the world is built from. Every sprite,
+colourway and aura is drawn in-engine — nothing is a stock asset.
+
+MODERATED, SAFE MULTIPLAYER
+Report and block any player from their legend page. Reports go to a human moderation
+process. No chat with strangers is required to play; the social layer is opt-in.
+
+MADE FOR THE LONG HAUL
+• Offline progress — the game runs up to 8 hours unattended (16 with Standing Orders)
+• Persistent characters that survive reinstalls
+• No energy timers, no gacha, no randomized paid items, no ads
+• One optional one-time purchase that expands offline range — never power, never paywall
+  progression
+
+Stillmarch respects your time. It is an idle game in the literal sense: a small, living
+world that keeps marching whether you watch it or not.
