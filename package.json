@@ -19,7 +19,8 @@
     "icon": "node tools/spritegen/makeAppIcon.mjs",
     "bundle:duel": "node tools/bundleDuelResolver.mjs",
     "deploy:duel": "npm run bundle:duel && supabase functions deploy duel",
-    "lint:tokens": "node scripts/validate-design-tokens.mjs"
+    "lint:tokens": "node scripts/validate-design-tokens.mjs",
+    "asc:status": "node tools/asc/appstore.mjs status"
   },
   "dependencies": {
     "@capacitor-community/in-app-review": "^8.0.0",
