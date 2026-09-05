@@ -19,7 +19,10 @@ import { PlayerCard } from './components/game/PlayerCard'
 import { WhisperWindow } from './components/game/WhisperWindow'
 import { installViewportInsets } from './engine/viewportInsets'
 import { deleteCloudSlot, installCloudSaveFlush } from './net/cloudSave'
-import { scheduleWatchEnd, cancelWatchEnd, primeWatchPermission } from './engine/watchNotifications'
+import {
+  scheduleWatchEnd, cancelWatchEnd, primeWatchPermission,
+  primeWatchPermissionAfterDwell, cancelWatchPermissionDwell,
+} from './engine/watchNotifications'
 import { watchCapacitySeconds } from './engine/offline'
 import { compileUpgrades } from './data/upgrades'
 import { compileUniques } from './data/uniques'
@@ -475,6 +478,16 @@ export default function App() {
       setCreating(list.length === 0)
     }
     return () => stopGameLoop()
+  }, [initialized])
+
+  // Entering the world is the only moment a FIRST-time player can be asked for notification
+  // permission: there is no visibilitychange→visible event on a cold launch, so the
+  // return-to-foreground path that `primeWatchPermission` rides never fires for them. Armed
+  // here and fired on a dwell — see watchNotifications.primeWatchPermissionAfterDwell.
+  useEffect(() => {
+    if (!initialized) return
+    primeWatchPermissionAfterDwell()
+    return cancelWatchPermissionDwell
   }, [initialized])
 
   // ── The terms gate, ahead of everything ─────────────────────────────────────

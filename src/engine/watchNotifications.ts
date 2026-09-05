@@ -107,6 +107,56 @@ export function primeWatchPermission(): void {
 }
 
 /**
+ * How long a first-time player must stay before being asked.
+ *
+ * The measured post-launch distribution (37 App Store accounts, 2026-09-05): 70% play past
+ * a minute, 41% past five, median session 3.0 minutes. Ninety seconds sits above the "first
+ * three seconds" the philosophy above rules out and still lands inside the median session,
+ * so it reaches most players without asking cold. Lower it to widen the net; raise it to ask
+ * warmer. It is the one number in this file worth tuning against real data.
+ */
+const FIRST_SESSION_PRIME_DELAY_MS = 90_000
+let dwellTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * The FIRST-session ask, and the reason a first-time player ever hears from this app again.
+ *
+ * `primeWatchPermission` only ever fires on visibilitychange→VISIBLE, and a first launch
+ * never produces that event: the page is already visible when it loads, and the listener
+ * catches transitions only. So on the original path the sequence was — install, play,
+ * background, `scheduleWatchEnd` checks permission WITHOUT asking (it must; Android
+ * auto-denies a backgrounded ask), finds none, schedules nothing, and the player is never
+ * invited back. The notification could only ever reach someone who had already returned
+ * under their own steam, which is precisely the cohort that does not need reminding.
+ * Measured consequence: 0 of 26 App Store players who had the chance ever came back.
+ *
+ * Armed when the player enters the world rather than at boot, and fired on a dwell rather
+ * than immediately, so the ask still lands after the game has had a chance to be worth
+ * something — the same judgement `ensurePermission` documents, applied to a session that
+ * has no "While you were away" modal to hang it on.
+ */
+export function primeWatchPermissionAfterDwell(): void {
+  if (!isNative || granted || permissionAsked) return
+  if (dwellTimer !== null) return
+  dwellTimer = setTimeout(() => {
+    dwellTimer = null
+    // Re-checked rather than assumed: the player may have backgrounded during the dwell, and
+    // ensurePermission would refuse anyway. Bailing here leaves the visibilitychange path to
+    // pick them up on return, which is the warmer moment of the two.
+    if (document.visibilityState !== 'visible') return
+    void ensurePermission(true)
+  }, FIRST_SESSION_PRIME_DELAY_MS)
+}
+
+/** Disarm the dwell — the run ended before the ask was earned. */
+export function cancelWatchPermissionDwell(): void {
+  if (dwellTimer !== null) {
+    clearTimeout(dwellTimer)
+    dwellTimer = null
+  }
+}
+
+/**
  * Schedule the "watch has ended" notice for `secondsFromNow`.
  *
  * Called when the app goes to the background. Cancels any previous one first: the watch
