@@ -26,7 +26,7 @@ import {
 import { watchCapacitySeconds } from './engine/offline'
 import { compileUpgrades } from './data/upgrades'
 import { compileUniques } from './data/uniques'
-import { getPurchaseState, purchasedWatchHours } from './monetization/purchases'
+import { getPurchaseState, purchasedWatchHours, whenPurchasesReady } from './monetization/purchases'
 import { useDismissable } from './components/ui/useDismissable'
 import { QuestToast } from './components/game/QuestToast'
 import { OfflineReportToast } from './components/game/OfflineReportToast'
@@ -410,8 +410,13 @@ export default function App() {
     resumed.current = true
     const last = getLastSlotId()
     if (!last) return
-    // A stale pointer (hero deleted on another tab) must not be retried forever.
-    if (!loadSlot(last)) setLastSlotId(null)
+    // Wait for entitlements first: loadSlot credits time away using the purchased watch
+    // hours, read once. On first mount RevenueCat has not answered yet, so resuming
+    // immediately paid a Standing Orders owner the free cap. See whenPurchasesReady.
+    void whenPurchasesReady(3000).then(() => {
+      // A stale pointer (hero deleted on another tab) must not be retried forever.
+      if (!loadSlot(last)) setLastSlotId(null)
+    })
   }, [loadSlot])
 
   /**

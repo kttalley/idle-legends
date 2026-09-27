@@ -112,6 +112,26 @@ export function subscribePurchases(fn: Listener): () => void {
 }
 
 /**
+ * Resolves once initPurchases() has settled — or at the deadline, whichever comes first.
+ *
+ * For anything that reads entitlements ONCE rather than subscribing. The boot resume is
+ * the one that matters: it credits time away through `purchasedWatchHours`, and it used
+ * to run on first mount, before the RevenueCat module had even loaded — so `active` was
+ * always the empty set and a Standing Orders owner returning from a long absence was
+ * capped at the free hours they paid to extend. Never rejects; a store that never answers
+ * costs the deadline, not the game.
+ */
+export function whenPurchasesReady(ms: number): Promise<void> {
+  if (state.ready) return Promise.resolve()
+  return new Promise(resolve => {
+    let off = () => {}
+    const done = () => { clearTimeout(t); off(); resolve() }
+    const t = setTimeout(done, ms)
+    off = subscribePurchases(s => { if (s.ready) done() })
+  })
+}
+
+/**
  * The plugin is a native bridge — on the web build there is no StoreKit behind it, and
  * calling it throws. The web/dev build therefore runs with zero entitlements, which is
  * also the correct default: it exercises the locked path, which is the one that has to
