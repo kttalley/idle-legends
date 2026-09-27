@@ -13,6 +13,8 @@
 //   analytics init    create the analytics report requests (once per app, ever)
 //   analytics pull    download the acquisition funnel — impressions, page views,
 //                     downloads, redownloads
+//   sales             daily sales rows — downloads and IAPs by product and country,
+//                     with customer price and developer proceeds
 //
 // WHAT NO API COVERS — these stay browser clicks:
 //   Submitting for review (the version record is owned by the review submission —
@@ -34,8 +36,9 @@
 //   reviewSubmissions   200          403
 //   analytics (GET)     403          200        reports-flavoured role
 //   analytics (POST)    403          403        ← neither can create a request
+//   salesReports        403          200        measured 2026-09-27
 //
-// So `status` runs on WB8UYW46J7 (the default) and `analytics` needs a key that can
+// So `status` runs on WB8UYW46J7 (the default), `sales` defaults to D4A8J64VJ9, and `analytics` needs a key that can
 // POST /v1/analyticsReportRequests — which neither currently can. Creating a report
 // request needs the ADMIN role; note /v1/users is NOT a test for Admin, it answers
 // 200 for lesser roles too and will mislead you.
@@ -57,7 +60,9 @@ import { homedir } from 'node:os'
 
 const APP_ID = '6800207310'
 const API = 'https://api.appstoreconnect.apple.com'
-const KEY_ID = process.env.ASC_KEY_ID || 'WB8UYW46J7'
+const KEY_ID = process.env.ASC_KEY_ID || (process.argv[2] === 'sales' ? 'D4A8J64VJ9' : 'WB8UYW46J7')
+// Not in any API response — read it off Payments and Financial Reports, top left.
+const VENDOR_NUMBER = '94681248'
 const ISSUER_ID = process.env.ASC_ISSUER_ID || '4f36dcad-26a1-4d94-b063-d7f2fae9a5e0'
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -268,6 +273,50 @@ async function cmdAnalyticsPull({ days }) {
   console.log()
 }
 
+// ── sales ────────────────────────────────────────────────────────────────────
+//
+// SUMMARY rows aggregate by product × country × device, so there is no buyer identity
+// here — nor anywhere Apple exposes. Daily reports lag about a day (Americas by 5 am
+// PT); a day not yet published is a 404, reported rather than fatal. Report days
+// don't line up exactly with the Analytics dashboard's days.
+
+const PRODUCT_TYPES = { '1F': 'download', '3F': 'redownload', '7F': 'update', IA1: 'IAP', IAY: 'sub', IAC: 'sub' }
+
+async function cmdSales({ days }) {
+  let units = 0
+  const proceeds = {}
+  for (let i = days; i >= 1; i--) {
+    const date = new Date(Date.now() - i * 86400e3).toISOString().slice(0, 10)
+    const url = `${API}/v1/salesReports?filter[frequency]=DAILY&filter[reportType]=SALES` +
+      `&filter[reportSubType]=SUMMARY&filter[version]=1_1&filter[vendorNumber]=${VENDOR_NUMBER}` +
+      `&filter[reportDate]=${date}`
+    const res = await fetch(url, { headers: { authorization: `Bearer ${TOKEN}`, accept: 'application/a-gzip' } })
+    const buf = Buffer.from(await res.arrayBuffer())
+    if (res.status === 404) { console.log(`  ${date}  not published yet (or no activity)`); continue }
+    if (!res.ok) {
+      const detail = JSON.parse(buf.toString()).errors?.[0]?.detail
+      throw new Error(`salesReports ${date} → ${res.status}: ${detail}` +
+        (res.status === 403 ? `\n  Key ${KEY_ID} can't read sales; D4A8J64VJ9 can.` : ''))
+    }
+    const [header, ...lines] = gunzipSync(buf).toString('utf8').trim().split('\n')
+    const cols = header.split('\t')
+    for (const line of lines) {
+      const r = Object.fromEntries(cols.map((c, j) => [c, line.split('\t')[j]?.trim()]))
+      const kind = PRODUCT_TYPES[r['Product Type Identifier']] ?? r['Product Type Identifier']
+      const money = Number(r['Developer Proceeds']) > 0
+        ? `  ${r['Customer Price']} ${r['Customer Currency']} → ${r['Developer Proceeds']} ${r['Currency of Proceeds']}`
+        : ''
+      console.log(`  ${date}  ${kind.padEnd(10)} ${r.Units.padStart(3)}× ${r.Title}  ` +
+                  `${r['Country Code']} ${r.Device}${money}`)
+      if (kind === 'IAP' || kind === 'sub') units += Number(r.Units)
+      const cur = r['Currency of Proceeds']
+      if (cur) proceeds[cur] = (proceeds[cur] ?? 0) + Number(r['Developer Proceeds']) * Number(r.Units)
+    }
+  }
+  const total = Object.entries(proceeds).map(([c, v]) => `${v.toFixed(2)} ${c}`).join(' + ') || '0'
+  console.log(`\n  ${units} purchase(s) · proceeds ${total} over ${days} day(s)\n`)
+}
+
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
 function die(msg) {
@@ -283,7 +332,8 @@ function arg(name, fallback) {
 const USAGE = `usage:
   node tools/asc/appstore.mjs status
   node tools/asc/appstore.mjs analytics init
-  node tools/asc/appstore.mjs analytics pull [--days 7]`
+  node tools/asc/appstore.mjs analytics pull [--days 7]
+  node tools/asc/appstore.mjs sales [--days 7]`
 
 const command = process.argv[2]
 const sub = process.argv[3]
@@ -294,6 +344,8 @@ try {
   switch (command) {
     case 'status':
       await cmdStatus(); break
+    case 'sales':
+      await cmdSales({ days: Number(arg('days', 7)) }); break
     case 'analytics':
       if (sub === 'init') await cmdAnalyticsInit()
       else if (sub === 'pull') await cmdAnalyticsPull({ days: Number(arg('days', 7)) })
