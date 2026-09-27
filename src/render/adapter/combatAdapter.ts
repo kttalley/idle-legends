@@ -53,6 +53,7 @@ import {
 } from '../../engine/partyChat'
 import { entityKey } from '../../engine/whisper'
 import { ZONES } from '../../data/zones'
+import { layoutLabels, clampLabelX } from '../labelLayout'
 import type { Facing, IndexedSprite } from '../types'
 import type {
   GameState, MobInstance, ClassType, RaceType, FactionType, Rarity, FloatingNumber, MapNode, MapScenery, WeatherType, ZoneId,
@@ -841,7 +842,7 @@ export class WorldSceneController {
     e: Entity; wx: number; wy: number; ranged: boolean; lunge: Lunge
   }>()
   /** Enemy players currently in the field, and the id of the engaged one — the two facts
-   *  `drawPvpNameplates` needs to find the right entity for each plate. */
+   *  `drawWorldNameplates` needs to find the right entity for each plate. */
   private pvpPlates: { id: string; name: string; faction: string; duel: boolean }[] = []
   private targetMobId: string | null = null
   /** Debounce so one splashed BURST plays one whirlwind, not one per enemy caught.
@@ -3138,7 +3139,7 @@ export class WorldSceneController {
     // Nameplates: building destinations + idle crowd in town, else roaming heroes.
     try {
       if (this.townMode) this.drawTownLabels(g)
-      else { this.drawAmbientNameplates(); this.drawPvpNameplates() }
+      else this.drawWorldNameplates()
     } catch (err) { console.error('[nameplate] draw failed:', err) }
 
     // Player chevron — gold marker above the followed unit (rides above the jump).
@@ -3890,52 +3891,79 @@ export class WorldSceneController {
 
   // Building destination labels + crowd nameplates (town). Same crisp outlined text as
   // the open-world nameplates; buildings gold, folk faction-tinted.
+  //
+  // Laid out as one set (render/labelLayout.ts) — a town is where characters stand closest
+  // together, and drawn in place the Crossroads Market printed names straight over each
+  // other. Priority: service NPCs (the thing the player walks up to), then buildings, then
+  // the crowd nearest the player outward.
   private drawTownLabels(g: GroundBuffer): void {
     const ctx = this.ctx
+    const FONT_BUILDING = '700 10px system-ui, -apple-system, "Segoe UI", sans-serif'
+    const FONT_ROLE = '700 10px system-ui, -apple-system, "Segoe UI", sans-serif'
+    const FONT_ROLE_NEAR = '700 11px system-ui, -apple-system, "Segoe UI", sans-serif'
+    const FONT_SMALL = '600 8px system-ui, -apple-system, "Segoe UI", sans-serif'
+    type Label = { text: string; font: string; fill: string; line: number; sx: number; sy: number
+                   w: number; sub?: { text: string; fill: string } }
+    const labels: Label[] = []
+    const measure = (font: string, text: string) => { ctx.font = font; return Math.ceil(ctx.measureText(text).width) + 4 }
+
     ctx.save()
     ctx.textAlign = 'center'
     ctx.lineJoin = 'round'
-    ctx.font = '700 10px system-ui, -apple-system, "Segoe UI", sans-serif'
-    for (const b of this.townBuildings) {
-      const sx = Math.round(feetX(g, b.tx, b.ty) - this.cam.x)
-      const sy = Math.round(feetY(g, b.tx, b.ty) - this.cam.y - 22)
-      if (sx < -60 || sx > this.cam.w + 60) continue
-      ctx.lineWidth = 3.5
-      ctx.strokeStyle = 'rgba(0,0,0,0.95)'
-      ctx.strokeText(b.label, sx, sy)
-      ctx.fillStyle = '#ffe08a'
-      ctx.fillText(b.label, sx, sy)
-    }
     // Service NPCs: role above the head, lit up once the hero is close enough to talk.
     for (const n of this.townNpcs) {
       const sx = Math.round(n.e.screenX - this.cam.x)
       const sy = Math.round(n.e.screenY - this.cam.y - n.e.sprite.frameH - 4)
       if (sx < -70 || sx > this.cam.w + 70) continue
       const near = this.nearNpc === n.def.id
-      ctx.font = `700 ${near ? 11 : 10}px system-ui, -apple-system, "Segoe UI", sans-serif`
-      ctx.lineWidth = 3.5
-      ctx.strokeStyle = 'rgba(0,0,0,0.95)'
-      ctx.strokeText(n.def.role, sx, sy)
-      ctx.fillStyle = near ? '#ffe08a' : '#c8a864'
-      ctx.fillText(n.def.role, sx, sy)
-      if (near) {
-        ctx.font = '600 8px system-ui, -apple-system, "Segoe UI", sans-serif'
-        ctx.lineWidth = 3
-        ctx.strokeText(n.def.name, sx, sy + 10)
-        ctx.fillStyle = '#d4b896'
-        ctx.fillText(n.def.name, sx, sy + 10)
-      }
+      const font = near ? FONT_ROLE_NEAR : FONT_ROLE
+      labels.push({
+        text: n.def.role, font, fill: near ? '#ffe08a' : '#c8a864', line: 3.5, sx, sy,
+        w: Math.max(measure(font, n.def.role), near ? measure(FONT_SMALL, n.def.name) : 0),
+        sub: near ? { text: n.def.name, fill: '#d4b896' } : undefined,
+      })
     }
-    ctx.font = '600 8px system-ui, -apple-system, "Segoe UI", sans-serif'
-    ctx.lineWidth = 3
-    for (const a of this.townCrowd) {
+    for (const b of this.townBuildings) {
+      const sx = Math.round(feetX(g, b.tx, b.ty) - this.cam.x)
+      const sy = Math.round(feetY(g, b.tx, b.ty) - this.cam.y - 22)
+      if (sx < -60 || sx > this.cam.w + 60) continue
+      labels.push({ text: b.label, font: FONT_BUILDING, fill: '#ffe08a', line: 3.5, sx, sy, w: measure(FONT_BUILDING, b.label) })
+    }
+    const px = this.player.screenX, py = this.player.screenY
+    const folk = this.townCrowd
+      .map(a => ({ a, d: (a.e.screenX - px) ** 2 + (a.e.screenY - py) ** 2 }))
+      .sort((m, n) => m.d - n.d)
+    for (const { a } of folk) {
       const sx = Math.round(a.e.screenX - this.cam.x)
       const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 2)
       if (sx < -40 || sx > this.cam.w + 40 || sy < 0 || sy > this.cam.h) continue
+      labels.push({ text: a.name, font: FONT_SMALL, fill: factionNameColor(a.faction), line: 3, sx, sy, w: measure(FONT_SMALL, a.name) })
+    }
+
+    for (const l of labels) l.sx = clampLabelX(l.sx, l.w, this.cam.w)
+    // Text is drawn on its alphabetic baseline, so a label's box sits mostly ABOVE `sy`;
+    // an NPC's name line hangs 10px below it.
+    const boxH = (l: Label) => (l.font === FONT_SMALL ? 10 : 12) + (l.sub ? 10 : 0)
+    const lifts = layoutLabels(labels.map(l => ({
+      cx: l.sx, cy: l.sy - (l.font === FONT_SMALL ? 3 : 4) + (l.sub ? 5 : 0), w: l.w, h: boxH(l),
+    })))
+    for (let i = 0; i < labels.length; i++) {
+      const l = labels[i], dy = lifts[i]
+      if (dy === null) continue
+      const y = l.sy + dy
+      ctx.font = l.font
+      ctx.lineWidth = l.line
       ctx.strokeStyle = 'rgba(0,0,0,0.95)'
-      ctx.strokeText(a.name, sx, sy)
-      ctx.fillStyle = factionNameColor(a.faction)
-      ctx.fillText(a.name, sx, sy)
+      ctx.strokeText(l.text, l.sx, y)
+      ctx.fillStyle = l.fill
+      ctx.fillText(l.text, l.sx, y)
+      if (l.sub) {
+        ctx.font = FONT_SMALL
+        ctx.lineWidth = 3
+        ctx.strokeText(l.sub.text, l.sx, y + 10)
+        ctx.fillStyle = l.sub.fill
+        ctx.fillText(l.sub.text, l.sx, y + 10)
+      }
     }
     ctx.restore()
   }
@@ -5250,22 +5278,28 @@ export class WorldSceneController {
     return c
   }
 
+  /** How far each ambient hero's plate was lifted this frame, for its bark to follow. */
+  private plateLift = new Map<Ambient, number>()
+
   /**
-   * Nameplates over enemy PLAYERS.
+   * Every open-world plate — enemy players and the ambient crowd — laid out as ONE set.
    *
-   * Ordinary mobs deliberately have none — the engaged target's name is on the HUD, and
-   * plates over a whole pack of wolves is noise. An enemy player is the exception, and it
-   * is the same exception the ambient crowd already gets: the thing a plate communicates
-   * here is not "what is that" but "whose side is that on", which is the only question
-   * that matters when the answer decides whether you can attack it.
+   * They used to be two independent passes that each drew wherever their owner stood, so
+   * any two heroes within a plate's width of each other printed one name over the other.
+   * Priority: enemy players first (whose side someone is on decides whether you can
+   * attack them), then the crowd nearest the player outward. See render/labelLayout.ts.
    *
-   * Reuses the ambient plate cache, so a name that appears in both places is rasterised
-   * once. The crossed swords are baked into the plate text rather than drawn separately —
-   * the cache is keyed on the string, so the marker costs nothing per frame.
+   * Enemy-player plates: ordinary mobs deliberately have none — the engaged target's name
+   * is on the HUD, and plates over a whole pack of wolves is noise. An enemy player is the
+   * exception, for the same reason the crowd gets one: the question a plate answers here is
+   * "whose side is that on". They reuse the ambient plate cache, with the crossed swords
+   * baked into the plate text so the marker costs nothing per frame.
    */
-  private drawPvpNameplates(): void {
-    if (!this.pvpPlates.length) return
+  private drawWorldNameplates(): void {
     const ctx = this.ctx
+    const px = this.player.screenX, py = this.player.screenY
+    const items: { plate: HTMLCanvasElement; sx: number; sy: number; amb: Ambient | null; d: number }[] = []
+
     for (const p of this.pvpPlates) {
       const ent = p.id === this.targetMobId ? this.mob : this.otherMobEnts.get(p.id)?.e
       if (!ent || !ent.active) continue
@@ -5276,20 +5310,30 @@ export class WorldSceneController {
       // plain plate — putting the "you may kill this" marker over a sparring partner would
       // say the opposite of what the rest of the UI says about them.
       const plate = this.nameplateFor(p.duel ? p.name : `${HOSTILE_MARK} ${p.name}`, p.faction)
-      ctx.drawImage(plate, sx - (plate.width >> 1), sy - (plate.height >> 1))
+      items.push({ plate, sx, sy, amb: null, d: -1 })
     }
-  }
-
-  private drawAmbientNameplates(): void {
-    if (!this.ambient.length) return
-    const ctx = this.ctx
+    const crowd: typeof items = []
     for (const a of this.ambient) {
       if (a.kind !== 'hero' || !a.name || !a.e.active) continue
       const sx = Math.round(a.e.screenX - this.cam.x)
       const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 2)
       if (sx < -40 || sx > this.cam.w + 40 || sy < 6 || sy > this.cam.h) continue
-      const plate = this.nameplateFor(a.name, a.faction)
-      ctx.drawImage(plate, sx - (plate.width >> 1), sy - (plate.height >> 1))
+      const d = (a.e.screenX - px) ** 2 + (a.e.screenY - py) ** 2
+      crowd.push({ plate: this.nameplateFor(a.name, a.faction), sx, sy, amb: a, d })
+    }
+    crowd.sort((m, n) => m.d - n.d)
+    items.push(...crowd)
+
+    // Pulled inside the viewport: a plate half off the edge reads as "…orvan", and a hero at
+    // the edge keeps a legible name a few pixels inboard of them instead.
+    for (const it of items) it.sx = clampLabelX(it.sx, it.plate.width, this.cam.w)
+    const lifts = layoutLabels(items.map(it => ({ cx: it.sx, cy: it.sy, w: it.plate.width, h: it.plate.height })))
+    this.plateLift.clear()
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i], dy = lifts[i]
+      if (dy === null) continue
+      ctx.drawImage(it.plate, it.sx - (it.plate.width >> 1), it.sy + dy - (it.plate.height >> 1))
+      if (it.amb) this.plateLift.set(it.amb, dy)
     }
     this.drawAmbientBarks()
   }
@@ -5321,8 +5365,9 @@ export class WorldSceneController {
     for (const a of this.ambient) {
       if (!a.bark || a.barkT <= 0 || a.kind !== 'hero') continue
       const sx = Math.round(a.e.screenX - this.cam.x)
-      // Sit above the nameplate, which itself sits above the sprite.
-      const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 14)
+      // Sit above the nameplate, which itself sits above the sprite — and ride with it
+      // when the declutter pass lifted it.
+      const sy = Math.round(a.e.screenY - this.cam.y - a.e.sprite.frameH - 14 + (this.plateLift.get(a) ?? 0))
       if (sx < -60 || sx > this.cam.w + 60 || sy < 10 || sy > this.cam.h) continue
 
       // Fade in fast, hold, fade out over the last half second.
