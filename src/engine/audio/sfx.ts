@@ -24,7 +24,7 @@ export type SfxCue =
   | 'hit_slash' | 'hit_blunt' | 'hit_pierce' | 'hit_crit' | 'hurt' | 'ally_hit'
   | 'cast_fire' | 'cast_frost' | 'cast_shadow' | 'cast_arcane' | 'cast_nature'
   | 'impact_fire' | 'impact_frost' | 'impact_shadow' | 'impact_arcane' | 'impact_nature'
-  | 'shadow_bolt' | 'splash' | 'dot_tick'
+  | 'shadow_bolt' | 'spell_thud' | 'splash' | 'dot_tick'
   | 'mob_death' | 'boss_death' | 'gold' | 'loot' | 'loot_unique'
   | 'level_up' | 'unlock' | 'boss_spawn'
   | 'player_death' | 'player_respawn' | 'ally_down'
@@ -42,7 +42,8 @@ const GAP: Partial<Record<SfxCue, number>> = {
 /** ±this fraction of random pitch per play. Chiptune samples tolerate it well. */
 const DETUNE = 0.03
 
-interface Cue { buffers: AudioBuffer[]; gain: number; next: number; lastAt: number }
+/** `rate` is the cue's own playback pitch (cues.json), before the per-play detune. */
+interface Cue { buffers: AudioBuffer[]; gain: number; rate: number; next: number; lastAt: number }
 
 let cues: Partial<Record<SfxCue, Cue>> = {}
 /** DEV only: what loaded and what played, for tools/uitest/suites/sfx.mjs. A test that
@@ -65,7 +66,7 @@ export function initSfx(): Promise<void> {
   loading = (async () => {
     try {
       const res = await fetch(`${BASE}manifest.json`)
-      const manifest = await res.json() as Record<string, { files: string[]; gain: number }>
+      const manifest = await res.json() as Record<string, { files: string[]; gain: number; rate?: number }>
       const decoded: Record<string, AudioBuffer> = {}
       const files = [...new Set(Object.values(manifest).flatMap(m => m.files))]
       await Promise.all(files.map(async f => {
@@ -79,7 +80,7 @@ export function initSfx(): Promise<void> {
       const next: typeof cues = {}
       for (const [cue, m] of Object.entries(manifest)) {
         const buffers = m.files.map(f => decoded[f]).filter((b): b is AudioBuffer => !!b)
-        if (buffers.length) next[cue as SfxCue] = { buffers, gain: m.gain, next: 0, lastAt: -1 }
+        if (buffers.length) next[cue as SfxCue] = { buffers, gain: m.gain, rate: m.rate ?? 1, next: 0, lastAt: -1 }
       }
       cues = next
       if (devProbe) devProbe.loaded = Object.keys(next)
@@ -110,7 +111,7 @@ export function playSfx(cue: SfxCue, gain = 1, delay = 0): void {
   c.next = (c.next + 1) % c.buffers.length
   const src = ctx.createBufferSource()
   src.buffer = buf
-  src.playbackRate.value = 1 + (Math.random() * 2 - 1) * DETUNE
+  src.playbackRate.value = c.rate * (1 + (Math.random() * 2 - 1) * DETUNE)
   const g = ctx.createGain()
   g.gain.value = c.gain * gain
   src.connect(g).connect(out)

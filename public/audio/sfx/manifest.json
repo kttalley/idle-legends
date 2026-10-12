@@ -52,27 +52,30 @@
  },
  "cast_frost": {
   "files": [
-   "magic_magical_3.wav"
+   "swords_sword_3.wav"
   ],
-  "gain": 0.3
+  "gain": 0.4
  },
  "cast_shadow": {
   "files": [
-   "magic_magical_4.wav"
+   "swords_sword_2.wav"
   ],
-  "gain": 0.45
+  "gain": 0.45,
+  "rate": 0.7
  },
  "cast_arcane": {
   "files": [
-   "rpg80_spell_01.wav"
+   "swords_sword_4.wav"
   ],
-  "gain": 0.4
+  "gain": 0.4,
+  "rate": 0.85
  },
  "cast_nature": {
   "files": [
-   "rpg80_spell_02.wav"
+   "swords_sword_7.wav"
   ],
-  "gain": 0.4
+  "gain": 0.35,
+  "rate": 0.9
  },
  "impact_fire": {
   "files": [
@@ -83,37 +86,49 @@
  },
  "impact_frost": {
   "files": [
-   "rpg80_item_gem_01.wav",
-   "rpg80_item_gem_03.wav"
+   "woodmetal_wood_cracking_04.wav",
+   "woodmetal_wood_cracking_03.wav"
   ],
-  "gain": 0.5
+  "gain": 0.55,
+  "rate": 0.9
  },
  "impact_shadow": {
   "files": [
    "rpg80_misc_02.wav",
-   "rpg80_stones_01.wav"
+   "woodmetal_misc_03.wav"
   ],
-  "gain": 0.6
+  "gain": 0.6,
+  "rate": 0.8
  },
  "impact_arcane": {
   "files": [
-   "rpg80_metal_03.wav",
-   "rpg80_metal_02.wav"
+   "woodmetal_metal_slam_01.wav",
+   "woodmetal_misc_06.wav"
   ],
-  "gain": 0.4
+  "gain": 0.5,
+  "rate": 0.85
  },
  "impact_nature": {
   "files": [
-   "rpg80_wood_03.wav",
-   "rpg80_item_wood_01.wav"
+   "woodmetal_wood_breaking_01.wav",
+   "rpg80_wood_03.wav"
   ],
-  "gain": 0.55
+  "gain": 0.5,
+  "rate": 0.9
  },
  "shadow_bolt": {
   "files": [
    "woodmetal_misc_03.wav"
   ],
-  "gain": 0.7
+  "gain": 0.75,
+  "rate": 0.7
+ },
+ "spell_thud": {
+  "files": [
+   "woodmetal_wood_misc_06.wav"
+  ],
+  "gain": 0.4,
+  "rate": 0.75
  },
  "splash": {
   "files": [

@@ -3058,11 +3058,16 @@ export class WorldSceneController {
           // The landing is the sound, as it is the flash. Incoming fire is a hit taken;
           // the warlock's heavy bolt (mag 4.2) has its own boom; the rest is the school's.
           if (b.impact === this.player) playSfx('hurt')
-          else if (b.mag >= 4) playSfx('shadow_bolt')
           else {
-            const land = schoolSfx('impact', b.palette)
-            if (land) playSfx(land, b.payload?.crit ? 1.3 : 1)
-            if (b.payload?.crit) playSfx('hit_crit', 0.7)
+            // Every spell landing gets a low thump under its school's own sound — the
+            // weight that makes a bolt read as a bolt rather than a chime.
+            playSfx('spell_thud', b.mag >= 4 || b.payload?.crit ? 1.4 : 1)
+            if (b.mag >= 4) playSfx('shadow_bolt')
+            else {
+              const land = schoolSfx('impact', b.palette)
+              if (land) playSfx(land, b.payload?.crit ? 1.3 : 1)
+              if (b.payload?.crit) playSfx('hit_crit', 0.7)
+            }
           }
           // …and the blow itself lands HERE, with the orb, rather than at cast time. The
           // ring is emitted at the target's mid point as it stands now, not where it stood

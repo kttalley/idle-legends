@@ -104,7 +104,7 @@ def main():
                 total += os.path.getsize(out)
                 done.add(out_name)
             urls.append(out_name)
-        manifest[cue] = {'files': urls, 'gain': c['gain']}
+        manifest[cue] = {'files': urls, 'gain': c['gain'], **({'rate': c['rate']} if 'rate' in c else {})}
     json.dump(manifest, open(os.path.join(OUT, 'manifest.json'), 'w'), indent=1)
     print(f'{len(manifest)} cues, {len(done)} files, {total / 1024:.0f} KB -> {os.path.relpath(OUT, REPO)}')
 
