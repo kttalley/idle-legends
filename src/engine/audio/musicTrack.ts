@@ -1,17 +1,11 @@
 // ── The music track ───────────────────────────────────────────────────────────
 //
-// A single looping piece, replacing the generative layer for the first release.
-//
-// ── Why this exists ──────────────────────────────────────────────────────────
-// `generativeEngine.ts` (Tone.js — zone grammar, world signals, tile reactivity) is still
-// in the tree and still wired to everything that feeds it, but it does not currently
-// produce music worth shipping. Rather than hold the release on retuning a live generative
-// system, the first release plays one authored track and the generative engine simply is
-// not started. Nothing is deleted: `initGenerative` is a dynamic import, so an engine that
-// is never started never even loads its chunk, and turning it back on is one call site.
+// A single looping piece: the game's only sound since 2026-10-11, when the procedural
+// ambience bed, the weather noise and the generative/stinger engine were removed (see the
+// header of audioEngine.ts).
 //
 // ── Why Web Audio and not an <audio> tag ─────────────────────────────────────
-// The bed, the stingers and this all have to share ONE AudioContext and ONE master gain,
+// Anything that makes sound has to share ONE AudioContext and ONE master gain,
 // or the mute switch and the volume slider only govern some of the sound. An `<audio>`
 // element is outside that graph and would keep playing at its own level through a mute.
 // It also would not be governed by the iOS gesture latch, so it would fail to start on the
@@ -28,9 +22,8 @@ import { getAudioContext, getMasterInput } from './audioEngine'
 const TRACK_URL = `${import.meta.env.BASE_URL}audio/theme.mp3`
 
 /**
- * The music side of the mix. Paired with `BED_MIX` in audioEngine, which carries the
- * ambience side — roughly 60% music to 40% ambience. Change both together or the balance
- * drifts; they are two halves of one decision.
+ * The track's level under the master volume. It was set when the track shared the mix with
+ * the ambience bed, and is unchanged so that removing the bed doesn't make the music louder.
  */
 const TRACK_GAIN = 0.7
 
@@ -42,10 +35,8 @@ const FADE_OUT_S = 1.2
  * Silence between takes, as a multiple of the track's own length.
  *
  * `0` — the piece runs continuously, which is what was asked for after hearing the gap.
- * It was briefly `1` (play once, rest for the same length). The idea was to stop a short
- * loop becoming tinnitus over an eight-hour idle session, but with the ambience mixed down
- * to `BED_MIX` the rest did not read as "the bed has the floor now", it read as the sound
- * cutting out — the bed alone is too quiet to hold a minute of silence open.
+ * It was briefly `1` (play once, rest for the same length), to stop a short loop becoming
+ * tinnitus over an eight-hour idle session, but the rest read as the sound cutting out.
  *
  * Kept as a constant rather than deleted along with the scheduler: the mechanism is sound
  * and the number is the only thing that was wrong, so raising it is a one-token change if

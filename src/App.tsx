@@ -35,18 +35,9 @@ import { CraftResultToast } from './components/game/CraftResultToast'
 import { LevelUpToast } from './components/game/LevelUpToast'
 import { slotStorage, getLastSlotId, setLastSlotId } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
-import { initAudio, setZone as audioSetZone, setVolume as audioSetVolume, setWeather as audioSetWeather, suspendAudio, resumeAudio } from './engine/audio/audioEngine'
+import { initAudio, setVolume as audioSetVolume, suspendAudio, resumeAudio } from './engine/audio/audioEngine'
 import { requestAudioFocus } from './engine/audio/audioFocus'
 import { Capacitor } from '@capacitor/core'
-// The generative MUSIC layer is INITIALISED but never STARTED for this release — see
-// engine/audio/musicTrack.ts for why, and for how to turn it back on.
-//
-// The distinction matters and is easy to get wrong: the sequenced music runs on Tone's
-// Transport, which `startGenerative()` starts. The stingers do not — they trigger against
-// `Tone.now()` directly. But `playStinger` bails out unless `initGenerative()` has run, so
-// skipping init entirely (the first version of this change) silently removed every
-// level-up, boss-spawn and mob-death cue along with the music nobody wanted.
-import { initGenerative, playStinger, stopGenerative } from './engine/audio/generativeEngine'
 import { startMusicTrack, stopMusicTrack } from './engine/audio/musicTrack'
 import { ZONES, ZONE_ORDER } from './data/zones'
 import { SpriteIcon } from './components/ui/SpriteIcon'
@@ -90,61 +81,6 @@ function defaultPanels(narrow: boolean): PanelState {
   return narrow
     ? { hero: false, log: false, bag: false }
     : { hero: true, log: true, bag: true }
-}
-
-// ── Audio signal helpers ──────────────────────────────────────────────────────────────
-// Pure projections of store state into the slices the generative engine listens to. Kept here
-// (not in the engine) so the engine stays free of store knowledge and headless-safe.
-type StoreState = ReturnType<typeof useGameStore.getState>
-const clamp01v = (v: number) => Math.max(0, Math.min(1, v))
-const clampv = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
-
-/** Non-tile world signals: how busy the world is, what mode, whether a boss is up, the weather,
- *  and how out-of-depth the player is. Pushed to the generative engine on change. */
-function worldSignals(s: StoreState) {
-  const range = ZONES[s.currentZone]?.levelRange
-  const danger = range && s.level < range[0] ? clamp01v((range[0] - s.level) / 8) : 0
-  return {
-    entityCount: s.mobs.length + s.allies.length,
-    gameMode: s.gameMode,
-    boss: !!s.currentMob?.isBoss,
-    weather: s.weatherState.type,
-    danger,
-  }
-}
-
-/** Tile-reactivity: histogram the ground under a radius around the player and translate it
- *  into register/tension/density nudges. Returns null when there is no map to read yet. */
-function tileSignals(s: StoreState): { registerShift: number; tensionAdd: number; densityMul: number } | null {
-  const map = s.zoneMaps[s.currentZone]
-  const tiles = map?.tiles
-  if (!tiles) return null
-  const R = 6
-  const cx = Math.round(s.playerMapPos.x), cy = Math.round(s.playerMapPos.y)
-  const counts: Record<string, number> = {}
-  let total = 0
-  for (let dy = -R; dy <= R; dy++) {
-    const r = cy + dy
-    if (r < 0 || r >= tiles.length) continue
-    const row = tiles[r]
-    for (let dx = -R; dx <= R; dx++) {
-      const c = cx + dx
-      if (c < 0 || c >= row.length) continue
-      const t = row[c]?.type
-      if (!t) continue
-      counts[t] = (counts[t] ?? 0) + 1
-      total++
-    }
-  }
-  if (!total) return null
-  const frac = (k: string) => (counts[k] ?? 0) / total
-  const water = frac('water'), ember = frac('ember'), rock = frac('rock')
-  const flower = frac('flower'), moss = frac('moss'), grass = frac('grass'), cliff = frac('cliff')
-  return {
-    registerShift: clampv(12 * water - 12 * (ember + rock), -12, 12),
-    tensionAdd: clamp01v(0.4 * (ember + rock) + 0.2 * cliff),
-    densityMul: clampv(1 + 0.3 * (flower + moss + grass) - 0.3 * water, 0.4, 1.6),
-  }
 }
 
 export default function App() {
@@ -225,14 +161,13 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [])
 
-  // ── Procedural audio ─────────────────────────────────────────────────────────────
+  // ── Audio ────────────────────────────────────────────────────────────────────────
   //
   // iOS WKWebView only resumes an AudioContext off a user gesture, so the context is latched
-  // on the first pointerdown/keydown (the Continue/Create tap is the natural one). After that
-  // a single store subscription drives BOTH audio layers: the ambient bed (zone crossfade,
-  // volume, weather) and the generative music (zone grammar + live world signals). The
-  // generative layer's tile-reactivity runs on its own 0.5 s sampler below. No per-frame work —
-  // both engines modulate parameters on transitions only (see audioEngine/generativeEngine).
+  // on the first pointerdown/keydown (the Continue/Create tap is the natural one). The only
+  // sound is the music track. The procedural ambience bed, the weather noise and the
+  // synthesized combat stingers were removed on 2026-10-11 because none of them sounded good
+  // enough to keep; see engine/audio/audioEngine.ts.
   useEffect(() => {
     let latched = false
     const latch = () => {
@@ -241,12 +176,7 @@ export default function App() {
       initAudio()
       const s = useGameStore.getState()
       audioSetVolume(s.settings.volume)
-      audioSetWeather(s.weatherState.type)
-      if (s.initialized) {
-        audioSetZone(s.currentZone, s.worldSeed)
-        void startMusicTrack()
-        void initGenerative()   // stingers only — the Transport is never started
-      }
+      if (s.initialized) void startMusicTrack()
       window.removeEventListener('pointerdown', latch)
       window.removeEventListener('keydown', latch)
     }
@@ -300,18 +230,12 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    // Tracks how much of combatLog we have already sonified, so only NEW entries fire stingers.
-    let lastLogLen = 0
-    // Diff only the slices the engines care about; everything else is ignored so combat ticks
-    // (which fire this callback constantly) never reach Web Audio.
+    // Diff only the slices audio cares about, so combat ticks (which fire this callback
+    // constantly) never reach Web Audio.
     const onStore = (state: ReturnType<typeof useGameStore.getState>, prev: typeof state) => {
       if (state.initialized && !prev.initialized) {
-        audioSetZone(state.currentZone, state.worldSeed)
         audioSetVolume(state.settings.volume)
-        audioSetWeather(state.weatherState.type)
-        lastLogLen = state.combatLog.length
         void startMusicTrack()
-        void initGenerative()   // stingers only — the Transport is never started
         // Sound is actually starting, so this is the moment the game asks the OS to be
         // treated as media (Android only; no-op elsewhere). Taken here rather than at the
         // gesture latch because the latch can fire at character select, where there is
@@ -322,43 +246,12 @@ export default function App() {
       if (!state.initialized) {
         // Back at character select — the run is over, so the music goes with it.
         stopMusicTrack()
-        // Still called: it resets the stinger voice cursors, which are absolute times on
-        // the audio clock and otherwise drift ahead of `Tone.now()` across a suspend.
-        stopGenerative()
-        lastLogLen = 0
         return
       }
-      // The BED still follows the zone — it is the layer that makes a swamp sound like a
-      // swamp. Only the music is now zone-independent: one authored track, everywhere.
-      if (state.currentZone !== prev.currentZone) {
-        audioSetZone(state.currentZone, state.worldSeed)
-      }
       if (state.settings.volume !== prev.settings.volume) audioSetVolume(state.settings.volume)
-      if (state.weatherState.type !== prev.weatherState.type) {
-        audioSetWeather(state.weatherState.type)
-      }
-
-      // Combat-log stinger tail: sonify level-ups, boss spawns, and mob deaths as the log grows.
-      const log = state.combatLog
-      if (log.length !== lastLogLen) {
-        if (log.length > lastLogLen) {
-          for (let i = lastLogLen; i < log.length; i++) {
-            const t = log[i].type
-            if (t === 'level_up') playStinger('level_up')
-            else if (t === 'boss_spawn') playStinger('boss_spawn')
-            else if (t === 'mob_death') playStinger('mob_death')
-          }
-        }
-        lastLogLen = log.length
-      }
     }
     return useGameStore.subscribe(onStore)
   }, [])
-
-  // The tile-reactivity sampler that used to live here is gone with the generative layer.
-  // It histogrammed the tiles around the player every 0.5s to retune the music grammar —
-  // pure cost with nothing listening, and it ran for the whole session. Restore it together
-  // with `startGenerative()` if the generative engine comes back.
 
   // Publish whatever occupies the foot of the left column as --log-h.
   //
