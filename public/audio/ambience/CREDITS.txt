@@ -1,0 +1,5 @@
+Ambience, all CC0 1.0 (public domain), cut and encoded by tools/sfx/build_ambience.py:
+- Park ambiences (birds, river, wind) by Thimras — https://opengameart.org/content/park-ambiences
+- Crickets ambient noise (loopable) by Wolfgang_ — https://opengameart.org/content/crickets-ambient-noise-loopable
+- Swamp environment audio by LokiF — https://opengameart.org/content/swamp-environment-audio
+- 30 CC0 SFX loops (rain) by rubberduck — https://opengameart.org/content/30-cc0-sfx-loops
