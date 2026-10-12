@@ -36,6 +36,7 @@ import { AGGRESSIVE_RE, combatantOnlyWorldFields, isRangedMob, restGapFor,
   MELEE_ATTACK_RANGE, RANGED_ATTACK_RANGE, PROJECTILE_FLIGHT_SECONDS,
   heroThrowsProjectile } from '../../engine/mobBehaviour'
 import { hitStyleOf, type HitStyle } from '../../data/items'
+import { playSfx, type SfxCue } from '../../engine/audio/sfx'
 import { runFight, type FightEvent, type HeroCombatant } from '../../engine/fight'
 import {
   makeAmbientHero, pickBark, BARK_CHANCE, BARK_SECONDS, BARK_COOLDOWN_SECONDS,
@@ -341,6 +342,15 @@ const CLASS_SCHOOL: Record<string, string> = {
 function heroSchool(cls: ClassType, allocs: Record<string, number>): string {
   const spec = deepestSpec(cls, allocs)
   return (spec && SPEC_SCHOOL[spec.id]) || CLASS_SCHOOL[cls] || 'fx/steel'
+}
+
+/** The sound of a school's spell, from its FX palette id ('spell/fire' → 'impact_fire').
+ *  Holy has no cue of its own and borrows arcane's; anything unknown is physical. */
+function schoolSfx(kind: 'cast' | 'impact', palette: string): SfxCue | null {
+  const school = palette.startsWith('spell/') ? palette.slice(6) : null
+  if (!school) return null
+  const s = school === 'holy' ? 'arcane' : school
+  return (['fire', 'frost', 'shadow', 'arcane', 'nature'].includes(s) ? `${kind}_${s}` : null) as SfxCue | null
 }
 
 // Per-biome ambient particle character (environment life). Purely decorative canvas
@@ -2353,6 +2363,8 @@ export class WorldSceneController {
       // the damage now genuinely arrives WITH the bolt, which is what this comment claimed
       // while the ring and the number were still being emitted here, mid-flight.
       this.emitCharge(this.worldMid(this.player).x, this.worldMid(this.player).y, mc.core, mc.glow)
+      const cast = schoolSfx('cast', this.heroFxSchool)
+      if (cast) playSfx(cast)
       this.spawnBolt(this.player.tx, this.player.ty, target.tx, target.ty,
                      this.heroFxSchool, target, fn.isCrit ? 1.6 : 1,
                      { target, text, crit: fn.isCrit, color, ring })
@@ -2363,6 +2375,7 @@ export class WorldSceneController {
       const pm = this.worldMid(this.player)
       const angle = Math.atan2(mm.y - pm.y, mm.x - pm.x)
       this.emitPhysicalHit(mm.x, mm.y, angle, this.heroHitStyle, mc.core, mc.glow, ring)
+      playSfx(fn.isCrit ? 'hit_crit' : `hit_${this.heroHitStyle}`)
       // Weight lives in the pause, not the particles: a crush holds the frame longer than
       // a cut, and a thrust barely holds it at all. Crits scale it, so the heaviest moment
       // in the game is still a critical mace blow.
@@ -2396,6 +2409,7 @@ export class WorldSceneController {
     // ally rather than the mob and skip the lunge entirely.
     if (fn.isMobDamage) {
       if (ally) {
+        playSfx('ally_hit', 0.7)
         ally.e.animator.set('hit')
         ally.e.animator.restart()
         const hm = this.worldMid(ally.e)
@@ -2426,6 +2440,7 @@ export class WorldSceneController {
     const mm = this.worldMid(target)
     const mc = fn.isCrit ? fxColors('spell/holy') : { core: '#dff5e0', glow: '#5fc06a' }
     this.emitImpact(mm.x, mm.y, mc.core, mc.glow, fn.isCrit ? 1.4 : 0.8)
+    playSfx('ally_hit', fn.isCrit ? 1.4 : 1)
     this.spawnFloater(
       target, `${fn.value}${fn.isCrit ? '!' : ''}`, fn.isCrit,
       fn.color ?? (fn.isCrit ? '#ffd27a' : '#9fe0a0'),
@@ -2451,6 +2466,7 @@ export class WorldSceneController {
       this.splashRingCool = SPLASH_RING_COOLDOWN
       const pm = this.worldMid(this.player)
       this.emitWhirlwind(pm.x, pm.y, '#ffd9a0', SPLASH_COLOR)
+      playSfx('splash')
       this.punch(2.4, 0)
       this.player.animator.set('attack')
       this.player.animator.restart()
@@ -2486,6 +2502,7 @@ export class WorldSceneController {
     const cc = fxColors('spell/shadow')
     const pm = this.worldMid(this.player)
     this.emitCharge(pm.x, pm.y, cc.core, cc.glow)
+    playSfx('cast_shadow', 1.3)
     this.spawnBolt(
       this.player.tx - r, this.player.ty - r,
       target.tx - r, target.ty - r,
@@ -2503,6 +2520,7 @@ export class WorldSceneController {
     const dc = fxColors('spell/shadow')
     const dm = this.worldMid(target)
     this.emitImpact(dm.x, dm.y, dc.core, dc.glow, 0.5)
+    playSfx('dot_tick')
     this.spawnFloater(target, `${fn.value}`, false, fn.color ?? '#aa88ff')
   }
 
@@ -2538,6 +2556,7 @@ export class WorldSceneController {
     // `return` on `!this.mob`, which in manual mode meant an entire pack landed hits with
     // no floater, no flash and no rumble — damage with no evidence anywhere on screen.
     if (!src) {
+      playSfx('hurt')
       this.impactHit(this.player, 'fx/hitflash', 2.0)
       this.spawnFloater(this.player, `-${fn.value}`, false, '#ff6666')
       return
@@ -2548,6 +2567,7 @@ export class WorldSceneController {
       // fires the flash/recoil/rumble on arrival, not at cast time).
       src.e.animator.set('attack')
       src.e.animator.restart()
+      playSfx('cast_shadow', 0.6)
       const r = WorldSceneController.FX_RISE
       this.spawnBolt(
         src.e.tx - r, src.e.ty - r,
@@ -2562,6 +2582,7 @@ export class WorldSceneController {
       this.beginLunge(src.lunge, src.e, this.player)
       src.e.animator.set('attack')
       src.e.animator.restart()
+      playSfx('hurt')
       this.impactHit(this.player, 'fx/hitflash', 2.0)
     }
     this.spawnFloater(this.player, `-${fn.value}`, false, '#ff6666')
@@ -3034,6 +3055,15 @@ export class WorldSceneController {
           // heavy) — flash/recoil the target, burst, rumble; else just a burst.
           if (b.impact && b.impact.active) this.impactHit(b.impact, b.palette, b.mag, 0.05 * FX_TIME_SCALE)
           else this.spawnBurst(b.toX, b.toY, b.palette)
+          // The landing is the sound, as it is the flash. Incoming fire is a hit taken;
+          // the warlock's heavy bolt (mag 4.2) has its own boom; the rest is the school's.
+          if (b.impact === this.player) playSfx('hurt')
+          else if (b.mag >= 4) playSfx('shadow_bolt')
+          else {
+            const land = schoolSfx('impact', b.palette)
+            if (land) playSfx(land, b.payload?.crit ? 1.3 : 1)
+            if (b.payload?.crit) playSfx('hit_crit', 0.7)
+          }
           // …and the blow itself lands HERE, with the orb, rather than at cast time. The
           // ring is emitted at the target's mid point as it stands now, not where it stood
           // when the spell left the hand — a mob that walked during the flight still gets

@@ -39,6 +39,8 @@ import { initAudio, setVolume as audioSetVolume, suspendAudio, resumeAudio } fro
 import { requestAudioFocus } from './engine/audio/audioFocus'
 import { Capacitor } from '@capacitor/core'
 import { startMusicTrack, stopMusicTrack } from './engine/audio/musicTrack'
+import { initSfx, playSfx } from './engine/audio/sfx'
+import type { CombatLogEntry } from './data/types'
 import { ZONES, ZONE_ORDER } from './data/zones'
 import { SpriteIcon } from './components/ui/SpriteIcon'
 import { formatGold } from './components/ui/GoldDisplay'
@@ -81,6 +83,30 @@ function defaultPanels(narrow: boolean): PanelState {
   return narrow
     ? { hero: false, log: false, bag: false }
     : { hero: true, log: true, bag: true }
+}
+
+/**
+ * The sound of a combat-log line, for the events with no animation of their own to hang it
+ * on. Swings, casts and impacts are voiced by the renderer on the frame they happen; this
+ * covers kills, loot, progress, bosses and deaths. Lines about party members are quieter.
+ */
+function sfxForLog(e: CombatLogEntry): void {
+  const m = e.message
+  switch (e.type) {
+    case 'mob_death':
+      // Spawns are logged under this type too ("Goblin appears!"). Only a boss arrival
+      // is worth a sound; an ordinary spawn is silent.
+      if (m.endsWith('appears!')) { if (m.includes('BOSS')) playSfx('boss_spawn'); break }
+      playSfx(m.includes('[BOSS]') ? 'boss_death' : 'mob_death')
+      break
+    case 'loot_gold':      playSfx('gold', 1, 0.12); break   // just after the kill, not on it
+    case 'loot_item':      playSfx(m.includes('unique') ? 'loot_unique' : 'loot', 1, 0.2); break
+    case 'level_up':       playSfx('level_up'); break
+    case 'zone_change':    if (m.includes('unlocked')) playSfx('unlock', 1, 0.4); break
+    case 'boss_spawn':     playSfx('boss_spawn'); break
+    case 'player_death':   playSfx(m.startsWith('You') ? 'player_death' : 'ally_down'); break
+    case 'player_respawn': playSfx('player_respawn', m.startsWith('You') ? 1 : 0.5); break
+  }
 }
 
 export default function App() {
@@ -165,9 +191,9 @@ export default function App() {
   //
   // iOS WKWebView only resumes an AudioContext off a user gesture, so the context is latched
   // on the first pointerdown/keydown (the Continue/Create tap is the natural one). The only
-  // sound is the music track. The procedural ambience bed, the weather noise and the
-  // synthesized combat stingers were removed on 2026-10-11 because none of them sounded good
-  // enough to keep; see engine/audio/audioEngine.ts.
+  // sound is the music track plus CC0 retro sound effects (engine/audio/sfx.ts). The
+  // procedural ambience bed, the weather noise and the synthesized stingers were removed on
+  // 2026-10-11; see engine/audio/audioEngine.ts.
   useEffect(() => {
     let latched = false
     const latch = () => {
@@ -176,6 +202,7 @@ export default function App() {
       initAudio()
       const s = useGameStore.getState()
       audioSetVolume(s.settings.volume)
+      void initSfx()
       if (s.initialized) void startMusicTrack()
       window.removeEventListener('pointerdown', latch)
       window.removeEventListener('keydown', latch)
@@ -230,10 +257,13 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    // How much of combatLog has already been voiced, so only NEW lines make a sound.
+    let lastLog: CombatLogEntry | undefined
     // Diff only the slices audio cares about, so combat ticks (which fire this callback
     // constantly) never reach Web Audio.
     const onStore = (state: ReturnType<typeof useGameStore.getState>, prev: typeof state) => {
       if (state.initialized && !prev.initialized) {
+        lastLog = state.combatLog[0]
         audioSetVolume(state.settings.volume)
         void startMusicTrack()
         // Sound is actually starting, so this is the moment the game asks the OS to be
@@ -249,6 +279,20 @@ export default function App() {
         return
       }
       if (state.settings.volume !== prev.settings.volume) audioSetVolume(state.settings.volume)
+
+      // New log lines. The log is NEWEST FIRST (each tick prepends its lines, then caps
+      // at LOG_MAX), so what's new is everything in front of the entry seen last time.
+      // Matched by entry rather than by length because once the log is full the length
+      // never changes.
+      const log = state.combatLog
+      if (log !== prev.combatLog && log.length && log[0] !== lastLog) {
+        const seen = lastLog ? log.indexOf(lastLog) : -1
+        // A long gap (offline catch-up, a save load) would replay a wall of sound; only a
+        // few lines of a batch are voiced.
+        const fresh = Math.min(seen === -1 ? 1 : seen, 4)
+        for (let i = fresh - 1; i >= 0; i--) sfxForLog(log[i])
+        lastLog = log[0]
+      }
     }
     return useGameStore.subscribe(onStore)
   }, [])

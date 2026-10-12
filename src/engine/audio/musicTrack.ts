@@ -16,7 +16,7 @@
 // scheduling gap, whereas an element's `loop` attribute re-seeks on the main thread and
 // audibly stutters on a slow frame.
 
-import { getAudioContext, getMasterInput } from './audioEngine'
+import { getAudioContext, getMusicInput } from './audioEngine'
 
 /** Published under `public/`, so it ships with both the web build and the iOS bundle. */
 const TRACK_URL = `${import.meta.env.BASE_URL}audio/theme.mp3`
@@ -105,7 +105,7 @@ export async function startMusicTrack(): Promise<void> {
   starting = true
   try {
     const ctx = getAudioContext()
-    const master = getMasterInput()
+    const master = getMusicInput()
     if (!ctx || !master) return
 
     gain = ctx.createGain()

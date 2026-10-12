@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useGameStore } from '../../store/gameStore'
 import { useDismissable } from '../ui/useDismissable'
 import { CLASS_DEFINITIONS } from '../../data/classes'
-import { getAudioState, setMuted as audioSetMuted, subscribeAudio } from '../../engine/audio/audioEngine'
+import { getAudioState, setMuted as audioSetMuted, setMusicOn, setSfxOn, subscribeAudio } from '../../engine/audio/audioEngine'
 import { ShopView } from './ShopView'
 
 // The way back to character select.
@@ -33,7 +33,7 @@ export function GameMenu({ onClose }: { onClose: () => void }) {
   const surface = useRef<HTMLDivElement>(null)
   useDismissable(true, onClose, { ref: surface, closeOnOutside: true, trapFocus: true })
 
-  // Session-only ambience state — it lives in the audio engine, not the persisted save, so
+  // Session-only sound state — it lives in the audio engine, not the persisted save, so
   // a mute set in a quiet room never surprises the player on the next launch.
   const audio = useSyncExternalStore(subscribeAudio, getAudioState)
 
@@ -113,8 +113,26 @@ export function GameMenu({ onClose }: { onClose: () => void }) {
               <span>Sound</span>
               <span className="menu-row-value">{audio.muted ? 'Off' : 'On'}</span>
               <span className="menu-row-note">
-                Ambience and the generative score. Not saved — it resets each launch.
+                All game audio. Not saved — these reset each launch.
               </span>
+            </button>
+            <button
+              className="rp-button menu-row"
+              onClick={() => setMusicOn(!audio.musicOn)}
+              aria-pressed={audio.musicOn}
+              disabled={audio.muted}
+            >
+              <span>Music</span>
+              <span className="menu-row-value">{audio.musicOn ? 'On' : 'Off'}</span>
+            </button>
+            <button
+              className="rp-button menu-row"
+              onClick={() => setSfxOn(!audio.sfxOn)}
+              aria-pressed={audio.sfxOn}
+              disabled={audio.muted}
+            >
+              <span>Sound effects</span>
+              <span className="menu-row-value">{audio.sfxOn ? 'On' : 'Off'}</span>
             </button>
             <button
               className="rp-button"
@@ -140,7 +158,7 @@ export function GameMenu({ onClose }: { onClose: () => void }) {
             </button>
             <button className="rp-button menu-row" onClick={() => setView('settings')}>
               <span>Settings</span>
-              <span className="menu-row-note">Sound, and more to come</span>
+              <span className="menu-row-note">Sound, music and effects</span>
             </button>
             <button className="rp-button menu-row" onClick={() => setView('leaving')}>
               <span>Character Select</span>

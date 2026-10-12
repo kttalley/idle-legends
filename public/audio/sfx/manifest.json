@@ -1,0 +1,196 @@
+{
+ "hit_slash": {
+  "files": [
+   "sfx_wpn_sword1.wav",
+   "sfx_wpn_sword2.wav",
+   "sfx_wpn_sword3.wav"
+  ],
+  "gain": 0.45
+ },
+ "hit_blunt": {
+  "files": [
+   "sfx_wpn_punch3.wav",
+   "sfx_wpn_punch4.wav"
+  ],
+  "gain": 0.55
+ },
+ "hit_pierce": {
+  "files": [
+   "sfx_wpn_dagger.wav",
+   "sfx_wpn_punch1.wav"
+  ],
+  "gain": 0.45
+ },
+ "hit_crit": {
+  "files": [
+   "sfx_sounds_impact5.wav",
+   "sfx_sounds_impact12.wav"
+  ],
+  "gain": 0.6
+ },
+ "hurt": {
+  "files": [
+   "sfx_damage_hit4.wav",
+   "sfx_damage_hit8.wav",
+   "sfx_damage_hit9.wav"
+  ],
+  "gain": 0.4
+ },
+ "ally_hit": {
+  "files": [
+   "sfx_exp_shortest_soft7.wav",
+   "sfx_exp_shortest_soft8.wav"
+  ],
+  "gain": 0.22
+ },
+ "cast_fire": {
+  "files": [
+   "sfx_wpn_laser8.wav"
+  ],
+  "gain": 0.3
+ },
+ "cast_frost": {
+  "files": [
+   "sfx_sounds_high3.wav"
+  ],
+  "gain": 0.22
+ },
+ "cast_shadow": {
+  "files": [
+   "sfx_wpn_laser7.wav"
+  ],
+  "gain": 0.3
+ },
+ "cast_arcane": {
+  "files": [
+   "sfx_wpn_laser10.wav"
+  ],
+  "gain": 0.3
+ },
+ "cast_nature": {
+  "files": [
+   "sfx_sounds_interaction19.wav"
+  ],
+  "gain": 0.25
+ },
+ "impact_fire": {
+  "files": [
+   "sfx_exp_shortest_hard5.wav",
+   "sfx_exp_shortest_hard4.wav"
+  ],
+  "gain": 0.5
+ },
+ "impact_frost": {
+  "files": [
+   "sfx_sounds_impact2.wav"
+  ],
+  "gain": 0.4
+ },
+ "impact_shadow": {
+  "files": [
+   "sfx_exp_shortest_soft9.wav",
+   "sfx_exp_shortest_soft3.wav"
+  ],
+  "gain": 0.55
+ },
+ "impact_arcane": {
+  "files": [
+   "sfx_sounds_impact15.wav"
+  ],
+  "gain": 0.45
+ },
+ "impact_nature": {
+  "files": [
+   "sfx_exp_shortest_soft1.wav"
+  ],
+  "gain": 0.45
+ },
+ "shadow_bolt": {
+  "files": [
+   "sfx_exp_shortest_hard3.wav"
+  ],
+  "gain": 0.65
+ },
+ "splash": {
+  "files": [
+   "sfx_sounds_impact11.wav"
+  ],
+  "gain": 0.5
+ },
+ "dot_tick": {
+  "files": [
+   "sfx_exp_shortest_soft2.wav"
+  ],
+  "gain": 0.18
+ },
+ "mob_death": {
+  "files": [
+   "sfx_exp_various1.wav",
+   "sfx_exp_various2.wav",
+   "sfx_exp_various3.wav",
+   "sfx_exp_various4.wav"
+  ],
+  "gain": 0.45
+ },
+ "boss_death": {
+  "files": [
+   "sfx_exp_double2.wav"
+  ],
+  "gain": 0.7
+ },
+ "gold": {
+  "files": [
+   "sfx_coin_single3.wav",
+   "sfx_coin_single5.wav"
+  ],
+  "gain": 0.22
+ },
+ "loot": {
+  "files": [
+   "sfx_sounds_powerup15.wav"
+  ],
+  "gain": 0.35
+ },
+ "loot_unique": {
+  "files": [
+   "sfx_sounds_powerup2.wav"
+  ],
+  "gain": 0.55
+ },
+ "level_up": {
+  "files": [
+   "sfx_sounds_fanfare1.wav"
+  ],
+  "gain": 0.7
+ },
+ "unlock": {
+  "files": [
+   "sfx_sounds_fanfare3.wav"
+  ],
+  "gain": 0.6
+ },
+ "boss_spawn": {
+  "files": [
+   "sfx_exp_odd5.wav"
+  ],
+  "gain": 0.6
+ },
+ "player_death": {
+  "files": [
+   "sfx_sounds_falling1.wav"
+  ],
+  "gain": 0.6
+ },
+ "player_respawn": {
+  "files": [
+   "sfx_movement_portal5.wav"
+  ],
+  "gain": 0.45
+ },
+ "ally_down": {
+  "files": [
+   "sfx_sounds_damage1.wav"
+  ],
+  "gain": 0.4
+ }
+}
