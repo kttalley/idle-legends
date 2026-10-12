@@ -27,22 +27,21 @@ const TRACK_URL = `${import.meta.env.BASE_URL}audio/theme.mp3`
  */
 const TRACK_GAIN = 0.7
 
-/** Long enough to feel like the music arrives rather than switches on. */
-const FADE_IN_S = 2.5
-const FADE_OUT_S = 1.2
+/** Just long enough to avoid a click; the music is meant to simply be there. */
+const RAMP_S = 0.3
 
 /**
- * Silence between takes, as a multiple of the track's own length.
+ * How early each pass starts before the previous one ends, in seconds.
  *
- * `0` — the piece runs continuously, which is what was asked for after hearing the gap.
- * It was briefly `1` (play once, rest for the same length), to stop a short loop becoming
- * tinnitus over an eight-hour idle session, but the rest read as the sound cutting out.
- *
- * Kept as a constant rather than deleted along with the scheduler: the mechanism is sound
- * and the number is the only thing that was wrong, so raising it is a one-token change if
- * a longer or more varied track ever makes a rest worth having again.
+ * The recording ends on a ~2 s natural decay and opens on a ~0.5 s swell, so restarting
+ * exactly at the end leaves a dip, and the file's trailing silence (4.5 s of it, until
+ * 2026-10-12) left an outright gap. Overlapping the next pass over the tail turns the seam
+ * into a short crossfade the recording supplies itself.
  */
-const REST_RATIO = 0
+const OVERLAP_S = 1.2
+
+/** Below this a sample counts as silence when finding where the music starts and ends. */
+const SILENCE = 10 ** (-60 / 20)
 
 let buffer: AudioBuffer | null = null
 let source: AudioBufferSourceNode | null = null
@@ -52,8 +51,11 @@ let gain: GainNode | null = null
 let mode: 'none' | 'buffer' | 'element' | 'failed' = 'none'
 /** Why the preferred path failed, if it did. */
 let lastError: string | null = null
-/** Pending timer for the next take, so stopping can cancel a queued one. */
-let restTimer: number | null = null
+/** Pending timer that schedules the next pass, so stopping can cancel it. */
+let passTimer: number | null = null
+/** Where the music actually starts and ends inside the buffer, in seconds. */
+let musicStart = 0
+let musicEnd = 0
 
 /** Guards against two overlapping starts — a second copy of the same track playing a few
  *  hundred ms out of phase with the first is a flanged mess, and it is the exact failure a
@@ -77,6 +79,7 @@ export async function initMusicTrack(): Promise<void> {
     // `decodeAudioData` detaches the ArrayBuffer it is handed, so this can only be done
     // once per fetch — hence the `buffer` cache rather than decoding per start.
     buffer = await ctx.decodeAudioData(bytes)
+    measureMusic(buffer)
     lastError = null
   } catch (e) {
     // Recorded rather than swallowed. This path went silent on device while the biome bed
@@ -110,45 +113,23 @@ export async function startMusicTrack(): Promise<void> {
 
     gain = ctx.createGain()
     gain.gain.setValueAtTime(0.0001, ctx.currentTime)
-    // Exponential, not linear: loudness is perceptual, and a linear ramp from silence
-    // sounds like it jumps most of the way in the first half-second.
-    gain.gain.exponentialRampToValueAtTime(TRACK_GAIN, ctx.currentTime + FADE_IN_S)
+    gain.gain.exponentialRampToValueAtTime(TRACK_GAIN, ctx.currentTime + RAMP_S)
     gain.connect(master)
 
     await initMusicTrack()
     if (buffer) {
-      // With no rest, looping belongs to the audio thread: `loop = true` repeats inside the
-      // renderer with no scheduling gap at all, where re-arming a node per take would leave
-      // a seam every time the main thread was busy. `scheduleTake` still exists and is used
-      // whenever REST_RATIO is non-zero.
-      if (REST_RATIO <= 0) {
-        source = ctx.createBufferSource()
-        source.buffer = buffer
-        source.loop = true
-        source.connect(gain)
-        source.start()
-      } else {
-        scheduleTake(ctx.currentTime)
-      }
       mode = 'buffer'
+      schedulePass(ctx.currentTime + 0.05)
       return
     }
 
     // ── Fallback ──────────────────────────────────────────────────────────────
     try {
       const el = new Audio(TRACK_URL)
-      // Continuous unless a rest is configured; see REST_RATIO.
-      el.loop = REST_RATIO <= 0
+      // The element can't overlap passes, so it loops the whole (trimmed) file; the seam
+      // is a little less smooth than the buffer path's, which is the fallback's trade.
+      el.loop = true
       el.preload = 'auto'
-      el.addEventListener('ended', () => {
-        if (REST_RATIO <= 0) return  // the element loops itself
-        if (element !== el) return   // stopped, or replaced — do not resurrect it
-        restTimer = window.setTimeout(() => {
-          if (element !== el) return
-          el.currentTime = 0
-          void el.play().catch(() => { /* interrupted; the next start will retry */ })
-        }, el.duration * REST_RATIO * 1000)
-      })
       // Required for `createMediaElementSource` to be allowed to read the samples. The file
       // is same-origin so this is a formality, but WKWebView is stricter about it.
       el.crossOrigin = 'anonymous'
@@ -170,28 +151,37 @@ export async function startMusicTrack(): Promise<void> {
   }
 }
 
+/** Find where the music starts and ends, ignoring leading and trailing silence. */
+function measureMusic(buf: AudioBuffer): void {
+  const data = buf.getChannelData(0)
+  let first = 0, last = data.length - 1
+  while (first < last && Math.abs(data[first]) < SILENCE) first++
+  while (last > first && Math.abs(data[last]) < SILENCE) last--
+  musicStart = first / buf.sampleRate
+  musicEnd = (last + 1) / buf.sampleRate
+}
+
 /**
- * Play one take at `at` (audio-clock seconds) and arm the one after it.
+ * Play one pass of the music at `at` (audio-clock seconds), and arrange the next pass to
+ * start OVERLAP_S before this one ends.
  *
- * Re-arms from `onended` rather than from a single long chain scheduled up front: a chain
- * would keep firing after `stopMusicTrack`, and cancelling it would mean tracking every
- * node. One take in flight at a time is the whole state.
+ * Start times are absolute on the audio clock, so they are sample-accurate however late
+ * the timer fires; the timer only has to run before the next pass is due, and it is set
+ * to fire several seconds early to make sure it does.
  */
-function scheduleTake(at: number): void {
+function schedulePass(at: number): void {
   const ctx = getAudioContext()
-  if (!ctx || !buffer || !gain) return
+  if (!ctx || !buffer || !gain || mode !== 'buffer') return
+  const length = musicEnd - musicStart
   const src = ctx.createBufferSource()
   src.buffer = buffer
   src.connect(gain)
-  src.start(at)
+  src.start(at, musicStart, length)
+  src.onended = () => { try { src.disconnect() } catch { /* gone */ } }
   source = src
-  src.onended = () => {
-    if (source !== src) return   // superseded by a stop; stay quiet
-    source = null
-    restTimer = window.setTimeout(
-      () => { if (mode === 'buffer') scheduleTake(getAudioContext()?.currentTime ?? 0) },
-      buffer!.duration * REST_RATIO * 1000)
-  }
+  const next = at + Math.max(1, length - OVERLAP_S)
+  const lead = Math.max(0, (next - ctx.currentTime - 5) * 1000)
+  passTimer = window.setTimeout(() => { passTimer = null; schedulePass(next) }, lead)
 }
 
 /** What the music layer is doing, and why, for an on-device diagnostic. */
@@ -199,10 +189,11 @@ export function musicDiagnostic(): { mode: string; error: string | null; url: st
   return { mode, error: lastError, url: TRACK_URL }
 }
 
-/** Fade out and stop. Safe to call when nothing is playing. */
+/** Fade out and stop. Safe to call when nothing is playing. The game itself no longer
+ *  stops the music (it plays through character select); this is for tests and teardown. */
 export function stopMusicTrack(): void {
   const ctx = getAudioContext()
-  if (restTimer !== null) { window.clearTimeout(restTimer); restTimer = null }
+  if (passTimer !== null) { window.clearTimeout(passTimer); passTimer = null }
   const s = source, g = gain, el = element
   source = null
   gain = null
@@ -210,14 +201,14 @@ export function stopMusicTrack(): void {
   mode = 'none'
   if (el) {
     // The element path has no scheduled stop; pause it and let the gain ramp cover the tail.
-    window.setTimeout(() => { try { el.pause() } catch { /* gone */ } }, FADE_OUT_S * 1000)
+    window.setTimeout(() => { try { el.pause() } catch { /* gone */ } }, RAMP_S * 1000)
   }
   if (!s) {
     if (g && ctx) {
       const t0 = ctx.currentTime
       g.gain.cancelScheduledValues(t0)
       g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t0)
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + FADE_OUT_S)
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + RAMP_S)
     }
     return
   }
@@ -228,11 +219,11 @@ export function stopMusicTrack(): void {
   // makes a fade that starts by jumping to full volume — audible every time the player
   // returns to character select during the opening fade-in.
   g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t)
-  g.gain.exponentialRampToValueAtTime(0.0001, t + FADE_OUT_S)
-  try { s.stop(t + FADE_OUT_S) } catch { /* already stopped */ }
+  g.gain.exponentialRampToValueAtTime(0.0001, t + RAMP_S)
+  try { s.stop(t + RAMP_S) } catch { /* already stopped */ }
   // Disconnect only after the ramp has actually run, or the node is torn out of the graph
   // mid-fade and the fade becomes a cut.
-  window.setTimeout(() => { try { g.disconnect() } catch { /* gone */ } }, (FADE_OUT_S + 0.2) * 1000)
+  window.setTimeout(() => { try { g.disconnect() } catch { /* gone */ } }, (RAMP_S + 0.2) * 1000)
 }
 
 /** True while the track is playing — the renderer has no use for this; tests do. */

@@ -38,8 +38,9 @@ import type { SaveSlotMeta } from './store/saveSlots'
 import { initAudio, setVolume as audioSetVolume, suspendAudio, resumeAudio } from './engine/audio/audioEngine'
 import { requestAudioFocus } from './engine/audio/audioFocus'
 import { Capacitor } from '@capacitor/core'
-import { startMusicTrack, stopMusicTrack } from './engine/audio/musicTrack'
+import { startMusicTrack } from './engine/audio/musicTrack'
 import { initSfx, playSfx } from './engine/audio/sfx'
+import { initAmbience, setAmbienceWeather, setAmbienceZone } from './engine/audio/ambience'
 import type { CombatLogEntry } from './data/types'
 import { ZONES, ZONE_ORDER } from './data/zones'
 import { SpriteIcon } from './components/ui/SpriteIcon'
@@ -191,9 +192,9 @@ export default function App() {
   //
   // iOS WKWebView only resumes an AudioContext off a user gesture, so the context is latched
   // on the first pointerdown/keydown (the Continue/Create tap is the natural one). The only
-  // sound is the music track plus CC0 retro sound effects (engine/audio/sfx.ts). The
-  // procedural ambience bed, the weather noise and the synthesized stingers were removed on
-  // 2026-10-11; see engine/audio/audioEngine.ts.
+  // sound is the music track, CC0 sound effects (engine/audio/sfx.ts) and quiet recorded
+  // nature beds chosen by zone and weather (engine/audio/ambience.ts). The procedural drone
+  // bed and synthesized stingers were removed on 2026-10-11; see audioEngine.ts.
   useEffect(() => {
     let latched = false
     const latch = () => {
@@ -203,7 +204,13 @@ export default function App() {
       const s = useGameStore.getState()
       audioSetVolume(s.settings.volume)
       void initSfx()
-      if (s.initialized) void startMusicTrack()
+      setAmbienceZone(s.initialized ? s.currentZone : null)
+      setAmbienceWeather(s.weatherState.type)
+      void initAmbience()
+      // The music plays from the first tap and never stops, character select included —
+      // so this is also when the game asks the OS to treat it as media (Android only).
+      void startMusicTrack()
+      void requestAudioFocus()
       window.removeEventListener('pointerdown', latch)
       window.removeEventListener('keydown', latch)
     }
@@ -265,19 +272,17 @@ export default function App() {
       if (state.initialized && !prev.initialized) {
         lastLog = state.combatLog[0]
         audioSetVolume(state.settings.volume)
-        void startMusicTrack()
-        // Sound is actually starting, so this is the moment the game asks the OS to be
-        // treated as media (Android only; no-op elsewhere). Taken here rather than at the
-        // gesture latch because the latch can fire at character select, where there is
-        // nothing to play yet.
-        void requestAudioFocus()
+        setAmbienceZone(state.currentZone)
+        setAmbienceWeather(state.weatherState.type)
         return
       }
       if (!state.initialized) {
-        // Back at character select — the run is over, so the music goes with it.
-        stopMusicTrack()
+        // Character select has the music but no world, so no world sounds.
+        if (prev.initialized) setAmbienceZone(null)
         return
       }
+      if (state.currentZone !== prev.currentZone) setAmbienceZone(state.currentZone)
+      if (state.weatherState.type !== prev.weatherState.type) setAmbienceWeather(state.weatherState.type)
       if (state.settings.volume !== prev.settings.volume) audioSetVolume(state.settings.volume)
 
       // New log lines. The log is NEWEST FIRST (each tick prepends its lines, then caps

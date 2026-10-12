@@ -1,4 +1,4 @@
-// ── Sound effects actually play, and the Sound effects switch actually stops them ─────
+// ── Sound effects play, ambience follows the zone, and the switches work ─────────────
 //
 // Reads `window.__sfx` (DEV-only, src/engine/audio/sfx.ts): which cues decoded and which
 // cues were started. The audio itself can't be heard from here, but "a hit played a hit
@@ -33,6 +33,16 @@ export async function run({ send, appUrl, check, note }) {
   check('combat makes combat sounds', played.some(c => COMBAT.test(c)))
   check('a kill makes a kill sound', played.includes('mob_death') || played.includes('boss_death'))
   check('every played cue is one that loaded', played.every(c => cues.includes(c)))
+
+  // Ambience: the starting zone is Sunhollow Meadows, which is birds over faint crickets.
+  await waitFor(send, `Object.keys(window.__ambience?.().beds ?? {}).length >= 6`, { timeout: 15000 })
+  const amb = await evaluate(send, `window.__ambience()`)
+  note(`ambience: ${JSON.stringify(amb)}`)
+  const on = Object.entries(amb.beds).filter(([, b]) => b.target > 0 && b.running).map(([k]) => k).sort()
+  check('the meadow plays birds and crickets, and nothing else', on.join() === 'birds,crickets', on.join())
+
+  // The music never stops: it is playing in the world, and still playing at character select.
+  check('music is playing in the world', await evaluate(send, `window.__ilMusic?.().playing === true`))
 
   // The switch: Menu → Settings → Sound effects Off, then nothing more should play.
   await evaluate(send, `document.querySelector('[aria-label="Menu — character select"]')?.click()`)

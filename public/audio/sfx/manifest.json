@@ -1,196 +1,200 @@
 {
  "hit_slash": {
   "files": [
-   "sfx_wpn_sword1.wav",
-   "sfx_wpn_sword2.wav",
-   "sfx_wpn_sword3.wav"
-  ],
-  "gain": 0.45
- },
- "hit_blunt": {
-  "files": [
-   "sfx_wpn_punch3.wav",
-   "sfx_wpn_punch4.wav"
-  ],
-  "gain": 0.55
- },
- "hit_pierce": {
-  "files": [
-   "sfx_wpn_dagger.wav",
-   "sfx_wpn_punch1.wav"
-  ],
-  "gain": 0.45
- },
- "hit_crit": {
-  "files": [
-   "sfx_sounds_impact5.wav",
-   "sfx_sounds_impact12.wav"
+   "rpg80_blade_01.wav",
+   "rpg80_blade_02.wav",
+   "rpg80_blade_03.wav"
   ],
   "gain": 0.6
  },
- "hurt": {
+ "hit_blunt": {
   "files": [
-   "sfx_damage_hit4.wav",
-   "sfx_damage_hit8.wav",
-   "sfx_damage_hit9.wav"
+   "woodmetal_wood_hit_07.wav",
+   "woodmetal_wood_hit_09.wav",
+   "woodmetal_wood_hammer_01.wav"
   ],
-  "gain": 0.4
+  "gain": 0.7
  },
- "ally_hit": {
+ "hit_pierce": {
   "files": [
-   "sfx_exp_shortest_soft7.wav",
-   "sfx_exp_shortest_soft8.wav"
-  ],
-  "gain": 0.22
- },
- "cast_fire": {
-  "files": [
-   "sfx_wpn_laser8.wav"
-  ],
-  "gain": 0.3
- },
- "cast_frost": {
-  "files": [
-   "sfx_sounds_high3.wav"
-  ],
-  "gain": 0.22
- },
- "cast_shadow": {
-  "files": [
-   "sfx_wpn_laser7.wav"
-  ],
-  "gain": 0.3
- },
- "cast_arcane": {
-  "files": [
-   "sfx_wpn_laser10.wav"
-  ],
-  "gain": 0.3
- },
- "cast_nature": {
-  "files": [
-   "sfx_sounds_interaction19.wav"
-  ],
-  "gain": 0.25
- },
- "impact_fire": {
-  "files": [
-   "sfx_exp_shortest_hard5.wav",
-   "sfx_exp_shortest_hard4.wav"
-  ],
-  "gain": 0.5
- },
- "impact_frost": {
-  "files": [
-   "sfx_sounds_impact2.wav"
-  ],
-  "gain": 0.4
- },
- "impact_shadow": {
-  "files": [
-   "sfx_exp_shortest_soft9.wav",
-   "sfx_exp_shortest_soft3.wav"
+   "kenney_knifeSlice2.wav",
+   "woodmetal_metal_hit_01.wav"
   ],
   "gain": 0.55
  },
- "impact_arcane": {
+ "hit_crit": {
   "files": [
-   "sfx_sounds_impact15.wav"
+   "swords_sword_clash_2.wav",
+   "swords_sword_clash_4.wav"
+  ],
+  "gain": 0.55
+ },
+ "hurt": {
+  "files": [
+   "woodmetal_wood_misc_06.wav",
+   "rpg80_misc_02.wav",
+   "woodmetal_wood_hit_03.wav"
+  ],
+  "gain": 0.55
+ },
+ "ally_hit": {
+  "files": [
+   "woodmetal_wood_hit_08.wav",
+   "rpg80_wood_03.wav"
+  ],
+  "gain": 0.3
+ },
+ "cast_fire": {
+  "files": [
+   "rpg80_spell_fire_07.wav"
   ],
   "gain": 0.45
+ },
+ "cast_frost": {
+  "files": [
+   "magic_magical_3.wav"
+  ],
+  "gain": 0.3
+ },
+ "cast_shadow": {
+  "files": [
+   "magic_magical_4.wav"
+  ],
+  "gain": 0.45
+ },
+ "cast_arcane": {
+  "files": [
+   "rpg80_spell_01.wav"
+  ],
+  "gain": 0.4
+ },
+ "cast_nature": {
+  "files": [
+   "rpg80_spell_02.wav"
+  ],
+  "gain": 0.4
+ },
+ "impact_fire": {
+  "files": [
+   "rpg80_spell_fire_06.wav",
+   "rpg80_spell_fire_01.wav"
+  ],
+  "gain": 0.55
+ },
+ "impact_frost": {
+  "files": [
+   "rpg80_item_gem_01.wav",
+   "rpg80_item_gem_03.wav"
+  ],
+  "gain": 0.5
+ },
+ "impact_shadow": {
+  "files": [
+   "rpg80_misc_02.wav",
+   "rpg80_stones_01.wav"
+  ],
+  "gain": 0.6
+ },
+ "impact_arcane": {
+  "files": [
+   "rpg80_metal_03.wav",
+   "rpg80_metal_02.wav"
+  ],
+  "gain": 0.4
  },
  "impact_nature": {
   "files": [
-   "sfx_exp_shortest_soft1.wav"
+   "rpg80_wood_03.wav",
+   "rpg80_item_wood_01.wav"
   ],
-  "gain": 0.45
+  "gain": 0.55
  },
  "shadow_bolt": {
   "files": [
-   "sfx_exp_shortest_hard3.wav"
+   "woodmetal_misc_03.wav"
   ],
-  "gain": 0.65
+  "gain": 0.7
  },
  "splash": {
   "files": [
-   "sfx_sounds_impact11.wav"
+   "swords_sword_6.wav"
   ],
   "gain": 0.5
  },
  "dot_tick": {
   "files": [
-   "sfx_exp_shortest_soft2.wav"
+   "rpg80_creature_slime_03.wav"
   ],
-  "gain": 0.18
+  "gain": 0.2
  },
  "mob_death": {
   "files": [
-   "sfx_exp_various1.wav",
-   "sfx_exp_various2.wav",
-   "sfx_exp_various3.wav",
-   "sfx_exp_various4.wav"
+   "rpg80_creature_die_01.wav",
+   "rpg80_creature_hurt_01.wav",
+   "rpg80_creature_misc_05.wav"
   ],
   "gain": 0.45
  },
  "boss_death": {
   "files": [
-   "sfx_exp_double2.wav"
+   "rpg80_creature_roar_02.wav"
   ],
   "gain": 0.7
  },
  "gold": {
   "files": [
-   "sfx_coin_single3.wav",
-   "sfx_coin_single5.wav"
+   "rpg80_item_coins_01.wav",
+   "rpg80_item_coins_03.wav"
   ],
-  "gain": 0.22
+  "gain": 0.4
  },
  "loot": {
   "files": [
-   "sfx_sounds_powerup15.wav"
+   "rpg80_item_misc_02.wav"
   ],
-  "gain": 0.35
+  "gain": 0.5
  },
  "loot_unique": {
   "files": [
-   "sfx_sounds_powerup2.wav"
-  ],
-  "gain": 0.55
- },
- "level_up": {
-  "files": [
-   "sfx_sounds_fanfare1.wav"
-  ],
-  "gain": 0.7
- },
- "unlock": {
-  "files": [
-   "sfx_sounds_fanfare3.wav"
+   "magic_magical_5.wav"
   ],
   "gain": 0.6
  },
+ "level_up": {
+  "files": [
+   "retro_sfx_sounds_fanfare1.wav"
+  ],
+  "gain": 0.5
+ },
+ "unlock": {
+  "files": [
+   "retro_sfx_sounds_fanfare3.wav"
+  ],
+  "gain": 0.45
+ },
  "boss_spawn": {
   "files": [
-   "sfx_exp_odd5.wav"
+   "rpg80_creature_roar_01.wav",
+   "rpg80_creature_roar_03.wav"
   ],
   "gain": 0.6
  },
  "player_death": {
   "files": [
-   "sfx_sounds_falling1.wav"
+   "rpg80_creature_monster_04.wav"
   ],
-  "gain": 0.6
+  "gain": 0.7
  },
  "player_respawn": {
   "files": [
-   "sfx_movement_portal5.wav"
+   "magic_magical_2.wav"
   ],
-  "gain": 0.45
+  "gain": 0.6
  },
  "ally_down": {
   "files": [
-   "sfx_sounds_damage1.wav"
+   "rpg80_creature_hurt_02.wav"
   ],
-  "gain": 0.4
+  "gain": 0.45
  }
 }

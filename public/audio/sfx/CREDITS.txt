@@ -1,4 +1,7 @@
-Sound effects: "The Essential Retro Video Game Sound Effects Collection [512 sounds]"
-by Juhani Junkala (SubspaceAudio), released under CC0 1.0 (public domain).
-https://opengameart.org/content/512-sound-effects-8-bit-style
-Processed (mono, 22.05 kHz, trimmed, normalized) by tools/sfx/build.py.
+Sound effects, all CC0 1.0 (public domain), processed by tools/sfx/build.py:
+- 80 CC0 RPG SFX by rubberduck — https://opengameart.org/content/80-cc0-rpg-sfx
+- 100 CC0 metal and wood SFX by rubberduck — https://opengameart.org/content/100-cc0-metal-and-wood-sfx
+- 50 RPG sound effects by Kenney — https://opengameart.org/content/50-rpg-sound-effects
+- 20 sword sound effects by StarNinjas — https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes
+- Magic spell SFX by JaggedStone — https://opengameart.org/content/magic-spell-sfx
+- 512 sound effects (8-bit style) by Juhani Junkala — https://opengameart.org/content/512-sound-effects-8-bit-style

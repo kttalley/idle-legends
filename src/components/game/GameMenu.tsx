@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useGameStore } from '../../store/gameStore'
 import { useDismissable } from '../ui/useDismissable'
 import { CLASS_DEFINITIONS } from '../../data/classes'
-import { getAudioState, setMuted as audioSetMuted, setMusicOn, setSfxOn, subscribeAudio } from '../../engine/audio/audioEngine'
+import { getAudioState, setAmbienceOn, setMuted as audioSetMuted, setMusicOn, setSfxOn, subscribeAudio } from '../../engine/audio/audioEngine'
 import { ShopView } from './ShopView'
 
 // The way back to character select.
@@ -133,6 +133,15 @@ export function GameMenu({ onClose }: { onClose: () => void }) {
             >
               <span>Sound effects</span>
               <span className="menu-row-value">{audio.sfxOn ? 'On' : 'Off'}</span>
+            </button>
+            <button
+              className="rp-button menu-row"
+              onClick={() => setAmbienceOn(!audio.ambienceOn)}
+              aria-pressed={audio.ambienceOn}
+              disabled={audio.muted}
+            >
+              <span>Ambience</span>
+              <span className="menu-row-value">{audio.ambienceOn ? 'On' : 'Off'}</span>
             </button>
             <button
               className="rp-button"

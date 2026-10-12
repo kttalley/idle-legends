@@ -1,9 +1,11 @@
 // ── Sound effects: CC0 retro samples, played on the frame the screen shows the event ─────
 //
-// The samples are Juhani Junkala's CC0 retro collection, picked per cue and processed by
-// tools/sfx/build.py into public/audio/sfx/ (mono 22 kHz WAV, trimmed, normalized), with
-// `manifest.json` mapping cue → files + gain. Swapping a sound is an edit to
-// tools/sfx/cues.json and a rebuild; nothing here names a file.
+// The samples are recorded fantasy foley from several CC0 packs (listed in
+// tools/sfx/cues.json), processed by tools/sfx/build.py into a 16-bit-era sampler sound
+// (low-passed, 16 kHz, 12-bit) in public/audio/sfx/, with `manifest.json` mapping
+// cue → files + gain. Swapping a sound is an edit to cues.json and a rebuild; nothing here
+// names a file. The effects bus in audioEngine.ts adds a further low-pass and sits ~7 dB
+// under the music.
 //
 // Who calls this: the renderer (combatAdapter.ts) for anything with an animation —
 // swings, casts, spell impacts, hits taken — so the sound lands on the same frame as the
@@ -38,7 +40,7 @@ const GAP: Partial<Record<SfxCue, number>> = {
   level_up: 1, unlock: 1, boss_spawn: 2, player_death: 1, player_respawn: 1,
 }
 /** ±this fraction of random pitch per play. Chiptune samples tolerate it well. */
-const DETUNE = 0.04
+const DETUNE = 0.03
 
 interface Cue { buffers: AudioBuffer[]; gain: number; next: number; lastAt: number }
 
