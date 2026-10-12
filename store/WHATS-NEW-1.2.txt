@@ -1,0 +1,6 @@
+Stillmarch 1.2
+
+• Sound effects! Every swing, spell, hit, kill, coin and level-up now has a retro 8-bit sound to match the pixel art. Each spell school has its own sound, so fire, frost, shadow, arcane and nature each sound different.
+• Cleaner audio: the background static and synth drones are gone, and the guitar theme plays on its own.
+• New Music and Sound effects switches in Menu → Settings, so you can keep one and turn off the other.
+• Behind the scenes: we now record anonymous progress milestones (first kill, levels reached, coming back the next day) to find where new players get stuck. No personal information is collected; see the updated privacy policy.
