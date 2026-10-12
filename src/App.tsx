@@ -19,6 +19,7 @@ import { PlayerCard } from './components/game/PlayerCard'
 import { WhisperWindow } from './components/game/WhisperWindow'
 import { installViewportInsets } from './engine/viewportInsets'
 import { deleteCloudSlot, installCloudSaveFlush } from './net/cloudSave'
+import { installFunnel } from './net/funnel'
 import {
   scheduleWatchEnd, cancelWatchEnd, primeWatchPermission,
   primeWatchPermissionAfterDwell, cancelWatchPermissionDwell,
@@ -187,6 +188,10 @@ export default function App() {
   // Listens on `visibilitychange`/`pagehide` rather than `beforeunload`, which mobile
   // browsers routinely skip when killing a backgrounded tab.
   useEffect(installCloudSaveFlush, [])
+
+  // Funnel milestones on resume. Saves and slot loads report from the store; a return from
+  // the background reloads nothing, so it has to be caught here. See `net/funnel.ts`.
+  useEffect(installFunnel, [])
 
   // ── The watch notification ───────────────────────────────────────────────────────
   //

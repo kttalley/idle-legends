@@ -80,6 +80,7 @@ import { generateNames, generateThought, generateFactionNamesFallback, generateP
 import type { ThoughtEvent } from '../engine/nameGen'
 import { slotStorage, summarize, newSlotId, setLastSlotId } from './saveSlots'
 import { queueCloudSave } from '../net/cloudSave'
+import { clearFunnelSlot, trackProgress, trackSession } from '../net/funnel'
 import { DEFAULT_COLORWAY, isColorwayUnlocked } from '../render/colorways'
 import { getPurchaseState } from '../monetization/purchases'
 import {
@@ -2170,6 +2171,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       })
       set(offline ? { ...saved, ...offline.patch, lastOffline: offline.report } : saved)
       get().saveGame()   // refreshes lastPlayedAt
+      trackSession(id, slot.createdAt, get(), offline !== null)
       return true
     } catch (err) {
       // Was a bare `catch { return false }`, and App.tsx discarded the boolean — so a
@@ -2203,6 +2205,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Deliberately not awaited and never able to throw: an autosave must not be able to
     // take an exception, or to wait on a network, on the path the game loop runs.
     queueCloudSave(slot)
+    trackProgress(slot.id, slot.createdAt, s)
   },
 
   // Save the active run and drop back to the character-select menu (no data loss —
@@ -2212,6 +2215,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     activeSlotId = null
     activeSlotCreatedAt = null
     setLastSlotId(null)   // an explicit exit to the menu must not auto-resume on reload
+    clearFunnelSlot()
     resetCombatAccumulators()
     set({ ...defaultState(), initialized: false })
   },
