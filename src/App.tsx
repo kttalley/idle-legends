@@ -35,7 +35,7 @@ import { CraftResultToast } from './components/game/CraftResultToast'
 import { LevelUpToast } from './components/game/LevelUpToast'
 import { slotStorage, getLastSlotId, setLastSlotId } from './store/saveSlots'
 import type { SaveSlotMeta } from './store/saveSlots'
-import { initAudio, setVolume as audioSetVolume, suspendAudio, resumeAudio } from './engine/audio/audioEngine'
+import { initAudio, setVolume as audioSetVolume, suspendAudio, resumeAudio, getAudioState, audioRunning } from './engine/audio/audioEngine'
 import { requestAudioFocus } from './engine/audio/audioFocus'
 import { Capacitor } from '@capacitor/core'
 import { startMusicTrack } from './engine/audio/musicTrack'
@@ -222,33 +222,39 @@ export default function App() {
     }
   }, [])
 
-  // ── Android: yield the audio output when the game is not the media in front ──────
+  // ── Yield the audio output when the game is not the app in front ────────────────────
   //
   // Two sources of "stop playing", one response:
-  //   - The activity is backgrounded (visibilitychange → hidden). iOS WKWebView suspends
-  //     its audio by itself; the Android WebView does not — verified on the emulator, the
-  //     app's players stay `started` after HOME — so the suspend is ours to do.
-  //   - Another app or a call took audio focus (`stillmarch-audiofocus` event from
+  //   - The app is backgrounded (visibilitychange → hidden). Both platforms need this. It
+  //     was Android-only until 2026-10-12 on the belief that iOS WKWebView suspends its own
+  //     audio — it does not, reliably: with the music and ambience now continuous, a
+  //     minimized iPhone kept playing and kept the speaker in the Dynamic Island. Suspending
+  //     the context stops the render thread, which is also what lets AppDelegate deactivate
+  //     the AVAudioSession (iOS refuses to while audio I/O is running).
+  //   - Android only: another app or a call took audio focus (`stillmarch-audiofocus` from
   //     AudioFocusPlugin.java → 'loss').
-  // Resume happens on visible + focus 'gain'; after a loss, returning to the foreground
-  // re-requests focus first so a call that ended or a podcast that was paused does not
-  // leave the game silently muted OR talking over the thing the player switched to.
-  // Android-gated: on iOS this would add a second resume path to WebKit's own
-  // suspend/resume, and in a browser tab, audio continuing while hidden is the point.
+  // Resume happens on visible (+ focus 'gain' on Android). iOS may refuse a programmatic
+  // resume after an interruption; if it does, the next tap resumes it (`resumeOnTap`).
+  // Native only — in a browser tab, audio continuing while hidden is the point.
   useEffect(() => {
-    if (Capacitor.getPlatform() !== 'android') return
+    const platform = Capacitor.getPlatform()
+    if (platform === 'web') return
     let focusHeld = true
+    const resumeOnTap = () => {
+      window.removeEventListener('pointerdown', resumeOnTap)
+      void resumeAudio()
+    }
     const apply = async (visible: boolean) => {
       if (!visible) {
         void suspendAudio()
         return
       }
-      if (focusHeld) {
-        void resumeAudio()
-      } else {
+      if (platform === 'android' && !focusHeld) {
         focusHeld = await requestAudioFocus()
-        if (focusHeld) void resumeAudio()
+        if (!focusHeld) return
       }
+      await resumeAudio()
+      if (getAudioState().ready && !audioRunning()) window.addEventListener('pointerdown', resumeOnTap)
     }
     const onVisibility = () => void apply(document.visibilityState === 'visible')
     const onFocus = (e: Event) => {
@@ -260,6 +266,7 @@ export default function App() {
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('stillmarch-audiofocus', onFocus)
+      window.removeEventListener('pointerdown', resumeOnTap)
     }
   }, [])
 

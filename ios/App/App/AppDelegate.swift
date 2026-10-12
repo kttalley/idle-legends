@@ -48,12 +48,35 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
-        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
-        // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
+        // Give the audio session back when the game leaves the screen. An active `.playback`
+        // session is what keeps the speaker in the Dynamic Island (and lets a minimized app
+        // keep sounding) — reported 2026-10-12 once the music and ambience became continuous.
+        deactivateAudioSession(retries: 3)
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
-        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("[audio] could not reactivate AVAudioSession: \(error)")
+        }
+    }
+
+    /// iOS refuses to deactivate a session while audio I/O is still running, and the web
+    /// side suspends its AudioContext on `visibilitychange`, which can land a moment after
+    /// this callback. So a refusal is retried briefly rather than taken as final.
+    private func deactivateAudioSession(retries: Int) {
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+        } catch {
+            guard retries > 0 else {
+                print("[audio] could not deactivate AVAudioSession: \(error)")
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                self.deactivateAudioSession(retries: retries - 1)
+            }
+        }
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {

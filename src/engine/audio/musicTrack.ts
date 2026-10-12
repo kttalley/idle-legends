@@ -16,7 +16,7 @@
 // scheduling gap, whereas an element's `loop` attribute re-seeks on the main thread and
 // audibly stutters on a slow frame.
 
-import { getAudioContext, getMusicInput } from './audioEngine'
+import { getAudioContext, getMusicInput, onMusicElementPlayback } from './audioEngine'
 
 /** Published under `public/`, so it ships with both the web build and the iOS bundle. */
 const TRACK_URL = `${import.meta.env.BASE_URL}audio/theme.mp3`
@@ -150,6 +150,13 @@ export async function startMusicTrack(): Promise<void> {
     starting = false
   }
 }
+
+// The element fallback is paused and resumed with the app; see onMusicElementPlayback.
+onMusicElementPlayback(playing => {
+  if (!element) return
+  if (playing) void element.play().catch(() => { /* resumes on the next start */ })
+  else element.pause()
+})
 
 /** Find where the music starts and ends, ignoring leading and trailing silence. */
 function measureMusic(buf: AudioBuffer): void {

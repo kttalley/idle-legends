@@ -142,24 +142,42 @@ async function maybeResume(): Promise<void> {
 
 // ── Backgrounding / focus ────────────────────────────────────────────────────────────────
 /**
- * Suspend the shared context: the Android WebView keeps rendering Web Audio while the
- * activity is backgrounded (iOS WKWebView suspends on its own — verified by watching the
- * app's AAudio players stay `started` after HOME), and an idle game that keeps playing
- * over the player's podcast is a removal-review bug. No-op when not running.
+ * Suspend the shared context when the app is backgrounded. Neither WebView reliably does it
+ * for us: the Android WebView keeps rendering (its AAudio players stay `started` after
+ * HOME), and on iOS a minimized app kept playing and kept the Dynamic Island speaker lit.
+ * An idle game that keeps playing over the player's podcast is a removal-review bug.
  */
 export async function suspendAudio(): Promise<void> {
+  setMusicElementPlaying?.(false)
   if (!ctx || ctx.state !== 'running') return
   try { await ctx.suspend() } catch { /* ignore — a failed suspend is just today's behaviour */ }
 }
 
 /**
- * Undo suspendAudio — Android only (App.tsx gates the listeners to the android platform);
- * on iOS WebKit owns suspend/resume and must not gain a second resume path. The context
- * was unlocked by a user gesture at latch time, so a programmatic resume is permitted
- * after that. No-op unless suspended.
+ * Undo suspendAudio, on returning to the foreground (App.tsx, native platforms only). The
+ * context was unlocked by a user gesture at latch time, so a programmatic resume is
+ * normally permitted; when iOS refuses one, App.tsx falls back to resuming on the next tap.
+ * No-op unless suspended.
  */
 export async function resumeAudio(): Promise<void> {
   await maybeResume()
+  setMusicElementPlaying?.(true)
+}
+
+/** True when the context exists and is actually producing sound. */
+export function audioRunning(): boolean {
+  return ctx?.state === 'running'
+}
+
+/**
+ * musicTrack.ts registers this so the `<audio>`-element fallback is paused along with the
+ * context: suspending the context silences an element routed through it, but the element
+ * itself keeps "playing", and an element that is playing is what iOS shows as Now Playing.
+ * Set from there rather than imported, to keep this module free of a dependency on it.
+ */
+let setMusicElementPlaying: ((playing: boolean) => void) | null = null
+export function onMusicElementPlayback(fn: (playing: boolean) => void): void {
+  setMusicElementPlaying = fn
 }
 
 // ── Volume / mute ────────────────────────────────────────────────────────────────────────
