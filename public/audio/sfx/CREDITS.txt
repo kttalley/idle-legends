@@ -5,3 +5,8 @@ Sound effects, all CC0 1.0 (public domain), processed by tools/sfx/build.py:
 - 20 sword sound effects by StarNinjas — https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes
 - Magic spell SFX by JaggedStone — https://opengameart.org/content/magic-spell-sfx
 - 512 sound effects (8-bit style) by Juhani Junkala — https://opengameart.org/content/512-sound-effects-8-bit-style
+- Wind, hit, time morph (swooshes) by qubodup — https://opengameart.org/content/wind-hit-time-morph
+- Fire staff sound effects by LEGIT — https://opengameart.org/content/fire-staff-sound-effects
+- Fireball 1 by Julien — https://opengameart.org/content/fireball-1
+- Ice spells by bart — https://opengameart.org/content/ice-spells
+- Earth element magic spell by qubodup — https://opengameart.org/content/earth-element-magic-spell

@@ -46,51 +46,53 @@
  },
  "cast_fire": {
   "files": [
-   "rpg80_spell_fire_07.wav"
+   "firestaff_LEGIT_FIR_Fire_Staff_7_Audio.wav",
+   "firestaff_LEGIT_FIR_Fire_Staff_8_Audio.wav"
   ],
-  "gain": 0.45
+  "gain": 0.5
  },
  "cast_frost": {
   "files": [
-   "swords_sword_3.wav"
+   "swoosh_qubodup_megaswosh1.wav"
   ],
-  "gain": 0.4
+  "gain": 0.45,
+  "rate": 1.15
  },
  "cast_shadow": {
   "files": [
-   "swords_sword_2.wav"
+   "swoosh_qubodup_megaswosh2.wav",
+   "swoosh_qubodup_slomo1.wav"
   ],
-  "gain": 0.45,
-  "rate": 0.7
+  "gain": 0.5,
+  "rate": 0.75
  },
  "cast_arcane": {
   "files": [
-   "swords_sword_4.wav"
+   "swoosh_60009__qubodup__swosh_22.wav"
   ],
-  "gain": 0.4,
-  "rate": 0.85
+  "gain": 0.45,
+  "rate": 0.9
  },
  "cast_nature": {
   "files": [
-   "swords_sword_7.wav"
+   "swoosh_qubodup_megaswosh1.wav"
   ],
-  "gain": 0.35,
-  "rate": 0.9
+  "gain": 0.4,
+  "rate": 0.95
  },
  "impact_fire": {
   "files": [
-   "rpg80_spell_fire_06.wav",
-   "rpg80_spell_fire_01.wav"
+   "fireball_105016__julien_matthey__jm_fx_fireball_01.wav",
+   "firestaff_LEGIT_FIR_Fire_Staff_1_Audio.wav"
   ],
   "gain": 0.55
  },
  "impact_frost": {
   "files": [
-   "woodmetal_wood_cracking_04.wav",
-   "woodmetal_wood_cracking_03.wav"
+   "ice_ice.wav",
+   "woodmetal_wood_cracking_04.wav"
   ],
-  "gain": 0.55,
-  "rate": 0.9
+  "gain": 0.55
  },
  "impact_shadow": {
   "files": [
@@ -102,19 +104,18 @@
  },
  "impact_arcane": {
   "files": [
-   "woodmetal_metal_slam_01.wav",
-   "woodmetal_misc_06.wav"
+   "earth_Earth_Element_Magic_Spell_0.wav"
   ],
   "gain": 0.5,
-  "rate": 0.85
+  "rate": 1.1
  },
  "impact_nature": {
   "files": [
-   "woodmetal_wood_breaking_01.wav",
-   "rpg80_wood_03.wav"
+   "earth_Earth_Element_Magic_Spell_0.wav",
+   "woodmetal_wood_breaking_01.wav"
   ],
   "gain": 0.5,
-  "rate": 0.9
+  "rate": 0.95
  },
  "shadow_bolt": {
   "files": [
