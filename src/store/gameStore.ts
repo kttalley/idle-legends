@@ -2352,7 +2352,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // ledger fed only by the optional strike meter, and (b) a loop instead of a single
     // decrement, so a large catch-up delta yields the harvests it earned instead of
     // silently dropping the surplus.
-    if (state.gameMode === 'gathering') {
+    // A dead hero skips this branch and the crafting one and falls through to the respawn
+    // below. Both return early, and respawn is the last thing before the combat set, so a
+    // corpse that tapped Gather on a node used to harvest forever and never rise
+    // (seen in a real 1.2 save, 2026-10-14: hp 0, respawnTimer frozen at 0.3s). The mode
+    // is kept, so the hero goes back to gathering once alive.
+    if (state.gameMode === 'gathering' && state.isAlive) {
       // World drift — slow wander so map scrolls past player.
       // The angle is driven by `totalPlayTime`, which this branch used to leave frozen:
       // only the combat branch advanced it, and every other branch returns before that.
@@ -2440,7 +2445,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     }
 
     // ── Crafting tick ────────────────────────────────────────────────────────
-    if (state.gameMode === 'crafting' && state.activeRecipe) {
+    if (state.gameMode === 'crafting' && state.activeRecipe && state.isAlive) {
       const newTimer = state.craftingTimer - deltaSeconds
       if (newTimer <= 0) {
         const recipe = RECIPES.find(r => r.id === state.activeRecipe)

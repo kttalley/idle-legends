@@ -100,6 +100,10 @@ export async function uploadSlot(slot: SaveSlot): Promise<boolean> {
     level: Math.max(1, Math.min(200, Math.round(slot.summary.level ?? 1))),
     play_time: Math.max(0, Math.round(slot.state.totalPlayTime ?? 0)),
     created_at: slot.createdAt ?? 0,
+    // The column default only fires on INSERT, so without this the upsert left `saved_at`
+    // at the first upload forever, and a restore showed "last played" as the day the
+    // character was made.
+    saved_at: new Date().toISOString(),
     state: stripForCloud(slot.state),
     summary: slot.summary,
   })
