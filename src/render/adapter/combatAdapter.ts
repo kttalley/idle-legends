@@ -674,6 +674,15 @@ export class WorldSceneController {
   private lctx: CanvasRenderingContext2D
   /** Device pixels per buffer pixel on the label canvas, for baking plates at that density. */
   private labelK = 1
+  /** Boxes (buffer px) drawn on the label canvas this frame, cleared at the start of the
+   *  next. Clearing the whole device-resolution canvas every frame cost 15-20% of the
+   *  frame rate under CPU throttling; a dozen small rects cost next to nothing. */
+  private labelDirty: number[] = []
+  private labelDirtyPrev: number[] = []
+  /** Record a box drawn on the label canvas so the next frame can erase exactly it. */
+  private markLabel(x: number, y: number, w: number, h: number): void {
+    this.labelDirty.push(x, y, w, h)
+  }
   private floatersHost: HTMLElement
   private floaters: Floater[] = []
 
@@ -2627,8 +2636,9 @@ export class WorldSceneController {
     const dpr = Math.min(3, window.devicePixelRatio || 1)
     const lw = Math.max(1, Math.round(cssW * dpr)), lh = Math.max(1, Math.round(cssH * dpr))
     if (this.labelCanvas.width !== lw || this.labelCanvas.height !== lh) {
-      this.labelCanvas.width = lw
+      this.labelCanvas.width = lw   // resizing a canvas clears it
       this.labelCanvas.height = lh
+      this.labelDirty.length = 0
     }
     const k = lw / vw
     if (k !== this.labelK) { this.labelK = k; this.nameplateCache.clear() }
@@ -2637,9 +2647,13 @@ export class WorldSceneController {
   /** Wipe the label canvas and point its transform at buffer coordinates for this frame. */
   private beginLabels(): void {
     const l = this.lctx
-    l.setTransform(1, 0, 0, 1, 0, 0)
-    l.clearRect(0, 0, this.labelCanvas.width, this.labelCanvas.height)
     l.setTransform(this.labelCanvas.width / this.cam.w, 0, 0, this.labelCanvas.height / this.cam.h, 0, 0)
+    // Erase last frame's labels. A 3px margin covers the outline stroke and the bubble tail.
+    const d = this.labelDirty
+    for (let i = 0; i < d.length; i += 4) l.clearRect(d[i] - 3, d[i + 1] - 3, d[i + 2] + 6, d[i + 3] + 6)
+    this.labelDirty = this.labelDirtyPrev
+    this.labelDirtyPrev = d
+    this.labelDirty.length = 0
   }
 
   /** Set the render zoom (world-px → CSS-px). The host picks a smaller value on narrow
@@ -4035,6 +4049,7 @@ export class WorldSceneController {
       ctx.strokeText(l.text, l.sx, y)
       ctx.fillStyle = l.fill
       ctx.fillText(l.text, l.sx, y)
+      this.markLabel(l.sx - l.w / 2, y - 12, l.w, 14 + (l.sub ? 10 : 0))
       if (l.sub) {
         ctx.font = FONT_SMALL
         ctx.lineWidth = 3
@@ -5382,6 +5397,7 @@ export class WorldSceneController {
     ctx.strokeText('Resting…', sx, sy)
     ctx.fillStyle = '#9fd6b0'
     ctx.fillText('Resting…', sx, sy)
+    this.markLabel(sx - 24, sy - 6, 48, 12)
     ctx.restore()
   }
 
@@ -5440,6 +5456,7 @@ export class WorldSceneController {
       const it = items[i], dy = lifts[i]
       if (dy === null) continue
       ctx.drawImage(it.plate.c, it.sx - (it.plate.w >> 1), it.sy + dy - (it.plate.h >> 1), it.plate.w, it.plate.h)
+      this.markLabel(it.sx - (it.plate.w >> 1), it.sy + dy - (it.plate.h >> 1), it.plate.w, it.plate.h)
       if (it.amb) this.plateLift.set(it.amb, dy)
     }
     this.drawAmbientBarks()
@@ -5484,6 +5501,7 @@ export class WorldSceneController {
       const w = Math.ceil(ctx.measureText(a.bark).width) + 10
       const h = 13
       const x = sx - w / 2, y = sy - h / 2
+      this.markLabel(x, y, w, h + 4)
 
       // Faction-tinted bubble for party chat only. Zone chatter keeps the original
       // neutral styling so the world doesn't go from one calm colour scheme to a
