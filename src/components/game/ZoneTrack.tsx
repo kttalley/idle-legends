@@ -5,6 +5,7 @@ import { useGameStore } from '../../store/gameStore'
 import { ZONES, ZONE_ORDER } from '../../data/zones'
 import { getZoneProgression, getPrerequisiteZone } from '../../engine/zoneProgression'
 import type { ZoneId } from '../../data/types'
+import { NEWCOMER_LEVEL } from '../../data/constants'
 
 // The zone list as a subway map.
 //
@@ -137,7 +138,7 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
             const isTarget   = travelTarget === zoneId
             const zKills     = totalZoneKills[zoneId as ZoneId] ?? 0
             const zBossDown  = bossesDefeated.includes(zoneId as ZoneId)
-            const bossReady  = unlocked && !zBossDown && zKills >= z.unlockKills
+            const bossReady  = unlocked && !zBossDown && zKills >= z.unlockKills && level >= NEWCOMER_LEVEL
 
             const travelSec = Math.abs(currentIdx - idx) * 8
 

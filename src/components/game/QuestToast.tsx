@@ -47,7 +47,7 @@ export function QuestToast() {
           <SpriteIcon ui="trophy" size={17} />
           <span
             style={{
-              fontSize: '0.55rem',
+              fontSize: '0.7rem',
               textTransform: 'uppercase',
               letterSpacing: '0.08em',
               color: 'var(--gold)',
@@ -70,7 +70,7 @@ export function QuestToast() {
 
         <div
           style={{
-            fontSize: '0.6rem',
+            fontSize: '0.75rem',
             color: '#b8a070',
             lineHeight: 1.4,
             marginBottom: 10,
@@ -82,7 +82,7 @@ export function QuestToast() {
         {rewardName && (
           <div
             style={{
-              fontSize: '0.55rem',
+              fontSize: '0.7rem',
               color: canTravel ? '#ffaa44' : '#b8a070',
               marginBottom: 10,
             }}
@@ -97,7 +97,7 @@ export function QuestToast() {
           {canTravel && (
             <button
               className="rp-button flex-1"
-              style={{ fontSize: '0.62rem', background: 'linear-gradient(180deg, var(--wood-lit), #4a3518)' }}
+              style={{ fontSize: '0.75rem', background: 'linear-gradient(180deg, var(--wood-lit), #4a3518)' }}
               onClick={() => claimQuestReward(activeQuest.id)}
             >
               Venture Onward
@@ -105,7 +105,7 @@ export function QuestToast() {
           )}
           <button
             className="rp-button"
-            style={{ fontSize: '0.6rem', color: canTravel ? '#a09080' : 'var(--gold-bright)', flex: canTravel ? undefined : 1 }}
+            style={{ fontSize: '0.75rem', color: canTravel ? '#a09080' : 'var(--gold-bright)', flex: canTravel ? undefined : 1 }}
             onClick={() => dismissQuestReward(activeQuest.id)}
           >
             {canTravel ? 'Stay' : 'Keep Hunting'}

@@ -8,6 +8,8 @@ import { TravelOverlay } from '../TravelOverlay'
 import { GatheringPanel } from '../GatheringPanel'
 import { CraftingPanel } from '../CraftingPanel'
 import { TownView } from '../TownView'
+import { SpriteIcon } from '../../ui/SpriteIcon'
+import { ZONE_MATERIALS, MATERIALS, CLASS_PROFESSIONS } from '../../../data/professions'
 
 // WoW/Diablo-style HUD shell: a click-through DOM overlay painted on top of the
 // dimetric world canvas (text/tooltips stay crisp; the canvas renders only the world).
@@ -22,8 +24,11 @@ export function HudOverlay() {
   const currentTown = useGameStore(s => s.currentTown)
   const setMode = useGameStore(s => s.setMode)
   const leaveTown = useGameStore(s => s.leaveTown)
+  // `undefined` (an older save) counts as chosen: that is how gathering always behaved.
+  const gatherChosen = useGameStore(s => s.gatherChosen !== false)
   const showTown = gameMode === 'in_town' && !!currentTown
-  const showPanel = gameMode === 'traveling' || gameMode === 'gathering'
+  const autoGathering = gameMode === 'gathering' && !gatherChosen
+  const showPanel = gameMode === 'traveling' || (gameMode === 'gathering' && gatherChosen)
     || gameMode === 'crafting' || showTown
 
   // Publish both top corners' real heights as --unit-h / --hud-r-h.
@@ -112,8 +117,36 @@ export function HudOverlay() {
             {showTown && <TownView />}
           </div>
         )}
+        {autoGathering && <AutoGatherChip />}
         <ActionBar />
       </div>
     </div>
+  )
+}
+
+// What the hero is doing when they wandered onto a node by themselves. The full panel used
+// to slide up here, over the fight a brand-new player was still watching, for a menu they
+// never opened. A tap expands it for anyone who wants to work the vein.
+function AutoGatherChip() {
+  const playerClass = useGameStore(s => s.playerClass)
+  const currentZone = useGameStore(s => s.currentZone)
+  const openGatherPanel = useGameStore(s => s.openGatherPanel)
+  const prof = CLASS_PROFESSIONS[playerClass]
+  const mat = MATERIALS[ZONE_MATERIALS[currentZone][playerClass]]
+  return (
+    <button
+      className="rp-glass"
+      onClick={openGatherPanel}
+      style={{
+        pointerEvents: 'auto', alignSelf: 'center', marginBottom: 6,
+        display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px',
+        borderRadius: 999, fontSize: '0.75rem', color: 'var(--parchment)',
+      }}
+      title={`${prof.gatherVerb} — tap to work the vein`}
+    >
+      <SpriteIcon emoji={prof.gatherIcon} size={14} />
+      <span>{prof.gatherVerb} {mat.name}</span>
+      <span style={{ color: 'var(--muted)', fontSize: '0.7rem' }}>· tap to work it</span>
+    </button>
   )
 }

@@ -48,7 +48,7 @@ export function CraftResultToast() {
           to   { opacity: 1; transform: none; }
         }
       `}</style>
-      <div style={{ fontSize: '0.5rem', color: '#8a8578', textTransform: 'uppercase', letterSpacing: 1 }}>
+      <div style={{ fontSize: '0.68rem', color: '#8a8578', textTransform: 'uppercase', letterSpacing: 1 }}>
         {result.kind === 'gear' ? 'Crafted equipment' : 'Crafted'}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 3 }}>
@@ -57,16 +57,16 @@ export function CraftResultToast() {
           <div style={{ fontSize: '0.7rem', color, fontWeight: 700, lineHeight: 1.15 }}>
             {result.name}
           </div>
-          <div style={{ fontSize: '0.52rem', color: '#9a9488' }}>
+          <div style={{ fontSize: '0.7rem', color: '#9a9488' }}>
             {QUALITY_LABEL[result.quality]} · {result.rarity}
           </div>
         </div>
       </div>
-      <div style={{ fontSize: '0.55rem', color: 'var(--parchment)', marginTop: 4 }}>
+      <div style={{ fontSize: '0.7rem', color: 'var(--parchment)', marginTop: 4 }}>
         {result.detail}
       </div>
       {result.kind === 'gear' && (
-        <div style={{ fontSize: '0.5rem', color: '#6a655c', marginTop: 3 }}>
+        <div style={{ fontSize: '0.68rem', color: '#6a655c', marginTop: 3 }}>
           In your bags — equip it to wear the colours.
         </div>
       )}

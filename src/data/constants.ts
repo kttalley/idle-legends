@@ -168,6 +168,40 @@ export const BOSS_DAMAGE_MULTIPLIER = 2.5
 export const ELITE_HP_MULTIPLIER = 3
 export const ELITE_DAMAGE_MULTIPLIER = 1.8
 
+// ── Newcomer grace ────────────────────────────────────────────────────────────
+// A brand-new hero died within their first 0.3–4 minutes in every simulated run (48 of
+// 48, all four classes), and warriors and rogues died six or seven times in the first
+// fifteen. Half of those were packs of ordinary mobs; the rest were elites and the zone
+// boss, which spawns at 35 kills, when the hero is about level 3, and swings for ~150.
+// A tester's first screenshot on Android was a level-1 hero lying dead. So until this
+// level: mobs hit softer (half at level 1, full at NEWCOMER_LEVEL), the hero recovers
+// between fights, no elites spawn, and the zone boss waits. It only ever bites in the first zone, which runs to level 10.
+export const NEWCOMER_LEVEL = 5
+/** Share of max HP a newcomer recovers per second while no mob is engaged. */
+export const NEWCOMER_REGEN_PER_SEC = 0.05
+/** Below this share of max HP an idle newcomer stops starting fights and recovers. */
+export const NEWCOMER_REST_BELOW = 0.6
+
+// ── Resting (every level) ─────────────────────────────────────────────────────
+// With no regeneration anywhere, death WAS the rest: fight to zero, 3s on the floor, back
+// at half health. That made dying ordinary (two or three times every fifteen minutes past
+// level 5), which reads as failure to someone watching and leaves death meaning nothing.
+// An idle hero now stops picking fights when low, recovers, and goes again; death is left
+// for the fights that are genuinely too much. The rate is set so the time spent resting is
+// about the time that used to be spent dead — the economy should barely notice.
+/** Below this share of max HP an idle hero (past newcomer grace) stops starting fights. */
+export const REST_BELOW = 0.35
+/** ...and rests until it is back to this share. */
+export const REST_UNTIL = 0.9
+/** Share of max HP recovered per second while resting. */
+export const REST_REGEN_PER_SEC = 0.08
+
+/** Incoming mob damage multiplier for a hero of this level. */
+export function newcomerDamageScale(level: number): number {
+  if (level >= NEWCOMER_LEVEL) return 1
+  return 0.5 + (0.5 * (Math.max(1, level) - 1)) / (NEWCOMER_LEVEL - 1)
+}
+
 /**
  * How far above a zone you can be and still earn XP there — the grey-mob rule.
  *

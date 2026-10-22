@@ -21,7 +21,7 @@ function formatSpan(seconds: number): string {
 
 function Row({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: '0.6rem' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: '0.75rem' }}>
       <span style={{ color: 'var(--muted)' }}>{label}</span>
       <span style={{ color: color ?? 'var(--parchment)', fontWeight: 700 }}>{value}</span>
     </div>
@@ -58,13 +58,13 @@ export function OfflineReportToast() {
           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold)' }}>
             While you were away
           </span>
-          <span style={{ fontSize: '0.55rem', color: 'var(--muted)' }}>
+          <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
             {formatSpan(report.secondsElapsed)}
           </span>
         </div>
 
         {report.cappedAtHours !== null && (
-          <div style={{ fontSize: '0.5rem', color: 'var(--gold-deep)', fontStyle: 'italic' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--gold-deep)', fontStyle: 'italic' }}>
             <SpriteIcon ui="warn" size={10} /> Counted the first {report.cappedAtHours} hours —
             that is as far ahead as your hero will range unsupervised.
           </div>
@@ -73,7 +73,7 @@ export function OfflineReportToast() {
         {/* The banked extension actually being SPENT is the only proof the player gets that
             the gold went somewhere, so it is stated even though nothing went wrong. */}
         {report.watchSpent > 0 && (
-          <div style={{ fontSize: '0.5rem', color: 'var(--gold-soft)', fontStyle: 'italic' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--gold-soft)', fontStyle: 'italic' }}>
             Drew {formatSpan(report.watchSpent)} from your banked watch
             {report.watchRemaining > 0
               ? ` — ${formatSpan(report.watchRemaining)} still in hand.`
@@ -85,7 +85,7 @@ export function OfflineReportToast() {
             opened for them. The fix is a door, not a purchase, so the line points at the
             door. */}
         {report.cappedByContent && (
-          <div style={{ fontSize: '0.5rem', color: 'var(--warn)', fontStyle: 'italic' }}>
+          <div style={{ fontSize: '0.68rem', color: 'var(--warn)', fontStyle: 'italic' }}>
             <SpriteIcon ui="warn" size={10} /> Your hero has learned all these lands can
             teach — they stopped at level {report.contentCeiling}. Open the next region to
             keep growing.
@@ -101,7 +101,7 @@ export function OfflineReportToast() {
               value={`+${report.gathered.qty.toLocaleString()}`}
               color="var(--success)"
             />
-            <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic', marginTop: 2 }}>
+            <div style={{ fontSize: '0.68rem', color: '#7a6a4a', fontStyle: 'italic', marginTop: 2 }}>
               Worked the vein while you were gone. Unattended stock comes back Coarse —
               quality is what being there is for.
             </div>
@@ -145,7 +145,7 @@ export function OfflineReportToast() {
             />
           )}
           {report.itemsSalvaged > 0 && report.itemsSold === 0 && (
-            <div style={{ fontSize: '0.5rem', color: '#7a6a4a', fontStyle: 'italic', marginTop: 2 }}>
+            <div style={{ fontSize: '0.68rem', color: '#7a6a4a', fontStyle: 'italic', marginTop: 2 }}>
               A factor would have sold those at full price instead of for scrap.
             </div>
           )}
@@ -154,7 +154,7 @@ export function OfflineReportToast() {
         <button
           className="rp-button"
           onClick={onDismiss}
-          style={{ fontSize: '0.6rem', padding: '3px 10px', alignSelf: 'flex-start', marginTop: 2 }}
+          style={{ fontSize: '0.75rem', padding: '3px 10px', alignSelf: 'flex-start', marginTop: 2 }}
         >
           Good to be back
         </button>

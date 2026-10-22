@@ -34,7 +34,7 @@ export function ThoughtBubble() {
         border: '1px solid #5a4020',
         borderRadius: 8,
         padding: '5px 8px',
-        fontSize: '0.6rem',
+        fontSize: '0.75rem',
         fontStyle: 'italic',
         color: 'var(--parchment)',
         textAlign: 'center',

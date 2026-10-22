@@ -66,6 +66,8 @@ import {
   INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
   PARTY_MOB_HP_SCALE, PARTY_MOB_DAMAGE_SCALE, PARTY_MOB_REWARD_SCALE,
   ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE, GREY_LEVEL_GAP,
+  NEWCOMER_LEVEL, NEWCOMER_REGEN_PER_SEC, NEWCOMER_REST_BELOW, newcomerDamageScale,
+  REST_BELOW, REST_UNTIL, REST_REGEN_PER_SEC,
   WATCH_BANK_CAP_HOURS, WATCH_EXTEND_HOURS,
   BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
   AUTOSAVE_INTERVAL_MS, ZONE_STUCK_SECONDS,
@@ -412,6 +414,8 @@ function defaultState(): GameState {
     materials: {},
     materialPurity: {},
     gatherSession: null,
+    gatherChosen: false,
+    resting: false,
     activeRecipe: null,
     craftingTimer: 0,
     craftQuality: null,
@@ -1455,7 +1459,8 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
   if (!zone) return null
   const totalKills = state.totalZoneKills[zoneId] ?? 0
   const bossDefeated = state.bossesDefeated.includes(zoneId)
-  const canSpawnBoss = totalKills >= zone.unlockKills && !bossDefeated
+  // The boss also waits for the hero to outgrow newcomer grace; see NEWCOMER_LEVEL.
+  const canSpawnBoss = totalKills >= zone.unlockKills && !bossDefeated && state.level >= NEWCOMER_LEVEL
 
   let template
   if (canSpawnBoss) {
@@ -1468,7 +1473,7 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
   // The Bloodfield Standard multiplies this. Champions seeking you out is a trade, not
   // a buff: elites hit harder and drop better, and an unattended hero meets more of them.
   const eliteChance = ELITE_SPAWN_CHANCE * compileUniques(state.equipment).eliteSpawnMult
-  const isElite = !canSpawnBoss && Math.random() < Math.min(1, eliteChance)
+  const isElite = !canSpawnBoss && state.level >= NEWCOMER_LEVEL && Math.random() < Math.min(1, eliteChance)
   const isBoss  = canSpawnBoss
   const hpMult  = isBoss ? BOSS_HP_MULTIPLIER  : isElite ? ELITE_HP_MULTIPLIER  : 1
   const dmgMult = isBoss ? BOSS_DAMAGE_MULTIPLIER : isElite ? ELITE_DAMAGE_MULTIPLIER : 1
@@ -1873,6 +1878,24 @@ function isBossPresent(mobs: MobInstance[]): boolean {
   return mobs.some(m => m.isBoss)
 }
 
+/** Health share below which an idle hero of this level stops starting fights. */
+function restThreshold(level: number): number {
+  return level < NEWCOMER_LEVEL ? NEWCOMER_REST_BELOW : REST_BELOW
+}
+
+/**
+ * What an idle hero may pick a fight with. A hero that is resting, or low enough that it
+ * should be, takes on only what is already coming for it (see Resting, in `tick`). Without
+ * this the hero chained fight into fight with no gap at all, so it never recovered and
+ * dying was the only way back to health.
+ */
+function idleCandidates(
+  mobs: MobInstance[], level: number, hp: { currentHp: number; maxHp: number }, resting: boolean,
+): MobInstance[] {
+  if (!resting && hp.currentHp >= hp.maxHp * restThreshold(level)) return mobs
+  return mobs.filter(m => m.aggro)
+}
+
 /** Nearest mob to the player, used when the player has expressed no preference. */
 function nearestMob(mobs: MobInstance[]): MobInstance | null {
   let best: MobInstance | null = null
@@ -2028,6 +2051,8 @@ interface GameActions {
   cancelTravel: () => void
   cycleZoom: () => void
   setMode: (mode: GameMode) => void
+  /** Expand an auto-gather into the full gathering panel without restarting the harvest. */
+  openGatherPanel: () => void
   setControlMode: (mode: 'idle' | 'manual') => void
   /** Equip a cosmetic colorway. Returns false if it is not unlocked. */
   setColorway: (id: string) => boolean
@@ -2591,7 +2616,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           : null
         target = resumed && torusDistance(resumed.pos, state.playerMapPos) <= RESUME_TARGET_RADIUS
           ? resumed
-          : nearestMob(mobs)
+          : nearestMob(idleCandidates(mobs, level, stats, !!state.resting))
         targetMobId = target?.id ?? null
       } else {
         // Manual control still engages what you have WALKED UP TO. See
@@ -2815,7 +2840,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // to it, neither of which ever consults `controlMode`.
       if (!currentMob) {
         target = mobs.find(m => m.id === targetMobId)
-          ?? (controlMode === 'idle' ? nearestMob(mobs) : engageableMobNearby(mobs))
+          ?? (controlMode === 'idle' ? nearestMob(idleCandidates(mobs, level, stats, !!state.resting)) : engageableMobNearby(mobs))
         targetMobId = target?.id ?? null
         currentMob = target
         activeDoTs = target ? target.dots : []
@@ -2893,9 +2918,23 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       m.aggro && Math.sqrt(m.offset.dx ** 2 + m.offset.dy ** 2) < attackRangeOf(m))
 
     if (!currentMob && !packInMelee) {
+      // ── Resting ──────────────────────────────────────────────────────────────
+      // Nothing else regenerates health: it comes back on a level-up and on respawn. So an
+      // idle hero low on health stops here between fights (idleCandidates keeps it from
+      // picking a new one) and recovers to REST_UNTIL; a newcomer also recovers slowly
+      // whenever it is between fights. Fractional on purpose, like Second Wind: per-frame
+      // ticks are ~16ms and rounding would round it away.
+      const hpShare = stats.currentHp / Math.max(1, stats.maxHp)
+      const resting = controlMode === 'idle' && isAlive && hpShare < REST_UNTIL
+        && (!!state.resting || hpShare < restThreshold(level))
+      const regen = (resting ? REST_REGEN_PER_SEC : 0) + (level < NEWCOMER_LEVEL ? NEWCOMER_REGEN_PER_SEC : 0)
+      const recovering = isAlive && regen > 0 && stats.currentHp < stats.maxHp
+      if (recovering) {
+        stats.currentHp = Math.min(stats.maxHp, stats.currentHp + stats.maxHp * regen * deltaSeconds)
+      }
       const idle = tickWorld(state, controlMode, mobs, null, targetMobId, deltaSeconds)
       if (idle.logs.length) newLogs.push(...idle.logs)
-      set({ mobs: idle.mobs, targetMobId: idle.targetMobId, currentMob: null,
+      set({ ...(recovering ? { stats } : {}), resting, mobs: idle.mobs, targetMobId: idle.targetMobId, currentMob: null,
         // Combat clocks ride out with every branch that RETURNS. Omitting them here would
         // discard this tick's working copy and silently reset the hero's swing timer every
         // frame — the same shape of omission that once froze the whole world tick.
@@ -3611,7 +3650,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         } else {
         // Fifth argument was omitted, so the avoidance roll drew off the global too.
         const swing = resolveMobAttack(atk, stats.armor, fx.mobAttackSpeedFactor, fx, combatRng)
-        let mobDmg = swing.damage
+        let mobDmg = swing.blocked ? 0 : Math.max(1, Math.round(swing.damage * newcomerDamageScale(state.level)))
 
         if (swing.blocked) {
           newFns.push(fn(0, false, true, false, '#88aaff', undefined, atk.id))
@@ -3902,6 +3941,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       gatherSession: nextGameMode === 'gathering'
         ? openGatherSession(state, enteredNode)
         : state.gatherSession,
+      // Auto-gather never opens the panel by itself; see `gatherChosen`.
+      ...(nextGameMode === 'gathering' && state.gameMode !== 'gathering' ? { gatherChosen: false } : {}),
       activeQuest: state.activeQuest,
       completedQuestIds: state.completedQuestIds,
     })
@@ -4443,6 +4484,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     resetCombatAccumulators()
   },
 
+  openGatherPanel: () => {
+    if (get().gameMode === 'gathering') set({ gatherChosen: true })
+  },
+
   cancelTravel: () => {
     set({ gameMode: 'combat', travelTarget: null, travelProgress: 0 })
     resetCombatAccumulators()
@@ -4461,16 +4506,16 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     if (s.gameMode === 'traveling') return
     if (mode === 'gathering') {
       set({
-        gameMode: 'gathering', gatheringTimer: GATHER_SECONDS,
+        gameMode: 'gathering', gatheringTimer: GATHER_SECONDS, gatherChosen: true,
         gatherSession: openGatherSession(s, nodeAt(s, s.playerMapPos)),
         mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], mobRespawnTimer: 0,
       })
       resetCombatAccumulators()
     } else if (mode === 'combat') {
-      set({ gameMode: 'combat', gatherSession: null, mobRespawnTimer: 0 })
+      set({ gameMode: 'combat', gatherSession: null, gatherChosen: false, mobRespawnTimer: 0 })
       resetCombatAccumulators()
     } else if (mode === 'crafting') {
-      set({ gameMode: 'crafting', gatherSession: null, mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
+      set({ gameMode: 'crafting', gatherSession: null, gatherChosen: false, mobs: [], targetMobId: null, currentMob: null, activeDoTs: [], mobRespawnTimer: 0 })
       resetCombatAccumulators()
     }
   },

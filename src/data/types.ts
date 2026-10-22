@@ -896,6 +896,14 @@ export interface GameState {
   materialPurity: Record<MaterialId, number>
   /** Live strike meter for the node being worked. Transient — nulled on rehydrate. */
   gatherSession: GatherSession | null
+  /** True when the player picked gathering themselves. The auto-gather (hero drifts onto a
+   *  node between fights) leaves it false, and the HUD then shows a small chip rather than
+   *  the full panel, so a new player's first fight is not covered by a menu they never
+   *  opened. Absent on older saves → treated as chosen, the previous behaviour. */
+  gatherChosen?: boolean
+  /** The idle hero is recovering between fights (REST_BELOW / REST_UNTIL). Only mobs
+   *  already attacking get fought while it is set. Absent on older saves → not resting. */
+  resting?: boolean
   activeRecipe: RecipeId | null
   craftingTimer: number
   /** Quality locked in when the active craft started (materials are consumed on

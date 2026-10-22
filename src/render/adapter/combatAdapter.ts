@@ -395,6 +395,8 @@ const AMBIENT_MONSTERS: Partial<Record<ZoneId, readonly string[]>> = {
 /** One font string, shared by the nameplate rasteriser and its measuring pass — they must
  *  agree or every plate is mis-sized. */
 const NAMEPLATE_FONT = '600 8px system-ui, -apple-system, "Segoe UI", sans-serif'
+/** A nameplate baked at label-canvas density: `c` is the bitmap, `w`×`h` its size in buffer px. */
+type Plate = { c: HTMLCanvasElement; w: number; h: number }
 
 // (The barren/verdant scenery split used to live here as `BARREN_SCENERY`. It is a fact
 // about palettes, not about the scene, and it now sits beside the palettes it selects —
@@ -662,6 +664,16 @@ export class WorldSceneController {
   private scene = new Scene()
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
+  // Labels (nameplates, town signs, chat bubbles) get their own canvas at DEVICE resolution.
+  // The world buffer is about a third of a phone's pixels across and is upscaled with
+  // `pixelated`, so 8px text drawn into it came out as blocky ~3.6x-magnified glyphs: a
+  // tester's first note on Android was that the names were hard to read. Drawing them here,
+  // through a transform that maps buffer coordinates onto it, keeps every layout number in
+  // buffer pixels while the glyphs rasterise sharp.
+  private labelCanvas: HTMLCanvasElement
+  private lctx: CanvasRenderingContext2D
+  /** Device pixels per buffer pixel on the label canvas, for baking plates at that density. */
+  private labelK = 1
   private floatersHost: HTMLElement
   private floaters: Floater[] = []
 
@@ -906,6 +918,8 @@ export class WorldSceneController {
   private jumpActive = false
   private jumpT = 0
   private lastControlMode: 'idle' | 'manual' = 'idle'
+  /** The store's `resting` flag, for the label over the hero (see drawRestingLabel). */
+  private playerResting = false
   // Last movement vector (for facing when auto-drift would otherwise leave it stale).
   private lastFaceDx = 1
   private lastFaceDy = 1
@@ -986,6 +1000,13 @@ export class WorldSceneController {
     this.ctx = canvas.getContext('2d')!
     this.ctx.imageSmoothingEnabled = false
     this.floatersHost = floatersHost
+    this.labelCanvas = document.createElement('canvas')
+    Object.assign(this.labelCanvas.style, {
+      position: 'absolute', inset: '0', width: '100%', height: '100%', pointerEvents: 'none',
+    })
+    // First child, so DOM floaters (damage numbers) still sit over the names.
+    floatersHost.insertBefore(this.labelCanvas, floatersHost.firstChild)
+    this.lctx = this.labelCanvas.getContext('2d')!
     this.tileset = makeTileset()   // programmatic default; init() may swap in the scaffold
     this.propSheet = makePropSheet()
     this.tallProps = makePropEntities()
@@ -1735,6 +1756,7 @@ export class WorldSceneController {
     // enmity table in `engine/pvp`.
     this.playerRace = state.playerRace ?? 'human'
     this.playerAlive = state.isAlive !== false
+    this.playerResting = !!state.resting && state.gameMode === 'combat'
     this.zoneDisplayName = state.generatedZoneNames?.[state.currentZone] ?? ZONES[state.currentZone]?.name ?? ''
     this.factionNames = state.factionNames ?? {}
     this.playerName = state.playerName || 'You'
@@ -2602,6 +2624,22 @@ export class WorldSceneController {
     }
     this.cam.w = vw
     this.cam.h = vh
+    const dpr = Math.min(3, window.devicePixelRatio || 1)
+    const lw = Math.max(1, Math.round(cssW * dpr)), lh = Math.max(1, Math.round(cssH * dpr))
+    if (this.labelCanvas.width !== lw || this.labelCanvas.height !== lh) {
+      this.labelCanvas.width = lw
+      this.labelCanvas.height = lh
+    }
+    const k = lw / vw
+    if (k !== this.labelK) { this.labelK = k; this.nameplateCache.clear() }
+  }
+
+  /** Wipe the label canvas and point its transform at buffer coordinates for this frame. */
+  private beginLabels(): void {
+    const l = this.lctx
+    l.setTransform(1, 0, 0, 1, 0, 0)
+    l.clearRect(0, 0, this.labelCanvas.width, this.labelCanvas.height)
+    l.setTransform(this.labelCanvas.width / this.cam.w, 0, 0, this.labelCanvas.height / this.cam.h, 0, 0)
   }
 
   /** Set the render zoom (world-px → CSS-px). The host picks a smaller value on narrow
@@ -2752,6 +2790,9 @@ export class WorldSceneController {
   }
 
   renderFrame(dt: number): void {
+    // Cleared before any early return, so a frame that draws no labels shows none rather
+    // than the last frame's names frozen in place.
+    this.beginLabels()
     if (!this.ground || !this.rigs) return
     const g = this.ground
 
@@ -3176,6 +3217,8 @@ export class WorldSceneController {
       if (this.townMode) this.drawTownLabels(g)
       else this.drawWorldNameplates()
     } catch (err) { console.error('[nameplate] draw failed:', err) }
+
+    this.drawRestingLabel()
 
     // Player chevron — gold marker above the followed unit (rides above the jump).
     const px = Math.round(this.player.screenX - this.cam.x)
@@ -3932,7 +3975,7 @@ export class WorldSceneController {
   // other. Priority: service NPCs (the thing the player walks up to), then buildings, then
   // the crowd nearest the player outward.
   private drawTownLabels(g: GroundBuffer): void {
-    const ctx = this.ctx
+    const ctx = this.lctx
     const FONT_BUILDING = '700 10px system-ui, -apple-system, "Segoe UI", sans-serif'
     const FONT_ROLE = '700 10px system-ui, -apple-system, "Segoe UI", sans-serif'
     const FONT_ROLE_NEAR = '700 11px system-ui, -apple-system, "Segoe UI", sans-serif'
@@ -5274,10 +5317,10 @@ export class WorldSceneController {
    * distinct thing, cache the pixels, and blit from then on (see `bakedSheet`, which does
    * exactly this for sprites). Per-frame work drops to one `drawImage` per plate.
    */
-  private nameplateCache = new Map<string, HTMLCanvasElement>()
+  private nameplateCache = new Map<string, Plate>()
 
   /** Rasterise one nameplate (outline + fill) onto its own little canvas. */
-  private nameplateFor(name: string, faction: string): HTMLCanvasElement {
+  private nameplateFor(name: string, faction: string): Plate {
     const key = `${name}\u0000${faction}`
     const hit = this.nameplateCache.get(key)
     if (hit) return hit
@@ -5287,9 +5330,13 @@ export class WorldSceneController {
     probe.font = NAMEPLATE_FONT
     const w = Math.ceil(probe.measureText(name).width) + pad * 2
     const h = 14
+    // Baked at the label canvas's density and blitted back down to w×h buffer pixels, so the
+    // layout below still works in buffer pixels while the glyphs stay sharp.
+    const k = Math.max(1, this.labelK)
     const c = document.createElement('canvas')
-    c.width = w; c.height = h
+    c.width = Math.ceil(w * k); c.height = Math.ceil(h * k)
     const g = c.getContext('2d')!
+    g.scale(c.width / w, c.height / h)
     g.font = NAMEPLATE_FONT
     g.textAlign = 'center'
     g.textBaseline = 'middle'
@@ -5309,8 +5356,33 @@ export class WorldSceneController {
       const oldest = this.nameplateCache.keys().next().value
       if (oldest !== undefined) this.nameplateCache.delete(oldest)
     }
-    this.nameplateCache.set(key, c)
-    return c
+    const plate = { c, w, h }
+    this.nameplateCache.set(key, plate)
+    return plate
+  }
+
+  /**
+   * "Resting…" over the hero while it recovers between fights. A hero that stands still
+   * with no explanation reads as stuck, which would be worse than the dying this replaced.
+   * On the label canvas, with a slow breathing fade so it is felt rather than read.
+   */
+  private drawRestingLabel(): void {
+    if (!this.playerResting || !this.playerAlive || this.townMode) return
+    const ctx = this.lctx
+    const sx = this.player.screenX - this.cam.x
+    const sy = this.player.screenY - this.cam.y - this.player.sprite.frameH - 14 - this.player.z
+    ctx.save()
+    ctx.globalAlpha = 0.75 + Math.sin(this.auraClock * 2.5) * 0.2
+    ctx.font = 'italic 600 7px system-ui, -apple-system, "Segoe UI", sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = 2.5
+    ctx.strokeStyle = 'rgba(0,0,0,0.9)'
+    ctx.strokeText('Resting…', sx, sy)
+    ctx.fillStyle = '#9fd6b0'
+    ctx.fillText('Resting…', sx, sy)
+    ctx.restore()
   }
 
   /** How far each ambient hero's plate was lifted this frame, for its bark to follow. */
@@ -5331,9 +5403,9 @@ export class WorldSceneController {
    * baked into the plate text so the marker costs nothing per frame.
    */
   private drawWorldNameplates(): void {
-    const ctx = this.ctx
+    const ctx = this.lctx
     const px = this.player.screenX, py = this.player.screenY
-    const items: { plate: HTMLCanvasElement; sx: number; sy: number; amb: Ambient | null; d: number }[] = []
+    const items: { plate: Plate; sx: number; sy: number; amb: Ambient | null; d: number }[] = []
 
     for (const p of this.pvpPlates) {
       const ent = p.id === this.targetMobId ? this.mob : this.otherMobEnts.get(p.id)?.e
@@ -5361,13 +5433,13 @@ export class WorldSceneController {
 
     // Pulled inside the viewport: a plate half off the edge reads as "…orvan", and a hero at
     // the edge keeps a legible name a few pixels inboard of them instead.
-    for (const it of items) it.sx = clampLabelX(it.sx, it.plate.width, this.cam.w)
-    const lifts = layoutLabels(items.map(it => ({ cx: it.sx, cy: it.sy, w: it.plate.width, h: it.plate.height })))
+    for (const it of items) it.sx = clampLabelX(it.sx, it.plate.w, this.cam.w)
+    const lifts = layoutLabels(items.map(it => ({ cx: it.sx, cy: it.sy, w: it.plate.w, h: it.plate.h })))
     this.plateLift.clear()
     for (let i = 0; i < items.length; i++) {
       const it = items[i], dy = lifts[i]
       if (dy === null) continue
-      ctx.drawImage(it.plate, it.sx - (it.plate.width >> 1), it.sy + dy - (it.plate.height >> 1))
+      ctx.drawImage(it.plate.c, it.sx - (it.plate.w >> 1), it.sy + dy - (it.plate.h >> 1), it.plate.w, it.plate.h)
       if (it.amb) this.plateLift.set(it.amb, dy)
     }
     this.drawAmbientBarks()
@@ -5392,7 +5464,7 @@ export class WorldSceneController {
    */
   private drawAmbientBarks(): void {
     if (!this.ambient.length) return
-    const ctx = this.ctx
+    const ctx = this.lctx
     ctx.save()
     ctx.font = '500 8px system-ui, -apple-system, "Segoe UI", sans-serif'
     ctx.textAlign = 'center'
