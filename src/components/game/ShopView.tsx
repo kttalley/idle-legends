@@ -3,6 +3,7 @@ import {
   buyFounderPack, buyStandingOrders, getPurchaseState, loadOfferings, restorePurchases,
   subscribePurchases, STANDING_ORDERS_ENTITLEMENT, STANDING_ORDERS_HOURS,
 } from '../../monetization/purchases'
+import { trackEvent } from '../../net/funnel'
 import { FOUNDER_ENTITLEMENT } from '../../render/colorways'
 
 /**
@@ -57,7 +58,7 @@ export function ShopView({ onBack }: { onBack: () => void }) {
   // not vended by StoreKit until the app has been through submission, so the boot fetch of
   // the very first launches returns nothing. Without a refetch here that empty answer
   // sticks for the whole session and the shop is permanently dead.
-  React.useEffect(() => { void loadOfferings() }, [])
+  React.useEffect(() => { void loadOfferings(); trackEvent('shop_open') }, [])
 
   const founderOwned = p.active.has(FOUNDER_ENTITLEMENT)
   const standingOwned = p.active.has(STANDING_ORDERS_ENTITLEMENT)

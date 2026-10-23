@@ -904,6 +904,9 @@ export interface GameState {
   /** The idle hero is recovering between fights (REST_BELOW / REST_UNTIL). Only mobs
    *  already attacking get fought while it is set. Absent on older saves → not resting. */
   resting?: boolean
+  /** The one-time "your bag is full" prompt has been answered for this character. Absent
+   *  on older saves → not yet, so a veteran with a full bag sees it once too. */
+  bagFullTipSeen?: boolean
   activeRecipe: RecipeId | null
   craftingTimer: number
   /** Quality locked in when the active craft started (materials are consumed on

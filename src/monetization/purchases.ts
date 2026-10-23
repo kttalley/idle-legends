@@ -13,6 +13,7 @@
 
 import { Capacitor } from '@capacitor/core'
 import { FOUNDER_ENTITLEMENT } from '../render/colorways'
+import { trackEvent } from '../net/funnel'
 
 /**
  * Standing Orders — a permanent extension to how long the hero will range unsupervised.
@@ -391,6 +392,11 @@ async function buy(needle: string, entitlement: string): Promise<boolean> {
     return false
   }
   set({ busy: true, error: null })
+  // Funnel: did they get as far as tapping buy? Once per character. Deliberately NOT the
+  // outcome: a completed purchase tied to the player id is "purchase history" used for
+  // analytics, which neither store label nor the privacy policy declares (purchase history
+  // is declared for app functionality only). Sales reports count purchases already.
+  trackEvent(`buy_tap_${needle}`)
   try {
     const { Purchases } = await plugin()
     const { current } = await withTimeout(Purchases.getOfferings(), OFFERINGS_MS, 'getOfferings')

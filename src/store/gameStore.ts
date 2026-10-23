@@ -7,7 +7,7 @@ import type {
   GameMode, RecipeId, MaterialId, WeatherType, TownId, Rarity, MerchantContract,
 } from '../data/types'
 import type { GatherSession, CraftResult, QualityTier, TemperSession } from '../data/types'
-import { TOWNS } from '../data/towns'
+import { TOWNS, ZONE_TOWN } from '../data/towns'
 import { RACE_DEFINITIONS } from '../data/races'
 import { ZONE_MATERIALS, RECIPES, isGearRecipe } from '../data/professions'
 import type { Recipe, CraftStatEffect } from '../data/professions'
@@ -82,7 +82,7 @@ import { generateNames, generateThought, generateFactionNamesFallback, generateP
 import type { ThoughtEvent } from '../engine/nameGen'
 import { slotStorage, summarize, newSlotId, setLastSlotId } from './saveSlots'
 import { queueCloudSave } from '../net/cloudSave'
-import { clearFunnelSlot, trackProgress, trackSession } from '../net/funnel'
+import { clearFunnelSlot, trackEvent, trackProgress, trackSession } from '../net/funnel'
 import { DEFAULT_COLORWAY, isColorwayUnlocked } from '../render/colorways'
 import { getPurchaseState } from '../monetization/purchases'
 import {
@@ -416,6 +416,7 @@ function defaultState(): GameState {
     gatherSession: null,
     gatherChosen: false,
     resting: false,
+    bagFullTipSeen: false,
     activeRecipe: null,
     craftingTimer: 0,
     craftQuality: null,
@@ -2067,6 +2068,8 @@ interface GameActions {
   /** Strike the piece being forged — the crafting half of the strike meter. */
   temperCraft: () => void
   enterTown: (townId: TownId) => void
+  /** Answer the one-time full-bag prompt; `toTown` walks the hero into the zone's town. */
+  answerBagFullTip: (toTown: boolean) => void
   leaveTown: () => void
   restInTown: () => void
   claimQuestReward: (questId: string) => void
@@ -4705,6 +4708,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
   // ── Towns ─────────────────────────────────────────────────────────────────────
   enterTown: (townId) => {
+    trackEvent('town_visit')
     resetCombatAccumulators()
     set({
       gameMode: 'in_town',
@@ -4713,6 +4717,14 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       mobRespawnTimer: 0,
       activeDoTs: [],
     })
+  },
+
+  answerBagFullTip: (toTown) => {
+    const s = get()
+    set({ bagFullTipSeen: true })
+    trackEvent(toTown ? 'bag_full_to_town' : 'bag_full_later')
+    const town = ZONE_TOWN[s.currentZone]
+    if (toTown && town && s.isAlive && s.gameMode !== 'traveling') get().enterTown(town)
   },
 
   leaveTown: () => {

@@ -24,6 +24,9 @@ import { cloudEnabled, restUrl } from './cloudConfig'
 import { ensureSession } from './session'
 
 const TABLE = 'funnel_events'
+// The store version this build shipped as (vite.config.ts reads it from the native
+// projects). Recorded on each row so a release can be judged against the one before it.
+const APP_VERSION: string | null = import.meta.env.VITE_APP_VERSION ?? null
 const SENT_KEY = 'stillmarch_funnel_v1'
 const DAY_MS = 86_400_000
 
@@ -91,6 +94,7 @@ async function send(slotId: string, events: string[], playTime: number): Promise
       method: 'POST',
       body: fresh.map(event => ({
         slot_id: slotId, event, platform, dev, play_time: Math.max(0, Math.round(playTime)),
+        app_version: APP_VERSION,
       })),
       prefer: 'resolution=ignore-duplicates,return=minimal',
     })
@@ -121,6 +125,17 @@ export function trackSession(slotId: string, createdAt: number, state: GameState
   const events = returnMilestones(createdAt, Date.now())
   if (offlineGranted) events.push('offline_reward')
   void send(slotId, events, state.totalPlayTime ?? 0)
+}
+
+/**
+ * A one-way action rather than a state the save can show — opening the shop, tapping
+ * buy, completing a purchase. Same table, same once-per-character rule, recorded against
+ * whichever character is in play (nothing is sent from the menus, where there is none).
+ * `name` must be a slug: lowercase, digits and underscores.
+ */
+export function trackEvent(name: string): void {
+  if (!active) return
+  void send(active.slotId, [name], active.state.totalPlayTime ?? 0)
 }
 
 /** A resume doesn't reload the slot, so it is picked up here. */

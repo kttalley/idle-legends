@@ -30,6 +30,7 @@ import { compileUniques } from './data/uniques'
 import { getPurchaseState, purchasedWatchHours, whenPurchasesReady } from './monetization/purchases'
 import { useDismissable } from './components/ui/useDismissable'
 import { QuestToast } from './components/game/QuestToast'
+import { BagFullTip } from './components/game/BagFullTip'
 import { OfflineReportToast } from './components/game/OfflineReportToast'
 import { CraftResultToast } from './components/game/CraftResultToast'
 import { LevelUpToast } from './components/game/LevelUpToast'
@@ -514,6 +515,7 @@ export default function App() {
       </div>
 
       <QuestToast />
+      <BagFullTip />
       <OfflineReportToast />
 
       {/* ── Left: hero strip / character / zone track ──

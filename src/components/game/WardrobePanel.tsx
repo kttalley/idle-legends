@@ -4,6 +4,7 @@ import { useGameStore } from '../../store/gameStore'
 import { useDismissable } from '../ui/useDismissable'
 import { HeroAvatar } from '../sprites/HeroAvatar'
 import { COLORWAYS, isColorwayUnlocked, FOUNDER_ENTITLEMENT } from '../../render/colorways'
+import { trackEvent } from '../../net/funnel'
 import {
   subscribePurchases, buyFounderPack, restorePurchases, loadOfferings,
   type PurchaseState,
@@ -29,7 +30,7 @@ export function WardrobePanel({ onClose }: { onClose: () => void }) {
   // launch that happened before StoreKit was vending left the paywall permanently reading
   // "Store unavailable" until the app was force-quit. Opening the shop is exactly the
   // moment the answer matters, so ask again.
-  useEffect(() => { void loadOfferings() }, [])
+  useEffect(() => { void loadOfferings(); trackEvent('wardrobe_open') }, [])
   const surface = useRef<HTMLDivElement>(null)
   useDismissable(true, onClose, { ref: surface, closeOnOutside: true, trapFocus: true })
   const active = iap?.active ?? new Set<string>()
