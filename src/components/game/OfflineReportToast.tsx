@@ -90,8 +90,8 @@ export function OfflineReportToast() {
         {report.cappedByContent && (
           <div style={{ fontSize: '0.68rem', color: 'var(--warn)', fontStyle: 'italic' }}>
             <SpriteIcon ui="warn" size={10} /> Your hero has learned all these lands can
-            teach — they stopped at level {report.contentCeiling}. Open the next region to
-            keep growing.
+            teach — they stopped at level {report.contentCeiling}. Beat this region's boss and
+            move on to keep growing.
           </div>
         )}
 

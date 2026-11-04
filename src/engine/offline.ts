@@ -2,7 +2,7 @@ import {
   OFFLINE_CAP_HOURS, TICK_RATE_MS, ITEM_DROP_CHANCE,
   OFFLINE_MIN_SECONDS, OFFLINE_RATE_WINDOW_SECONDS, OFFLINE_MIN_MEASURED_SECONDS,
   OFFLINE_THIN_SAMPLE_SECONDS, OFFLINE_THIN_SAMPLE_CAP_SECONDS, GREY_LEVEL_GAP,
-  WATCH_EXTEND_HOURS, WATCH_EXTEND_BASE_COST,
+  WATCH_EXTEND_HOURS, WATCH_EXTEND_BASE_COST, OFFLINE_EFFICIENCY,
 } from '../data/constants'
 import { UPGRADE_COST_GROWTH } from '../data/upgrades'
 import { ZONES } from '../data/zones'
@@ -196,24 +196,26 @@ const ALL_SLOTS: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket'
  * zone that has stopped teaching them anything. Unbounded offline levelling does not
  * accelerate the game; it walks the player off the end of it.
  *
- * So an absence may carry you to the top of the content you have OPENED, plus the same
- * grey-mob margin the live game already uses, and no further. Unlocking the next region is
- * something you come back and do.
+ * So an absence may carry you to the top of the region you are in, and no further.
+ * Unlocking the next region is something you come back and do.
  *
  * Deliberately generous rather than tight: it binds only on a hero who was already near the
  * ceiling of their unlocked world, which is exactly the hero for whom levelling further is
  * meaningless anyway.
  */
 export function offlineLevelCeiling(state: GameState): number {
-  let top = 0
-  for (const zoneId of state.unlockedZones ?? []) {
-    const band = ZONES[zoneId]?.levelRange
-    if (band) top = Math.max(top, band[1])
-  }
+  // Tightened 2026-11-03 from "the top of every unlocked zone, plus GREY_LEVEL_GAP" to the
+  // top of the zone the hero is IN. The old ceiling let one night away carry a hero ten
+  // levels past their region's band, so the next session crushed its boss and the zone
+  // after it in minutes and the following night filled the new ceiling again: about two
+  // zones a session, most of the game inside three days (sim: L40 and 3 bosses after day
+  // one). At the current zone's top, coming back to beat the boss is the step that opens
+  // the next stretch of offline growth, which is what this rule always said it was for.
+  const band = ZONES[state.currentZone]?.levelRange
   // No zone data (a corrupt or very old save) must not mean "no progress" — fall back to
   // letting the hero keep what they have rather than clamping them backwards.
-  if (top <= 0) return Number.MAX_SAFE_INTEGER
-  return top + GREY_LEVEL_GAP
+  if (!band) return Number.MAX_SAFE_INTEGER
+  return Math.max(band[1], state.level)
 }
 
 /**
@@ -309,7 +311,8 @@ export function projectOfflineProgress(
   const secs = thin
     ? Math.min(elapsed.secondsElapsed, OFFLINE_THIN_SAMPLE_CAP_SECONDS)
     : elapsed.secondsElapsed
-  const kills = Math.floor((rates.kills / rates.seconds) * secs)
+  // At OFFLINE_EFFICIENCY of the measured pace; everything below is derived from kills.
+  const kills = Math.floor((rates.kills / rates.seconds) * secs * OFFLINE_EFFICIENCY)
   if (kills <= 0) return null
 
   // Scale gold and XP by the kills actually granted, not by raw elapsed time, so the

@@ -4,6 +4,14 @@ export const COMBAT_TICK_SECONDS = 2      // seconds per attack exchange
 export const RESPAWN_TIMER_SECONDS = 3    // player death respawn delay
 export const MOB_RESPAWN_SECONDS = 1.5    // mob respawn after kill
 export const OFFLINE_CAP_HOURS = 8        // max offline progress
+// Share of the measured online rate an absence pays (gold, XP, levels and loot all follow
+// the kill count). It was 1.0, and with an 8-hour watch that meant one night away banked
+// +10-17 levels early on: real 1.3 players reached level 41-91 with 30-74 minutes of
+// actual play, cleared most of the twelve zones within two or three days, and the funnel
+// showed almost nobody coming back after that. Half pace is the convention in idle games
+// for exactly this reason: coming back is still a windfall, and being present is worth
+// something. Gathering is unaffected (materials only, a fixed cadence the panel quotes).
+export const OFFLINE_EFFICIENCY = 0.5
 
 // Offline progress is projected from the hero's own measured combat rate — see
 // engine/offline.ts. Parity is exactly 1.0: being away pays what being present paid.

@@ -16,6 +16,7 @@ import { useGameStore } from '../store/gameStore'
 import {
   INVENTORY_SLOTS, RARITY_WEIGHTS, BAG_SLOTS_MAX_PURCHASED, ZONE_STUCK_SECONDS,
   ELITE_SPAWN_CHANCE,
+  OFFLINE_EFFICIENCY,
 } from '../data/constants'
 import type { ClassType, GameState, RaceType, TownId, ZoneId } from '../data/types'
 import { ZONE_ORDER, ZONES } from '../data/zones'
@@ -735,9 +736,11 @@ export function runLootFidelity(): Violation[] {
     inventory: new Array(400).fill(null),
     merchantContract: null,
     settings: { ...base.settings, autoEquip: false },
+    // Measured at 1/OFFLINE_EFFICIENCY the pace so the projection still grants KILLS:
+    // this check is about quality per drop, and the sample size it was tuned on.
     offlineRates: {
       seconds: 3600, gold: 100000, xp: 100000,
-      kills: KILLS, eliteKills: Math.round(KILLS * eliteShare),
+      kills: KILLS / OFFLINE_EFFICIENCY, eliteKills: Math.round((KILLS / OFFLINE_EFFICIENCY) * eliteShare),
     },
     lastTickTimestamp: Date.now() - 3600 * 1000,
   }
@@ -1063,10 +1066,14 @@ export function runOfflineParity(
   const offlineGold = outcome ? outcome.report.gold : 0
   const offlineKills = outcome ? outcome.report.kills : 0
 
+  // Parity is about rate-replay FIDELITY: the projection should pay what playing would
+  // have, scaled by the deliberate offline discount. Judged against the scaled figure so a
+  // design decision is not reported as a replay bug.
+  const expGold = onlineGold * OFFLINE_EFFICIENCY, expKills = onlineKills * OFFLINE_EFFICIENCY
   return {
     seed, onlineGold, offlineGold, onlineKills, offlineKills,
-    goldError: onlineGold > 0 ? (offlineGold - onlineGold) / onlineGold : 0,
-    killError: onlineKills > 0 ? (offlineKills - onlineKills) / onlineKills : 0,
+    goldError: expGold > 0 ? (offlineGold - expGold) / expGold : 0,
+    killError: expKills > 0 ? (offlineKills - expKills) / expKills : 0,
   }
 }
 
