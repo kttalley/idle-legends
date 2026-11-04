@@ -13,6 +13,15 @@ export const OFFLINE_CAP_HOURS = 8        // max offline progress
 // something. Gathering is unaffected (materials only, a fixed cadence the panel quotes).
 export const OFFLINE_EFFICIENCY = 0.5
 
+// ── Daily bounty ─────────────────────────────────────────────────────────────
+// The light half of "a reason to come back tomorrow": every local day, the first
+// DAILY_BOUNTY_KILLS kills made with the game open pay a gold purse and turn that kill's
+// drop into a guaranteed rare-or-better. Small on purpose: a few minutes early on, about a
+// minute late, and nothing is lost by skipping a day (no streak to break).
+export const DAILY_BOUNTY_KILLS = 30
+/** Gold per hero level in the bounty purse: a few minutes of earnings at any level. */
+export const DAILY_BOUNTY_GOLD_PER_LEVEL = 40
+
 // Offline progress is projected from the hero's own measured combat rate — see
 // engine/offline.ts. Parity is exactly 1.0: being away pays what being present paid.
 /** Absences shorter than this are ignored, so a reload isn't a reward. */

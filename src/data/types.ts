@@ -907,6 +907,10 @@ export interface GameState {
   /** The one-time "your bag is full" prompt has been answered for this character. Absent
    *  on older saves → not yet, so a veteran with a full bag sees it once too. */
   bagFullTipSeen?: boolean
+  /** Today's bounty, keyed by the player's local calendar day. Only kills made with the
+   *  game open count (the offline projection never calls registerKill), because the point
+   *  is a reason to open it. Absent on older saves → a fresh bounty on the next kill. */
+  dailyBounty?: { day: string; progress: number; done: boolean }
   activeRecipe: RecipeId | null
   craftingTimer: number
   /** Quality locked in when the active craft started (materials are consumed on

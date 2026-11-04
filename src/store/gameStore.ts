@@ -67,6 +67,7 @@ import {
   PARTY_MOB_HP_SCALE, PARTY_MOB_DAMAGE_SCALE, PARTY_MOB_REWARD_SCALE,
   ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE, GREY_LEVEL_GAP,
   NEWCOMER_LEVEL, NEWCOMER_REGEN_PER_SEC, NEWCOMER_REST_BELOW, newcomerDamageScale,
+  DAILY_BOUNTY_KILLS, DAILY_BOUNTY_GOLD_PER_LEVEL,
   REST_BELOW, REST_UNTIL, REST_REGEN_PER_SEC,
   WATCH_BANK_CAP_HOURS, WATCH_EXTEND_HOURS,
   BOSS_HP_MULTIPLIER, BOSS_DAMAGE_MULTIPLIER,
@@ -1879,6 +1880,11 @@ function isBossPresent(mobs: MobInstance[]): boolean {
   return mobs.some(m => m.isBoss)
 }
 
+/** The player's local calendar day, YYYY-MM-DD — what "today's" bounty is keyed on. */
+function localDayKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /** Health share below which an idle hero of this level stops starting fights. */
 function restThreshold(level: number): number {
   return level < NEWCOMER_LEVEL ? NEWCOMER_REST_BELOW : REST_BELOW
@@ -2973,6 +2979,12 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // could die back when the target was the only thing that fought. Retaliation can now
     // kill a mob the hero never targeted, and a kill that pays nothing is a worse bug
     // than no kill at all — so the victim is a parameter.
+    // Today's bounty, rolled over to a fresh one on a new local day.
+    const today = localDayKey()
+    const bounty = state.dailyBounty?.day === today
+      ? { ...state.dailyBounty }
+      : { day: today, progress: 0, done: false }
+
     const registerKill = (victim: MobInstance | null = currentMob): boolean => {
       if (!victim || victim.currentHp > 0) return false
       const deadMob = victim
@@ -3038,6 +3050,23 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       )
       gold += loot.gold
       killGoldThisTick += loot.gold
+
+      // The bounty's last kill pays the purse and becomes a guaranteed rare-or-better drop,
+      // which then goes through the same wear / sell / bag ladder as any other.
+      if (!bounty.done) {
+        bounty.progress += 1
+        if (bounty.progress >= DAILY_BOUNTY_KILLS) {
+          bounty.done = true
+          const purse = DAILY_BOUNTY_GOLD_PER_LEVEL * level
+          gold += purse
+          const r = Math.random()
+          const slots: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket']
+          loot.item = generateItem(slots[Math.floor(Math.random() * slots.length)], level, 0,
+            r < 0.05 ? 'legendary' : r < 0.3 ? 'epic' : 'rare')
+          newLogs.push(log('loot_item', `★ Daily bounty complete! +${purse} gold and a ${loot.item.rarity} reward.`, '#ffd700'))
+          trackEvent(`bounty_${today.replace(/-/g, '')}`)
+        }
+      }
 
       newLogs.push(log('mob_death', `${deadMob.name} dies!`, '#ff4444'))
       newLogs.push(log('loot_gold',  `+${loot.gold} gold`,   '#ffd700'))
@@ -3926,6 +3955,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       ),
       // Evidence for the retreat rule. Reset whenever the hero changes zone, so it always
       // describes the ground they are standing on.
+      dailyBounty: bounty,
       zoneWatch: state.zoneWatch.zone === currentZone
         ? { zone: currentZone, seconds: state.zoneWatch.seconds + deltaSeconds,
             kills: state.zoneWatch.kills + killsThisTick }

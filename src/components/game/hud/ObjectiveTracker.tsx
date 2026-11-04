@@ -3,6 +3,7 @@ import { useGameStore } from '../../../store/gameStore'
 import { ZONES } from '../../../data/zones'
 import { isZoneQuestComplete } from '../../../engine/zoneProgression'
 import { SpriteIcon } from '../../ui/SpriteIcon'
+import { DAILY_BOUNTY_KILLS } from '../../../data/constants'
 
 // The objective tracker — what the player is supposed to be doing, while they are doing it.
 //
@@ -33,6 +34,7 @@ export function ObjectiveTracker() {
   const generatedZoneNames = useGameStore(s => s.generatedZoneNames)
   const level = useGameStore(s => s.level)
   const gameMode = useGameStore(s => s.gameMode)
+  const bounty = useGameStore(s => s.dailyBounty)
 
   const [collapsed, setCollapsed] = useState(loadCollapsed)
 
@@ -107,6 +109,29 @@ export function ObjectiveTracker() {
             <span className="objective-text">Defeat {bossName}</span>
             {killsMet && !bossDown && <span className="objective-count is-ready">ready</span>}
           </div>
+
+          {/* The daily bounty: same rows, so it reads as one more thing to do here rather
+              than a separate system to learn. A stale day reads as a fresh bounty. */}
+          {(() => {
+            const d = new Date()
+            const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+            const b = bounty?.day === today ? bounty : { progress: 0, done: false }
+            const n = Math.min(b.progress, DAILY_BOUNTY_KILLS)
+            return (
+              <>
+                <div className={`objective-row${b.done ? ' is-done' : ''}`}>
+                  <span className="objective-tick" aria-hidden>{b.done ? '✓' : '★'}</span>
+                  <span className="objective-text" title="Every day, your first kills earn a gold purse and a rare-or-better item">Daily bounty</span>
+                  <span className="objective-count">{b.done ? 'done' : `${n}/${DAILY_BOUNTY_KILLS}`}</span>
+                </div>
+                {!b.done && (
+                  <div className="objective-meter" aria-hidden>
+                    <i style={{ width: `${(n / DAILY_BOUNTY_KILLS) * 100}%` }} />
+                  </div>
+                )}
+              </>
+            )
+          })()}
 
           {underLevelled && (
             <div className="objective-warn">
