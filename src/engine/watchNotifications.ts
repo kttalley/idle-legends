@@ -20,6 +20,7 @@
 // notification" rather than to a broken game.
 
 import { Capacitor } from '@capacitor/core'
+import { trackEvent } from '../net/funnel'
 
 const isNative = Capacitor.isNativePlatform()
 
@@ -66,7 +67,10 @@ async function ensurePermission(request: boolean): Promise<boolean> {
     const { LocalNotifications: LN } = await plugin()
     const check = await LN.checkPermissions()
     granted = check.display === 'granted'
-    if (granted) return true
+    // Funnel: does the one reminder this game sends ever have permission to reach anyone?
+    // Once per character each, so these read as "how many players got this far".
+    if (granted) { trackEvent('notif_on'); return true }
+    if (check.display === 'denied') trackEvent('notif_off')
     if (!request || check.display !== 'prompt') return false
     if (document.visibilityState !== 'visible') return false
     // The WebView fires visibilitychange→visible during the resume transition — before the
@@ -77,15 +81,17 @@ async function ensurePermission(request: boolean): Promise<boolean> {
     await new Promise((r) => setTimeout(r, 1200))
     if (document.visibilityState !== 'visible') return false
     permissionAsked = true
+    trackEvent('notif_asked')
     const req = await LN.requestPermissions()
     granted = req.display === 'granted'
-    if (granted) return true
+    if (granted) { trackEvent('notif_granted'); return true }
     // A blocked launch resolves 'denied' without a human involved, and the system state
     // still reads 'prompt' — only a real answer flips it to 'denied'. Latch on the state,
     // not on the request result, so a blocked ask retries at the next foreground moment
     // instead of switching the feature off for the life of the install.
     const after = await LN.checkPermissions()
     permissionAsked = after.display === 'denied'
+    if (permissionAsked) trackEvent('notif_denied')
     granted = false
     return false
   } catch (err) {
@@ -180,6 +186,7 @@ export async function scheduleWatchEnd(secondsFromNow: number): Promise<void> {
         schedule: { at: new Date(Date.now() + secondsFromNow * 1000) },
       }],
     })
+    trackEvent('notif_scheduled')
   } catch (err) {
     console.warn('[watch] could not schedule', err)
   }

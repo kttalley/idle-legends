@@ -7,7 +7,7 @@ import { termsAccepted } from './moderation/terms'
 import { CharacterSelect } from './components/game/CharacterSelect'
 import { CloudSaveNotice } from './components/game/CloudSaveNotice'
 import { CombatView } from './components/game/CombatView'
-import { CharacterPanel } from './components/game/CharacterPanel'
+import { CharacterPanel, OPEN_TALENTS_EVENT } from './components/game/CharacterPanel'
 import { InventoryPanel } from './components/game/InventoryPanel'
 import { ZoneTrack } from './components/game/ZoneTrack'
 import { HeroBar } from './components/game/HeroBar'
@@ -384,6 +384,13 @@ export default function App() {
       if (next && isNarrow()) return { ...defaultPanels(true), [id]: true }
       return { ...cur, [id]: next }
     })
+  }, [])
+
+  // Something sent the player to the talent tree: make sure the drawer holding it is open.
+  useEffect(() => {
+    const open = () => setPanels(cur => (cur.hero ? cur : isNarrow() ? { ...defaultPanels(true), hero: true } : { ...cur, hero: true }))
+    window.addEventListener(OPEN_TALENTS_EVENT, open)
+    return () => window.removeEventListener(OPEN_TALENTS_EVENT, open)
   }, [])
 
   /** Retract everything. A no-op on desktop, where nothing is covering the world. */

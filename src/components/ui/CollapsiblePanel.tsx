@@ -73,6 +73,13 @@ export interface CollapsiblePanelProps {
   children: React.ReactNode
 }
 
+/** Open a panel from outside it (e.g. a prompt that leads into the talent tree). In a
+ *  group this claims the slot, which folds the sibling exactly as a header tap would. */
+export function expandPanel(id: string, group?: string): void {
+  const stored = loadCollapsed()
+  saveCollapsed(group ? { ...stored, [groupKey(group)]: id } : { ...stored, [id]: false })
+}
+
 export function CollapsiblePanel({
   id, title, headerRight, defaultCollapsed = false, group, grow = false, children,
 }: CollapsiblePanelProps) {

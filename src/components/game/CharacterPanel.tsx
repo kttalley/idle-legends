@@ -1,9 +1,13 @@
-import { CollapsiblePanel } from '../ui/CollapsiblePanel'
-import React, { useState } from 'react'
+import { CollapsiblePanel, expandPanel } from '../ui/CollapsiblePanel'
+import React, { useEffect, useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { CLASS_DEFINITIONS } from '../../data/classes'
 import { xpForLevel } from '../../engine/progression'
 import { HealthBar } from '../ui/HealthBar'
+
+/** Dispatched on `window` by anything that wants to send the player to the talent tree.
+ *  The panel picks the tab and unfolds itself; App opens the drawer that holds it. */
+export const OPEN_TALENTS_EVENT = 'stillmarch-open-talents'
 import { TalentTree } from './TalentTree'
 
 type Tab = 'stats' | 'talents'
@@ -15,6 +19,12 @@ export function CharacterPanel() {
   const classDef = CLASS_DEFINITIONS[playerClass]
   const xpNeeded = xpForLevel(level)
   const [tab, setTab] = useState<Tab>('stats')
+  // `OPEN_TALENTS_EVENT` (the offline report's "Spend talent points") lands on the tree.
+  useEffect(() => {
+    const open = () => { setTab('talents'); expandPanel('character', 'rail-left') }
+    window.addEventListener(OPEN_TALENTS_EVENT, open)
+    return () => window.removeEventListener(OPEN_TALENTS_EVENT, open)
+  }, [])
 
   return (
     // `grow` rather than `h-full`: asking for 100% height made this panel claim the whole

@@ -1,6 +1,8 @@
 import React from 'react'
 import { useGameStore } from '../../store/gameStore'
 import { SpriteIcon } from '../ui/SpriteIcon'
+import { trackEvent } from '../../net/funnel'
+import { OPEN_TALENTS_EVENT } from './CharacterPanel'
 import { maybeRequestReview } from '../../engine/appReview'
 
 /**
@@ -32,6 +34,7 @@ export function OfflineReportToast() {
   const report = useGameStore(s => s.lastOffline)
   const dismiss = useGameStore(s => s.dismissOfflineReport)
   const level = useGameStore(s => s.level)
+  const talentPoints = useGameStore(s => s.talentPoints)
 
   if (!report) return null
 
@@ -151,13 +154,32 @@ export function OfflineReportToast() {
           )}
         </div>
 
-        <button
-          className="rp-button"
-          onClick={onDismiss}
-          style={{ fontSize: '0.75rem', padding: '3px 10px', alignSelf: 'flex-start', marginTop: 2 }}
-        >
-          Good to be back
-        </button>
+        {/* A long absence can bank a dozen levels at once, and the points that come with
+            them sat unspent: the players who got furthest in 1.3 came back to 17 and 18.
+            This is the moment they are most worth pointing at. */}
+        {talentPoints >= 3 && (
+          <div style={{ fontSize: '0.72rem', color: '#ffd86b', marginTop: 2 }}>
+            {talentPoints} talent points are waiting to be spent.
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+          {talentPoints >= 3 && (
+            <button
+              className="rp-button"
+              onClick={() => { trackEvent('talent_nudge_tap'); onDismiss(); window.dispatchEvent(new Event(OPEN_TALENTS_EVENT)) }}
+              style={{ fontSize: '0.75rem', padding: '3px 10px', background: 'linear-gradient(180deg, var(--wood-lit), #4a3518)' }}
+            >
+              Spend talent points
+            </button>
+          )}
+          <button
+            className="rp-button"
+            onClick={onDismiss}
+            style={{ fontSize: '0.75rem', padding: '3px 10px' }}
+          >
+            Good to be back
+          </button>
+        </div>
       </div>
     </div>
   )
