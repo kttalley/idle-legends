@@ -20,6 +20,12 @@
 //     back at least once" — nobody reaches it inside a first session.
 //   • At most three times, ever, spaced by months.
 //
+// A second moment was added in 1.5, after six weeks of zero ratings: finishing the daily
+// bounty on a day after the character was made. The offline-report moment needs level 8
+// AND a good absence, a bar few players reached. Completing a bounty on day two is the
+// same signal — they came back, and the game just paid them — and it is reached sooner.
+// Both moments share the one ledger, so the lifetime cap is unchanged.
+//
 // Both platforms silently throttle this on their own (StoreKit allows roughly three
 // prompts per user per 365 days; Play has its own undisclosed quota) and NEITHER tells you
 // whether a sheet was actually shown. So `requestReview()` resolving means "the OS
@@ -31,6 +37,7 @@
 // every call wrapped, every failure resolving to "no prompt" rather than to a broken game.
 
 import { Capacitor } from '@capacitor/core'
+import { trackEvent } from '../net/funnel'
 
 const isNative = Capacitor.isNativePlatform()
 
@@ -161,7 +168,26 @@ export function isWorthAsking(moment: ReviewMoment): boolean {
 export async function maybeRequestReview(moment: ReviewMoment): Promise<boolean> {
   if (!isNative) return false
   if (!isWorthAsking(moment)) return false
+  return askIfLedgerAllows()
+}
 
+/** Bounty moment: a level floor below the offline one, since coming back is proven. */
+const BOUNTY_MIN_LEVEL = 5
+
+/**
+ * Ask after the daily bounty completes, if the character was made on an earlier local day
+ * (a returning player, not a first session) and the shared ledger allows. Same contract as
+ * `maybeRequestReview`: fire-and-forget, nothing branches on the result.
+ */
+export async function maybeRequestReviewAfterBounty(level: number, slotCreatedAt: number | null): Promise<boolean> {
+  if (!isNative || level < BOUNTY_MIN_LEVEL || slotCreatedAt === null) return false
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  if (slotCreatedAt >= startOfToday.getTime()) return false
+  return askIfLedgerAllows()
+}
+
+async function askIfLedgerAllows(): Promise<boolean> {
   const ledger = readLedger()
   if (ledger.asks >= MAX_ASKS) return false
   if (ledger.lastAskAt > 0 && Date.now() - ledger.lastAskAt < MS_BETWEEN_ASKS) return false
@@ -185,6 +211,8 @@ export async function maybeRequestReview(moment: ReviewMoment): Promise<boolean>
     // Recorded AFTER the call resolves. A bridge that rejected asked nobody anything, and
     // burning one of three lifetime asks on a failed call is the wrong trade.
     writeLedger({ asks: ledger.asks + 1, lastAskAt: Date.now() })
+    // That we asked, never what came of it — which no API reveals anyway.
+    trackEvent('review_asked')
     return true
   } catch (err) {
     // Never surfaced to the player. A store prompt that cannot be shown is not an error

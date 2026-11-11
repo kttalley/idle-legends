@@ -84,6 +84,7 @@ import type { ThoughtEvent } from '../engine/nameGen'
 import { slotStorage, summarize, newSlotId, setLastSlotId } from './saveSlots'
 import { queueCloudSave } from '../net/cloudSave'
 import { clearFunnelSlot, trackEvent, trackProgress, trackSession } from '../net/funnel'
+import { maybeRequestReviewAfterBounty } from '../engine/appReview'
 import { DEFAULT_COLORWAY, isColorwayUnlocked } from '../render/colorways'
 import { getPurchaseState } from '../monetization/purchases'
 import {
@@ -3065,6 +3066,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             r < 0.05 ? 'legendary' : r < 0.3 ? 'epic' : 'rare')
           newLogs.push(log('loot_item', `★ Daily bounty complete! +${purse} gold and a ${loot.item.rarity} reward.`, '#ffd700'))
           trackEvent(`bounty_${today.replace(/-/g, '')}`)
+          void maybeRequestReviewAfterBounty(level, activeSlotCreatedAt)
         }
       }
 

@@ -21,7 +21,7 @@ import { installViewportInsets } from './engine/viewportInsets'
 import { deleteCloudSlot, installCloudSaveFlush } from './net/cloudSave'
 import { installFunnel } from './net/funnel'
 import {
-  scheduleWatchEnd, cancelWatchEnd, primeWatchPermission,
+  scheduleWatchEnd, scheduleBountyReminder, cancelWatchEnd, primeWatchPermission,
   primeWatchPermissionAfterDwell, cancelWatchPermissionDwell,
 } from './engine/watchNotifications'
 import { watchCapacitySeconds } from './engine/offline'
@@ -183,7 +183,9 @@ export default function App() {
         compileUpgrades(s.upgradeRanks).offlineHours +
         compileUniques(s.equipment).offlineHours +
         purchasedWatchHours(getPurchaseState().active)
-      void scheduleWatchEnd(watchCapacitySeconds(s, permanentHours).total)
+      const watchSeconds = watchCapacitySeconds(s, permanentHours).total
+      void scheduleWatchEnd(watchSeconds)
+      void scheduleBountyReminder(watchSeconds)
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)

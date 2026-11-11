@@ -15,6 +15,12 @@
 // idle game, and the moment it stops being that it becomes the thing that gets the app
 // deleted.
 //
+// The one addition (1.5): the daily bounty reminder. Next-day return on Android 1.3 was 1
+// of 27, and nothing ever told a player there was a reason to come back tomorrow. It
+// obeys the same rule as the watch notice: at most one pending, scheduled only when the
+// player leaves, cancelled when they return — so a player who stops opening the app gets
+// exactly one reminder and then silence, never a drip.
+//
 // Native-only, and guarded exactly like monetization/purchases.ts: on the web there is no
 // plugin behind the bridge, every call is wrapped, and every failure resolves to "no
 // notification" rather than to a broken game.
@@ -24,8 +30,9 @@ import { trackEvent } from '../net/funnel'
 
 const isNative = Capacitor.isNativePlatform()
 
-/** Stable id, so re-scheduling replaces rather than stacks. */
+/** Stable ids, so re-scheduling replaces rather than stacks. */
 const WATCH_NOTIFICATION_ID = 1001
+const BOUNTY_NOTIFICATION_ID = 1002
 
 let permissionAsked = false
 let granted = false
@@ -192,11 +199,51 @@ export async function scheduleWatchEnd(secondsFromNow: number): Promise<void> {
   }
 }
 
-/** Drop the pending notice — the player is here, so it can only ever fire wrongly now. */
+/** The reminder lands tomorrow at about the hour the player left, kept to waking hours. */
+const BOUNTY_EARLIEST_HOUR = 9
+const BOUNTY_LATEST_HOUR = 21
+/** A watch notice this close to the reminder already brings the player back; send one. */
+const BOUNTY_WATCH_GAP_MS = 3 * 60 * 60 * 1000
+
+/** When tomorrow's reminder fires, for a player leaving at `now`. Pure, for tests. */
+export function bountyReminderAt(now: Date): Date {
+  const hour = Math.min(BOUNTY_LATEST_HOUR, Math.max(BOUNTY_EARLIEST_HOUR, now.getHours()))
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hour, 0, 0, 0)
+}
+
+/**
+ * Schedule tomorrow's "a new bounty is posted" reminder. Called alongside
+ * `scheduleWatchEnd` when the app goes to the background, with the same seconds, so the
+ * two never land on top of each other.
+ */
+export async function scheduleBountyReminder(watchSecondsFromNow: number): Promise<void> {
+  if (!isNative) return
+  if (!(await ensurePermission(false))) return
+  const at = bountyReminderAt(new Date())
+  const watchAt = Date.now() + watchSecondsFromNow * 1000
+  try {
+    const { LocalNotifications: LN } = await plugin()
+    await LN.cancel({ notifications: [{ id: BOUNTY_NOTIFICATION_ID }] })
+    if (Math.abs(at.getTime() - watchAt) < BOUNTY_WATCH_GAP_MS) return
+    await LN.schedule({
+      notifications: [{
+        id: BOUNTY_NOTIFICATION_ID,
+        title: 'A new bounty is posted',
+        body: "Today's bounty is up: 30 kills for a gold purse and a guaranteed rare-or-better drop.",
+        schedule: { at },
+      }],
+    })
+    trackEvent('notif_bounty_scheduled')
+  } catch (err) {
+    console.warn('[watch] could not schedule bounty reminder', err)
+  }
+}
+
+/** Drop the pending notices — the player is here, so they can only ever fire wrongly now. */
 export async function cancelWatchEnd(): Promise<void> {
   if (!isNative) return
   try {
     const { LocalNotifications: LN } = await plugin()
-    await LN.cancel({ notifications: [{ id: WATCH_NOTIFICATION_ID }] })
+    await LN.cancel({ notifications: [{ id: WATCH_NOTIFICATION_ID }, { id: BOUNTY_NOTIFICATION_ID }] })
   } catch { /* nothing pending, or no permission — both are fine */ }
 }
