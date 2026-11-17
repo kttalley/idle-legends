@@ -350,8 +350,10 @@ export async function loadOfferings(): Promise<void> {
     try {
       const { Purchases } = await plugin()
       const wanted = [PRODUCT_IDS.founder, PRODUCT_IDS.standing]
+      // Android: getProducts defaults to SUBSCRIPTION and would return nothing for these
+      // one-time products. The type is ignored on iOS.
       const { products } = await withTimeout(
-        Purchases.getProducts({ productIdentifiers: wanted }), OFFERINGS_MS, 'getProducts')
+        Purchases.getProducts({ productIdentifiers: wanted, type: 'NON_SUBSCRIPTION' as never }), OFFERINGS_MS, 'getProducts')
       const list = (products ?? []) as unknown as Array<Record<string, unknown> & { identifier?: string }>
       for (const prod of list) {
         if (prod?.identifier) storeProducts.set(prod.identifier, prod)
