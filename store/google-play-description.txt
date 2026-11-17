@@ -5,9 +5,8 @@
 # and the "characters survive reinstalls" claim is dropped (Android identity-recovery is
 # Phase 3 in docs/ANDROID-PLAN.md, not shipped).
 #
-# TODO(kristian): FILL IN whether both products (Founder Pack, Standing Orders) are live in
-# Play Console. If Android billing isn't live yet, change the last line of the full
-# description to: "Free to play. No purchases yet on Android."
+# Both products went live on Play 2026-11-17 and this copy was published to the listing
+# via the Play Developer API the same day.
 
 ===== SHORT DESCRIPTION (80/80) =====
 Idle MMORPG with talent trees, offline progress, and a real cross-player ladder.
