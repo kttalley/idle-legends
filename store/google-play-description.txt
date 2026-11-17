@@ -1,0 +1,41 @@
+# Google Play listing copy (paste into Play Console > Store presence > Main store listing)
+# Written 2026-11-16 from the App Store description (store/SUBMISSION.md section 3).
+# Changes from the previous Play copy: "MMO-style" instead of "WoW-style" (competitor trademark),
+# same facts and voice as the Apple listing, purchase count matches the code (two products),
+# and the "characters survive reinstalls" claim is dropped (Android identity-recovery is
+# Phase 3 in docs/ANDROID-PLAN.md, not shipped).
+#
+# TODO(kristian): FILL IN whether both products (Founder Pack, Standing Orders) are live in
+# Play Console. If Android billing isn't live yet, change the last line of the full
+# description to: "Free to play. No purchases yet on Android."
+
+===== SHORT DESCRIPTION (80/80) =====
+Idle MMORPG with talent trees, offline progress, and a real cross-player ladder.
+
+===== FULL DESCRIPTION (1345/4000) =====
+Stillmarch is an idle MMORPG for people who love the shape of an MMO and can't give it forty hours a week.
+
+Pick a class, spend your talent points, and send your hero into the march. Combat resolves itself. You make the decisions that matter: the build, the gear, the route, and which fights are worth picking. Close the app and your hero keeps going. Open it tomorrow and collect.
+
+SKILL TREES WITH TEETH
+MMO-style talent trees for every class. Respec any time, and builds play differently instead of just scaling harder.
+
+OFFLINE PROGRESS
+Your hero ranges on their own for up to 8 hours, or 16 with Standing Orders. No energy timers, no countdowns nagging you back.
+
+LOOT AND TEMPERING
+Craft, temper, and push the quality of the gear you find.
+
+A LIVING WORLD
+Zones, gathering nodes, town vendors, and heroes going about their own business around you.
+
+REAL PLAYERS
+A cross-player ladder where every rank is another person's hero. Publish your roster, challenge other people's characters, and climb.
+
+SAFE MULTIPLAYER
+Report or block any player from their legend page. Reports go to a person who reviews them. You never have to chat with strangers to play.
+
+NO GACHA, NO ADS
+No loot boxes, no odds tables, no gems, no ads. Purchases are named things you can see before you buy.
+
+Free to play. Two optional one-time purchases, no subscriptions.
