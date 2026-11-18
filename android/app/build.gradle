@@ -24,8 +24,8 @@ android {
         applicationId "com.stillmarch.game"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
-        versionName "1.5.1"
+        versionCode 7
+        versionName "1.5.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -84,4 +84,18 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+// Guard (added 2026-11-17 after 1.5.1 shipped a black screen): the WEB build uses
+// base '/projects/stillmarch/', so its asset URLs 404 inside the app. Native builds use
+// base './'. Refuse to build a release from web-built assets.
+tasks.matching { it.name in ['bundleRelease', 'assembleRelease'] }.configureEach {
+    doFirst {
+        def index = file('src/main/assets/public/index.html')
+        if (index.exists() && index.text.contains('/projects/stillmarch/')) {
+            throw new GradleException(
+                "android/app/src/main/assets/public was synced from the WEB build. " +
+                "Run `npm run cap:sync:android` (BUILD_TARGET=native), never `npm run build`, before a release build.")
+        }
+    }
 }
