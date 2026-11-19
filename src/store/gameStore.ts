@@ -33,7 +33,7 @@ import {
   makeShadowBoltHit, makeAbilityBuff, isGearUpgrade,
   emptyAbilityMod, RAMPAGE_MAX_STACKS, ARCANE_MAX_CHARGES, resolveHeroTurn, advanceHeroUpkeep,
 } from '../engine/combat'
-import { xpForLevel } from '../engine/progression'
+import { greyLevel, killXp, xpForLevel } from '../engine/progression'
 import { getParty } from '../engine/party'
 import { registerFactionNames, resolveFaction } from '../data/factions'
 import { clearSelectedHero } from '../engine/selection'
@@ -65,7 +65,7 @@ import {
 import {
   INVENTORY_SLOTS, MOB_RESPAWN_SECONDS, RESPAWN_TIMER_SECONDS,
   PARTY_MOB_HP_SCALE, PARTY_MOB_DAMAGE_SCALE, PARTY_MOB_REWARD_SCALE,
-  ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE, GREY_LEVEL_GAP,
+  ELITE_HP_MULTIPLIER, ELITE_DAMAGE_MULTIPLIER, ELITE_SPAWN_CHANCE, LEVELS_PER_CIRCUIT,
   NEWCOMER_LEVEL, NEWCOMER_REGEN_PER_SEC, NEWCOMER_REST_BELOW, newcomerDamageScale,
   DAILY_BOUNTY_KILLS, DAILY_BOUNTY_GOLD_PER_LEVEL,
   REST_BELOW, REST_UNTIL, REST_REGEN_PER_SEC,
@@ -3110,13 +3110,23 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // Offline inherits this for free: `offlineRates` accrues from `xpThisTick`, so a
       // grey zone banks a zero XP rate and the projection pays out accordingly. Without
       // that, idling in a grey zone would out-earn playing in it.
+      //
+      // Each completed lap lifts the line (`greyLevel`), and a later lap scales kill XP up
+      // to the hero (`killXp`). Without that, the whole world is below a hero who has
+      // finished it, and levelling stopped for good a little past 110.
       const zoneTop = ZONES[currentZone]?.levelRange[1] ?? level
-      const isGrey = level - zoneTop > GREY_LEVEL_GAP
-      const awardedXp = isGrey ? 0 : deadMob.xpReward
+      const circuit = state.zoneCircuit ?? 0
+      const isGrey = level > greyLevel(zoneTop, circuit)
+      const awardedXp = isGrey ? 0 : killXp(deadMob.xpReward, level, zoneTop, circuit)
       if (isGrey && greyZoneNotified !== currentZone) {
         greyZoneNotified = currentZone
+        // Past the first lap, say how to get XP back: a player at 113 asked on the Play
+        // Store how to level past it, because nothing in the game told them.
         newLogs.push(log('proc',
-          `${ZONES[currentZone].name} is far below you — its enemies grant no experience.`,
+          circuit === 0
+            ? `${ZONES[currentZone].name} is far below you — its enemies grant no experience.`
+            : `${ZONES[currentZone].name} is far below you — its enemies grant no experience. ` +
+              `Higher zones still do, and each circuit you complete raises the limit by ${LEVELS_PER_CIRCUIT}.`,
           '#8a8070'))
       }
 

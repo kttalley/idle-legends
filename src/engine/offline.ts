@@ -2,10 +2,12 @@ import {
   OFFLINE_CAP_HOURS, TICK_RATE_MS, ITEM_DROP_CHANCE,
   OFFLINE_MIN_SECONDS, OFFLINE_RATE_WINDOW_SECONDS, OFFLINE_MIN_MEASURED_SECONDS,
   OFFLINE_THIN_SAMPLE_SECONDS, OFFLINE_THIN_SAMPLE_CAP_SECONDS, GREY_LEVEL_GAP,
-  WATCH_EXTEND_HOURS, WATCH_EXTEND_BASE_COST, OFFLINE_EFFICIENCY,
+  WATCH_EXTEND_HOURS, WATCH_EXTEND_BASE_COST, OFFLINE_EFFICIENCY, LEVELS_PER_CIRCUIT,
+  TALENT_POINT_MAX,
 } from '../data/constants'
 import { UPGRADE_COST_GROWTH } from '../data/upgrades'
 import { ZONES } from '../data/zones'
+import { totalSpent } from '../data/specs'
 import { ZONE_MATERIALS, MATERIALS } from '../data/professions'
 import { GATHER_SECONDS, GATHER_YIELD, purityToQuality } from './crafting'
 import type { GameState, Item, QualityTier, Slot } from '../data/types'
@@ -215,7 +217,9 @@ export function offlineLevelCeiling(state: GameState): number {
   // No zone data (a corrupt or very old save) must not mean "no progress" — fall back to
   // letting the hero keep what they have rather than clamping them backwards.
   if (!band) return Number.MAX_SAFE_INTEGER
-  return Math.max(band[1], state.level)
+  // Completed laps lift the ceiling the same way they lift the grey line, so an absence on
+  // a later lap still pays, up to what the hero's laps have earned.
+  return Math.max(band[1] + LEVELS_PER_CIRCUIT * Math.max(0, state.zoneCircuit ?? 0), state.level)
 }
 
 /**
@@ -333,7 +337,9 @@ export function projectOfflineProgress(
   while (xp >= xpForLevel(level) && level - startLevel < 200 && level < ceiling) {
     xp -= xpForLevel(level)
     level++
-    talentPoints++
+    // Same lifetime cap the live tick applies. Without it an absence past level 100 handed
+    // out points the next load quietly took back (the save loader re-derives them).
+    if (talentPoints + totalSpent(state.talentAllocs) < TALENT_POINT_MAX) talentPoints++
   }
   // At the ceiling the surplus is DROPPED, not banked. Banking it would hand the player
   // three instant level-ups the moment they reopened the app, which is the same runaway

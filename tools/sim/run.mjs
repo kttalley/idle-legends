@@ -61,6 +61,14 @@ const result = await build({
   },
 })
 
+// `--from-saves <file>`: real saved heroes (JSON array of {label, state}) for the bundle
+// to load through the game's own save path. Read here because the bundle has no fs.
+const savesAt = process.argv.indexOf('--from-saves')
+if (savesAt >= 0) {
+  const { readFile } = await import('node:fs/promises')
+  globalThis.__savedHeroes = JSON.parse(await readFile(process.argv[savesAt + 1], 'utf8'))
+}
+
 const dir = await mkdtemp(join(tmpdir(), 'il-econ-'))
 const bundlePath = join(dir, 'sim.mjs')
 await writeFile(bundlePath, result.outputFiles[0].text)

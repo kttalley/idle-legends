@@ -3,10 +3,12 @@
 
 import {
   runScenario, runSweep, runInvariants, runSaveMigration, runOfflineParity, runLootFidelity, runManualAggro,
-  formatReport, formatSweep, formatParity, MEAN_TOLERANCE,
+  formatReport, formatSweep, formatParity, MEAN_TOLERANCE, runSavedHero,
   type ScenarioOpts, type Violation,
 } from './econSim'
-import type { ClassType } from '../data/types'
+import type { ClassType, GameState, ZoneId } from '../data/types'
+import { ZONE_ORDER as ZONE_IDS } from '../data/zones'
+const ZONE_ORDER = ZONE_IDS as ZoneId[]
 
 declare const process: { argv: string[]; stdout: { write(s: string): void } }
 
@@ -135,6 +137,32 @@ if (process.argv.includes('--parity')) {
     for (const v of migration) process.stdout.write(`          [${v.rule}] ${v.detail}\n`)
   }
   process.stdout.write(failed === 0 ? '\nall invariants hold\n' : `\n${failed} shape(s) violated invariants\n`)
+} else if (process.argv.includes('--from-saves')) {
+  // Real heroes, loaded through the real save path and run forward as they are.
+  const heroes = (globalThis as { __savedHeroes?: { label: string; state: GameState }[] }).__savedHeroes ?? []
+  for (const h of heroes) {
+    const pts = runSavedHero(h.state, opts.minutes, opts.stepSeconds, opts.sampleEveryMinutes)
+    const first = h.state.level, last = pts[pts.length - 1]
+    process.stdout.write(`${h.label.padEnd(52)} -> L${last.level} (+${last.level - first}) C${last.circuit}  [${pts.map(p => `${p.minute}m:L${p.level}`).join(' ')}]\n`)
+  }
+} else if (process.argv.includes('--endless')) {
+  // Levelling after the final boss. A from-scratch run never gets there, so each case
+  // starts a hero on a later lap and reports levels gained. Circuit 0 at the top of the
+  // last zone is the control: the grey-mob rule must still hold it in place.
+  const cases: { name: string; level: number; circuit: number; zone: ZoneId }[] = [
+    { name: 'control: L111, circuit 0, last zone', level: 111, circuit: 0, zone: ZONE_ORDER[ZONE_ORDER.length - 1] },
+    { name: 'baseline: L96, circuit 0, last zone', level: 96, circuit: 0, zone: ZONE_ORDER[ZONE_ORDER.length - 1] },
+    { name: 'L113, circuit 1, first zone',        level: 113, circuit: 1, zone: ZONE_ORDER[0] },
+    { name: 'L116, circuit 9, first zone',        level: 116, circuit: 9, zone: ZONE_ORDER[0] },
+    { name: 'L118, circuit 5, last zone',         level: 118, circuit: 5, zone: ZONE_ORDER[ZONE_ORDER.length - 1] },
+    { name: 'L300, circuit 3, middle zone',       level: 300, circuit: 3, zone: ZONE_ORDER[Math.floor(ZONE_ORDER.length / 2)] },
+  ]
+  for (const c of cases) {
+    const r = runScenario({ ...opts, forceLevel: c.level, forceCircuit: c.circuit, forceZone: c.zone,
+      advanceZones: process.argv.includes('--advance'), seed: opts.seed ?? 1 })
+    const pts = r.samples.map(x => `${x.minute}m:L${x.level}${x.circuit !== c.circuit ? `(C${x.circuit})` : ''}`).join(' ')
+    process.stdout.write(`${c.name.padEnd(40)} -> L${r.final.level} after ${opts.minutes} min  [${pts}]\n`)
+  }
 } else if (process.argv.includes('--combat-trace')) {
   // The STORE's golden. `fight.mjs` gates `engine/fight.ts` byte-for-byte; the store's own
   // combat path had no equivalent, so the only check on a refactor there was whether

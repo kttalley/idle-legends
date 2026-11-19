@@ -233,8 +233,25 @@ export function newcomerDamageScale(level: number): number {
  * 81, Cinderfall (85–100) at 111.
  *
  * This is the pressure that sends a stalled player at the boss instead of at more trash.
+ *
+ * First lap only. On circuit 1+ the hero has finished the world and every zone is below
+ * them, so greying it capped levelling a little past 110. Later laps scale kill XP up to
+ * the hero instead; see `killXp` in engine/progression.ts.
  */
 export const GREY_LEVEL_GAP = 10
+
+/**
+ * How far each completed lap (circuit) lifts the grey-mob line.
+ *
+ * Without it levelling stopped for good a little past 110: every zone is below a hero who
+ * has finished the world, so every kill was grey. Live saves on 2026-11-19 were all parked
+ * at 113 to 118, one of them on circuit 45. Scaling kill XP to the hero's level instead ran
+ * away in the sim (300 to 7,000 levels an hour on those same saves), because a hero past
+ * the first lap clears 10 to 15 laps an hour and the +50%-per-lap enemy scaling never
+ * catches up. Tying the ceiling to laps cleared bounds the pace by the thing the hero is
+ * actually doing. Measured with `node tools/sim/run.mjs --from-saves <file>`.
+ */
+export const LEVELS_PER_CIRCUIT = 2
 
 // ── Party scaling ─────────────────────────────────────────────────────────────
 // A party used to be free power: measured at three companions, gold +27.9% and deaths

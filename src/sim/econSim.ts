@@ -22,7 +22,7 @@ import type { ClassType, GameState, RaceType, TownId, ZoneId } from '../data/typ
 import { ZONE_ORDER, ZONES } from '../data/zones'
 import { canEnterZone, townForZone } from '../engine/zoneProgression'
 import { UPGRADES, upgradeCost } from '../data/upgrades'
-import { slotStorage } from '../store/saveSlots'
+import { slotStorage, summarize } from '../store/saveSlots'
 import { projectOfflineProgress } from '../engine/offline'
 import { itemPower, generateItem } from '../data/items'
 import { ELITE_DROP_CHANCE_MULT, placeDrop, rollLoot } from '../engine/loot'
@@ -224,6 +224,11 @@ export interface ScenarioOpts {
   /** Start the hero at this level. Needed whenever a case depends on an action-bar slot,
    *  since those open at 1 / 8 / 16 and a short trace never levels that far. */
   forceLevel?: number
+  /** Start on this lap of the world (`zoneCircuit`). With `forceZone`, used to measure
+   *  levelling after the final boss, which a from-scratch run never reaches. */
+  forceCircuit?: number
+  /** Start in this zone, with every zone up to it unlocked. */
+  forceZone?: ZoneId | ''
 }
 
 declare const process: { argv?: string[]; stdout: { write(s: string): void } }
@@ -315,6 +320,8 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
     captureCombatTrace: false,
     forceTalents: {},
     forceLevel: 0,
+    forceCircuit: 0,
+    forceZone: '',
     ...opts,
   }
 
@@ -340,6 +347,14 @@ export function runScenario(opts: ScenarioOpts): ScenarioResult {
   // precisely the coverage gap these cases exist to close.
   if (o.forceLevel > 0) {
     useGameStore.setState({ level: o.forceLevel })
+  }
+  if (o.forceCircuit > 0 || o.forceZone) {
+    const zone = (o.forceZone || store.getState().currentZone) as ZoneId
+    const order = ZONE_ORDER as ZoneId[]
+    const unlocked = order.slice(0, Math.max(1, order.indexOf(zone) + 1))
+    useGameStore.setState({ zoneCircuit: o.forceCircuit, unlockedZones: unlocked })
+    // Through the real action, so the zone gets its map and travel exactly as a click would.
+    if (zone !== store.getState().currentZone) store.getState().selectZone(zone)
   }
   if (Object.keys(o.forceTalents).length || o.forceLevel > 0) {
     // Straight onto the state: `allocateTalent` gates on points spent per tree, which is
@@ -543,7 +558,7 @@ export function runInvariants(opts: ScenarioOpts): Violation[] {
     playerClass: 'warrior', playerRace: 'human', stepSeconds: 0.25,
     sampleEveryMinutes: 5, advanceZones: false, sellCommons: false,
     buyBagSlots: false, buyContract: false, buyUpgrades: false, autoEquip: false,
-    disableAutoEquip: false, disableAutoAdvance: false, seed: null, partySize: 0, spendTalents: false, captureCombatTrace: false, forceTalents: {}, forceLevel: 0, ...opts,
+    disableAutoEquip: false, disableAutoAdvance: false, seed: null, partySize: 0, spendTalents: false, captureCombatTrace: false, forceTalents: {}, forceLevel: 0, forceCircuit: 0, forceZone: '', ...opts,
   }
   if (typeof __setSeed === 'function') __setSeed(o.seed)
 
@@ -1252,4 +1267,27 @@ export function formatReport(r: ScenarioResult): string {
   }
   out.push(`deaths:            ${f.deaths}`)
   return out.join('\n')
+}
+
+/**
+ * Run a real saved hero forward, through the real save loader. For measuring pace on
+ * content a from-scratch run never reaches (after the final boss), where a forced level on
+ * starter gear is not a hero anyone actually has.
+ */
+export function runSavedHero(state: GameState, minutes: number, stepSeconds = 0.25,
+                             sampleEveryMinutes = 15): { minute: number; level: number; circuit: number; zone: ZoneId }[] {
+  if (typeof __setSeed === 'function') __setSeed(1)
+  const id = `sim_${Math.random().toString(36).slice(2, 8)}`
+  const now = Date.now()
+  slotStorage.save({ id, createdAt: now, lastPlayedAt: now, summary: summarize(state), state })
+  useGameStore.getState().loadSlot(id)
+  const out: { minute: number; level: number; circuit: number; zone: ZoneId }[] = []
+  const ticksPerSample = Math.round((sampleEveryMinutes * 60) / stepSeconds)
+  for (let m = sampleEveryMinutes; m <= minutes; m += sampleEveryMinutes) {
+    for (let i = 0; i < ticksPerSample; i++) useGameStore.getState().tick(stepSeconds)
+    const s = useGameStore.getState()
+    out.push({ minute: m, level: s.level, circuit: s.zoneCircuit ?? 0, zone: s.currentZone })
+  }
+  slotStorage.delete(id)
+  return out
 }
