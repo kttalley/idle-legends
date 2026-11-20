@@ -235,3 +235,29 @@ const MILESTONE_TITLES: Record<number, string> = {
 export function milestoneTitle(depth: number): string {
   return MILESTONE_TITLES[depth] ?? `Conqueror of Floor ${depth}`
 }
+
+// ── Phase 3: blended floors ──────────────────────────────────────────────────
+
+/**
+ * Which of the floor's biomes owns map tile (gx, gy) on the 64x64 torus: 0 is the floor's
+ * base biome (the one whose terrain shapes and tileset the floor uses), 1 and 2 are painted
+ * over it by the renderer with their own palettes. Jittered nearest-seed regions, seeded by
+ * depth, so every player sees the same floor.
+ */
+export function floorRegionIndex(floor: UndermawFloor, gx: number, gy: number, size = 64): number {
+  if (floor.biomes.length < 2) return 0
+  const r = rng((UNDERMAW_SEED ^ Math.imul(floor.depth, 0x85ebca6b)) >>> 0)
+  // Two seeds per biome, so a region is rarely one blob.
+  const seeds: { x: number; y: number; b: number }[] = []
+  for (let b = 0; b < floor.biomes.length; b++) for (let k = 0; k < 2; k++) seeds.push({ x: r() * size, y: r() * size, b })
+  // Cheap deterministic jitter so region edges wander instead of running dead straight.
+  const jitter = (((gx * 73856093) ^ (gy * 19349663) ^ floor.depth) >>> 0) % 7 - 3
+  let best = 0, bestD = Infinity
+  for (const s of seeds) {
+    let dx = Math.abs(gx - s.x), dy = Math.abs(gy - s.y)
+    dx = Math.min(dx, size - dx); dy = Math.min(dy, size - dy)
+    const d = dx * dx + dy * dy + jitter * 4
+    if (d < bestD) { bestD = d; best = s.b }
+  }
+  return best
+}

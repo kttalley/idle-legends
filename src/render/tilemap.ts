@@ -285,3 +285,45 @@ export function bakeGround(
     wrapTiles: map.wrapTiles ?? 0,
   }
 }
+/**
+ * Paint `layer` (the same map baked with another biome's palette) over `base`, but only in
+ * the buffer tiles where `inRegion(bx, by)` is true. Used for the Undermaw's blended floors:
+ * terrain shapes stay continuous, the biome changes underfoot. Clips to each tile's column
+ * (raised diamond plus cliff face plus a little headroom for raised detail), then drops the
+ * base's animated cells inside the region, since those reblit from the base palette's sheet.
+ */
+export function blendGroundRegions(base: GroundBuffer, layer: GroundBuffer, inRegion: (bx: number, by: number) => boolean): void {
+  const ctx = base.canvas.getContext('2d')
+  if (!ctx) return
+  const bw = base.bw
+  const bh = base.heights ? base.heights.length / bw : bw
+  ctx.save()
+  ctx.beginPath()
+  let any = false
+  for (let by = 0; by < bh; by++) {
+    for (let bx = 0; bx < bw; bx++) {
+      if (!inRegion(bx, by)) continue
+      any = true
+      const x0 = base.originX + tileToScreenX(bx, by)
+      const lift = heightAt(base, bx, by)
+      const top = tileToScreenY(bx, by) + base.planeOffsetY - lift
+      ctx.moveTo(x0 + HALF_W, top - 8)
+      ctx.lineTo(x0 + 2 * HALF_W, top + HALF_H)
+      ctx.lineTo(x0 + 2 * HALF_W, top + HALF_H + lift)
+      ctx.lineTo(x0 + HALF_W, top + 2 * HALF_H + lift)
+      ctx.lineTo(x0, top + HALF_H + lift)
+      ctx.lineTo(x0, top + HALF_H)
+      ctx.closePath()
+    }
+  }
+  if (any) { ctx.clip(); ctx.drawImage(layer.canvas, 0, 0) }
+  ctx.restore()
+  if (!any || !base.anims.length) return
+  base.anims = base.anims.filter(a => {
+    const sx = a.dx + HALF_W - base.originX
+    const sy = a.dy + HALF_H - base.planeOffsetY
+    const tx = Math.round((sx / HALF_W + sy / HALF_H) / 2)
+    const ty = Math.round((sy / HALF_H - sx / HALF_W) / 2)
+    return !inRegion(tx, ty)
+  })
+}

@@ -11,7 +11,8 @@
 // anchor and lunges can never slingshot across the screen.
 
 import { Scene, type Camera, type Entity } from '../scene'
-import { bakeGround, feetX, feetY, HALF_W, HALF_H, type GroundBuffer } from '../tilemap'
+import { bakeGround, blendGroundRegions, feetX, feetY, HALF_W, HALF_H, type GroundBuffer } from '../tilemap'
+import { generateFloor, floorRegionIndex } from '../../engine/undermaw'
 import { loadSprite, loadSpriteOrPlaceholder } from '../indexedSprite'
 import { makeHumanoidRig, makeBeastRig, makeTileset, makePropSheet, makePropEntities, TALL_PROP, makeLandmarks, makeBoltRig, makeBurstRig, TILE_ANIMS, TILE, makeTownBuildings, TOWN_BUILDING } from '../placeholderArt'
 import { getPalette, hasPalette, registerPaletteRaw, RARITY_ACCENTS } from '../palettes'
@@ -717,6 +718,8 @@ export class WorldSceneController {
 
   private ground: GroundBuffer | null = null
   private zone: string | null = null
+  /** The Undermaw floor the ground was baked for (0 outside the Undermaw). */
+  private bakedFloor = 0
   private tileset: IndexedSprite
   private propSheet: IndexedSprite
   /** Tall prop sprite per kind (Phase E), spawned as depth-sorted entities at nodes. */
@@ -1823,7 +1826,11 @@ export class WorldSceneController {
 
     // Zone change (or a never-baked ground — closes any first-bake race that would
     // otherwise leave a black viewport) → rebake ground + repopulate the zone.
-    if (state.currentZone !== this.zone || !this.ground) {
+    // An Undermaw floor can change without the zone changing (two floors may share a base
+    // biome), and each floor blends its own regions, so the floor is part of the bake key.
+    const floorKey = state.undermaw?.active ? state.undermaw.depth : 0
+    if (state.currentZone !== this.zone || !this.ground || floorKey !== this.bakedFloor) {
+      this.bakedFloor = floorKey
       // Retire the previous zone's tall-prop + ambient entities first (even if the
       // new zone's map isn't ready yet, so stale entities never linger).
       this.retirePropEntities()
@@ -1840,11 +1847,27 @@ export class WorldSceneController {
       const zm = state.zoneMaps[state.currentZone]
       if (zm) {
         const palId = biomePaletteId(state.currentZone)
+        const tileMap = zoneMapToTileMap(zm, state.currentZone)
         this.ground = bakeGround(
-          zoneMapToTileMap(zm, state.currentZone), this.tileset,
+          tileMap, this.tileset,
           palId, getPalette(palId),
           TILE_ANIMS, this.propSheet,
         )
+        // Undermaw floors with more than one biome: bake the same terrain in each other
+        // biome's palette and paint it into that biome's regions (docs/UNDERMAW.md P3).
+        if (state.undermaw?.active) {
+          const floor = generateFloor(state.undermaw.depth)
+          for (let b = 1; b < floor.biomes.length; b++) {
+            const otherPal = biomePaletteId(floor.biomes[b])
+            if (otherPal === palId) continue
+            const layer = bakeGround(tileMap, this.tileset, otherPal, getPalette(otherPal), TILE_ANIMS, this.propSheet)
+            blendGroundRegions(this.ground, layer, (bx, by) => {
+              const gx = (((bx - PAD) % MAP_SIZE) + MAP_SIZE) % MAP_SIZE
+              const gy = (((by - PAD) % MAP_SIZE) + MAP_SIZE) % MAP_SIZE
+              return floorRegionIndex(floor, gx, gy) === b
+            })
+          }
+        }
         this.zone = state.currentZone
         this.lastNodes = zm.nodes
         this.walkMask = getWalkMask(zm)
