@@ -3,7 +3,7 @@
 
 import {
   runScenario, runSweep, runInvariants, runSaveMigration, runOfflineParity, runLootFidelity, runManualAggro,
-  formatReport, formatSweep, formatParity, MEAN_TOLERANCE, runSavedHero,
+  formatReport, formatSweep, formatParity, MEAN_TOLERANCE, runSavedHero, diagnoseSavedHero,
   type ScenarioOpts, type Violation,
 } from './econSim'
 import type { ClassType, GameState, ZoneId } from '../data/types'
@@ -137,6 +137,16 @@ if (process.argv.includes('--parity')) {
     for (const v of migration) process.stdout.write(`          [${v.rule}] ${v.detail}\n`)
   }
   process.stdout.write(failed === 0 ? '\nall invariants hold\n' : `\n${failed} shape(s) violated invariants\n`)
+} else if (process.argv.includes('--diagnose')) {
+  // One real hero, run forward with its combat log tallied. For "why is this hero stuck?".
+  const heroes = (globalThis as { __savedHeroes?: { label: string; state: GameState }[] }).__savedHeroes ?? []
+  for (const h of heroes) {
+    const r = diagnoseSavedHero(h.state, opts.minutes, opts.stepSeconds)
+    process.stdout.write(`## ${h.label}\n${r.samples.join('\n')}\n`)
+    process.stdout.write(`boss max hp seen: ${r.bossMaxHp}, lowest boss hp seen: ${r.bossLowestHp}\n`)
+    for (const [k, v] of Object.entries(r.tally).sort((a, b) => b[1] - a[1]).slice(0, 15)) process.stdout.write(`  ${String(v).padStart(4)}  ${k}\n`)
+    process.stdout.write(`hero: ${JSON.stringify(r.hero)}\n`)
+  }
 } else if (process.argv.includes('--from-saves')) {
   // Real heroes, loaded through the real save path and run forward as they are.
   const heroes = (globalThis as { __savedHeroes?: { label: string; state: GameState }[] }).__savedHeroes ?? []

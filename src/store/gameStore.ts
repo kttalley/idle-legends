@@ -3202,6 +3202,18 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         const zone = ZONES[currentZone]
         const nextZoneId = zone.nextZone
 
+        // Killing the gate boss proves the hero can handle what lies past it, so lift any
+        // fall-back block on the next zone. The block otherwise waits for the hero to
+        // out-level it, and a hero who cannot level where they stand never does: a live
+        // save (L118, circuit 5) killed this boss over and over and never moved on, held
+        // in Shattered Crossing by a block on The Bloodfields recorded at level 118.
+        if (nextZoneId && state.zoneBlockedAtLevel[nextZoneId] !== undefined) {
+          set(s => {
+            const { [nextZoneId]: _lifted, ...rest } = s.zoneBlockedAtLevel
+            return { zoneBlockedAtLevel: rest }
+          })
+        }
+
         // Update the active quest for this zone to completed.
         let activeQuest: ZoneQuest | null = state.activeQuest
         if (activeQuest?.zoneId === currentZone) {
@@ -3223,7 +3235,9 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           // Final zone (the_maw_eternal) — circuit increment, loop back to start.
           // Drop the cached maps: mapSeed folds in the circuit, so the next lap through
           // the world is generated fresh instead of replaying the same geography.
-          set(s => ({ zoneCircuit: s.zoneCircuit + 1, zoneMaps: {} }))
+          // A new lap is a fresh start for fall-back blocks too: the hero who recorded them
+          // has since cleared the whole world.
+          set(s => ({ zoneCircuit: s.zoneCircuit + 1, zoneMaps: {}, zoneBlockedAtLevel: {} }))
           bossesDefeated.length = 0  // reset all boss kills for the new circuit
           currentZone = 'sunhollow_meadows'
           activeQuest = makeZoneQuest('sunhollow_meadows', state.playerFaction)

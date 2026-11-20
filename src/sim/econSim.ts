@@ -1291,3 +1291,50 @@ export function runSavedHero(state: GameState, minutes: number, stepSeconds = 0.
   slotStorage.delete(id)
   return out
 }
+
+/**
+ * Diagnose a saved hero that is not progressing: run it forward and tally what the combat
+ * log says (boss sightings, boss deaths, hero deaths, zone changes), plus a snapshot of the
+ * hero and the current target. Read-only; nothing here changes the game.
+ */
+export function diagnoseSavedHero(state: GameState, minutes: number, stepSeconds = 0.25) {
+  if (typeof __setSeed === 'function') __setSeed(1)
+  const id = `diag_${Math.random().toString(36).slice(2, 8)}`
+  const now = Date.now()
+  slotStorage.save({ id, createdAt: now, lastPlayedAt: now, summary: summarize(state), state })
+  useGameStore.getState().loadSlot(id)
+  const tally: Record<string, number> = {}
+  const samples: string[] = []
+  let seen = 0
+  const bump = (k: string) => { tally[k] = (tally[k] ?? 0) + 1 }
+  const ticks = Math.round((minutes * 60) / stepSeconds)
+  let bossMaxHp = 0, bossMinHp = Infinity
+  for (let i = 0; i < ticks; i++) {
+    useGameStore.getState().tick(stepSeconds)
+    const s = useGameStore.getState()
+    const log = s.combatLog
+    // combatLog is capped, so only scan entries that are new since the last tick
+    const fresh = log.slice(Math.max(0, log.length - Math.min(log.length, 40)))
+    for (const e of fresh) {
+      const key = `${e.timestamp ?? ''}|${e.message}`
+      if ((diagnoseSavedHero as unknown as { _seen?: Set<string> })._seen?.has(key)) continue
+      ;((diagnoseSavedHero as unknown as { _seen?: Set<string> })._seen ??= new Set()).add(key)
+      seen++
+      const m = e.message as string
+      if (/boss/i.test(m) || /Golem/.test(m)) bump('boss: ' + m.replace(/\d+/g, '#').slice(0, 70))
+      if (/you (have )?died|you were slain|defeated you|slain by/i.test(m)) bump('HERO DIED: ' + m.replace(/\d+/g, '#').slice(0, 60))
+      if (e.type === 'zone_change') bump('zone: ' + m.slice(0, 70))
+    }
+    const mob = s.currentMob
+    if (mob?.isBoss) { bossMaxHp = Math.max(bossMaxHp, mob.maxHp ?? 0); bossMinHp = Math.min(bossMinHp, mob.currentHp ?? Infinity) }
+    if (i % Math.round(120 / stepSeconds) === 0) {
+      samples.push(`${(i * stepSeconds / 60).toFixed(0)}m L${s.level} C${s.zoneCircuit} ${s.currentZone} alive=${s.isAlive} hp=${s.stats.currentHp}/${s.stats.maxHp} ` +
+        `target=${mob ? `${mob.name}${mob.isBoss ? '(BOSS)' : ''} ${mob.currentHp ?? '?'}/${mob.maxHp ?? '?'} dmg=${mob.damage}` : 'none'}`)
+    }
+  }
+  slotStorage.delete(id)
+  const s = useGameStore.getState()
+  return { tally, samples, bossMaxHp, bossLowestHp: bossMinHp, logEntries: seen,
+    hero: { level: s.level, circuit: s.zoneCircuit, zone: s.currentZone, maxHp: s.stats.maxHp,
+            stats: Object.fromEntries(Object.entries(s.stats).filter(([, v]) => typeof v === 'number')) } }
+}
