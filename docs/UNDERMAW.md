@@ -242,3 +242,24 @@ paid items trigger odds disclosure on both stores). At most, a one-time cosmetic
   ties by who got there first; pin the player's own row with neighbours.
 - Existing gaps the new mode makes worse: the offline summary has no accessible role, and
   ladder names show faction by colour only.
+
+## 8. Phase 0 results (2026-11-20)
+
+`node tools/sim/run.mjs --undermaw --from-saves <file> [--growth --boost --kpl --double --days]`
+on two real post-game saves (L118, circuits 5 and 9):
+
+| Setting | Result |
+|---|---|
+| growth 1.013, boost 0.5%/new floor, 15 kills/level at L110 doubling every 99 | L~380 day 1, ~675 week 1, ~885 day 30, **999 in ~100 to 120 days**; hours per level doubles about every 100 levels (0.25h at 400-500 to ~10h at 900-999) |
+| growth 1.016 (same otherwise) | permanent power wall at L880 to 980 |
+| growth 1.010 | depth runs away from level (floor 700+ at L480) |
+
+Findings:
+- The pacing rule must key off the **hero's** level, not the floor's (fixed in `floorKillXp`).
+- 900 to 999 currently takes about 2x everything before it; `doubleEvery` ~115 brings it
+  to ~1x as the rule states.
+- **Depth runs ahead of level**: floor 445 in ~2 days at ~L500, then a slow crawl to
+  550-600. Recommendation: gate floors by level (a floor opens at most a few floors past
+  the one that teaches your level) so depth and level climb together. **[decide]**
+- Model gaps to close before P1: all 10 saves (only 2 run so far), talents gained past the
+  save, store-only procs, offline at 75%, affixes.
