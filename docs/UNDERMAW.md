@@ -1,4 +1,6 @@
-# Slayer mode: an endless, procedural post-game (design, 2026-11-20)
+# The Undermaw: an endless, procedural post-game (design, 2026-11-20)
+
+Name decided 2026-11-20 (was "Slayer mode" / "the Undermaw"; Undermaw is a registered mark, see 7.2).
 
 Status: design only. Nothing here is built. Measurements are from the headless sim
 (`node tools/sim/run.mjs --from-saves`, `--diagnose`) against real saves pulled 2026-11-19.
@@ -22,7 +24,7 @@ procedural and endless ("or to level 999").
 
 ## 2. The idea in one paragraph
 
-Defeating the final boss for the first time opens **the Rift**: an endless descent of
+Defeating the final boss for the first time opens **the Undermaw**: an endless descent of
 procedurally generated floors. Each floor stitches together terrain from two or three of
 the 12 biomes, fills it with a mixed roster drawn from every zone's enemies, and ends with
 a remixed boss. Floors get harder **exponentially**, so every hero eventually meets a wall,
@@ -36,8 +38,8 @@ prefers them.
 
 - A floor is one generated map plus a kill target, like a zone. Clearing the kill target
   spawns the floor boss; killing it opens the next floor.
-- **Seeded by `(riftSeed, depth)`.** The same depth is the same floor for everyone in a
-  season, so the ladder compares like with like. `riftSeed` rotates weekly (see 3.6).
+- **Seeded by `(depthSeed, depth)`.** The same depth is the same floor for everyone in a
+  season, so the ladder compares like with like. `depthSeed` rotates weekly (see 3.6).
 - **Biomes:** each floor picks 1 to 3 biomes from the 12 (weighted so neighbours in the
   zone order blend well) and splits the map into regions, each painted with that biome's
   `BIOME_MAP_CONFIGS` (terrain chars, colours, water density, ore and herb colours).
@@ -45,28 +47,28 @@ prefers them.
   floor** and phase 3 adds region blending (see 6).
 - **Roster:** 3 to 5 enemy templates drawn from the chosen biomes' `mobs`, plus a chance of
   one "stranger" from any zone. Templates keep their sprites, attack speeds and names.
-- **Boss:** one of the 12 zone bosses, renamed with an epithet ("Siege War Golem, Rift-born")
+- **Boss:** one of the 12 zone bosses, renamed with an epithet ("Siege War Golem, Undermaw-born")
   and given one affix (3.4).
 
 ### 3.2 Difficulty curve
 
 Enemy health and damage on floor `d`:
 
-    riftMult(d) = RIFT_BASE * RIFT_GROWTH^d        (RIFT_GROWTH around 1.06 to 1.10, to tune)
+    depthMult(d) = DEPTH_BASE * DEPTH_GROWTH^d        (DEPTH_GROWTH around 1.06 to 1.10, to tune)
 
 applied to the template's base stats in place of `circuitMult`. Exponential growth is the
 point: hero power grows roughly linearly with level and item level, so an exponential
 enemy curve guarantees a wall at some depth for every hero, and each improvement moves the
-wall by a shrinking amount (`log(1 + gain) / log(RIFT_GROWTH)` floors). That gives the slow,
+wall by a shrinking amount (`log(1 + gain) / log(DEPTH_GROWTH)` floors). That gives the slow,
 always-possible climb idle games run on, instead of the current "nothing" or "everything".
 
-`RIFT_BASE` should put floor 1 at about the difficulty of the final zone on circuit 0, so
-entering the Rift is a step up, not a reset.
+`DEPTH_BASE` should put floor 1 at about the difficulty of the final zone on circuit 0, so
+entering the Undermaw is a step up, not a reset.
 
 ### 3.3 Levelling and the level-999 goal
 
-- The Rift pays XP scaled to depth, not to the hero: a floor's XP line (`greyLevel`) is
-  `110 + RIFT_LEVELS_PER_FLOOR * d`. Levelling is bounded by how deep you can go, which is
+- The Undermaw pays XP scaled to depth, not to the hero: a floor's XP line (`greyLevel`) is
+  `110 + LEVELS_PER_FLOOR * d`. Levelling is bounded by how deep you can go, which is
   bounded by the curve, so it cannot run away the way scaling XP to the hero did in the sim
   (300 to 7,000 levels an hour).
 - **The pacing rule (designer's call, 2026-11-20): levels 900 to 999 take as long as levels
@@ -74,13 +76,13 @@ entering the Rift is a step up, not a reset.
   each level takes about 0.7% longer to earn than the one before (`r = 2^(1/99) ≈ 1.00703`),
   so time per level doubles every 99 levels and the last 99 equal everything before them.
 - The rule is about **time**, so it is tuned in the sim, not derived on paper: P0 adjusts
-  `RIFT_GROWTH` and the XP line per floor until measured time per level on real saves
+  `DEPTH_GROWTH` and the XP line per floor until measured time per level on real saves
   follows `t(L) = t0 * r^(L - 110)`.
-- `t0`, the time for level 110 to 111 in the Rift, sets the scale. At `t0 = 1 min`, level
+- `t0`, the time for level 110 to 111 in the Undermaw, sets the scale. At `t0 = 1 min`, level
   999 takes about 8.5 hours and 110 to 999 takes about 50 days of play (offline counts);
   at `t0 = 2 min`, about 17 hours and 100 days. Target: a dedicated player reaches 999 in
   two to four months.
-- `RIFT_LEVELS_PER_FLOOR = 2` (level 999 around floor 445) is the starting point for that
+- `LEVELS_PER_FLOOR = 2` (level 999 around floor 445) is the starting point for that
   tuning, not a commitment.
 - Talent points stay capped at 100 (`TALENT_POINT_MAX`). Levels past 100 keep raising stats.
 
@@ -96,27 +98,27 @@ existing combat path.
 
 - Loot rolls at `max(hero level, floor item level)` with rarity bias rising slowly with
   depth, so deep floors are where better gear comes from.
-- Gold scales with `riftMult` at a lower exponent than health, so gold sinks (bag slots,
+- Gold scales with `depthMult` at a lower exponent than health, so gold sinks (bag slots,
   upgrades) stay meaningful.
 - A **depth milestone** every 25 floors: a guaranteed drop and a title on the ladder.
 
 ### 3.6 Ladder and seasons
 
 - New ladder column: **deepest floor this season**, beside level and power.
-- Weekly seasons reset only the Rift ladder column (not the hero). The seed rotates so the
+- Weekly seasons reset only the Undermaw ladder column (not the hero). The seed rotates so the
   floors are new each week.
 - Duels are unaffected: they already resolve from stats.
 
 ### 3.7 Offline
 
-Offline progress in the Rift farms the **deepest floor cleared minus 5** at the measured
+Offline progress in the Undermaw farms the **deepest floor cleared minus 5** at the measured
 rate, and never descends. Going deeper is something you come back and do, the same
 principle `offlineLevelCeiling` already follows.
 
 ### 3.8 How it coexists with circuits
 
-The Rift is a separate place, entered from the final zone or the map. Circuits keep
-working (with the 1.5.3 levelling). A hero can leave the Rift at any time and keeps their
+The Undermaw is a separate place, entered from the final zone or the map. Circuits keep
+working (with the 1.5.3 levelling). A hero can leave the Undermaw at any time and keeps their
 best depth.
 
 ## 4. What the measurements say so far
@@ -130,27 +132,27 @@ best depth.
 
 ## 5. Open questions for the designer
 
-1. **Name.** "The Rift", "Slayer", "The Descent", "The Maw Below"? Should it be tied to the
+1. **Name.** "The Undermaw", "Slayer", "The Descent", "The Maw Below"? Should it be tied to the
    final zone (The Maw Eternal) in the fiction?
 2. **How steep is the wall?** Gentle (most players reach floor 100) or steep (floor 100 is
-   an achievement)? This sets `RIFT_GROWTH`.
+   an achievement)? This sets `DEPTH_GROWTH`.
 3. **Seasons:** weekly, monthly, or none?
-4. **Should circuits eventually retire** in favour of the Rift, or stay as the relaxed mode?
-5. **Monetization:** none planned. Standing Orders (offline hours) already applies to Rift
+4. **Should circuits eventually retire** in favour of the Undermaw, or stay as the relaxed mode?
+5. **Monetization:** none planned. Standing Orders (offline hours) already applies to Undermaw
    farming through 3.7, which seems right.
 
 ## 6. Build plan (each phase shippable on its own)
 
 | Phase | Scope | Proves |
 |---|---|---|
-| P0 | `engine/rift.ts`: floor generator (seeded biome pick, roster, boss, affix stub) and `riftMult`. Sim only: `--rift` runs real saves down the Rift and reports depth per hour and the wall. | the curve, before any UI |
-| P1 | Enter/leave the Rift; one biome per floor (reuses existing tilesets); depth counter in the HUD; saves store `riftDepth` and `riftBest`. | the loop is fun |
-| P2 | Affixes; depth milestones; Rift loot table. | variety |
+| P0 | `engine/undermaw.ts`: floor generator (seeded biome pick, roster, boss, affix stub) and `depthMult`. Sim only: `--undermaw` runs real saves down the Undermaw and reports depth per hour and the wall. | the curve, before any UI |
+| P1 | Enter/leave the Undermaw; one biome per floor (reuses existing tilesets); depth counter in the HUD; saves store `undermawDepth` and `undermawBest`. | the loop is fun |
+| P2 | Affixes; depth milestones; Undermaw loot table. | variety |
 | P3 | Region blending (multiple biomes per floor) in `mapGen` and the tilemap bake. | the "procedural" feel |
 | P4 | Ladder column, weekly seed rotation, season reset. | competition |
 
 Every phase runs `--assert` (economy invariants, offline parity, loot fidelity, save
-migration) plus a new invariant: **offline in the Rift never out-earns online**, and
+migration) plus a new invariant: **offline in the Undermaw never out-earns online**, and
 **depth never decreases from offline progress**.
 
 ## 7. Research findings and recommendations (2026-11-20)
@@ -165,13 +167,13 @@ Even a generous ~1,000x hero gain from level 110 to 999 only survives about
 `log(1000) / log(growth)` floors: ~118 at 1.06, ~72 at 1.10. Level 999 at floor 445 needs
 growth near **1.016**, or a hero-side multiplier that compounds, or both. With depth-gated
 XP and 1.06 to 1.10, levels would stall around 250 to 350.
-**Recommendation:** start P0 at growth ~1.015 to 1.02 **plus** a small Rift-earned
+**Recommendation:** start P0 at growth ~1.015 to 1.02 **plus** a small Undermaw-earned
 permanent multiplier (3.9), and make the first sim output "the floor where hero power
-equals riftMult" for each real save.
+equals depthMult" for each real save.
 
-### 7.2 Name **[decide]**
+### 7.2 Name: **decided, The Undermaw** (2026-11-20)
 
-Avoid **Rift** (registered US word mark for an MMO; also Diablo III's "Greater Rift") and
+Avoid **Undermaw** (registered US word mark for an MMO; also Diablo III's "Greater Undermaw") and
 **Slayer** (a skill in RuneScape and Melvor). Also avoid Delve, The Pit, Nightmare, Abyss,
 Descent, Breach, and "The Maw Below" (WoW's endless tower sits in a zone called The Maw).
 Shortlist: **The Undermaw** (beneath The Maw Eternal; clearest tie to the finale and to the
@@ -183,7 +185,7 @@ Targets for a hero who has beaten the final boss: floor 25 on day one, 50 in wee
 100 in about a month, 200 as a multi-month goal. These replace "share of players", which
 means nothing at ~50 players.
 
-### 7.4 Seasons **[decide]**
+### 7.4 Seasons: **decided, permanent "deepest ever", fixed seed, no weekly resets** (2026-11-20)
 
 No weekly seasons: with ~25 players per platform they mean empty boards and the same
 winner. Ship a permanent **deepest ever** column; add a monthly column only past 100+

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ── mob_hollowcrown: the Rift's signature boss ───────────────────────────────
+// ── mob_hollowcrown: the Undermaw's signature boss ───────────────────────────────
 //
 // The thing waiting at the bottom of the Maw. Every other boss in the bestiary stands on
 // the ground; this one does not: no legs, a robe that frays into wisps above the floor, so
