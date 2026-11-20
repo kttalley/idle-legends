@@ -3,7 +3,7 @@
 
 import {
   runScenario, runSweep, runInvariants, runSaveMigration, runOfflineParity, runLootFidelity, runManualAggro,
-  formatReport, formatSweep, formatParity, MEAN_TOLERANCE, runSavedHero, diagnoseSavedHero,
+  formatReport, formatSweep, formatParity, MEAN_TOLERANCE, runSavedHero, diagnoseSavedHero, runUndermawStore,
   type ScenarioOpts, type Violation,
 } from './econSim'
 import type { ClassType, GameState, ZoneId } from '../data/types'
@@ -138,6 +138,15 @@ if (process.argv.includes('--parity')) {
     for (const v of migration) process.stdout.write(`          [${v.rule}] ${v.detail}\n`)
   }
   process.stdout.write(failed === 0 ? '\nall invariants hold\n' : `\n${failed} shape(s) violated invariants\n`)
+} else if (process.argv.includes('--undermaw-store')) {
+  // A real save, in the Undermaw, through the real store.
+  const heroes = (globalThis as { __savedHeroes?: { label: string; state: GameState }[] }).__savedHeroes ?? []
+  for (const h of heroes.slice(0, argNum('--heroes', 1))) {
+    const r = runUndermawStore(h.state, opts.minutes, opts.stepSeconds)
+    process.stdout.write(`## ${h.label}\n${r.samples.join('\n')}\n`)
+    for (const [k, v] of Object.entries(r.tally).sort((a, b) => b[1] - a[1]).slice(0, 14)) process.stdout.write(`  ${String(v).padStart(4)}  ${k}\n`)
+    process.stdout.write(`final: ${JSON.stringify(r.final)}\n`)
+  }
 } else if (process.argv.includes('--undermaw')) {
   // Phase 0: real saved heroes down the Undermaw. Knobs: --growth --boost --kpl --overhead --days
   UNDERMAW.growth = argNum('--growth', UNDERMAW.growth)

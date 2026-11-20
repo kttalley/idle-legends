@@ -50,6 +50,19 @@ export function floorMinLevel(depth: number): number {
   return UNDERMAW.levelFloor + UNDERMAW.levelsPerFloor * (depth - UNDERMAW.gateFloors)
 }
 
+/** The deepest floor this hero may enter: one past their best, and within the level gate. */
+export function maxOpenFloor(level: number, best: number): number {
+  const byLevel = Math.floor((level - UNDERMAW.levelFloor) / UNDERMAW.levelsPerFloor) + UNDERMAW.gateFloors
+  return Math.max(1, Math.min(best + 1, byLevel))
+}
+
+/** Permanent boost per new floor cleared, compounding, applied by softening enemies (8.1). */
+export const UNDERMAW_BOOST = 0.005
+/** Kills per level at level `levelFloor` (8.1); doubles every 115 levels. */
+export const UNDERMAW_KILLS_PER_LEVEL = 15
+/** Every this many floors the boss is the Hollow Crown and the floor is a milestone. */
+export const MILESTONE_EVERY = 25
+
 /** Deterministic per-floor stream (mulberry32), so a floor is the same for everyone. */
 function rng(seed: number): () => number {
   let a = seed >>> 0
@@ -174,4 +187,51 @@ export function makeFloorMob(e: FloorEnemy, depth: number, opts: { isBoss?: bool
     path: null, pathCool: 0, aggro: true, aggroRadius: 0, offset: { dx: 0, dy: 0 },
     dots: [], attackAccum: 0,
   } as MobInstance
+}
+
+// ── Phase 2: modifiers and milestones ────────────────────────────────────────
+
+/** Level ceiling (UNDERMAW.md 3.3). */
+export const UNDERMAW_LEVEL_MAX = 999
+
+/** Gold per floor kill: the final zone's range, scaled with depth more gently than health so
+ *  gold sinks stay meaningful (3.5). */
+export function floorGold(depth: number): [number, number] {
+  const cfg = ZONES[FINAL_ZONE]
+  const trash = cfg.mobs.filter(m => m.id !== cfg.bossId)
+  const lo = trash.reduce((a, m) => a + m.goldMin, 0) / trash.length
+  const hi = trash.reduce((a, m) => a + m.goldMax, 0) / trash.length
+  const k = Math.sqrt(depthMult(depth))
+  return [Math.round(lo * k), Math.round(hi * k)]
+}
+
+export const AFFIX_RULES: Record<import('../data/types').UndermawAffix, string> = {
+  hasted: 'Hasted: strikes harder and faster.',
+  vampiric: 'Vampiric: heals when it hits.',
+  warded: 'Warded: a shield to break first.',
+  thorned: 'Thorned: hurts you when you strike it.',
+  splitting: 'Splitting: leaves a half-strength copy when slain.',
+}
+
+/**
+ * Modifiers for an elite or boss on `depth`: one per 10 floors, at most three, all answerable
+ * by build (7.7): no one-shots, nothing that counters a class. Bosses never split.
+ */
+export function rollAffixes(depth: number, isBoss: boolean, r: () => number = Math.random): import('../data/types').UndermawAffix[] {
+  const count = Math.min(3, Math.floor(depth / 10))
+  const pool: import('../data/types').UndermawAffix[] = isBoss
+    ? ['hasted', 'vampiric', 'warded', 'thorned']
+    : ['hasted', 'vampiric', 'warded', 'thorned', 'splitting']
+  const out: import('../data/types').UndermawAffix[] = []
+  while (out.length < count && pool.length) out.push(pool.splice(Math.floor(r() * pool.length), 1)[0])
+  return out
+}
+
+const MILESTONE_TITLES: Record<number, string> = {
+  25: 'Deepwalker', 50: 'Gullet-diver', 75: 'Lightless', 100: 'Hollowsworn', 150: 'Crownbreaker',
+  200: 'Unlit Sovereign', 250: 'Swallower of Lights', 300: 'The Returned', 400: 'Maw-heart',
+}
+/** The ladder title for clearing a milestone floor (every MILESTONE_EVERY). */
+export function milestoneTitle(depth: number): string {
+  return MILESTONE_TITLES[depth] ?? `Conqueror of Floor ${depth}`
 }

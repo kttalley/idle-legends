@@ -6,7 +6,7 @@ import type {
   AllyCombatant, CombatAccumulators,
   GameMode, RecipeId, MaterialId, WeatherType, TownId, Rarity, MerchantContract,
 } from '../data/types'
-import type { GatherSession, CraftResult, QualityTier, TemperSession } from '../data/types'
+import type { GatherSession, CraftResult, QualityTier, TemperSession, UndermawState, UndermawAffix } from '../data/types'
 import { TOWNS, ZONE_TOWN } from '../data/towns'
 import { RACE_DEFINITIONS } from '../data/races'
 import { ZONE_MATERIALS, RECIPES, isGearRecipe } from '../data/professions'
@@ -34,6 +34,7 @@ import {
   emptyAbilityMod, RAMPAGE_MAX_STACKS, ARCANE_MAX_CHARGES, resolveHeroTurn, advanceHeroUpkeep,
 } from '../engine/combat'
 import { greyLevel, killXp, xpForLevel } from '../engine/progression'
+import { generateFloor, maxOpenFloor, makeFloorMob, floorKillXp, floorLevelLimit, floorMinLevel, floorGold, rollAffixes, milestoneTitle, UNDERMAW_BOOST, UNDERMAW_KILLS_PER_LEVEL, UNDERMAW_LEVEL_MAX, MILESTONE_EVERY } from '../engine/undermaw'
 import { getParty } from '../engine/party'
 import { registerFactionNames, resolveFaction } from '../data/factions'
 import { clearSelectedHero } from '../engine/selection'
@@ -391,6 +392,7 @@ function defaultState(): GameState {
     },
     bossesDefeated: [],
     zoneCircuit: 0,
+    undermaw: defaultUndermaw(),
     lastTickTimestamp: Date.now(),
     offlineRates: emptyRates(),
     lastOffline: null,
@@ -512,6 +514,9 @@ function rehydrateState(saved: GameState): GameState {
   }
   saved.zoneWatch = { zone: saved.currentZone, seconds: 0, kills: 0 }
   saved.zoneBlockedAtLevel = saved.zoneBlockedAtLevel ?? {}
+  // Saves from before the Undermaw existed get a closed, empty one. The return zone is the
+  // zone the hero is in, so leaving (once they have entered) puts them back where they were.
+  saved.undermaw = { ...defaultUndermaw(saved.currentZone), ...(saved.undermaw ?? {}) }
   saved.upgradeRanks      = saved.upgradeRanks ?? {}
   saved.offlineRates      = saved.offlineRates ?? emptyRates()
   saved.lastOffline       = null   // set by the load path if there is time to grant
@@ -623,6 +628,15 @@ function rehydrateState(saved: GameState): GameState {
 
 // Serialize the live state into a save blob, stashing currentHp (derived stats are
 // recomputed on load, but current HP must survive).
+/** The half-strength copy a Splitting enemy leaves behind, spawned next (UNDERMAW.md 3.4). */
+let pendingSplitChild: MobInstance | null = null
+/** The floor whose level-limit notice has been logged, so it shows once per floor. */
+let undermawLimitNotified = 0
+
+export function defaultUndermaw(returnZone: ZoneId = 'the_maw_eternal'): UndermawState {
+  return { active: false, depth: 1, best: 0, floorKills: 0, boosts: 0, returnZone, titles: [], pushDeeper: true }
+}
+
 function toSaveBlob(s: GameState): GameState {
   const blob = { ...s } as GameState;
   (blob.stats as any) = { ...s.stats, _savedHp: s.stats.currentHp }
@@ -1458,6 +1472,7 @@ function tickWorld(
 }
 
 function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
+  if (state.undermaw?.active) return spawnFloorMob(state)
   const zone = ZONES[zoneId]
   if (!zone) return null
   const totalKills = state.totalZoneKills[zoneId] ?? 0
@@ -1535,6 +1550,58 @@ function spawnMob(zoneId: ZoneId, state: GameState): MobInstance | null {
     dots: [],
     attackAccum: 0,
   }
+}
+
+/**
+ * An Undermaw enemy (docs/UNDERMAW.md): a floor roster mob, an elite, or the floor boss once
+ * the kill target is met. Every 25th floor's boss is the Hollow Crown. Elites and bosses
+ * carry modifiers from floor 10 on. A Splitting enemy's leftover copy spawns first.
+ */
+function spawnFloorMob(state: GameState): MobInstance {
+  const place = (m: MobInstance): MobInstance =>
+    ({ ...m, id: `mob_${++mobInstanceSeq}`, ...placeInWorld(state, { name: m.name, isBoss: m.isBoss }) })
+  if (pendingSplitChild) { const c = pendingSplitChild; pendingSplitChild = null; return place(c) }
+
+  const u = state.undermaw
+  const d = u.depth
+  const fl = generateFloor(d)
+  const soften = Math.pow(1 + UNDERMAW_BOOST, u.boosts)
+  let mob: MobInstance
+  if (u.floorKills >= fl.killTarget) {
+    const crown = d % MILESTONE_EVERY === 0
+    mob = makeFloorMob(fl.boss, d, { isBoss: true, soften, title: crown ? 'The Hollow Crown' : fl.boss.title })
+    if (crown) {
+      // The milestone boss: the Undermaw's own creature, half again as tough as a floor boss.
+      mob.spriteKey = 'mob_hollowcrown'
+      mob.templateId = 'undermaw_hollow_crown'   // MOB_SPRITE maps this to the drawn sheet
+      mob.baseName = 'The Hollow Crown'
+      mob.maxHp = mob.currentHp = Math.round(mob.maxHp * 1.5)
+      mob.damage = Math.round(mob.damage * 1.2)
+    }
+    mob.name = `[BOSS] ${mob.name}`
+  } else {
+    const e = fl.roster[Math.floor(Math.random() * fl.roster.length)]
+    mob = makeFloorMob(e, d, { soften })
+    if (Math.random() < ELITE_SPAWN_CHANCE * compileUniques(state.equipment).eliteSpawnMult) {
+      mob.isElite = true
+      mob.maxHp = mob.currentHp = Math.round(mob.maxHp * ELITE_HP_MULTIPLIER)
+      mob.damage = Math.round(mob.damage * ELITE_DAMAGE_MULTIPLIER)
+      mob.name = `★ ${mob.name}`
+    }
+  }
+  if (mob.isElite || mob.isBoss) {
+    const affixes = rollAffixes(d, mob.isBoss)
+    if (affixes.length) {
+      mob.affixes = affixes
+      // Stat-shaped modifiers are applied here; Vampiric, Thorned and Splitting act in combat.
+      if (affixes.includes('hasted')) mob.damage = Math.round(mob.damage * 1.3)
+      if (affixes.includes('warded')) mob.maxHp = mob.currentHp = Math.round(mob.maxHp * 1.4)
+    }
+  }
+  const [gMin, gMax] = floorGold(d)
+  mob.goldMin = mob.isBoss ? gMin * 10 : gMin
+  mob.goldMax = mob.isBoss ? gMax * 10 : gMax
+  return place(mob)
 }
 
 /**
@@ -2047,6 +2114,12 @@ interface GameActions {
   cancelMerchantContract: () => void
   selectZone: (zoneId: ZoneId) => void
   devJumpZone: (zoneId: ZoneId) => void
+  /** Enter the Undermaw (UNDERMAW.md). `floor` defaults to continuing the push; it is
+   *  clamped to one past the best floor and to the level gate. No-op before circuit 1. */
+  enterUndermaw: (floor?: number) => void
+  /** Back to the zone the hero came from. The best floor is kept. */
+  leaveUndermaw: () => void
+  setUndermawPushDeeper: (on: boolean) => void
   allocateTalent: (talentId: string) => void
   deallocateTalent: (talentId: string) => void
   resetTalents: () => void
@@ -3116,8 +3189,20 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       // finished it, and levelling stopped for good a little past 110.
       const zoneTop = ZONES[currentZone]?.levelRange[1] ?? level
       const circuit = state.zoneCircuit ?? 0
-      const isGrey = level > greyLevel(zoneTop, circuit)
-      const awardedXp = isGrey ? 0 : killXp(deadMob.xpReward, level, zoneTop, circuit)
+      // In the Undermaw the floor decides (UNDERMAW.md 3.3): kills per level follow the
+      // pacing rule, and nothing pays past the floor's level limit.
+      const inUndermawXp = !!state.undermaw?.active
+      const isGrey = !inUndermawXp && level > greyLevel(zoneTop, circuit)
+      const awardedXp = inUndermawXp
+        ? (level >= UNDERMAW_LEVEL_MAX ? 0
+          : floorKillXp(state.undermaw.depth, level, UNDERMAW_KILLS_PER_LEVEL, 115, deadMob.isBoss) * (deadMob.isElite ? 2 : 1))
+        : isGrey ? 0 : killXp(deadMob.xpReward, level, zoneTop, circuit)
+      if (inUndermawXp && awardedXp === 0 && undermawLimitNotified !== state.undermaw.depth) {
+        undermawLimitNotified = state.undermaw.depth
+        newLogs.push(log('proc',
+          `Level limit reached here (floor ${state.undermaw.depth} teaches up to ${floorLevelLimit(state.undermaw.depth)}). Go deeper to keep levelling.`,
+          '#8a8070'))
+      }
       if (isGrey && greyZoneNotified !== currentZone) {
         greyZoneNotified = currentZone
         // Past the first lap, say how to get XP back: a player at 113 asked on the Play
@@ -3193,11 +3278,52 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         }
       }
 
-      const killKey = `${currentZone}:${deadMob.templateId}`
-      zoneKillCounts[killKey] = (zoneKillCounts[killKey] ?? 0) + 1
-      totalZoneKills[currentZone] = (totalZoneKills[currentZone] ?? 0) + 1
+      // Undermaw kills count toward the floor, not the zone whose biome the floor borrows, so
+      // a floor never opens a zone boss or quest out in the world.
+      const inUndermawKill = !!state.undermaw?.active
+      if (!inUndermawKill) {
+        const killKey = `${currentZone}:${deadMob.templateId}`
+        zoneKillCounts[killKey] = (zoneKillCounts[killKey] ?? 0) + 1
+        totalZoneKills[currentZone] = (totalZoneKills[currentZone] ?? 0) + 1
+      }
 
-      if (deadMob.isBoss && !bossesDefeated.includes(currentZone)) {
+      if (inUndermawKill) {
+        const u = get().undermaw
+        if (deadMob.isBoss) {
+          const cleared = u.depth
+          const isNew = cleared > u.best
+          const titles = [...u.titles]
+          if (isNew && cleared % MILESTONE_EVERY === 0) {
+            const title = milestoneTitle(cleared)
+            if (!titles.includes(title)) titles.push(title)
+            newLogs.push(log('level_up', `Floor ${cleared} conquered. Title earned: ${title}.`, '#4fd6c8'))
+          } else {
+            newLogs.push(log('zone_change', `Floor ${cleared} cleared.`, '#4fd6c8'))
+          }
+          const next = cleared + 1
+          let depth = cleared
+          if (u.pushDeeper && level >= floorMinLevel(next)) {
+            depth = next
+            const nf = generateFloor(next)
+            const z = nf.biomes[0]
+            if (!unlockedZones.includes(z)) unlockedZones.push(z)
+            if (!get().zoneMaps[z]) set(st => ({ zoneMaps: { ...st.zoneMaps, [z]: generateZoneMap(z, mapSeed(st)) } }))
+            currentZone = z
+            newLogs.push(log('zone_change', `Floor ${next}: ${nf.biomes.map(b => ZONES[b].name).join(' / ')}.`, '#4fd6c8'))
+          } else if (u.pushDeeper) {
+            newLogs.push(log('proc', `Floor ${next} opens at level ${floorMinLevel(next)}. Farming floor ${cleared} until then.`, '#8a8070'))
+          }
+          set({ undermaw: { ...u, best: Math.max(u.best, cleared), boosts: u.boosts + (isNew ? 1 : 0), depth, floorKills: 0, titles } })
+        } else {
+          set({ undermaw: { ...u, floorKills: u.floorKills + 1 } })
+          if (deadMob.affixes?.includes('splitting') && !deadMob.splitChild) {
+            const half = Math.max(1, Math.round(deadMob.maxHp / 2))
+            pendingSplitChild = { ...deadMob, splitChild: true, maxHp: half, currentHp: half, dots: [],
+              affixes: (deadMob.affixes ?? []).filter(a => a !== 'splitting') }
+            newLogs.push(log('proc', `${deadMob.name} leaves a half-strength copy behind!`, '#4fd6c8'))
+          }
+        }
+      } else if (deadMob.isBoss && !bossesDefeated.includes(currentZone)) {
         bossesDefeated.push(currentZone)
         const zone = ZONES[currentZone]
         const nextZoneId = zone.nextZone
@@ -3527,6 +3653,13 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
             })
           } else {
             currentMob = { ...currentMob!, currentHp: currentMob!.currentHp - hit.damage }
+            // Thorned (Undermaw): a melee blow costs the striker a little. Thrown blows are
+            // exempt, which is part of why it is answerable by build.
+            if (currentMob.affixes?.includes('thorned') && hit.damage > 0) {
+              const thorn = Math.max(1, Math.round(hit.damage * 0.08))
+              stats.currentHp = Math.max(1, stats.currentHp - thorn)
+              if (state.settings.showDamageNumbers) newFns.push(fn(thorn, false, true, false, '#ffaa44'))
+            }
           }
 
           if (hit.kind === 'swing') {
@@ -3734,6 +3867,10 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
         }
 
         if (mobDmg > 0) {
+          // Vampiric (Undermaw): it drinks a quarter of what it deals. Burst answers it.
+          if (atk.affixes?.includes('vampiric')) {
+            atk = { ...atk, currentHp: Math.min(atk.maxHp, atk.currentHp + Math.round(mobDmg * 0.25)) }
+          }
           stats.currentHp = Math.max(0, stats.currentHp - mobDmg)
           newFns.push(fn(mobDmg, false, true, false, undefined, undefined, atk.id))
           newLogs.push(log('mob_attack', `${atk.name} hits you for ${mobDmg}`, '#ff8888'))
@@ -4014,7 +4151,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     // Runs against the JUST-COMMITTED state so it sees this tick's zoneWatch, and only
     // between fights, so it never yanks the hero off an enemy mid-swing.
     const committed = get()
-    if (committed.gameMode === 'combat' && committed.isAlive && !committed.currentMob) {
+    if (committed.gameMode === 'combat' && committed.isAlive && !committed.currentMob && !committed.undermaw?.active) {
       const move = decideZoneMove(committed)
       if (move) {
         if (move.retreat) {
@@ -4247,6 +4384,50 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
       playerMapPos: { x: 32, y: 32 },
     })
   },
+
+  // ── The Undermaw ────────────────────────────────────────────────────────────
+  enterUndermaw: (floor) => {
+    const s = get()
+    if ((s.zoneCircuit ?? 0) < 1 || s.currentTown) return
+    const u = s.undermaw
+    const open = maxOpenFloor(s.level, u.best)
+    const depth = Math.max(1, Math.min(floor ?? open, open))
+    const fl = generateFloor(depth)
+    const zone = fl.biomes[0]
+    const unlockedZones = s.unlockedZones.includes(zone) ? s.unlockedZones : [...s.unlockedZones, zone]
+    const zoneMaps = s.zoneMaps[zone] ? s.zoneMaps : { ...s.zoneMaps, [zone]: generateZoneMap(zone, mapSeed(s)) }
+    resetCombatAccumulators()
+    pendingSplitChild = null
+    set({
+      undermaw: { ...u, active: true, depth, floorKills: 0, returnZone: u.active ? u.returnZone : s.currentZone },
+      unlockedZones, zoneMaps, currentZone: zone,
+      gameMode: 'combat', mobs: [], targetMobId: null, currentMob: null, mobRespawnTimer: 0, activeDoTs: [],
+      travelTarget: null, travelProgress: 0, activeQuest: null,
+      combatLog: [
+        log('zone_change', `The Undermaw, floor ${depth}. ${fl.biomes.map(b => ZONES[b].name).join(' / ')}.`, '#4fd6c8'),
+        ...s.combatLog,
+      ].slice(0, LOG_MAX),
+    })
+  },
+
+  leaveUndermaw: () => {
+    const s = get()
+    if (!s.undermaw.active) return
+    const to = s.undermaw.returnZone
+    resetCombatAccumulators()
+    pendingSplitChild = null
+    set({
+      undermaw: { ...s.undermaw, active: false, floorKills: 0 },
+      currentZone: to, mobs: [], targetMobId: null, currentMob: null, mobRespawnTimer: 0, activeDoTs: [],
+      activeQuest: deriveActiveQuest({ currentZone: to, playerFaction: s.playerFaction, bossesDefeated: s.bossesDefeated }),
+      combatLog: [
+        log('zone_change', `You climb out of the Undermaw. Your best floor (${s.undermaw.best}) is kept.`, '#4fd6c8'),
+        ...s.combatLog,
+      ].slice(0, LOG_MAX),
+    })
+  },
+
+  setUndermawPushDeeper: (on) => set(st => ({ undermaw: { ...st.undermaw, pushDeeper: on } })),
 
   // ── Talents ──────────────────────────────────────────────────────────────────
   // Both gates delegate to data/specs.ts rather than carrying their own copy of the

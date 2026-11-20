@@ -560,6 +560,27 @@ export interface AllyCombatant {
   rngState: number
 }
 
+export interface UndermawState {
+  /** True while the hero is in the Undermaw rather than the zones. */
+  active: boolean
+  /** The floor being played. */
+  depth: number
+  /** Deepest floor ever cleared. Kept when leaving; the ladder's depth column. */
+  best: number
+  /** Kills on the current floor; the floor boss appears at FLOOR_KILLS. */
+  floorKills: number
+  /** New floors cleared = permanent boosts earned (each softens enemies by UNDERMAW_BOOST). */
+  boosts: number
+  /** Where "Leave the Undermaw" returns to. */
+  returnZone: ZoneId
+  /** Milestone titles earned (every 25 floors). */
+  titles: string[]
+  /** Push deeper automatically after a floor boss falls, when the level gate allows. */
+  pushDeeper: boolean
+}
+
+export type UndermawAffix = 'hasted' | 'vampiric' | 'warded' | 'thorned' | 'splitting'
+
 export interface MobInstance {
   /** Unique per spawned instance — several mobs of the same template coexist. */
   id: string
@@ -591,6 +612,10 @@ export interface MobInstance {
   attackSpeedSeconds: number
   isElite: boolean
   isBoss: boolean
+  /** Undermaw modifiers (UNDERMAW.md 3.4 / 7.7). Absent outside the Undermaw. */
+  affixes?: UndermawAffix[]
+  /** Set on the half-strength copy a Splitting enemy leaves behind, so it does not split again. */
+  splitChild?: boolean
   /** Where this mob actually STANDS, in zone tile coordinates on the 64×64 torus.
    *
    *  This is the authoritative position. `offset` used to be it, which meant a mob had no
@@ -933,6 +958,9 @@ export interface GameState {
   mobMapOffset: { dx: number; dy: number } // tiles from player to mob
   // ── Prestige / Circuit ──────────────────────────────────────────────────────
   zoneCircuit: number                      // prestige loop counter, starts at 0
+  // ── The Undermaw (docs/UNDERMAW.md) ─────────────────────────────────────────
+  /** The endless post-game. Opens after the first final-boss kill (zoneCircuit >= 1). */
+  undermaw: UndermawState
   // ── Towns ──────────────────────────────────────────────────────────────────
   currentTown: TownId | null
   generatedTownNames: Record<TownId, string>

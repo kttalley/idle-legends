@@ -1338,3 +1338,45 @@ export function diagnoseSavedHero(state: GameState, minutes: number, stepSeconds
     hero: { level: s.level, circuit: s.zoneCircuit, zone: s.currentZone, maxHp: s.stats.maxHp,
             stats: Object.fromEntries(Object.entries(s.stats).filter(([, v]) => typeof v === 'number')) } }
 }
+
+/**
+ * Play a real save in the Undermaw through the REAL store: enterUndermaw(), then ticks.
+ * Reports depth, best, level, boosts, titles and the floor/boss/affix log lines seen.
+ */
+export function runUndermawStore(state: GameState, minutes: number, stepSeconds = 0.25) {
+  if (typeof __setSeed === 'function') __setSeed(3)
+  const id = `um_${Math.random().toString(36).slice(2, 8)}`
+  const now = Date.now()
+  slotStorage.save({ id, createdAt: now, lastPlayedAt: now, summary: summarize(state), state })
+  const store = useGameStore
+  store.getState().loadSlot(id)
+  store.getState().enterUndermaw()
+  const seen = new Set<string>()
+  const tally: Record<string, number> = {}
+  const samples: string[] = []
+  const ticks = Math.round((minutes * 60) / stepSeconds)
+  for (let i = 0; i < ticks; i++) {
+    store.getState().tick(stepSeconds)
+    const s = store.getState()
+    for (const e of s.combatLog.slice(0, 30)) {
+      const key = `${e.id ?? ''}|${e.message}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const m = String(e.message)
+      if (/Hollow Crown|Title earned|half-strength|opens at level|conquered/.test(m) || (/\[BOSS\]|★/.test(m) && / appears/.test(m))) {
+        const k = m.replace(/\d+/g, '#').slice(0, 80); tally[k] = (tally[k] ?? 0) + 1
+      }
+      if (/you have died|goes down|slain you/i.test(m)) tally['hero died'] = (tally['hero died'] ?? 0) + 1
+    }
+    const cm = s.currentMob
+    if (cm?.affixes?.length) { const k = `affix on ${cm.isBoss ? 'boss' : 'elite'}: ${[...cm.affixes].sort().join(',')}`; tally[k] = (tally[k] ?? 0) + (seen.has('m' + cm.id) ? 0 : 1); seen.add('m' + cm.id) }
+    if (cm?.templateId === 'undermaw_hollow_crown' && !seen.has('crown' + cm.id)) { seen.add('crown' + cm.id); tally[`Hollow Crown fought on floor ${s.undermaw.depth}`] = 1 }
+    if (i % Math.round(300 / stepSeconds) === 0) {
+      const u = s.undermaw
+      samples.push(`${Math.round(i * stepSeconds / 60)}m active=${u.active} floor=${u.depth} best=${u.best} kills=${u.floorKills} boosts=${u.boosts} L${s.level} zone=${s.currentZone} mob=${s.currentMob ? `${s.currentMob.name}${s.currentMob.affixes?.length ? ` [${s.currentMob.affixes.join(',')}]` : ''} ${s.currentMob.currentHp}/${s.currentMob.maxHp}` : '-'}`)
+    }
+  }
+  const s = store.getState()
+  slotStorage.delete(id)
+  return { samples, tally, final: { ...s.undermaw, level: s.level } }
+}

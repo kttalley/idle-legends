@@ -48,6 +48,8 @@ import type { MobId } from './types'
 // manifest `anchor` for placement, not the canvas centre.
 
 export const MOB_SPRITE: Record<MobId, string> = {
+  // The Undermaw's milestone boss: an original, code-drawn sheet (tools/spritegen/mob_hollowcrown.mjs).
+  undermaw_hollow_crown: 'mob_hollowcrown',
   // Sunhollow Meadows
   grey_wolf: 'ffa_direwolf',
   kobold_miner: 'ffa_goblin',

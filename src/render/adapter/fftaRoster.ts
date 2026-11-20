@@ -229,7 +229,7 @@ export const ORIGINAL_SPRITE: Record<string, string> = {
 // Original monster rigs authored on the HUMANOID frame (24×32) rather than the beast frame
 // — governs which placeholder generator to use if an original rig fails to load.
 const HUMANOID_ORIGINALS = new Set<string>([
-  'mob_gravewalker', 'mob_shivtail', 'mob_gnarljaw', 'mob_grubkin', 'mob_stoneward',
+  'mob_gravewalker', 'mob_shivtail', 'mob_gnarljaw', 'mob_grubkin', 'mob_stoneward', 'mob_hollowcrown',
 ])
 
 /** True if an original rig id uses the humanoid frame (24×32). */

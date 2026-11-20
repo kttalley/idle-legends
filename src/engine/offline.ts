@@ -8,6 +8,7 @@ import {
 import { UPGRADE_COST_GROWTH } from '../data/upgrades'
 import { ZONES } from '../data/zones'
 import { totalSpent } from '../data/specs'
+import { floorLevelLimit } from './undermaw'
 import { ZONE_MATERIALS, MATERIALS } from '../data/professions'
 import { GATHER_SECONDS, GATHER_YIELD, purityToQuality } from './crafting'
 import type { GameState, Item, QualityTier, Slot } from '../data/types'
@@ -217,6 +218,9 @@ export function offlineLevelCeiling(state: GameState): number {
   // No zone data (a corrupt or very old save) must not mean "no progress" — fall back to
   // letting the hero keep what they have rather than clamping them backwards.
   if (!band) return Number.MAX_SAFE_INTEGER
+  // In the Undermaw the floor's level limit is the ceiling, and an absence never descends
+  // (offline runs no floor bosses), so the hero farms the floor they left on.
+  if (state.undermaw?.active) return Math.max(state.level, Math.min(floorLevelLimit(state.undermaw.depth), 999))
   // Completed laps lift the ceiling the same way they lift the grey line, so an absence on
   // a later lap still pays, up to what the hero's laps have earned.
   return Math.max(band[1] + LEVELS_PER_CIRCUIT * Math.max(0, state.zoneCircuit ?? 0), state.level)
