@@ -152,3 +152,91 @@ best depth.
 Every phase runs `--assert` (economy invariants, offline parity, loot fidelity, save
 migration) plus a new invariant: **offline in the Rift never out-earns online**, and
 **depth never decreases from offline progress**.
+
+## 7. Research findings and recommendations (2026-11-20)
+
+Three research passes (game design, interaction design, comparable games) against this
+draft. Recommendations below; items marked **[decide]** need the designer's call.
+
+### 7.1 The curve math in section 3 does not close (most important)
+
+Hero power grows roughly polynomially with level and item level (loot rolls at hero level).
+Even a generous ~1,000x hero gain from level 110 to 999 only survives about
+`log(1000) / log(growth)` floors: ~118 at 1.06, ~72 at 1.10. Level 999 at floor 445 needs
+growth near **1.016**, or a hero-side multiplier that compounds, or both. With depth-gated
+XP and 1.06 to 1.10, levels would stall around 250 to 350.
+**Recommendation:** start P0 at growth ~1.015 to 1.02 **plus** a small Rift-earned
+permanent multiplier (3.9), and make the first sim output "the floor where hero power
+equals riftMult" for each real save.
+
+### 7.2 Name **[decide]**
+
+Avoid **Rift** (registered US word mark for an MMO; also Diablo III's "Greater Rift") and
+**Slayer** (a skill in RuneScape and Melvor). Also avoid Delve, The Pit, Nightmare, Abyss,
+Descent, Breach, and "The Maw Below" (WoW's endless tower sits in a zone called The Maw).
+Shortlist: **The Undermaw** (beneath The Maw Eternal; clearest tie to the finale and to the
+Hollow Crown), **The Gullet**, **The Eternal Wound**. Trademark checks were web searches only.
+
+### 7.3 Wall steepness: tune by time
+
+Targets for a hero who has beaten the final boss: floor 25 on day one, 50 in week one,
+100 in about a month, 200 as a multi-month goal. These replace "share of players", which
+means nothing at ~50 players.
+
+### 7.4 Seasons **[decide]**
+
+No weekly seasons: with ~25 players per platform they mean empty boards and the same
+winner. Ship a permanent **deepest ever** column; add a monthly column only past 100+
+active players. Keep the floor seed **fixed** (or rotate monthly): same floors for everyone
+removes "fishing" for easy maps, Diablo III's biggest ladder complaint. Seeds need a
+minimum enemy density so no floor is a dud.
+
+### 7.5 Circuits stay, capped
+
+Keep circuits as the relaxed mode, but cap circuit levelling at the XP line of the hero's
+best floor. At 2 levels per lap and 10 to 15 laps an hour, circuits would otherwise become
+the fastest XP and undercut the 999 pacing.
+
+### 7.6 Offline
+
+Keep "best floor minus 5, never descends". Pay ~75% of the measured online rate, cap the
+window (Standing Orders extends it), and add a short "rested" bonus on return. Add an
+online **farm** toggle at best minus 5 (and "Push deeper when ready"), so closing the app is
+never the best option.
+
+### 7.7 Affixes: answerable by build
+
+The player is usually not watching: no one-shots, nothing that hard-counters one class
+(Diablo IV removed affixes like that). Each affix should push a gear or talent choice
+(Warded rewards burst). Each has a fixed shape glyph, name and one-line rule; colour is
+never the only signal; one screen-reader announcement per floor; Reduce Motion swaps
+pulses for a static outline.
+
+### 7.8 Show the level limit everywhere
+
+"Lv 184 / limit 190" on the XP bar, the limit in its accessible value, and the rule in
+words ("Floor 40 teaches up to level 190. Floor 41 teaches up to 192."). This is the direct
+fix for "How can level up more than 113?" and applies to circuits today, before any of
+the new mode ships.
+
+### 7.9 Milestones and a cooperative hook
+
+Every 25 floors: a milestone boss (the Hollow Crown is the natural fit), a guaranteed drop
+and a ladder title. Every 100 levels: a title or cosmetic, with a big one at 999 (the goal is
+the milestones, not the number). For a tiny audience, borrow AFK Arena's King's Tower:
+the first player to reach a milestone floor unlocks a small reward for everyone.
+
+### 7.10 Monetization
+
+Nothing paid moves depth or ladder rank. Standing Orders feeding offline farming is fine
+(offline never descends). No paid revives, skips, multipliers or random caches (random
+paid items trigger odds disclosure on both stores). At most, a one-time cosmetic.
+
+### 7.11 Engineering risks
+
+- Big numbers: `growth^d` passes 2^53 eventually; check ladder/backend column types
+  (`roster_snapshots.power` is `bigint`), damage formatting, and add suffix notation.
+- Ladder UI: a Level | Power | Depth segmented control instead of more columns; rank depth
+  ties by who got there first; pin the player's own row with neighbours.
+- Existing gaps the new mode makes worse: the offline summary has no accessible role, and
+  ladder names show faction by colour only.
