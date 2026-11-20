@@ -1,6 +1,6 @@
 # The Undermaw: an endless, procedural post-game (design, 2026-11-20)
 
-Name decided 2026-11-20 (was "Slayer mode" / "the Undermaw"; Undermaw is a registered mark, see 7.2).
+Name decided 2026-11-20 (was "Slayer mode" / "the Rift"; Rift is a registered mark, see 7.2).
 
 Status: design only. Nothing here is built. Measurements are from the headless sim
 (`node tools/sim/run.mjs --from-saves`, `--diagnose`) against real saves pulled 2026-11-19.
@@ -173,7 +173,7 @@ equals depthMult" for each real save.
 
 ### 7.2 Name: **decided, The Undermaw** (2026-11-20)
 
-Avoid **Undermaw** (registered US word mark for an MMO; also Diablo III's "Greater Undermaw") and
+Avoid **Rift** (registered US word mark for an MMO; also Diablo III's "Greater Rift") and
 **Slayer** (a skill in RuneScape and Melvor). Also avoid Delve, The Pit, Nightmare, Abyss,
 Descent, Breach, and "The Maw Below" (WoW's endless tower sits in a zone called The Maw).
 Shortlist: **The Undermaw** (beneath The Maw Eternal; clearest tie to the finale and to the
