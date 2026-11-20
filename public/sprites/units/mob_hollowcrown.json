@@ -1,0 +1,126 @@
+{
+  "id": "mob_hollowcrown",
+  "image": "mob_hollowcrown.png",
+  "frameW": 24,
+  "frameH": 32,
+  "anchor": {
+    "x": 12,
+    "y": 30
+  },
+  "sourcePalette": [
+    "",
+    "#6e6656",
+    "#9a917c",
+    "#c4bba2",
+    "#e8e1cc",
+    "#1e1626",
+    "#2e2238",
+    "#43324f",
+    "#5c4668",
+    "#07060c",
+    "#0f0d18",
+    "#181526",
+    "#252036",
+    "#2a6f7a",
+    "#4fd6c8",
+    "#d8fff6"
+  ],
+  "animations": {
+    "idle": {
+      "se": {
+        "frames": [
+          0,
+          1
+        ],
+        "fps": 3,
+        "loop": true
+      },
+      "ne": {
+        "frames": [
+          0,
+          1
+        ],
+        "fps": 3,
+        "loop": true
+      }
+    },
+    "walk": {
+      "se": {
+        "frames": [
+          2,
+          3,
+          4,
+          5
+        ],
+        "fps": 6,
+        "loop": true
+      },
+      "ne": {
+        "frames": [
+          2,
+          3,
+          4,
+          5
+        ],
+        "fps": 6,
+        "loop": true
+      }
+    },
+    "attack": {
+      "se": {
+        "frames": [
+          6,
+          7,
+          8
+        ],
+        "fps": 9,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          6,
+          7,
+          8
+        ],
+        "fps": 9,
+        "loop": false
+      }
+    },
+    "hit": {
+      "se": {
+        "frames": [
+          9,
+          10
+        ],
+        "fps": 12,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          9,
+          10
+        ],
+        "fps": 12,
+        "loop": false
+      }
+    },
+    "death": {
+      "se": {
+        "frames": [
+          11,
+          12
+        ],
+        "fps": 5,
+        "loop": false
+      },
+      "ne": {
+        "frames": [
+          11,
+          12
+        ],
+        "fps": 5,
+        "loop": false
+      }
+    }
+  }
+}
