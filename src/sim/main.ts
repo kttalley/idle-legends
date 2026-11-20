@@ -8,6 +8,7 @@ import {
 } from './econSim'
 import type { ClassType, GameState, ZoneId } from '../data/types'
 import { ZONE_ORDER as ZONE_IDS } from '../data/zones'
+import { climb, formatClimb, UNDERMAW } from './undermawSim'
 const ZONE_ORDER = ZONE_IDS as ZoneId[]
 
 declare const process: { argv: string[]; stdout: { write(s: string): void } }
@@ -137,6 +138,21 @@ if (process.argv.includes('--parity')) {
     for (const v of migration) process.stdout.write(`          [${v.rule}] ${v.detail}\n`)
   }
   process.stdout.write(failed === 0 ? '\nall invariants hold\n' : `\n${failed} shape(s) violated invariants\n`)
+} else if (process.argv.includes('--undermaw')) {
+  // Phase 0: real saved heroes down the Undermaw. Knobs: --growth --boost --kpl --overhead --days
+  UNDERMAW.growth = argNum('--growth', UNDERMAW.growth)
+  UNDERMAW.levelsPerFloor = argNum('--lpf', UNDERMAW.levelsPerFloor)
+  const params = { boost: argNum('--boost', 0.01), killsPerLevel: argNum('--kpl', 60),
+    overheadSec: argNum('--overhead', 2.5), maxDays: argNum('--days', 120), seeds: argNum('--seeds', 3),
+    doubleEvery: argNum('--double', 99) }
+  process.stdout.write(`growth ${UNDERMAW.growth} lpf ${UNDERMAW.levelsPerFloor} boost ${params.boost} kpl ${params.killsPerLevel} double ${params.doubleEvery} days ${params.maxDays}\n`)
+  const heroes = (globalThis as { __savedHeroes?: { label: string; state: GameState }[] }).__savedHeroes ?? []
+  const limit = argNum('--heroes', heroes.length)
+  for (const h of heroes.slice(0, limit)) {
+    const seedFn = (globalThis as unknown as { __setSeed?: (n: number) => void }).__setSeed
+    if (typeof seedFn === 'function') seedFn(7)
+    process.stdout.write(formatClimb(h.label.slice(0, 40), climb(h.state, params)) + '\n')
+  }
 } else if (process.argv.includes('--diagnose')) {
   // One real hero, run forward with its combat log tallied. For "why is this hero stuck?".
   const heroes = (globalThis as { __savedHeroes?: { label: string; state: GameState }[] }).__savedHeroes ?? []
