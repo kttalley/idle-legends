@@ -69,9 +69,19 @@ entering the Rift is a step up, not a reset.
   `110 + RIFT_LEVELS_PER_FLOOR * d`. Levelling is bounded by how deep you can go, which is
   bounded by the curve, so it cannot run away the way scaling XP to the hero did in the sim
   (300 to 7,000 levels an hour).
-- `RIFT_LEVELS_PER_FLOOR = 2` makes level 999 roughly floor 445. Whether anyone should
-  realistically reach that is a tuning call (3.2); a soft target is "a dedicated player
-  reaches 999 in a few months".
+- **The pacing rule (designer's call, 2026-11-20): levels 900 to 999 take as long as levels
+  1 to 900 did.** The same idea as RuneScape, where 92 is half of 99. Stated as a curve:
+  each level takes about 0.7% longer to earn than the one before (`r = 2^(1/99) ≈ 1.00703`),
+  so time per level doubles every 99 levels and the last 99 equal everything before them.
+- The rule is about **time**, so it is tuned in the sim, not derived on paper: P0 adjusts
+  `RIFT_GROWTH` and the XP line per floor until measured time per level on real saves
+  follows `t(L) = t0 * r^(L - 110)`.
+- `t0`, the time for level 110 to 111 in the Rift, sets the scale. At `t0 = 1 min`, level
+  999 takes about 8.5 hours and 110 to 999 takes about 50 days of play (offline counts);
+  at `t0 = 2 min`, about 17 hours and 100 days. Target: a dedicated player reaches 999 in
+  two to four months.
+- `RIFT_LEVELS_PER_FLOOR = 2` (level 999 around floor 445) is the starting point for that
+  tuning, not a commitment.
 - Talent points stay capped at 100 (`TALENT_POINT_MAX`). Levels past 100 keep raising stats.
 
 ### 3.4 Affixes
