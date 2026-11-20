@@ -263,3 +263,19 @@ Findings:
   the one that teaches your level) so depth and level climb together. **[decide]**
 - Model gaps to close before P1: all 10 saves (only 2 run so far), talents gained past the
   save, store-only procs, offline at 75%, affixes.
+
+### 8.1 Locked (2026-11-20): level gate, growth 1.013, doubling every 115
+
+Designer: "whatever you think is best". Floors open at most 10 past the floor that teaches
+your level (`floorMinLevel`). Four real saves, 200 sim days each:
+
+| | L day 1 | L900 | L999 | 900->999 vs before | floor 445 |
+|---|---|---|---|---|---|
+| hero1 (C5) | 432 | 24.6d | 51.1d | 1.08x | 44.1d |
+| hero2 (C9) | 431 | 22.2d | 44.2d | 0.99x | 38.8d |
+| hero3 (C9) | 431 | 22.2d | 44.2d | 0.99x | 38.8d |
+| hero4 (C10) | 430 | 22.2d | 46.0d | 1.08x | 40.0d |
+
+Depth and level now climb together; no permanent wall. Growth 1.015 walled two of four
+(L931, L978). Days are continuous active-equivalent play; with real sessions and 75%
+offline the calendar time is longer.

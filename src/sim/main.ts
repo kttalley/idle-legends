@@ -142,10 +142,11 @@ if (process.argv.includes('--parity')) {
   // Phase 0: real saved heroes down the Undermaw. Knobs: --growth --boost --kpl --overhead --days
   UNDERMAW.growth = argNum('--growth', UNDERMAW.growth)
   UNDERMAW.levelsPerFloor = argNum('--lpf', UNDERMAW.levelsPerFloor)
+  UNDERMAW.gateFloors = argNum('--gate', UNDERMAW.gateFloors)
   const params = { boost: argNum('--boost', 0.01), killsPerLevel: argNum('--kpl', 60),
     overheadSec: argNum('--overhead', 2.5), maxDays: argNum('--days', 120), seeds: argNum('--seeds', 3),
-    doubleEvery: argNum('--double', 99) }
-  process.stdout.write(`growth ${UNDERMAW.growth} lpf ${UNDERMAW.levelsPerFloor} boost ${params.boost} kpl ${params.killsPerLevel} double ${params.doubleEvery} days ${params.maxDays}\n`)
+    doubleEvery: argNum('--double', 115) }
+  process.stdout.write(`gate ${UNDERMAW.gateFloors} growth ${UNDERMAW.growth} lpf ${UNDERMAW.levelsPerFloor} boost ${params.boost} kpl ${params.killsPerLevel} double ${params.doubleEvery} days ${params.maxDays}\n`)
   const heroes = (globalThis as { __savedHeroes?: { label: string; state: GameState }[] }).__savedHeroes ?? []
   const limit = argNum('--heroes', heroes.length)
   for (const h of heroes.slice(0, limit)) {

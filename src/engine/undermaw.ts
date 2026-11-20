@@ -23,8 +23,10 @@ import { xpForLevel } from './progression'
  *   base            floor 1 sits a step above the final zone on circuit 0
  *   levelsPerFloor  how much each floor raises the level limit (3.3)
  *   levelFloor      the level limit at floor 0, where the first lap's XP line already sits
+ *   gateFloors      how far past the floor that teaches your level you may descend (8.x:
+ *                   without a gate, depth raced ahead of level and then crawled for months)
  */
-export const UNDERMAW = { growth: 1.018, base: 1.25, levelsPerFloor: 2, levelFloor: 110 }
+export const UNDERMAW = { growth: 1.013, base: 1.25, levelsPerFloor: 2, levelFloor: 110, gateFloors: 10 }
 /** Kills per floor before the floor boss appears. */
 export const FLOOR_KILLS = 30
 /** The season seed. Fixed: same floors for everyone (UNDERMAW.md 7.4). */
@@ -37,6 +39,15 @@ export function depthMult(depth: number): number {
 /** The level a floor teaches up to: past it, its kills pay no XP. */
 export function floorLevelLimit(depth: number): number {
   return UNDERMAW.levelFloor + UNDERMAW.levelsPerFloor * depth
+}
+
+/**
+ * The lowest level that may enter a floor. Depth and level climb together: you may go at most
+ * `gateFloors` past the floor that teaches your current level. Zones already gate on a
+ * minimum level; this is the same idea, continued downward.
+ */
+export function floorMinLevel(depth: number): number {
+  return UNDERMAW.levelFloor + UNDERMAW.levelsPerFloor * (depth - UNDERMAW.gateFloors)
 }
 
 /** Deterministic per-floor stream (mulberry32), so a floor is the same for everyone. */
@@ -120,12 +131,13 @@ export function generateFloor(depth: number, seed = UNDERMAW_SEED): UndermawFloo
 
 /**
  * Kill XP in the Undermaw. The pacing rule (UNDERMAW.md 3.3) is about the HERO's level:
- * a level takes `killsPerLevel` kills at level `levelFloor`, doubling every `doubleEvery`
+ * a level takes `killsPerLevel` kills at level `levelFloor`, doubling every `doubleEvery` (115:
+ * that makes 900 to 999 take about as long as everything before it, measured in the sim)
  * levels, wherever it is earned. The floor only caps it: at or past a floor's level limit
  * its kills pay nothing, so going deeper is what keeps levelling open.
  */
 export function floorKillXp(depth: number, heroLevel: number, killsPerLevel: number,
-                            doubleEvery = 99, isBoss = false): number {
+                            doubleEvery = 115, isBoss = false): number {
   if (heroLevel >= floorLevelLimit(depth)) return 0
   const kpl = doubleEvery
     ? killsPerLevel * Math.pow(2, Math.max(0, heroLevel - UNDERMAW.levelFloor) / doubleEvery)

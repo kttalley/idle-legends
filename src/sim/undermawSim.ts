@@ -21,7 +21,7 @@
 //     "active-equivalent" hours.
 
 import { runFight, type HeroCombatant } from '../engine/fight'
-import { generateFloor, makeFloorMob, floorKillXp, floorLevelLimit, UNDERMAW } from '../engine/undermaw'
+import { generateFloor, makeFloorMob, floorKillXp, floorLevelLimit, floorMinLevel, UNDERMAW } from '../engine/undermaw'
 import { xpForLevel } from '../engine/progression'
 import { generateItem } from '../data/items'
 import { RACE_DEFINITIONS } from '../data/races'
@@ -54,6 +54,8 @@ export interface ClimbResult {
   /** Mean hours per level within level bands, for the 0.7%-per-level check. */
   hoursPerLevel: { band: string; hours: number }[]
   stuck: string | null
+  /** Days to reach these levels (null if not reached). */
+  daysToLevel: Record<number, number | null>
 }
 
 const DAY = 86400
@@ -92,6 +94,7 @@ export function climb(state: GameState, p: ClimbParams): ClimbResult {
   levelTimes.push(0)
   const startLevel = level
   let stuck: string | null = null
+  const daysToLevel: Record<number, number | null> = { 300: null, 500: null, 700: null, 900: null, 999: null }
 
   const evalFloor = (d: number): FloorEval => {
     const key = `${d}|${level}|${boosts}|${gearLevel}`
@@ -126,6 +129,7 @@ export function climb(state: GameState, p: ClimbParams): ClimbResult {
       while (xp >= xpForLevel(level) && level < floorLevelLimit(d) && level < LEVEL_MAX) {
         xp -= xpForLevel(level); level++
         levelTimes.push(t)
+        if (daysToLevel[level] === null) daysToLevel[level] = t / DAY
         if (level - gearLevel >= 5) { gearLevel = level; gear = gearAt(state.equipment, level) }
       }
     }
@@ -134,8 +138,9 @@ export function climb(state: GameState, p: ClimbParams): ClimbResult {
   const marks = [1, 7, 30, 60, 120]
   while (t < p.maxDays * DAY) {
     const next = depth + 1
-    const ev = evalFloor(next)
-    if (ev.clear) {
+    const gated = level < floorMinLevel(next)
+    const ev = gated ? null : evalFloor(next)
+    if (ev?.clear) {
       t += ev.floorSec + ev.bossSec
       gainXp(next, 30)
       depth = next; boosts++
@@ -146,7 +151,7 @@ export function climb(state: GameState, p: ClimbParams): ClimbResult {
       // floor). If that floor is unexpectedly hard (floors vary by roster and boss), step
       // up toward the surface until one is clearable.
       const shallowest = Math.max(1, Math.floor((level - UNDERMAW.levelFloor) / UNDERMAW.levelsPerFloor) + 1)
-      if (shallowest > depth) {
+      if (shallowest > depth && !gated) {
         stuck = `power wall at floor ${next}, level ${level}: every floor that still teaches it is unexplored`
         break
       }
@@ -170,7 +175,7 @@ export function climb(state: GameState, p: ClimbParams): ClimbResult {
     if (i0 < 0 || i1 >= levelTimes.length || i1 <= i0) continue
     hoursPerLevel.push({ band: `${lo}-${lo + (i1 - i0)}`, hours: (levelTimes[i1] - levelTimes[i0]) / 3600 / (i1 - i0) })
   }
-  return { daysTo, levelAt, finalDepth: depth, finalLevel: level, hoursPerLevel, stuck }
+  return { daysTo, levelAt, finalDepth: depth, finalLevel: level, hoursPerLevel, stuck, daysToLevel }
 }
 
 export function formatClimb(label: string, r: ClimbResult): string {
@@ -178,7 +183,11 @@ export function formatClimb(label: string, r: ClimbResult): string {
   const to = Object.entries(r.daysTo).map(([f, x]) => `F${f}:${d(x)}`).join(' ')
   const lv = Object.entries(r.levelAt).map(([m, l]) => `d${m}:L${l}`).join(' ')
   const hp = r.hoursPerLevel.map(h => `${h.band}:${h.hours.toFixed(2)}h`).join(' ')
+  const dl = Object.entries(r.daysToLevel).map(([l, x]) => `L${l}:${d(x)}`).join(' ')
+  const t900 = r.daysToLevel[900], t999 = r.daysToLevel[999]
+  const ratio = t900 && t999 ? `  (900->999 takes ${((t999 - t900) / t900).toFixed(2)}x the time to 900)` : ''
   return `${label}\n    reach: ${to}\n    level: ${lv}  -> floor ${r.finalDepth}, L${r.finalLevel}` +
+    `\n    levels: ${dl}${ratio}` +
     `${hp ? `\n    hours/level: ${hp}` : ''}${r.stuck ? `\n    ${r.stuck}` : ''}`
 }
 
