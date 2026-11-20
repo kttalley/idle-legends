@@ -3368,6 +3368,11 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
           currentZone = 'sunhollow_meadows'
           activeQuest = makeZoneQuest('sunhollow_meadows', state.playerFaction)
           newLogs.push(log('zone_change', `The world resets. Stronger now. Circuit ${(state.zoneCircuit ?? 0) + 1} begins.`, '#cc88ff'))
+          if ((state.zoneCircuit ?? 0) === 0) {
+            newLogs.push(log('level_up',
+              'The Undermaw has opened below The Maw: endless floors, each harder than the last, each teaching higher levels. Find it at the end of the zone track.',
+              '#4fd6c8'))
+          }
         }
 
         // Apply the completed quest to the local copy so it is persisted in the tick set().
@@ -4709,6 +4714,8 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
   // ── Travel ────────────────────────────────────────────────────────────────────
   beginTravel: (toZone) => {
+    // Travelling out of the Undermaw climbs out first, so the floor never lingers behind a zone.
+    if (get().undermaw?.active) get().leaveUndermaw()
     const s = get()
     if (!canEnterZone(toZone, s.level, s.bossesDefeated)) return
     if (toZone === s.currentZone) return
@@ -4945,6 +4952,7 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
 
   // ── Towns ─────────────────────────────────────────────────────────────────────
   enterTown: (townId) => {
+    if (get().undermaw?.active) get().leaveUndermaw()
     trackEvent('town_visit')
     resetCombatAccumulators()
     set({

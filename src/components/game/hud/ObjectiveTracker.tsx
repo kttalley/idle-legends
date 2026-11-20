@@ -4,6 +4,7 @@ import { ZONES } from '../../../data/zones'
 import { isZoneQuestComplete } from '../../../engine/zoneProgression'
 import { SpriteIcon } from '../../ui/SpriteIcon'
 import { DAILY_BOUNTY_KILLS } from '../../../data/constants'
+import { UndermawTracker } from './UndermawTracker'
 
 // The objective tracker — what the player is supposed to be doing, while they are doing it.
 //
@@ -37,6 +38,9 @@ export function ObjectiveTracker() {
   const bounty = useGameStore(s => s.dailyBounty)
 
   const [collapsed, setCollapsed] = useState(loadCollapsed)
+  const inUndermaw = useGameStore(s => s.undermaw?.active ?? false)
+  // In the Undermaw the floor is the objective (all hooks above run first, so order is stable).
+  if (inUndermaw && gameMode !== 'in_town') return <UndermawTracker />
 
   // Nothing to track once it is done — `QuestToast` owns the completion moment, and two
   // surfaces claiming the same beat would just talk over each other.

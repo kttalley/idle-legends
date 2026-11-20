@@ -8,6 +8,9 @@ import { CLASS_PROFESSIONS } from '../../../data/professions'
 import { ZONE_TOWN } from '../../../data/towns'
 import { xpForLevel } from '../../../engine/progression'
 import type { GameMode } from '../../../data/types'
+import { floorLevelLimit } from '../../../engine/undermaw'
+import { greyLevel } from '../../../engine/progression'
+import { ZONES } from '../../../data/zones'
 
 // Bottom-docked action bar: mode/town toggle buttons on the left, the class ability
 // slots on the right (only while actually in combat). Reskinned WoW/Diablo shell over
@@ -34,7 +37,15 @@ const MODE_BTN = (touch: boolean): React.CSSProperties => ({
 })
 
 export function ActionBar() {
-  const { playerClass, gameMode, setMode, mobMapOffset, currentMob, level, xp } = useGameStore()
+  const { playerClass, gameMode, setMode, mobMapOffset, currentMob, level, xp, undermaw, currentZone, zoneCircuit } = useGameStore()
+  // The level limit rides on the XP bar (interaction research 7.8), so a stalled bar always
+  // says why: the floor's limit in the Undermaw, the zone's XP line out in the world.
+  const levelLimit = undermaw?.active
+    ? floorLevelLimit(undermaw.depth)
+    : greyLevel(ZONES[currentZone]?.levelRange[1] ?? level, zoneCircuit ?? 0)
+  const limitText = level >= levelLimit
+    ? `  ·  limit ${levelLimit} reached${undermaw?.active ? ', go deeper' : ''}`
+    : `  ·  limit ${levelLimit}`
   const prof = CLASS_PROFESSIONS[playerClass]
   const isTraveling = gameMode === 'traveling'
   const mobDist = Math.sqrt(mobMapOffset.dx ** 2 + mobMapOffset.dy ** 2)
@@ -152,7 +163,7 @@ export function ActionBar() {
           max={xpNeeded}
           type="xp"
           height={11}
-          label={`XP ${Math.floor(xp)} / ${xpNeeded}  ·  ${xpNeeded - Math.floor(xp)} to L${level + 1}`}
+          label={`XP ${Math.floor(xp)} / ${xpNeeded}  ·  ${xpNeeded - Math.floor(xp)} to L${level + 1}${limitText}`}
         />
       </div>
     </div>

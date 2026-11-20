@@ -50,6 +50,7 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
     currentZone, unlockedZones, totalZoneKills, bossesDefeated, level,
     beginTravel, generatedZoneNames, gameMode, travelTarget,
     settings, setAutoAdvanceZones,
+    zoneCircuit, undermaw, enterUndermaw, leaveUndermaw,
   } = useGameStore()
 
   const railRef = useRef<HTMLDivElement>(null)
@@ -198,6 +199,25 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
               </button>
             )
           })}
+          {/* The Undermaw: a branch below the last zone, not a 13th zone of the loop. Opens
+              once the world has been finished (circuit 1+). */}
+          {zoneCircuit >= 1 && (
+            <button
+              type="button"
+              className={`zone-stop is-open${undermaw.active ? ' is-current' : ''}`}
+              style={{ borderStyle: 'dashed' } as React.CSSProperties}
+              title={undermaw.active ? `The Undermaw, floor ${undermaw.depth}. Tap to leave.`
+                : `The Undermaw: endless floors below The Maw. Best floor ${undermaw.best}.`}
+              aria-label={undermaw.active ? `Leave the Undermaw, floor ${undermaw.depth}`
+                : `Enter the Undermaw, endless floors, best floor ${undermaw.best}`}
+              aria-current={undermaw.active ? 'true' : undefined}
+              disabled={isTraveling}
+              onClick={() => { if (undermaw.active) leaveUndermaw(); else enterUndermaw() }}
+            >
+              <span className="zone-stop-dot" aria-hidden>⌄</span>
+              <span className="zone-stop-name">The Undermaw</span>
+            </button>
+          )}
         </div>
 
         <div className="zone-track-status">
