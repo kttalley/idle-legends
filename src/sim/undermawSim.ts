@@ -72,7 +72,10 @@ function heroFrom(state: GameState, level: number, equipment: Record<Slot, Item 
 function gearAt(base: Record<Slot, Item | null>, level: number): Record<Slot, Item | null> {
   const out = {} as Record<Slot, Item | null>
   for (const [slot, item] of Object.entries(base) as [Slot, Item | null][]) {
-    out[slot] = item && !item.uniqueId ? generateItem(slot, level, 0, item.rarity, item.name) : item
+    // Uniques too: a unique is minted at the level it dropped and never grows, so an engaged
+    // player replaces it with a level-appropriate drop. Keeping it froze two slots at an old
+    // item level and walled the two saves that wore two uniques each.
+    out[slot] = item ? generateItem(slot, level, 0, item.rarity, item.name) : item
   }
   return out
 }

@@ -279,3 +279,16 @@ your level (`floorMinLevel`). Four real saves, 200 sim days each:
 Depth and level now climb together; no permanent wall. Growth 1.015 walled two of four
 (L931, L978). Days are continuous active-equivalent play; with real sessions and 75%
 offline the calendar time is longer.
+
+### 8.2 All 10 real saves (2026-11-20)
+
+With the locked settings, 8 of 10 reached L999 in 38 to 51 sim days (900->999 at 0.91 to
+1.14x the time to 900). The other two walled at floor 390 / L888: both had **0 of 100 talent
+points spent** and wore two uniques the model never replaced. With uniques re-rolled at
+hero level like other gear (an engaged player replaces them), both reach L999 in 73 days,
+untalented. Talents are worth ~50% of the pace, which is right, and skipping them is not a
+dead end.
+
+Design consequence: the "What would help" sheet (7.8 / interaction report) leads with
+unspent talent points and gear far below the hero's level. Those are the two things that
+walled real saves.
