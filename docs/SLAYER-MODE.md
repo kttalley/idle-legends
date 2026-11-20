@@ -1,0 +1,144 @@
+# Slayer mode: an endless, procedural post-game (design, 2026-11-20)
+
+Status: design only. Nothing here is built. Measurements are from the headless sim
+(`node tools/sim/run.mjs --from-saves`, `--diagnose`) against real saves pulled 2026-11-19.
+
+## 1. The problem this solves
+
+After the final boss, Stillmarch loops the same 12 zones ("circuits"). That loop does not
+work as a post-game:
+
+- **It is trivial.** In the sim, real late heroes clear 10 to 15 laps an hour. Enemies get
+  +50% health and damage per lap (`circuitMult = 1 + 0.5c`), which is linear and shrinking
+  in relative terms, while loot rolls at the hero's level, so gear keeps pace with the hero
+  automatically. One live hero is on circuit 59.
+- **It had no levelling.** Every late hero was parked at 113 to 118 until 1.5.3, which now
+  adds 2 levels of headroom per lap. That fixes "stuck", not "boring": the laps are still
+  the same content, cleared in minutes.
+- **There is no goal.** Nothing gets harder in a way the player has to answer.
+
+The player brief: levelling should never stop, content can be recycled, and it should be
+procedural and endless ("or to level 999").
+
+## 2. The idea in one paragraph
+
+Defeating the final boss for the first time opens **the Rift**: an endless descent of
+procedurally generated floors. Each floor stitches together terrain from two or three of
+the 12 biomes, fills it with a mixed roster drawn from every zone's enemies, and ends with
+a remixed boss. Floors get harder **exponentially**, so every hero eventually meets a wall,
+and pushing that wall back (gear, talents, upgrades, levels) is the game. Depth is the new
+progression stat and gets its own ladder column. Circuits stay as they are for anyone who
+prefers them.
+
+## 3. Core rules
+
+### 3.1 Floors
+
+- A floor is one generated map plus a kill target, like a zone. Clearing the kill target
+  spawns the floor boss; killing it opens the next floor.
+- **Seeded by `(riftSeed, depth)`.** The same depth is the same floor for everyone in a
+  season, so the ladder compares like with like. `riftSeed` rotates weekly (see 3.6).
+- **Biomes:** each floor picks 1 to 3 biomes from the 12 (weighted so neighbours in the
+  zone order blend well) and splits the map into regions, each painted with that biome's
+  `BIOME_MAP_CONFIGS` (terrain chars, colours, water density, ore and herb colours).
+  The renderer bakes the ground once per map per tileset, so phase 1 uses **one biome per
+  floor** and phase 3 adds region blending (see 6).
+- **Roster:** 3 to 5 enemy templates drawn from the chosen biomes' `mobs`, plus a chance of
+  one "stranger" from any zone. Templates keep their sprites, attack speeds and names.
+- **Boss:** one of the 12 zone bosses, renamed with an epithet ("Siege War Golem, Rift-born")
+  and given one affix (3.4).
+
+### 3.2 Difficulty curve
+
+Enemy health and damage on floor `d`:
+
+    riftMult(d) = RIFT_BASE * RIFT_GROWTH^d        (RIFT_GROWTH around 1.06 to 1.10, to tune)
+
+applied to the template's base stats in place of `circuitMult`. Exponential growth is the
+point: hero power grows roughly linearly with level and item level, so an exponential
+enemy curve guarantees a wall at some depth for every hero, and each improvement moves the
+wall by a shrinking amount (`log(1 + gain) / log(RIFT_GROWTH)` floors). That gives the slow,
+always-possible climb idle games run on, instead of the current "nothing" or "everything".
+
+`RIFT_BASE` should put floor 1 at about the difficulty of the final zone on circuit 0, so
+entering the Rift is a step up, not a reset.
+
+### 3.3 Levelling and the level-999 goal
+
+- The Rift pays XP scaled to depth, not to the hero: a floor's XP line (`greyLevel`) is
+  `110 + RIFT_LEVELS_PER_FLOOR * d`. Levelling is bounded by how deep you can go, which is
+  bounded by the curve, so it cannot run away the way scaling XP to the hero did in the sim
+  (300 to 7,000 levels an hour).
+- `RIFT_LEVELS_PER_FLOOR = 2` makes level 999 roughly floor 445. Whether anyone should
+  realistically reach that is a tuning call (3.2); a soft target is "a dedicated player
+  reaches 999 in a few months".
+- Talent points stay capped at 100 (`TALENT_POINT_MAX`). Levels past 100 keep raising stats.
+
+### 3.4 Affixes
+
+Elites and floor bosses roll one affix per 10 floors, from a small authored list, for
+example: *Hasted* (attack speed), *Thorned* (reflect), *Warded* (damage shield that must be
+broken first), *Vampiric* (heals on hit), *Splitting* (spawns two weaker copies on death).
+Affixes are the variety that a pure stat multiplier lacks, and each is one rule in the
+existing combat path.
+
+### 3.5 Rewards
+
+- Loot rolls at `max(hero level, floor item level)` with rarity bias rising slowly with
+  depth, so deep floors are where better gear comes from.
+- Gold scales with `riftMult` at a lower exponent than health, so gold sinks (bag slots,
+  upgrades) stay meaningful.
+- A **depth milestone** every 25 floors: a guaranteed drop and a title on the ladder.
+
+### 3.6 Ladder and seasons
+
+- New ladder column: **deepest floor this season**, beside level and power.
+- Weekly seasons reset only the Rift ladder column (not the hero). The seed rotates so the
+  floors are new each week.
+- Duels are unaffected: they already resolve from stats.
+
+### 3.7 Offline
+
+Offline progress in the Rift farms the **deepest floor cleared minus 5** at the measured
+rate, and never descends. Going deeper is something you come back and do, the same
+principle `offlineLevelCeiling` already follows.
+
+### 3.8 How it coexists with circuits
+
+The Rift is a separate place, entered from the final zone or the map. Circuits keep
+working (with the 1.5.3 levelling). A hero can leave the Rift at any time and keeps their
+best depth.
+
+## 4. What the measurements say so far
+
+| Measurement (sim, real saves) | Result |
+|---|---|
+| Laps per hour, strong post-game hero | 10 to 15 |
+| Levels per hour if kill XP scales with hero level | 300 to 7,000 (runaway) |
+| Levels per hour with 1.5.3 lap-gating (2 per lap) | catches up in ~20 min, then ~2 per lap |
+| Stuck at a boss gate by a fall-back block | 1 of 10 saves; fixed on branch `endless-levelling` (d77dbd8, not released) |
+
+## 5. Open questions for the designer
+
+1. **Name.** "The Rift", "Slayer", "The Descent", "The Maw Below"? Should it be tied to the
+   final zone (The Maw Eternal) in the fiction?
+2. **How steep is the wall?** Gentle (most players reach floor 100) or steep (floor 100 is
+   an achievement)? This sets `RIFT_GROWTH`.
+3. **Seasons:** weekly, monthly, or none?
+4. **Should circuits eventually retire** in favour of the Rift, or stay as the relaxed mode?
+5. **Monetization:** none planned. Standing Orders (offline hours) already applies to Rift
+   farming through 3.7, which seems right.
+
+## 6. Build plan (each phase shippable on its own)
+
+| Phase | Scope | Proves |
+|---|---|---|
+| P0 | `engine/rift.ts`: floor generator (seeded biome pick, roster, boss, affix stub) and `riftMult`. Sim only: `--rift` runs real saves down the Rift and reports depth per hour and the wall. | the curve, before any UI |
+| P1 | Enter/leave the Rift; one biome per floor (reuses existing tilesets); depth counter in the HUD; saves store `riftDepth` and `riftBest`. | the loop is fun |
+| P2 | Affixes; depth milestones; Rift loot table. | variety |
+| P3 | Region blending (multiple biomes per floor) in `mapGen` and the tilemap bake. | the "procedural" feel |
+| P4 | Ladder column, weekly seed rotation, season reset. | competition |
+
+Every phase runs `--assert` (economy invariants, offline parity, loot fidelity, save
+migration) plus a new invariant: **offline in the Rift never out-earns online**, and
+**depth never decreases from offline progress**.
