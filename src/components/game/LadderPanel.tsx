@@ -34,7 +34,7 @@ import { buildSnapshot } from '../../net/snapshot'
 type Status = 'idle' | 'loading' | 'offline' | 'disabled' | 'ready'
 
 export function LadderPanel({ onClose }: { onClose?: () => void } = {}) {
-  const [tab, setTab] = useState<'ladder' | 'record' | 'honor'>('ladder')
+  const [tab, setTab] = useState<'ladder' | 'record' | 'honor' | 'depth'>('ladder')
   const [status, setStatus] = useState<Status>('idle')
   const [fetched, setEntries] = useState<LeaderboardEntry[]>([])
 
@@ -57,7 +57,7 @@ export function LadderPanel({ onClose }: { onClose?: () => void } = {}) {
   // ladder — it is a different query with a different index behind it, because the two
   // rankings genuinely disagree: the strongest character on the server may have taken no
   // kills at all, and a dedicated ganker may be nowhere near the top by power.
-  const board: BoardKind = tab === 'honor' ? 'honor' : 'power'
+  const board: BoardKind = tab === 'honor' ? 'honor' : tab === 'depth' ? 'depth' : 'power'
 
   const refresh = useCallback(async (kind: BoardKind = 'power') => {
     if (!cloudEnabled()) { setStatus('disabled'); return }
@@ -154,6 +154,11 @@ export function LadderPanel({ onClose }: { onClose?: () => void } = {}) {
             onClick={() => setTab('honor')}
           >{HOSTILE_MARK} HONOR</button>
           <button
+            className={`ladder-tab${tab === 'depth' ? ' is-active' : ''}`}
+            onClick={() => setTab('depth')}
+            aria-label="Depth: deepest Undermaw floor"
+          >⌄ DEPTH</button>
+          <button
             className={`ladder-tab${tab === 'record' ? ' is-active' : ''}`}
             onClick={() => setTab('record')}
           >RECORD</button>
@@ -179,17 +184,18 @@ export function LadderPanel({ onClose }: { onClose?: () => void } = {}) {
 
       {status === 'ready' && entries.length === 0 && tab !== 'honor' && (
         <div className="ladder-empty">
-          <p>No challengers yet.</p>
-          <p className="ladder-hint">You are the first to march.</p>
+          <p>{tab === 'depth' ? 'No one has entered the Undermaw yet.' : 'No challengers yet.'}</p>
+          <p className="ladder-hint">{tab === 'depth' ? 'Finish the world to find it below The Maw.' : 'You are the first to march.'}</p>
         </div>
       )}
 
       {tab === 'honor' ? (
         <HonorTab entries={entries} />
-      ) : tab === 'ladder' ? (
+      ) : tab === 'ladder' || tab === 'depth' ? (
         <ol className="ladder-list">
           {entries.map(e => (
-            <li key={e.userId} className={`ladder-row${e.isYou ? ' is-you' : ''}`}>
+            <li key={e.userId} className={`ladder-row${e.isYou ? ' is-you' : ''}`}
+                aria-label={`Rank ${e.rank}, ${e.name}, ${e.factionName || e.faction}, ${tab === 'depth' ? `floor ${e.undermawBest}, ` : ''}level ${e.level}`}>
               <span className="ladder-rank">{e.rank}</span>
               <span className="ladder-name" style={{ color: factionNameColor(e.faction) }}>
                 <span className="ladder-name-text">
@@ -211,8 +217,9 @@ export function LadderPanel({ onClose }: { onClose?: () => void } = {}) {
                 )}
               </span>
               <span className="ladder-meta">
-                Lv {e.level}
-                {e.zoneCircuit > 0 && <span className="ladder-circuit"> · C{e.zoneCircuit}</span>}
+                {tab === 'depth'
+                  ? <>Floor {e.undermawBest}<span className="ladder-circuit"> · Lv {e.level}{e.undermawTitle ? ` · ${e.undermawTitle}` : ''}</span></>
+                  : <>Lv {e.level}{e.zoneCircuit > 0 && <span className="ladder-circuit"> · C{e.zoneCircuit}</span>}</>}
               </span>
               {!e.isYou && (
                 <button

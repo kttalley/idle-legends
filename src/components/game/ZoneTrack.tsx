@@ -204,8 +204,7 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
           {zoneCircuit >= 1 && (
             <button
               type="button"
-              className={`zone-stop is-open${undermaw.active ? ' is-current' : ''}`}
-              style={{ borderStyle: 'dashed' } as React.CSSProperties}
+              className={`zone-stop zone-stop-undermaw is-open${undermaw.active ? ' is-current' : ''}${undermaw.best === 0 && !undermaw.active ? ' is-bossready' : ''}`}
               title={undermaw.active ? `The Undermaw, floor ${undermaw.depth}. Tap to leave.`
                 : `The Undermaw: endless floors below The Maw. Best floor ${undermaw.best}.`}
               aria-label={undermaw.active ? `Leave the Undermaw, floor ${undermaw.depth}`
@@ -214,7 +213,7 @@ export function ZoneTrack({ collapsible = true, onTravel }: ZoneTrackProps = {})
               disabled={isTraveling}
               onClick={() => { if (undermaw.active) leaveUndermaw(); else enterUndermaw() }}
             >
-              <span className="zone-stop-dot" aria-hidden>⌄</span>
+              <span className="zone-stop-dot" aria-hidden>{undermaw.best === 0 && !undermaw.active ? '!' : '⌄'}</span>
               <span className="zone-stop-name">The Undermaw</span>
             </button>
           )}

@@ -2119,6 +2119,9 @@ interface GameActions {
   enterUndermaw: (floor?: number) => void
   /** Back to the zone the hero came from. The best floor is kept. */
   leaveUndermaw: () => void
+  /** TestFlight review tool: make a NEW throwaway hero (its own slot) at level 150 with the
+   *  world finished, so the Undermaw can be reviewed without touching a real save. */
+  createReviewHero: () => void
   setUndermawPushDeeper: (on: boolean) => void
   allocateTalent: (talentId: string) => void
   deallocateTalent: (talentId: string) => void
@@ -4433,6 +4436,30 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
   },
 
   setUndermawPushDeeper: (on) => set(st => ({ undermaw: { ...st.undermaw, pushDeeper: on } })),
+
+  createReviewHero: () => {
+    const prev = get()
+    get().initGame(prev.initialized ? prev.playerClass : 'warrior', prev.initialized ? prev.playerRace : 'human',
+      { name: 'Undermaw Reviewer' })
+    const s = get()
+    const level = 150
+    const racial = RACE_DEFINITIONS[s.playerRace]?.racialPassive ?? {}
+    // Level-appropriate epic gear in every slot, so the review shows a fair fight.
+    const equipment = { ...s.equipment }
+    for (const slot of ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket'] as const) equipment[slot] = generateItem(slot, level, 0, 'epic')
+    const stats = compileStats(s.playerClass, level, equipment, s.talentAllocs, racial)
+    stats.currentHp = stats.maxHp
+    const unlockedZones = [...ZONE_ORDER] as ZoneId[]
+    const zoneMaps = { ...s.zoneMaps }
+    for (const z of unlockedZones) if (!zoneMaps[z]) zoneMaps[z] = generateZoneMap(z, mapSeed(s))
+    set({
+      reviewHero: true, level, xp: 0, talentPoints: 100, equipment, stats,
+      zoneCircuit: 1, unlockedZones, zoneMaps, bossesDefeated: [], currentZone: 'the_maw_eternal',
+      undermaw: defaultUndermaw('the_maw_eternal'),
+      combatLog: [log('level_up', 'Review hero ready: level 150, the world finished. The Undermaw is at the end of the zone track.', '#4fd6c8'), ...s.combatLog].slice(0, LOG_MAX),
+    })
+    get().saveGame()
+  },
 
   // ── Talents ──────────────────────────────────────────────────────────────────
   // Both gates delegate to data/specs.ts rather than carrying their own copy of the

@@ -3339,3 +3339,25 @@ button, .app-dock-btn, .rp-button, .whisper-send, .whisper-close, .whisper-input
   pointer-events: none;
 }
 .toast-top > * { pointer-events: auto; }
+
+/* ── The Undermaw (docs/UNDERMAW.md) ─────────────────────────────────────────── */
+/* The tracker's controls are the only parts of the HUD corner that take taps. */
+.undermaw-controls { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; pointer-events: auto; }
+.undermaw-toggle { display: flex; align-items: center; gap: 6px; font-size: 0.6rem; color: var(--parchment); cursor: pointer; min-height: 28px; }
+.undermaw-toggle input { width: 16px; height: 16px; accent-color: #4fd6c8; }
+.undermaw-leave {
+  background: linear-gradient(180deg, var(--wood-lit), var(--wood));
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  color: var(--parchment);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.62rem;
+  min-height: 30px;
+  padding: 4px 10px;
+}
+.undermaw-leave:hover, .undermaw-leave:focus-visible { border-color: #4fd6c8; outline: none; }
+.undermaw-affix { display: inline-flex; align-items: center; gap: 3px; margin: 0 6px 2px 0; padding: 1px 5px;
+  border: 1px solid var(--edge); border-radius: 3px; font-size: 0.56rem; white-space: nowrap; }
+.undermaw-affix-glyph { font-weight: 700; color: #4fd6c8; }
+.zone-stop-undermaw { border-style: dashed !important; }

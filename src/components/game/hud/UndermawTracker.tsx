@@ -37,7 +37,6 @@ export function UndermawTracker() {
   const crown = u.depth % MILESTONE_EVERY === 0
   const affixes = currentMob?.affixes ?? []
   const biomes = floor.biomes.map(b => ZONES[b]?.name ?? b).join(' / ')
-  const btn: React.CSSProperties = { pointerEvents: 'auto' }
 
   return (
     <div className="objective-tracker" aria-label={`The Undermaw, floor ${u.depth}, best floor ${u.best}`}>
@@ -82,21 +81,21 @@ export function UndermawTracker() {
           <div className="objective-row" aria-label={`${currentMob?.name}: ${affixes.map(a => AFFIX_RULES[a]).join(' ')}`}>
             <span className="objective-text">
               {affixes.map(a => (
-                <span key={a} title={AFFIX_RULES[a]} style={{ marginRight: 8, whiteSpace: 'nowrap' }}>
-                  <span aria-hidden>{AFFIX_GLYPH[a]}</span> {AFFIX_NAME[a]}
+                <span key={a} className="undermaw-affix" title={AFFIX_RULES[a]}>
+                  <span className="undermaw-affix-glyph" aria-hidden>{AFFIX_GLYPH[a]}</span>{AFFIX_NAME[a]}
                 </span>
               ))}
             </span>
           </div>
         )}
 
-        <label className="objective-row" style={btn}>
-          <input type="checkbox" checked={u.pushDeeper} onChange={e => setPush(e.target.checked)} style={{ marginRight: 6 }} />
-          <span className="objective-text">Push deeper when ready</span>
-        </label>
-        <button type="button" className="objective-row" style={{ ...btn, justifyContent: 'center' }} onClick={leave}>
-          Leave the Undermaw
-        </button>
+        <div className="undermaw-controls">
+          <label className="undermaw-toggle">
+            <input type="checkbox" checked={u.pushDeeper} onChange={e => setPush(e.target.checked)} />
+            Push deeper when ready
+          </label>
+          <button type="button" className="undermaw-leave" onClick={leave}>Leave the Undermaw</button>
+        </div>
         {u.titles.length > 0 && (
           <div className="objective-warn" title="Milestone titles">Title: {u.titles[u.titles.length - 1]}</div>
         )}

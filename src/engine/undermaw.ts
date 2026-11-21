@@ -53,7 +53,14 @@ export function floorMinLevel(depth: number): number {
 /** The deepest floor this hero may enter: one past their best, and within the level gate. */
 export function maxOpenFloor(level: number, best: number): number {
   const byLevel = Math.floor((level - UNDERMAW.levelFloor) / UNDERMAW.levelsPerFloor) + UNDERMAW.gateFloors
-  return Math.max(1, Math.min(best + 1, byLevel))
+  // Floors that no longer teach this hero are skippable: starting below them would mean a
+  // run of floors that pay no XP (a level-113 hero earned nothing on floor 1 in testing).
+  return Math.max(1, Math.min(Math.max(best + 1, teachingFloor(level)), byLevel))
+}
+
+/** The shallowest floor whose level limit is above `level`, i.e. the first that teaches it. */
+export function teachingFloor(level: number): number {
+  return Math.max(1, Math.floor((level - UNDERMAW.levelFloor) / UNDERMAW.levelsPerFloor) + 1)
 }
 
 /** Permanent boost per new floor cleared, compounding, applied by softening enemies (8.1). */

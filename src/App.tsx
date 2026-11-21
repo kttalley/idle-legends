@@ -48,6 +48,8 @@ import { SpriteIcon } from './components/ui/SpriteIcon'
 import { formatGold } from './components/ui/GoldDisplay'
 
 const SHOW_DEV_JUMP = new URLSearchParams(window.location.search).has('dev')
+/** TestFlight review tools: only in builds made with VITE_REVIEW_TOOLS=1, never the store build. */
+const REVIEW_TOOLS = import.meta.env.VITE_REVIEW_TOOLS === '1'
 
 // ── One panel metaphor, both breakpoints ──────────────────────────────────────
 //
@@ -118,6 +120,7 @@ export default function App() {
   const gold         = useGameStore(s => s.gold)
   const currentZone  = useGameStore(s => s.currentZone)
   const devJumpZone  = useGameStore(s => s.devJumpZone)
+  const createReviewHero = useGameStore(s => s.createReviewHero)
   const talentPoints = useGameStore(s => s.talentPoints)
 
   const [panels, setPanels] = useState<PanelState>(() => defaultPanels(isNarrow()))
@@ -553,6 +556,12 @@ export default function App() {
         </div>
         <div className="rail-body">
           <CharacterPanel />
+          {REVIEW_TOOLS && (
+            <button type="button" className="rp-button" style={{ fontSize: '0.6rem', padding: '4px 6px', margin: '6px 0' }}
+              onClick={() => { if (window.confirm('Create a separate test hero at level 150 with the Undermaw open? Your current hero is kept in its own slot.')) createReviewHero() }}>
+              Review: new Undermaw test hero
+            </button>
+          )}
           {SHOW_DEV_JUMP && (
             <select
               value={currentZone}

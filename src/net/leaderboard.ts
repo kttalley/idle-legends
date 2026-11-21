@@ -53,6 +53,9 @@ export interface LeaderboardEntry {
   bossesDefeated: number
   /** Enemy-faction kills — what the HONOR board ranks by. */
   honorKills: number
+  /** Deepest Undermaw floor cleared (0 if never entered). Read from the snapshot. */
+  undermawBest: number
+  undermawTitle?: string
   /** True for the signed-in player's own row, so the UI can highlight it. */
   isYou: boolean
 }
@@ -65,6 +68,8 @@ export interface LeaderboardEntry {
  * switched off", and callers must treat that as ordinary.
  */
 export async function publishSnapshot(state: GameState): Promise<boolean> {
+  // Review heroes (TestFlight review tool) never reach the live ladder.
+  if (state.reviewHero) return false
   if (!(await ensureSession())) return false
   const session = currentSession()
   if (!session) return false
@@ -121,14 +126,16 @@ const ROW_COLUMNS =
 /** How a board is ordered. Power is the main ladder; honor is the PvP one, and it is a
  *  genuinely different ranking — the strongest character on the server may never have
  *  taken a single kill. */
-export type BoardKind = 'power' | 'honor'
+export type BoardKind = 'power' | 'honor' | 'depth'
 
 export async function fetchLeaderboard(limit = 50, kind: BoardKind = 'power'): Promise<CloudResult<LeaderboardEntry[]>> {
   const order = kind === 'honor' ? 'order=honor_kills.desc,power.desc' : 'order=power.desc,level.desc'
+  // Depth has no column of its own: it lives in the snapshot, so the board reads the top
+  // 200 by power and re-sorts by depth here. At this game's size that is the whole ladder.
   const query = [
     `select=${ROW_COLUMNS}`,
     order,
-    `limit=${Math.max(1, Math.min(limit, 200))}`,
+    `limit=${kind === 'depth' ? 200 : Math.max(1, Math.min(limit, 200))}`,
   ].join('&')
 
   const res = await selectRows<RosterRow>(TABLE, query)
@@ -159,8 +166,17 @@ export async function fetchLeaderboard(limit = 50, kind: BoardKind = 'power'): P
       // orders by server-side; the payload is what an older row still carries when the
       // column has not been written yet.
       honorKills: r.honor_kills ?? r.snapshot?.honorKills ?? 0,
+      undermawBest: Math.max(0, Math.floor(Number(r.snapshot?.undermawBest ?? 0)) || 0),
+      undermawTitle: typeof r.snapshot?.undermawTitle === 'string' ? r.snapshot.undermawTitle.slice(0, 40) : undefined,
       isYou: me !== null && r.user_id === me,
     })
+  }
+  if (kind === 'depth') {
+    const deep = entries.filter(e => e.undermawBest > 0)
+      .sort((a, b) => b.undermawBest - a.undermawBest || b.level - a.level)
+      .slice(0, limit)
+    deep.forEach((e, i) => { e.rank = i + 1 })
+    return { ok: true, data: deep }
   }
   return { ok: true, data: entries }
 }

@@ -89,6 +89,8 @@ export function stripForCloud(state: GameState): GameState {
  */
 export async function uploadSlot(slot: SaveSlot): Promise<boolean> {
   if (!cloudEnabled()) return false
+  // Review heroes (TestFlight review tool) stay on the device.
+  if ((slot.state as { reviewHero?: boolean } | undefined)?.reviewHero) return false
   if (!(await ensureSession())) return false
   const session = currentSession()
   if (!session) return false
@@ -97,7 +99,8 @@ export async function uploadSlot(slot: SaveSlot): Promise<boolean> {
     user_id: session.userId,
     slot_id: slot.id,
     hero_name: slot.summary.playerName ?? '',
-    level: Math.max(1, Math.min(200, Math.round(slot.summary.level ?? 1))),
+    // Matches the column check (raised to 999 in migration 20261121000000).
+    level: Math.max(1, Math.min(999, Math.round(slot.summary.level ?? 1))),
     play_time: Math.max(0, Math.round(slot.state.totalPlayTime ?? 0)),
     created_at: slot.createdAt ?? 0,
     // The column default only fires on INSERT, so without this the upsert left `saved_at`

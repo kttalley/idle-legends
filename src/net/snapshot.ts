@@ -34,10 +34,10 @@ import { playerCombatant } from '../engine/duel'
 /** Ceilings used only to reject impossible snapshots. Generous on purpose — this is a
  *  garbage filter, not a balance rule, and a false positive silently benches a real
  *  player. Raise these when the game's own caps move. */
-const MAX_LEVEL = 200
+const MAX_LEVEL = 999   // the Undermaw's cap (docs/UNDERMAW.md); was 200, which dropped live heroes past it from the ladder
 const MAX_TALENT_RANK = 10
 const MAX_TALENT_NODES = 200
-const MAX_ITEM_LEVEL = 300
+const MAX_ITEM_LEVEL = 1200   // loot rolls at hero level, which now reaches 999
 
 const SLOTS: Slot[] = ['weapon', 'helm', 'chest', 'legs', 'boots', 'trinket']
 
@@ -60,6 +60,10 @@ export interface RosterSnapshot {
    * Readers treat `undefined` as 0.
    */
   honorKills?: number
+  /** Deepest Undermaw floor cleared (docs/UNDERMAW.md); the ladder's Depth board sorts by it. */
+  undermawBest?: number
+  /** Latest Undermaw milestone title. */
+  undermawTitle?: string
   /** Deaths to enemy players, shown beside kills on the honor board. */
   honorDeaths?: number
 }
@@ -95,6 +99,8 @@ export function buildSnapshot(s: GameState): RosterSnapshot {
     power: powerScore(s.level, circuit, bosses),
     honorKills: s.pvpRecord?.kills ?? 0,
     honorDeaths: s.pvpRecord?.deaths ?? 0,
+    undermawBest: s.undermaw?.best ?? 0,
+    undermawTitle: s.undermaw?.titles?.[s.undermaw.titles.length - 1],
   }
 }
 

@@ -35,6 +35,7 @@ export function OfflineReportToast() {
   const dismiss = useGameStore(s => s.dismissOfflineReport)
   const level = useGameStore(s => s.level)
   const talentPoints = useGameStore(s => s.talentPoints)
+  const undermaw = useGameStore(s => s.undermaw)
 
   if (!report) return null
 
@@ -56,7 +57,8 @@ export function OfflineReportToast() {
         zIndex: 120, width: 'min(340px, 92vw)',
       }}
     >
-      <div className="rp-panel" style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className="rp-panel" role="dialog" aria-label="While you were away"
+           style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--gold)' }}>
             While you were away
@@ -87,11 +89,21 @@ export function OfflineReportToast() {
         {/* Not an error, and it must not read as one: the hero out-grew the world you have
             opened for them. The fix is a door, not a purchase, so the line points at the
             door. */}
+        {/* In the Undermaw the absence farmed one floor and never descended (UNDERMAW.md 3.7);
+            say so, with the numbers, and point at the way down. */}
+        {undermaw?.active && (
+          <div style={{ fontSize: '0.7rem', color: '#4fd6c8' }}>
+            Farmed Undermaw floor {undermaw.depth} (best: {undermaw.best}). Your hero doesn't go
+            deeper while you're away.
+          </div>
+        )}
         {report.cappedByContent && (
           <div style={{ fontSize: '0.68rem', color: 'var(--warn)', fontStyle: 'italic' }}>
-            <SpriteIcon ui="warn" size={10} /> Your hero has learned all these lands can
-            teach — they stopped at level {report.contentCeiling}. Beat this region's boss and
-            move on to keep growing.
+            <SpriteIcon ui="warn" size={10} />{' '}
+            {undermaw?.active
+              ? <>Level limit reached on this floor ({report.contentCeiling}). Push deeper to keep levelling.</>
+              : <>Your hero has learned all these lands can teach — they stopped at level{' '}
+                {report.contentCeiling}. Beat this region's boss and move on to keep growing.</>}
           </div>
         )}
 

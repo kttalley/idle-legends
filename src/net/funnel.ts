@@ -89,7 +89,8 @@ async function send(slotId: string, events: string[], playTime: number): Promise
   try {
     if (!(await ensureSession())) return
     const platform = Capacitor.getPlatform()
-    const dev = import.meta.env.DEV
+    // Review builds (VITE_REVIEW_TOOLS) count as dev, so TestFlight sessions stay out of the funnel.
+    const dev = import.meta.env.DEV || import.meta.env.VITE_REVIEW_TOOLS === '1'
     const res = await cloudFetch(restUrl(TABLE), {
       method: 'POST',
       body: fresh.map(event => ({

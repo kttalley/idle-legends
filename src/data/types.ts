@@ -961,6 +961,9 @@ export interface GameState {
   // ── The Undermaw (docs/UNDERMAW.md) ─────────────────────────────────────────
   /** The endless post-game. Opens after the first final-boss kill (zoneCircuit >= 1). */
   undermaw: UndermawState
+  /** A throwaway hero made by the TestFlight review tool. Never uploaded to the cloud or the
+   *  ladder, so testing cannot touch a real save or the live board. */
+  reviewHero?: boolean
   // ── Towns ──────────────────────────────────────────────────────────────────
   currentTown: TownId | null
   generatedTownNames: Record<TownId, string>
